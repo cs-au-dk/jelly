@@ -1,0 +1,717 @@
+<!DOCTYPE>
+<html lang="utf8">
+<head>
+  <title>Jelly</title>
+  <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1, maximum-scale=1">
+  <script src="https://unpkg.com/cytoscape/dist/cytoscape.min.js"></script>
+  <script src="https://unpkg.com/layout-base/layout-base.js"></script>
+  <script src="https://unpkg.com/cose-base/cose-base.js"></script>
+  <script src="https://unpkg.com/webcola/WebCola/cola.min.js"></script>
+  <script src="https://unpkg.com/cytoscape-cola/cytoscape-cola.js"></script>
+  <script src="https://unpkg.com/cytoscape-expand-collapse/cytoscape-expand-collapse.js"></script>
+  <link href="https://unpkg.com/cytoscape-panzoom/cytoscape.js-panzoom.css" rel="stylesheet" type="text/css" />
+  <link href="https://unpkg.com/cytoscape-panzoom/font-awesome-4.0.3/css/font-awesome.css" rel="stylesheet" type="text/css" />
+  <script src="http://code.jquery.com/jquery-2.0.3.min.js"></script>
+  <script src="https://unpkg.com/cytoscape-panzoom/cytoscape-panzoom.js"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      overflow: hidden;
+    }
+    #cy {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      right: 0;
+      z-index: 900;
+    }
+    #info {
+      position: absolute;
+      bottom: 20px;
+      left: 10px;
+      z-index: 800;
+      opacity: 0.8;
+      font-size: 15px;
+    }
+    #control {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      text-align: right;
+      max-width: calc(100% - 250px);
+    }
+    .group {
+      background: rgba(255, 255, 255, .7);
+      padding: 2px 4px 2px 4px;
+      text-align: left;
+      display: inline-block;
+      z-index: 999;
+      position: relative;
+    }
+    #fields {
+      z-index: 999;
+      position: relative;
+    }
+    #fields label {
+      background: rgba(255, 255, 255, .7);
+      padding: 5px;
+    }
+    #dataset {
+      position: absolute;
+      top: 50px;
+      left: 10px;
+      z-index: 999;
+    }
+    #msg {
+      position: absolute;
+      margin-top: 10px;
+      bottom: 20px;
+      right: 20px;
+      z-index: 999;
+      background: rgba(255, 255, 255, .7);
+      padding: 4px;
+    }
+    h1 {
+      font-variant: small-caps;
+      opacity: 0.5;
+      font-size: 25px;
+    }
+    button {
+      height: 25px;
+      background-color: white;
+      border-radius: 1px;
+      cursor: pointer;
+    }
+    .cy-panzoom {
+      position: absolute;
+      top: 100px;
+      left: 20px;
+    }
+    .shadow {
+      box-shadow: inset 1px 1px 4px #aaa;
+      background-color: #eee;
+    }
+    body.callgraphModeHidden .callgraphMode {
+      display: none;
+    }
+    body.dataflowModeHidden .dataflowMode {
+      display: none;
+    }
+    input[type=number] {
+      width: 60px;
+      height: 30px;
+    }
+  </style>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      cytoscape.warnings(false);
+      const cy = window.cy = cytoscape({
+        container: document.getElementById('cy'),
+        layout: null,
+        wheelSensitivity: 0.3,
+        maxZoom: 3,
+        style: [
+          {
+            selector: 'node',
+            style: {
+              'min-zoomed-font-size': '3px',
+              'background-color': '#aaaaaa'
+            }
+          },
+          {
+            selector: 'node.cy-expand-collapse-collapsed-node',
+            style: {
+              'shape': 'rectangle',
+              'border-width': '1px',
+              'border-style': 'solid',
+              'border-color': '#000000'
+            }
+          },
+          {
+            selector: 'node.cy-expand-collapse-collapsed-node.callWeight',
+            style: {
+              'background-color': 'mapData(callWeight, 0, 100, lightgray, purple)'
+            }
+          },
+          {
+            selector: 'node.cy-expand-collapse-collapsed-node.tokenWeight',
+            style: {
+              'background-color': 'mapData(tokenWeight, 0, 100, lightgray, purple)'
+            }
+          },
+          {
+            selector: 'node[isEntry]',
+            style: {
+              'border-width': '3px',
+              'border-style': 'solid',
+              'border-color': '#000000'
+            }
+          },
+          {
+            selector: 'node:selected',
+            style: {
+              'border-width': '4px',
+              'border-style': 'solid',
+              'border-color': '#3050c0'
+            }
+          },
+          {
+            selector: 'node[isReachable].highlight',
+            style: {
+              'border-width': '2px',
+              'border-style': 'solid',
+              'border-color': '#ffff00'
+            }
+          },
+          {
+            selector: 'node:selected[isReachable].highlight',
+            style: {
+              'border-width': '4px',
+              'border-color': '#50c050'
+            }
+          },
+          {
+            selector: 'node:selected[isEntry]',
+            style: {
+              'border-width': '5px',
+            }
+          },
+          {
+            selector: 'node[isEntry].highlight',
+            style: {
+              'border-width': '5px',
+            }
+          },
+          {
+            selector: 'node[kind="package"]',
+            style: {
+              'label': 'data(name)',
+              'font-size': '10px',
+              'shape': 'rectangle'
+            }
+          },
+          {
+            selector: 'node[kind="package"].callWeight',
+            style: {
+              'width': function (node) {
+                return (30 + Math.sqrt(node.data('callWeight'))*2) + 'px';
+              },
+              'height': function (node) {
+                return (30 + Math.sqrt(node.data('callWeight'))*2) + 'px';
+              }
+            }
+          },
+          {
+            selector: 'node[kind="package"].tokenWeight',
+            style: {
+              'width': function (node) {
+                return (30 + Math.sqrt(node.data('tokenWeight'))*2) + 'px';
+              },
+              'height': function (node) {
+                return (30 + Math.sqrt(node.data('tokenWeight'))*2) + 'px';
+              }
+            }
+          },
+          {
+            selector: 'node[kind="module"]',
+            style: {
+              'label': 'data(name)',
+              'font-size': '8px',
+              'shape': 'rectangle'
+            }
+          },
+          {
+            selector: 'node[kind="module"].callWeight',
+            style: {
+              'width': function (node) {
+                return (20 + Math.sqrt(node.data('callWeight'))) + 'px';
+              },
+              'height': function (node) {
+                return (20 + Math.sqrt(node.data('callWeight'))) + 'px';
+              }
+            }
+          },
+          {
+            selector: 'node[kind="module"].tokenWeight',
+            style: {
+              'width': function (node) {
+                return (20 + Math.sqrt(node.data('tokenWeight'))) + 'px';
+              },
+              'height': function (node) {
+                return (20 + Math.sqrt(node.data('tokenWeight'))) + 'px';
+              },
+              'background-color': 'mapData(tokenWeight, 0, 100, gray, red)'
+            }
+          },
+          {
+            selector: 'node[kind="function"]',
+            style: {
+              'label': 'data(name)',
+              'font-size': '6px',
+              'shape': 'ellipse'
+            }
+          },
+          {
+            selector: 'node[kind="function"].callWeight',
+            style: {
+              'width': function (node) {
+                return (10 + node.data('callWeight')/3) + 'px';
+              },
+              'height': function (node) {
+                return (10 + node.data('callWeight')/3) + 'px';
+              },
+              'background-color': 'mapData(callWeight, 0, 100, gray, purple)'
+            }
+          },
+          {
+            selector: ':parent',
+            style: {
+              'background-opacity': 0.333
+            }
+          },
+          {
+            selector: 'node[isSource]',
+            style: {
+              'background-color': '#aa0000',
+              'background-opacity': 0.8
+            }
+          },
+          {
+            selector: 'node[isTarget]',
+            style: {
+              'background-color': '#ff0000',
+              'background-opacity': 0.8
+            }
+          },
+          {
+            selector: 'node[kind="variable"]',
+            style: {
+              'shape': 'ellipse',
+              'width': '8px',
+              'height': '8px',
+              'background-color': 'gray'
+            }
+          },
+          {
+            selector: 'node[kind="variable"].tokenWeight',
+            style: {
+              'width': function (node) {
+                return (8 + Math.sqrt(node.data('tokenWeight'))/2) + 'px';
+              },
+              'height': function (node) {
+                return (8 + Math.sqrt(node.data('tokenWeight'))/2) + 'px';
+              },
+              'background-color': 'mapData(tokenWeight, 0, 100, gray, red)'
+            }
+          },
+          {
+            selector: 'edge',
+            style: {
+              'width': 1,
+              'line-color': '#888',
+              'target-arrow-color': '#888',
+              'target-arrow-shape': 'triangle',
+              'curve-style': 'bezier'
+            }
+          },
+          {
+            selector: 'edge.cy-expand-collapse-collapsed-edge',
+            style: {
+              'width': function (edge) {
+                return (2 + Math.log2(edge.data('collapsedEdges').length)/2) + 'px';
+              },
+              'curve-style': 'unbundled-bezier'
+            }
+          },
+          {
+            selector: 'edge[kind="require"]',
+            style: {
+              'line-color': '#bbb',
+              'target-arrow-color': '#bbb',
+            }
+          },
+          {
+            selector: '.hidden',
+            css: {
+              'display': 'none'
+            }
+          },
+          {
+            selector: 'edge[sourceTarget]',
+            style: {
+              'line-color': '#aa0000',
+              'target-arrow-color': '#aa0000',
+              'width': '3px'
+            }
+          },
+          {
+            selector: 'edge[kind="data"]',
+            style: {
+              'width': function (edge) {
+                return 1 + Math.log2((edge.data('weight') ?? 0) + 1);
+              }
+            }
+          }
+        ]
+      });
+      cy.panzoom({
+        panSpeed: 5,
+        panDistance: 15
+      });
+
+      cy.on("layoutstart", e => {
+        document.getElementById("layout").classList.add("shadow");
+      });
+      cy.on("layoutstop", e => {
+        document.getElementById("layout").classList.remove("shadow");
+      });
+      cy.on('select', e => {
+        document.getElementById("msg").textContent = e.target?.data()?.fullName ?? '';
+      });
+      cy.on('unselect', () => {
+        document.getElementById("msg").textContent = '';
+      });
+
+      let layout;
+      function stopLayout() {
+        if (layout)
+          layout.stop();
+      }
+      function newLayout(fit = false) {
+        layout = cy.layout({
+          name: 'cola',
+          padding: 20,
+          animate: true,
+          randomize: false,
+          fit,
+          centerGraph: false,
+          avoidOverlap: true,
+          maxSimulationTime: 3000
+        });
+        layout.start();
+      }
+
+      let removed;
+      function hide() {
+        stopLayout();
+        if (removed) {
+          const ns = removed.filter("node");
+          ns.restore();
+          removed.filter("edge").forEach(e => {
+            if (e.source().inside() && e.target().inside())
+              e.restore();
+          });
+          removed = removed.filter(":removed");
+        }
+        const threshold = document.getElementById("threshold").value;
+        const count = graph.kind === "callgraph" ? "callCount" : graph.kind === "dataflow" ? "tokenCount" : undefined;
+        const queries = [];
+        if (count && threshold > 0)
+          queries.push(`node[${count} < ${threshold}]`);
+        if (document.getElementById("hideUnreachable").checked)
+          queries.push("node[!isReachable]");
+        if (queries.length > 0) {
+          const nodes = cy.elements(queries.join(","));
+          ec.expandAllEdges();
+          ec.collapseRecursively(nodes);
+          ec.collapseAllEdges();
+          const r = nodes.remove();
+          removed = removed ? removed.union(r) : r;
+        }
+      }
+
+      const ec = cy.expandCollapse({
+        fisheye: false,
+        randomize: false,
+        animate: true,
+        undoable: false,
+        cueEnabled: false,
+        allowNestedEdgeCollapse: false,
+        groupEdgesOfSameTypeOnCollapse: true
+      });
+      cy.on("expandcollapse.afterexpand", node => {
+        cy.batch(() => {
+          const desc = cy.nodes(node.target).descendants();
+          if (document.getElementById("showCallDensity").checked)
+            desc.addClass("callWeight");
+          else
+            desc.removeClass("callWeight");
+          if (document.getElementById("showValueDensity").checked)
+            desc.addClass("tokenWeight");
+          else
+            desc.removeClass("tokenWeight");
+          if (document.getElementById("highlightReachable").checked)
+            desc.addClass("highlight");
+          else
+            desc.removeClass("highlight");
+        });
+      });
+
+      document.getElementById("collapseAll").addEventListener("click", () => {
+        stopLayout();
+        ec.expandAllEdges();
+        ec.collapseAll();
+        ec.collapseAllEdges();
+        showVulnerabilities();
+        newLayout();
+      });
+      document.getElementById("collapseSelected").addEventListener("click", () => {
+        stopLayout();
+        const ns = cy.$(":selected:compound:visible");
+        if (ns.size() > 0) {
+          ec.expandAllEdges();
+          ec.collapseRecursively(ns);
+          ec.collapseAllEdges();
+          showVulnerabilities();
+          newLayout();
+        }
+      });
+      document.getElementById("expandSelected").addEventListener("click", () => {
+        stopLayout();
+        const es = cy.$(":selected:visible.cy-expand-collapse-collapsed-node,:selected:visible:compound");
+        if (es.size() > 0) {
+          ec.expandAllEdges();
+          ec.expand(es.union(es.children(":visible")));
+          ec.collapseAllEdges();
+          showVulnerabilities();
+          hide();
+          newLayout();
+        }
+      });
+      document.getElementById("expandAllPackages").addEventListener("click", () => {
+        stopLayout();
+        ec.expandAllEdges();
+        ec.expand(cy.$('node[kind="package"]:visible.cy-expand-collapse-collapsed-node'));
+        ec.collapseAllEdges();
+        showVulnerabilities();
+        hide();
+        newLayout();
+      });
+      document.getElementById("expandAll").addEventListener("click", () => {
+        stopLayout();
+        ec.expandAllEdges();
+        ec.expandRecursively(cy.nodes(":visible"));
+        hide();
+        newLayout();
+      });
+      document.getElementById("removeSelected").addEventListener("click", () => {
+        const es = cy.$(":selected");
+        if (es.size() > 0) {
+          stopLayout();
+          ec.expandAllEdges();
+          cy.$(":selected").remove();
+          ec.collapseAllEdges();
+          hide();
+          newLayout();
+        }
+      });
+      document.getElementById("removeNonSelected").addEventListener("click", () => {
+        const es = cy.$(":selected");
+        if (es.size() > 0) {
+          stopLayout();
+          ec.expandAllEdges();
+          cy.nodes().difference(es.union(es.descendants()).union(es.ancestors())).remove();
+          ec.collapseAllEdges();
+          removed = undefined;
+          hide();
+          newLayout();
+        }
+      });
+      document.getElementById("layout").addEventListener("click", () => {
+        stopLayout();
+        if (!document.getElementById("layout").classList.contains("shadow"))
+          newLayout();
+      });
+      document.getElementById("hideUnreachable").addEventListener("change", () => {
+        stopLayout();
+        hide();
+        newLayout();
+      });
+      document.getElementById("threshold").addEventListener("change", () => {
+        stopLayout();
+        hide();
+        newLayout();
+      });
+      document.getElementById("threshold").addEventListener("focus", e => {
+        e.target.select();
+      });
+      document.getElementById("highlightReachable").addEventListener("change", () => {
+        stopLayout();
+        if (document.getElementById("highlightReachable").checked)
+          cy.nodes().addClass("highlight");
+        else
+          cy.nodes().removeClass("highlight");
+        newLayout();
+      });
+      document.getElementById("showCallDensity").addEventListener("change", () => {
+        stopLayout();
+        if (document.getElementById("showCallDensity").checked)
+          cy.nodes().addClass("callWeight");
+        else
+          cy.nodes().removeClass("callWeight");
+        newLayout();
+      });
+      document.getElementById("showValueDensity").addEventListener("change", () => {
+        stopLayout();
+        if (document.getElementById("showValueDensity").checked)
+          cy.nodes().addClass("tokenWeight");
+        else
+          cy.nodes().removeClass("tokenWeight");
+        newLayout();
+      });
+
+      const data = $DATA;
+      let graph;
+
+      function showVulnerabilities() {
+        stopLayout();
+        const vulnerabilityTitle = document.getElementById("vulnerabilities").value;
+        const e = document.getElementsByName("vulnerabilityLevel");
+        let level = "package";
+        for (let i = 0; i < e.length; i++)
+          if (e[i].checked) {
+            level = e[i].value;
+            break;
+          }
+        const sources = new Set(), targets = new Set();
+        if (graph.vulnerabilities)
+          for (const v of graph.vulnerabilities)
+            if (v.title === vulnerabilityTitle) {
+              for (const s of v[level].sources)
+                sources.add(String(s));
+              for (const s of v[level].targets)
+                targets.add(String(s));
+            }
+        function has(collection, node) {
+          return collection.has(node.data("id")) || (ec.isExpandable(node) && ec.getCollapsedChildrenRecursively(node).some(n => collection.has(n.data("id"))));
+        }
+        cy.batch(() => {
+          cy.nodes().forEach(node => {
+            node.removeData("isSource isTarget");
+            if (has(sources, node))
+              node.data("isSource", true);
+            if (has(targets, node))
+              node.data("isTarget", true);
+          });
+          cy.edges().forEach(edge => {
+            edge.removeData("sourceTarget");
+            const source = edge.source();
+            const target = edge.target();
+            if (has(sources, source) && (has(targets, target) || has(sources, target)))
+              edge.data("sourceTarget", true);
+          });
+         cy.elements().removeClass("workaround");
+       });
+      }
+      document.getElementById("vulnerabilities").addEventListener("change", showVulnerabilities);
+      document.getElementById("vulnerabilityLevel").addEventListener("change", showVulnerabilities);
+
+      function setGraph(i) {
+        stopLayout();
+        removed = undefined;
+        cy.elements().remove();
+        graph = data.graphs[i];
+        cy.add(structuredClone(graph.elements));
+        ec.collapseAll();
+        ec.collapseAllEdges();
+        if (graph.kind === "callgraph")
+          document.body.classList.remove("callgraphModeHidden");
+        if (graph.kind === "dataflow")
+          document.body.classList.remove("dataflowModeHidden");
+        document.getElementById("showValueDensity").checked = false;
+        if (graph.info)
+          document.getElementById("info").innerText = graph.info;
+        document.getElementById("threshold").value = 0;
+        if (graph.vulnerabilities) {
+          const vulnerabilities = document.getElementById("vulnerabilities");
+          const vulnerabilityLevel = document.getElementById("vulnerabilityLevel");
+          vulnerabilities.hidden = false;
+          vulnerabilityLevel.hidden = false;
+          for (let i = 0; i < graph.vulnerabilities.length; i++) {
+            const opt = document.createElement("option");
+            opt.value = opt.innerText = graph.vulnerabilities[i].title;
+            vulnerabilities.appendChild(opt);
+          }
+          showVulnerabilities();
+        }
+        newLayout(true);
+      }
+
+      if (data.graphs.length >= 1) {
+        setGraph(0);
+        if (data.graphs.length > 1) {
+          const dataset = document.getElementById('dataset');
+          dataset.hidden = false;
+          for (let i = 0; i < data.graphs.length; i++) {
+            const opt = document.createElement('option');
+            opt.value = i;
+            opt.innerText = data.graphs[i].title ?? "";
+            dataset.appendChild(opt);
+          }
+          document.getElementById("dataset").addEventListener("change", e => {
+            setGraph(e.target.value);
+          });
+        }
+      }
+    });
+  </script>
+</head>
+<body class="callgraphModeHidden dataflowModeHidden">
+<header>
+<h1>Jelly visualizer</h1>
+<div id="info"></div>
+<div id="control">
+<div class="group">
+<button id="collapseAll">Collapse all</button>
+<button id="collapseSelected">Collapse selected</button>
+<button id="expandSelected">Expand selected</button>
+<span class="callgraphMode"><button id="expandAllPackages">Expand all packages</button></span>
+<button id="expandAll">Expand all</button>
+</div>
+<br/>
+<div class="group">
+<button id="removeSelected">Remove selected</button>
+<button id="removeNonSelected">Remove non-selected</button>
+</div>
+<br/>
+<div class="group">
+<button id="layout">Layout</button>
+</div>
+<br/>
+<div class="group">
+<span class="callgraphMode">
+<input type="checkbox" id="showCallDensity"><label for="showCallDensity"> Show call density</label>
+<br/>
+<input type="checkbox" id="highlightReachable"><label for="highlightReachable"> Highlight reachable</label>
+<br/>
+<input type="checkbox" id="hideUnreachable"><label for="hideUnreachable"> Hide unreachable</label>
+</span>
+<span class="dataflowMode">
+<input type="checkbox" id="showValueDensity"><label for="showValueDensity"> Show value density</label>
+</span>
+</div>
+<span id="fields">
+<br/>
+<label for="threshold">Threshold: </label><input type="number" id="threshold" value="0" min="0">
+<br/>
+</span>
+<div class="group">
+<span id="vulnerabilityLevel" hidden>
+Vulnerabilities:<br/>
+<select id="vulnerabilities" hidden><option></option></select>
+<br/>
+<input type="radio" name="vulnerabilityLevel" id="vulnerabilityLevelPackage" value="package" checked><label for="vulnerabilityLevelPackage">Package dependency</label>
+<br/>
+<input type="radio" name="vulnerabilityLevel" id="vulnerabilityLevelModule" value="module"><label for="vulnerabilityLevelModule">Module dependency</label>
+<br/>
+<input type="radio" name="vulnerabilityLevel" id="vulnerabilityLevelFunction" value="function"><label for="vulnerabilityLevelFunction">Function reachability</label>
+</span>
+</div>
+</div>
+<select id="dataset" hidden></select>
+<div id="msg"></div>
+</header>
+<div id="cy"></div>
+</body>
+</html>

@@ -1,0 +1,8 @@
+[
+  {
+    "pattern": "read <winston>.Logger",
+    "id": "1",
+    "changelogDescription": "winston.Logger has been replaced with winston.createLogger.",
+    "changelogId": "1"
+  }
+]

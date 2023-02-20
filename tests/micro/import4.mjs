@@ -1,0 +1,26 @@
+import defaultExport1 from "module-name1";
+import * as name1 from "module-name2";
+import { export1 } from "module-name3";
+import { export2 as alias1 } from "module-name4";
+import { export3, export4 } from "module-name5";
+import { export5, export6 as alias2 , export7 as alias3 } from "module-name6";
+import defaultExport2, { export8 , export9 } from "module-name7";
+import defaultExport3, * as name2 from "module-name8";
+import "module-name9";
+var p = import("module-name10");
+
+var x1 = defaultExport1;
+var x2 = defaultExport2;
+var x3 = defaultExport3;
+var x4 = name1;
+var x5 = name2;
+var x6 = export1;
+var x7 = export3;
+var x8 = export4;
+var x9 = export5;
+var x10 = export8;
+var x11 = export9;
+var x12 = alias1;
+var x13 = alias2;
+var x14 = alias3;
+var x15 = p;

@@ -1,0 +1,474 @@
+[
+  {
+    "name": "open",
+    "version": "8.4.0"
+  },
+  {
+    "name": "ember-load-initializers",
+    "version": "2.1.2"
+  },
+  {
+    "name": "eslint-config-react-app",
+    "version": "7.0.1"
+  },
+  {
+    "name": "react-app-rewired",
+    "version": "2.2.1"
+  },
+  {
+    "name": "lodash.clonedeep",
+    "version": "4.5.0"
+  },
+  {
+    "name": "ncp",
+    "version": "2.0.0"
+  },
+  {
+    "name": "nanoid",
+    "version": "4.0.0"
+  },
+  {
+    "name": "mustache",
+    "version": "4.2.0"
+  },
+  {
+    "name": "passport",
+    "version": "0.6.0"
+  },
+  {
+    "name": "graceful-fs",
+    "version": "4.2.10"
+  },
+  {
+    "name": "husky",
+    "version": "8.0.2"
+  },
+  {
+    "name": "react-window",
+    "version": "1.8.8"
+  },
+  {
+    "name": "fast-deep-equal",
+    "version": "3.1.3"
+  },
+  {
+    "name": "cross-env",
+    "version": "7.0.3"
+  },
+  {
+    "name": "get-port",
+    "version": "6.1.2"
+  },
+  {
+    "name": "eslint-plugin-promise",
+    "version": "6.1.1"
+  },
+  {
+    "name": "object-assign",
+    "version": "4.1.1"
+  },
+  {
+    "name": "url-join",
+    "version": "5.0.0"
+  },
+  {
+    "name": "gulp-rename",
+    "version": "2.0.0"
+  },
+  {
+    "name": "dotenv",
+    "version": "16.0.3"
+  },
+  {
+    "name": "reflect-metadata",
+    "version": "0.1.13"
+  },
+  {
+    "name": "abort-controller",
+    "version": "3.0.0"
+  },
+  {
+    "name": "strip-ansi",
+    "version": "7.0.1"
+  },
+  {
+    "name": "es6-promise",
+    "version": "4.2.8"
+  },
+  {
+    "name": "path-to-regexp",
+    "version": "6.2.1"
+  },
+  {
+    "name": "babel-plugin-dynamic-import-node",
+    "version": "2.3.3"
+  },
+  {
+    "name": "resize-observer-polyfill",
+    "version": "1.5.1"
+  },
+  {
+    "name": "redux-thunk",
+    "version": "2.4.2"
+  },
+  {
+    "name": "mime-types",
+    "version": "2.1.35"
+  },
+  {
+    "name": "colors",
+    "version": "1.4.0"
+  },
+  {
+    "name": "babel-plugin-transform-react-remove-prop-types",
+    "version": "0.4.24"
+  },
+  {
+    "name": "reselect",
+    "version": "4.1.7"
+  },
+  {
+    "name": "query-string",
+    "version": "8.1.0"
+  },
+  {
+    "name": "turbo",
+    "version": "1.6.3"
+  },
+  {
+    "name": "babel-plugin-add-module-exports",
+    "version": "1.0.4"
+  },
+  {
+    "name": "compare-versions",
+    "version": "6.0.0-rc.1"
+  },
+  {
+    "name": "minimatch",
+    "version": "5.1.2"
+  },
+  {
+    "name": "stylelint-config-standard",
+    "version": "29.0.0"
+  },
+  {
+    "name": "react-is",
+    "version": "18.2.0"
+  },
+  {
+    "name": "lodash.merge",
+    "version": "4.6.2"
+  },
+  {
+    "name": "serve-favicon",
+    "version": "2.5.0"
+  },
+  {
+    "name": "is-ci",
+    "version": "3.0.1"
+  },
+  {
+    "name": "redux-saga",
+    "version": "1.2.2"
+  },
+  {
+    "name": "url",
+    "version": "0.11.0"
+  },
+  {
+    "name": "memoize-one",
+    "version": "6.0.0"
+  },
+  {
+    "name": "hoist-non-react-statics",
+    "version": "3.3.2"
+  },
+  {
+    "name": "color",
+    "version": "4.2.3"
+  },
+  {
+    "name": "constructs",
+    "version": "10.1.200"
+  },
+  {
+    "name": "eslint-plugin-no-only-tests",
+    "version": "3.1.0"
+  },
+  {
+    "name": "benchmark",
+    "version": "2.1.4"
+  },
+  {
+    "name": "karma-sourcemap-loader",
+    "version": "0.3.8"
+  },
+  {
+    "name": "webpack-node-externals",
+    "version": "3.0.0"
+  },
+  {
+    "name": "karma-jasmine",
+    "version": "5.1.0"
+  },
+  {
+    "name": "object-hash",
+    "version": "3.0.0"
+  },
+  {
+    "name": "identity-obj-proxy",
+    "version": "3.0.0"
+  },
+  {
+    "name": "lodash.get",
+    "version": "4.4.2"
+  },
+  {
+    "name": "escape-string-regexp",
+    "version": "5.0.0"
+  },
+  {
+    "name": "camelcase",
+    "version": "7.0.1"
+  },
+  {
+    "name": "fsevents",
+    "version": "2.3.2"
+  },
+  {
+    "name": "regenerator-runtime",
+    "version": "0.13.11"
+  },
+  {
+    "name": "whatwg-fetch",
+    "version": "3.6.2"
+  },
+  {
+    "name": "lru-cache",
+    "version": "7.14.1"
+  },
+  {
+    "name": "i18next-browser-languagedetector",
+    "version": "7.0.1"
+  },
+  {
+    "name": "react-refresh",
+    "version": "0.14.0"
+  },
+  {
+    "name": "sinon-chai",
+    "version": "3.7.0"
+  },
+  {
+    "name": "tree-kill",
+    "version": "1.2.2"
+  },
+  {
+    "name": "bip39",
+    "version": "3.0.4"
+  },
+  {
+    "name": "cors",
+    "version": "2.8.5"
+  },
+  {
+    "name": "stylelint-config-recommended",
+    "version": "9.0.0"
+  },
+  {
+    "name": "lodash.isequal",
+    "version": "4.5.0"
+  },
+  {
+    "name": "case-sensitive-paths-webpack-plugin",
+    "version": "2.4.0"
+  },
+  {
+    "name": "json-loader",
+    "version": "0.5.7"
+  },
+  {
+    "name": "redux-devtools-extension",
+    "version": "2.13.9"
+  },
+  {
+    "name": "flat",
+    "version": "5.0.2"
+  },
+  {
+    "name": "loader-utils",
+    "version": "3.2.1"
+  },
+  {
+    "name": "js-cookie",
+    "version": "3.0.1"
+  },
+  {
+    "name": "delay",
+    "version": "5.0.0"
+  },
+  {
+    "name": "find-up",
+    "version": "6.3.0"
+  },
+  {
+    "name": "tslib",
+    "version": "2.4.1"
+  },
+  {
+    "name": "lodash.throttle",
+    "version": "4.1.1"
+  },
+  {
+    "name": "debug",
+    "version": "4.3.4"
+  },
+  {
+    "name": "copy-to-clipboard",
+    "version": "3.3.3"
+  },
+  {
+    "name": "loader.js",
+    "version": "4.7.0"
+  },
+  {
+    "name": "eslint-config-next",
+    "version": "13.1.1"
+  },
+  {
+    "name": "grunt-contrib-copy",
+    "version": "1.0.0"
+  },
+  {
+    "name": "config",
+    "version": "3.3.8"
+  },
+  {
+    "name": "md5",
+    "version": "2.3.0"
+  },
+  {
+    "name": "buffer",
+    "version": "6.0.3"
+  },
+  {
+    "name": "ua-parser-js",
+    "version": "1.0.32"
+  },
+  {
+    "name": "url-parse",
+    "version": "1.5.10"
+  },
+  {
+    "name": "which",
+    "version": "3.0.0"
+  },
+  {
+    "name": "flow-bin",
+    "version": "0.196.3"
+  },
+  {
+    "name": "dotenv-expand",
+    "version": "10.0.0"
+  },
+  {
+    "name": "pretty-bytes",
+    "version": "6.0.0"
+  },
+  {
+    "name": "classnames",
+    "version": "2.3.2"
+  },
+  {
+    "name": "process",
+    "version": "0.11.10"
+  },
+  {
+    "name": "mime",
+    "version": "3.0.0"
+  },
+  {
+    "name": "cookie",
+    "version": "0.5.0"
+  },
+  {
+    "name": "slugify",
+    "version": "1.6.5"
+  },
+  {
+    "name": "pluralize",
+    "version": "8.0.0"
+  },
+  {
+    "name": "file-saver",
+    "version": "2.0.5"
+  },
+  {
+    "name": "lodash.debounce",
+    "version": "4.0.8"
+  },
+  {
+    "name": "ms",
+    "version": "2.1.3"
+  },
+  {
+    "name": "unified",
+    "version": "10.1.2"
+  },
+  {
+    "name": "stylelint-config-standard-scss",
+    "version": "6.1.0"
+  },
+  {
+    "name": "karma-firefox-launcher",
+    "version": "2.1.2"
+  },
+  {
+    "name": "csv-parse",
+    "version": "5.3.3"
+  },
+  {
+    "name": "eslint-import-resolver-alias",
+    "version": "1.1.2"
+  },
+  {
+    "name": "path",
+    "version": "0.12.7"
+  },
+  {
+    "name": "unist-util-visit",
+    "version": "4.1.1"
+  },
+  {
+    "name": "json5",
+    "version": "2.2.2"
+  },
+  {
+    "name": "uuid",
+    "version": "9.0.0"
+  },
+  {
+    "name": "invariant",
+    "version": "2.2.4"
+  },
+  {
+    "name": "browser-sync",
+    "version": "2.27.11"
+  },
+  {
+    "name": "p-limit",
+    "version": "4.0.0"
+  },
+  {
+    "name": "chalk",
+    "version": "5.2.0"
+  },
+  {
+    "name": "styled-components",
+    "version": "5.3.6"
+  },
+  {
+    "name": "karma-chai",
+    "version": "0.1.0"
+  }
+]

@@ -1,0 +1,8 @@
+[
+  {
+    "pattern": "read <rxjs{,/**/*}>?**.{do,catch,switch,finally}",
+    "id": "103a",
+    "changelogDescription": "Operator renames: do -> tap, catch -> catchError, switch -> switchAll, finally -> finalize, throw -> throwError\n",
+    "changelogId": "23"
+  }
+]

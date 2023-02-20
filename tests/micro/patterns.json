@@ -1,0 +1,26 @@
+[
+  {
+    "id": "1",
+    "pattern": "import <lib>"
+  },
+  {
+    "id": "2",
+    "pattern": "read <lib>.filter"
+  },
+  {
+    "id": "3",
+    "pattern": "call <lib>.filter"
+  },
+  {
+    "id": "4",
+    "pattern": "call <lib>.filter()"
+  },
+  {
+    "id": "5",
+    "pattern": "read <lib>.obj"
+  },
+  {
+    "id": "6",
+    "pattern": "write <lib>.obj.foo"
+  }
+]

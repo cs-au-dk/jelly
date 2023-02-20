@@ -1,0 +1,74 @@
+[
+  {
+    "name": "eslint-config-prettier",
+    "version": "8.5.0"
+  },
+  {
+    "name": "ws",
+    "version": "8.11.0"
+  },
+  {
+    "name": "redux-logger",
+    "version": "3.0.6"
+  },
+  {
+    "name": "form-data",
+    "version": "4.0.0"
+  },
+  {
+    "name": "eslint-config-google",
+    "version": "0.14.0"
+  },
+  {
+    "name": "ember-resolver",
+    "version": "9.0.1"
+  },
+  {
+    "name": "eslint-config-standard",
+    "version": "17.0.0"
+  },
+  {
+    "name": "jest-puppeteer",
+    "version": "6.2.0"
+  },
+  {
+    "name": "chai-as-promised",
+    "version": "7.1.1"
+  },
+  {
+    "name": "mkdirp",
+    "version": "1.0.4"
+  },
+  {
+    "name": "cross-spawn",
+    "version": "7.0.3"
+  },
+  {
+    "name": "eslint-plugin-simple-import-sort",
+    "version": "8.0.0"
+  },
+  {
+    "name": "preact",
+    "version": "10.11.3"
+  },
+  {
+    "name": "eventemitter3",
+    "version": "5.0.0"
+  },
+  {
+    "name": "js-base64",
+    "version": "3.7.3"
+  },
+  {
+    "name": "@tailwindcss/forms",
+    "version": "0.5.3"
+  },
+  {
+    "name": "cookie-parser",
+    "version": "1.4.6"
+  },
+  {
+    "name": "eslint-plugin-standard",
+    "version": "5.0.0"
+  }
+]

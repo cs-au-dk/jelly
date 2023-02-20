@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+
+export JELLY_BIN=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+export JELLY_OUT=${JELLY_OUT:-'/tmp/jelly.json'}
+DYNJS=$( dirname $JELLY_BIN )/dynamic/dyn.js
+
+if [[ -z "${GRAAL_HOME}" ]]; then
+  echo "Error: Environment variable GRAAL_HOME not set, aborting"
+  exit -1
+fi
+
+if [[ ! -x $GRAAL_HOME/bin/node ]]; then
+  echo "Error: $GRAAL_HOME/bin/node executable not found, aborting"
+  exit -1
+fi
+
+if [[ ! -f $GRAAL_HOME/tools/nodeprof/jalangi.js ]]; then
+  echo "Error: $GRAAL_HOME/tools/nodeprof/jalangi.js not found, aborting"
+  exit -1
+fi
+
+if [[ ! -f $DYNJS ]]; then
+  echo "Error: $DYNJS not found, aborting"
+  exit -1
+fi
+
+PATH=$GRAAL_HOME/bin:$PATH exec node --jvm --experimental-options --nodeprof $GRAAL_HOME/tools/nodeprof/jalangi.js --analysis $DYNJS $@

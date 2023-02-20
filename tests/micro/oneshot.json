@@ -1,0 +1,20 @@
+{
+ "entries": ["oneshot.js"],
+ "time": "Sat, 30 Jul 2022 13:24:46 GMT",
+ "files": [
+  "oneshot.js"
+ ],
+ "functions": {
+  "2": "0:1:1:6:1",
+  "4": "0:3:28:5:2"
+ },
+ "calls": {
+  "3": "0:3:9:5:23"
+ },
+ "fun2fun": [
+  [2, 4]
+ ],
+ "call2fun": [
+  [3, 4]
+ ]
+}

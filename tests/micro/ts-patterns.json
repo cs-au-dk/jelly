@@ -1,0 +1,6 @@
+[
+  {
+    "id": "1",
+    "pattern": "call <lib>.foo 0:Foo 1:string 2:\"bar\" 3:function 4:string 5:42 6:number 7:number"
+  }
+]

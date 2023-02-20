@@ -1,0 +1,7 @@
+{
+  "name": "tests-vulnerabilities",
+  "version": "1.0.0",
+  "dependencies": {
+    "node-etsy-client": "^0.2.0"
+  }
+}

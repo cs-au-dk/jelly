@@ -1,0 +1,6 @@
+[
+  {
+    "id": "1",
+    "pattern": "read {<foo>,<bar>}.f.g"
+  }
+]

@@ -1,0 +1,14 @@
+[
+  {
+    "id": "1",
+    "pattern": "import rxjs/Rx"
+  },
+  {
+    "id": "2",
+    "pattern": "import rxjs"
+  },
+  {
+    "id": "3",
+    "pattern": "import rxjs/Subject"
+  }
+]

@@ -1,0 +1,14 @@
+[
+  {
+    "id": "1",
+    "pattern": "read <foo>?**.bar"
+  },
+  {
+    "id": "2",
+    "pattern": "read <baz>?**.bar"
+  },
+  {
+    "id": "3",
+    "pattern": "read <foo>.bar"
+  }
+]

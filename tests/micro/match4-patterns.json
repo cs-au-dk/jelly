@@ -1,0 +1,6 @@
+[
+  {
+    "id": "1",
+    "pattern": "call <rxjs>?**.mergeMap"
+  }
+]
