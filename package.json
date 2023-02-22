@@ -8,9 +8,9 @@
     "type": "git",
     "url": "git+https://github.com/cs-au-dk/jelly.git"
   },
-  "engines" : { 
-    "node" : ">=15.0.0"
-  }
+  "engines": {
+    "node": ">=15.0.0"
+  },
   "homepage": "https://github.com/cs-au-dk/jelly#readme",
   "keywords": [
     "call graph",
