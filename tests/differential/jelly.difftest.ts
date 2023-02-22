@@ -27,7 +27,7 @@ describe("tiny", () => {
         options.basedir = prevOptions.basedir = `${__dirname}/simple`;
         const app = "application.js";
         options.callgraphRequire = options.callgraphImplicit = options.callgraphNative =
-            prevOptions.callgraphRequireCalls = prevOptions.callgraphImplicitCalls = prevOptions.callgraphNativeCalls = true; // TODO: remove eventually (also below)
+            prevOptions.callgraphRequire = prevOptions.callgraphImplicit = prevOptions.callgraphNative = true; // TODO: remove eventually (also below)
         // options.bottomUp = true;
         const solver = new Solver();
         await analyzeFiles([app], solver);
@@ -51,7 +51,7 @@ describe("small", () => {
                 `${packagesDir}/${name.replace("@", "").replace("/", "-")}/${version}`;
             const files = expand(options.basedir);
             options.callgraphRequire = options.callgraphImplicit = options.callgraphNative =
-                prevOptions.callgraphRequireCalls = prevOptions.callgraphImplicitCalls = prevOptions.callgraphNativeCalls = true;
+                prevOptions.callgraphRequire = prevOptions.callgraphImplicit = prevOptions.callgraphNative = true;
             // options.bottomUp = true;
             const solver = new Solver();
             await analyzeFiles(files, solver);
@@ -76,7 +76,7 @@ describe("large", () => {
                 `${packagesDir}/${name.replace("@", "").replace("/", "-")}/${version}`;
             const files = expand(options.basedir);
             options.callgraphRequire = options.callgraphImplicit = options.callgraphNative =
-                prevOptions.callgraphRequireCalls = prevOptions.callgraphImplicitCalls = prevOptions.callgraphNativeCalls = true;
+                prevOptions.callgraphRequire = prevOptions.callgraphImplicit = prevOptions.callgraphNative = true;
             // options.bottomUp = true;
             const solver = new Solver();
             await analyzeFiles(files, solver);

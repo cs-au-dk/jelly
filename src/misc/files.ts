@@ -174,7 +174,9 @@ const codeCache: Map<SourceLocationStr, string> = new Map<SourceLocationStr, str
  * Reads the code for a source location.
  * If cached, returns the cached value. If the code is too long, only returns the head and tail of the code.
  */
-export function codeFromLocation(loc: SourceLocation): string {
+export function codeFromLocation(loc: SourceLocation | null | undefined): string {
+    if (!loc)
+        return "-";
     let locStr = JSON.stringify(loc);
     let content = codeCache.get(locStr);
     if (!content) {
@@ -196,8 +198,8 @@ export function codeFromLocation(loc: SourceLocation): string {
                 }
             }
             content = content.replaceAll(/\s+/g, " ");
-            if (content.length > 40)
-                content = `${content.substring(0, 20)}/*...*/$${content.substring(content.length - 10)}`;
+            if (content.length > 50)
+                content = `${content.substring(0, 20)}/*...*/$${content.substring(content.length - 20)}`;
         }
         codeCache.set(locStr, content);
     }

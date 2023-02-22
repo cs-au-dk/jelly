@@ -43,13 +43,12 @@ export default function() {
     }
     console.log(`Installing previous version '${tag}' of Jelly...`);
     fs.mkdirSync(jellyPrevious, {recursive: true});
-    execSync(`git clone --depth=1 --single-branch --branch ${tag} git@github.com:cs-au-dk/jelly.git -c advice.detachedHead=false ${jellyPrevious}`);
+    execSync(`git clone --depth=1 --single-branch --branch ${tag} $(git remote get-url origin) -c advice.detachedHead=false ${jellyPrevious}`);
     execSync(`cd ${jellyPrevious} && npm install --force`);
     const packageJson = require(packageJsonFile);
     packageJson.name = `jelly-${tag}`;
     packageJson.version = tag;
     fs.writeFileSync(packageJsonFile, JSON.stringify(packageJson, null, 2));
-    fs.copyFileSync(`${__dirname}/../../src/misc/util.ts`, `${jellyPrevious}/src/misc/util.ts`);
     fs.rmSync(`${jellyPrevious}/tests`, {recursive: true});
     fs.rmSync(`${jellyPrevious}/.idea`, {recursive: true});
     fs.rmSync(`${jellyPrevious}/.git`, {recursive: true});

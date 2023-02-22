@@ -86,10 +86,10 @@ export class ObjectPropertyVar extends ConstraintVar {
     }
 
     getParent() {
-        return this.obj instanceof AllocationSiteToken  ? this.obj.allocSite :
+        return this.obj instanceof AllocationSiteToken ? this.obj.allocSite :
             this.obj instanceof FunctionToken ? this.obj.fun :
-              this.obj instanceof NativeObjectToken ? this.obj.moduleInfo :
-                this.obj.packageInfo;
+                this.obj instanceof NativeObjectToken ? this.obj.moduleInfo :
+                    this.obj.packageInfo;
     }
 }
 

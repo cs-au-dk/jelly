@@ -1,13 +1,14 @@
 import {AnalysisState} from "../analysis/analysisstate";
 import {readFileSync, writeFileSync} from "fs";
 import {FunctionInfo, ModuleInfo, PackageInfo} from "../analysis/infos";
-import {addAll, getOrSet, mapGetMap, sourceLocationToStringWithFile,} from "../misc/util";
+import {addAll, getOrSet, mapGetMap} from "../misc/util";
 import {ConstraintVar, NodeVar, ObjectPropertyVar} from "../analysis/constraintvars";
 import {FragmentState} from "../analysis/fragmentstate";
 import {NativeObjectToken, Token} from "../analysis/tokens";
 import {isIdentifier} from "@babel/types";
 import {VulnerabilityResults} from "../patternmatching/vulnerabilitydetector";
 import {Vulnerability} from "vulnerabilities";
+import {constraintVarToStringWithCode, funcToStringWithCode} from "./tostringwithcode";
 
 export interface VisualizerGraphs {
     graphs: Array<{
@@ -191,7 +192,7 @@ function getVisualizerCallGraph(a: AnalysisState, vulnerabilities: Vulnerability
             kind: "function",
             parent: id(f.moduleInfo),
             name: f.name ?? "<anon>",
-            fullName: sourceLocationToStringWithFile(f.loc),
+            fullName: funcToStringWithCode(f),
             callWeight: Math.round(100 * functionCallCount / maxFunctionCallCount),
             callCount: functionCallCount,
             isReachable: reachable.has(f) ? "true" : undefined
@@ -332,7 +333,7 @@ function getVisualizerDataFlowGraphs(a: AnalysisState, f: FragmentState): Visual
                         id: id(v),
                         kind: "variable",
                         parent: id(parent),
-                        fullName: v.toString(), // TODO: more information?
+                        fullName: constraintVarToStringWithCode(v),
                         tokenWeight: Math.floor(100 * (size - 1) / maxLocalVariableCount),
                         tokenCount: size
                     });
@@ -456,7 +457,8 @@ function getVisualizerDataFlowGraphs(a: AnalysisState, f: FragmentState): Visual
 
 function writeVisualizerHtml(filename: string, g: VisualizerGraphs) {
     const DATA = "$DATA";
-    const t = readFileSync(__dirname + "/../resources/visualizer.html", "utf-8");
+    const templateFile =  __dirname + (__filename.endsWith(".ts") ? "/.." : "") + "/../resources/visualizer.html"; // if using ts-node to run main.ts, the resources are in the ../../resources directory
+    const t = readFileSync(templateFile, "utf-8");
     const i = t.indexOf(DATA); // string.replace doesn't like very long strings
     const res = t.substring(0, i) + JSON.stringify(g) + t.substring(i + DATA.length);
     writeFileSync(filename, res);

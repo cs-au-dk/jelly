@@ -1,21 +1,30 @@
-// @ts-nocheck
 // too many import from jelly-previous, so disable ts check, otherwise it has compile error when we run test the first time.
 import Solver from "../../src/analysis/solver";
-import {FunctionInfo, ModuleInfo} from "../../src/analysis/infos";
+import {DummyModuleInfo, FunctionInfo, ModuleInfo} from "../../src/analysis/infos";
 import {AnalysisState} from "../../src/analysis/analysisstate";
 import logger from "../../src/misc/logger";
-import {AllocationSiteToken, FunctionToken, SnapshotObjectToken, Token} from "../../src/analysis/tokens";
+import {Token} from "../../src/analysis/tokens";
 import {mapGetSet, sourceLocationToString, SourceLocationWithFilename} from "../../src/misc/util";
 import {Node} from "@babel/core";
 import {ConstraintVar} from "../../src/analysis/constraintvars";
-import {default as PrevSolver} from "jelly-previous/src/analysis/solver";
-import {FunctionInfo as PrevFunctionInfo, ModuleInfo as PrevModuleInfo} from "jelly-previous/src/analysis/infos";
-import {AnalysisState as PrevAnalysisState} from "jelly-previous/src/analysis/analysisstate";
-import {ConstraintVar as PrevConstraintVar} from "jelly-previous/src/analysis/constraintvars";
-import {SourceLocation} from "@babel/types";
-import {SnapshotFunctionDescriptor} from "../../src/blended/snapshots";
-import * as PrevTokens from "jelly-previous/src/analysis/tokens";
 import {codeFromLocation} from "../../src/misc/files";
+import {constraintVarToStringWithCode, funcToStringWithCode, getTokenLocation} from "../../src/output/tostringwithcode";
+// @ts-ignore
+import {default as PrevSolver} from "jelly-previous/src/analysis/solver";
+import {
+    DummyModuleInfo as PrevDummyModuleInfo,
+    FunctionInfo as PrevFunctionInfo,
+    ModuleInfo as PrevModuleInfo
+// @ts-ignore
+} from "jelly-previous/src/analysis/infos";
+// @ts-ignore
+import {AnalysisState as PrevAnalysisState} from "jelly-previous/src/analysis/analysisstate";
+// @ts-ignore
+import {ConstraintVar as PrevConstraintVar} from "jelly-previous/src/analysis/constraintvars";
+// @ts-ignore
+import * as PrevTokens from "jelly-previous/src/analysis/tokens";
+// @ts-ignore
+import * as PrevStringCode from "jelly-previous/src/output/tostringwithcode";
 
 /**
  * Compares the previous and the current version of Jelly on the given package.
@@ -84,7 +93,7 @@ export function compare(prevSolver: PrevSolver, currSolver: Solver, _package: st
      */
     function getTokensByPrevConstraintVar(prevVar: PrevConstraintVar, currSolver: Solver): Array<Token> {
         for (const [newConstraintVar, tokens] of currSolver.fragmentState.getAllVarsAndTokens())
-            if (varToCodeString(newConstraintVar) === varToCodeString(prevVar))
+            if (constraintVarToStringWithCode(newConstraintVar) === PrevStringCode.constraintVarToStringWithCode(prevVar))
                 return Array.from(tokens);
         return [];
     }
@@ -94,8 +103,9 @@ export function compare(prevSolver: PrevSolver, currSolver: Solver, _package: st
         let m = prevSolver.analysisState.getConstraintVarParent(prevConstraintVar);
         if (m && m.isEntry) {
             const prevTokenStrings = Array.from(prevTokens)
+                // @ts-ignore
                 .filter((t: Token) => {
-                    const loc = getTokenLocation(t);
+                    const loc = PrevStringCode.getTokenLocation(t);
                     return loc && entryModulePaths.includes((<SourceLocationWithFilename>loc).filename);
                 }).map((t: any) => t.toString());
             const currTokens = getTokensByPrevConstraintVar(prevConstraintVar, currSolver);
@@ -118,8 +128,8 @@ export function compare(prevSolver: PrevSolver, currSolver: Solver, _package: st
             const m = currSolver.analysisState.getConstraintVarParent(fromVar);
             const n = currSolver.analysisState.getConstraintVarParent(toVar);
             if ((m && m.isEntry) || (n && n.isEntry)) {
-                const s = mapGetSet(currSubsetStrEdge, varToCodeString(fromVar));
-                const toVarStr = varToCodeString(toVar);
+                const s = mapGetSet(currSubsetStrEdge, constraintVarToStringWithCode(fromVar));
+                const toVarStr = constraintVarToStringWithCode(toVar);
                 if (toVarStr)
                     s.add(toVarStr);
             }
@@ -129,14 +139,14 @@ export function compare(prevSolver: PrevSolver, currSolver: Solver, _package: st
         for (const toVar of mapGetSet(prevSolver.fragmentState.subsetEdges, fromVar)) {
             const m = prevSolver.analysisState.getConstraintVarParent(fromVar);
             const n = prevSolver.analysisState.getConstraintVarParent(toVar);
-            if (varToCodeString(fromVar) && varToCodeString(toVar))
-                if ((m && m.isEntry) || (n && n.isEntry) ) {
+            if (PrevStringCode.constraintVarToStringWithCode(fromVar) && PrevStringCode.constraintVarToStringWithCode(toVar))
+                if ((m && m.isEntry) || (n && n.isEntry)) {
                     expect(currSubsetStrEdge.keys(),
-                        `Dataflow doesn't have node ${varToCodeString(fromVar)}`)
-                        .toContain(varToCodeString(fromVar));
-                    expect(mapGetSet(currSubsetStrEdge, varToCodeString(fromVar)),
-                        `Dataflow edge(app->module,module->app) \u2329${varToCodeString(fromVar)}\u232a->\u2329${varToCodeString(toVar)}\u232a doesn't exist`)
-                        .toContain(varToCodeString(toVar));
+                        `Dataflow doesn't have node ${PrevStringCode.constraintVarToStringWithCode(fromVar)}`)
+                        .toContain(PrevStringCode.constraintVarToStringWithCode(fromVar));
+                    expect(mapGetSet(currSubsetStrEdge, PrevStringCode.constraintVarToStringWithCode(fromVar)),
+                        `Dataflow edge(app->module,module->app) \u2329${PrevStringCode.constraintVarToStringWithCode(fromVar)}\u232a->\u2329${PrevStringCode.constraintVarToStringWithCode(toVar)}\u232a doesn't exist`)
+                        .toContain(PrevStringCode.constraintVarToStringWithCode(toVar));
                 }
         }
     }
@@ -156,17 +166,18 @@ export function compare(prevSolver: PrevSolver, currSolver: Solver, _package: st
         }
         return visited;
     }
+
     // 8. The dataflow reachability from a app to app shouldn't be missing in current version.
     const currReachability = new Map<string, Set<string>>();
     for (const fromVar of currSolver.fragmentState.vars) {
         const m = currSolver.analysisState.getConstraintVarParent(fromVar);
         if (m && m.isEntry) {
             const s = new Set<string>();
-            const fromVarStr = varToCodeString(fromVar);
+            const fromVarStr = constraintVarToStringWithCode(fromVar);
             if (fromVarStr)
                 currReachability.set(fromVarStr, s);
             for (const toVar of bfsReachability<ConstraintVar>(currSolver.fragmentState.subsetEdges, fromVar)) {
-                const toVarStr = varToCodeString(toVar);
+                const toVarStr = constraintVarToStringWithCode(toVar);
                 if (toVarStr)
                     s.add(toVarStr);
             }
@@ -177,10 +188,10 @@ export function compare(prevSolver: PrevSolver, currSolver: Solver, _package: st
         if (m && m.isEntry) {
             for (const toVar of bfsReachability<PrevConstraintVar>(prevSolver.fragmentState.subsetEdges, fromVar)) {
                 const n = prevSolver.analysisState.getConstraintVarParent(toVar);
-                if (n && n.isEntry && n !== m && varToCodeString(fromVar) && varToCodeString(toVar))
-                    expect(mapGetSet(currReachability, varToCodeString(fromVar)),
-                        `Dataflow reachability(app-->app) \u2329${varToCodeString(fromVar)}\u232a-->\u2329${varToCodeString(toVar)}\u232a doesn't exist`)
-                        .toContain(varToCodeString(toVar));
+                if (n && n.isEntry && n !== m && PrevStringCode.constraintVarToStringWithCode(fromVar) && PrevStringCode.constraintVarToStringWithCode(toVar))
+                    expect(mapGetSet(currReachability, PrevStringCode.constraintVarToStringWithCode(fromVar)),
+                        `Dataflow reachability(app-->app) \u2329${PrevStringCode.constraintVarToStringWithCode(fromVar)}\u232a-->\u2329${PrevStringCode.constraintVarToStringWithCode(toVar)}\u232a doesn't exist`)
+                        .toContain(PrevStringCode.constraintVarToStringWithCode(toVar));
             }
         }
     }
@@ -191,14 +202,14 @@ export function compare(prevSolver: PrevSolver, currSolver: Solver, _package: st
      * Transform a map from node to node to a map from string
      * And only keep the call node that is in the application module.
      */
-    function transformCallToFunctionOrModuleToStringMap(callToFunctionOrModule: Map<Node, Set<any>>) {
+    function transformCallToFunctionOrModuleToStringMap<T extends FunctionOrModule | PrevFunctionOrModule>(callToFunctionOrModule: Map<Node, Set<T>>) {
         const ret: Map<string, Set<string>> = new Map<string, Set<string>>();
         for (const [callNode, funcOrModules] of callToFunctionOrModule) {
             if (callNode.loc && "filename" in callNode.loc && entryModulePaths.includes(<string>callNode.loc.filename)) {
                 const s = new Set<string>();
                 for (const callee of funcOrModules)
-                    s.add(funcOrModuleToString(callee));
-                ret.set(`'${codeFromLocation(callNode.loc)}'${sourceLocationToString(callNode.loc)}`, s);
+                    s.add(funcOrModuleToStringWithCode(callee));
+                ret.set(`'${codeFromLocation(callNode.loc)}'${sourceLocationToString(callNode.loc, true, true)}`, s);
             }
         }
         return ret;
@@ -215,7 +226,6 @@ export function compare(prevSolver: PrevSolver, currSolver: Solver, _package: st
 
     /**
      * Transform a map from CallGraph to String Graph.
-     * @param cgEdge
      */
     function translateNodeGraphToStringGraph(cgEdge: Map<FunctionInfo | ModuleInfo, Set<FunctionInfo | ModuleInfo>>): [Set<string>, Map<string, Set<string>>] {
         const vertices = new Set<string>();
@@ -223,11 +233,11 @@ export function compare(prevSolver: PrevSolver, currSolver: Solver, _package: st
         for (const [caller, callees] of cgEdge) {
             const s = new Set<string>();
             for (const callee of callees) {
-                const calleeStr = funcOrModuleToString(callee);
+                const calleeStr = funcOrModuleToStringWithCode(callee);
                 s.add(calleeStr);
                 vertices.add(calleeStr);
             }
-            const callerStr = funcOrModuleToString(caller);
+            const callerStr = funcOrModuleToStringWithCode(caller);
             vertices.add(callerStr);
             edges.set(callerStr, s);
         }
@@ -240,68 +250,29 @@ export function compare(prevSolver: PrevSolver, currSolver: Solver, _package: st
     const [prevCGvertices, prevCGEdges] = getCallGraph(prevSolver.analysisState);
     for (const from of prevCGvertices)
         if (from.packageInfo.isEntry) {
-            const currReachability = bfsReachability<string>(currCGEdgeStr, funcOrModuleToString(from));
+            const currReachability = bfsReachability<string>(currCGEdgeStr, funcOrModuleToStringWithCode(from));
             for (const to of bfsReachability<PrevModuleInfo | PrevFunctionInfo>(prevCGEdges, from))
                 if (to.packageInfo.isEntry)
                     expect(currReachability,
-                        `CallGraph reachability(app-->app) \u2329${funcOrModuleToString(from)} --> ${funcOrModuleToString(to)} is missing`
-                    ).toContain(funcOrModuleToString(to));
+                        `CallGraph reachability(app-->app) \u2329${funcOrModuleToStringWithCode(from)} --> ${funcOrModuleToStringWithCode(to)} is missing`
+                    ).toContain(funcOrModuleToStringWithCode(to));
         }
 }
 
-/**
- * Return the code with location string of the constraint variable, otherwise return variable.toString.
- */
-
-export function varToCodeString<T extends ConstraintVar | PrevConstraintVar>(v: T): string | undefined { // TODO: Will be replaced with constraintVarToString in the future.
-    if (!("loc" in v))
-        return v.toString();
-    else if (v.loc && "filename" in v.loc && v.loc.filename !== "%nodejs" && v.loc.filename !== "%ecmascript")
-        return `'${codeFromLocation(v.loc)}'[${sourceLocationToString(v.loc, true, true)}]`;
-    else
-        return undefined; // dummy location
-}
-
-/**
- * Extract the source location from a token, if token doesn't contain source location, return undefined.
- */
-export function getTokenLocation<T extends Token | PrevTokens.Token>(token: T): SourceLocation | undefined {
-    if (token instanceof FunctionToken || token instanceof PrevTokens.FunctionToken) {
-        if (token.fun.loc)
-            return token.fun.loc;
-    } else if (token instanceof AllocationSiteToken || token instanceof PrevTokens.AllocationSiteToken) {
-        if (token.allocSite.loc)
-            return token.allocSite.loc;
-    } else if (token instanceof SnapshotObjectToken || token instanceof PrevTokens.SnapshotObjectToken) {
-        if (token.obj instanceof SnapshotFunctionDescriptor)
-            return token.obj.loc;
-    }
-    return undefined;
-}
-
-/**
- * A string formatter for function/module info,
- * if the constraint variable has source location, it is ast node, return the code of the constraint variable with constraint variable.toString()
- * otherwise, return variable.toString().
- */
-export function funcOrModuleToString(info: FunctionInfo | ModuleInfo | PrevFunctionInfo | PrevModuleInfo): string { // TODO: Will be replaced with function.toString() and module.toString() in the future.
-    if ((info instanceof FunctionInfo || info instanceof PrevFunctionInfo) && info.loc)
-        return `'${codeFromLocation(info.loc)}'${sourceLocationToString(info.loc)}}`;
-    else
-        return `${(<ModuleInfo|PrevModuleInfo>info).path}`;
-}
-
+type GraphNode = FunctionInfo | ModuleInfo
+type PrevGraphNode = PrevFunctionInfo | PrevModuleInfo;
 
 /**
  * Merge require graph and function to function graph to a call graph ( Function/Module × Function/Module )
  * @param a analysis state
  * @returns a tuple of vertexes and edges
  */
-export function getCallGraph<A extends AnalysisState|PrevAnalysisState,
-    N extends (A extends AnalysisState ? FunctionInfo|ModuleInfo: PrevFunctionInfo|PrevModuleInfo)>(a: A):
+export function getCallGraph<A extends AnalysisState | PrevAnalysisState,
+    N extends (A extends AnalysisState ? GraphNode : PrevGraphNode)>(a: A):
     [Set<N>, Map<N, Set<N>>] {
     const vertexes = new Set<N>();
     const edges = new Map<N, Set<N>>();
+    // @ts-ignore
     for (const [caller, callees] of a.requireGraph) {
         const s = mapGetSet(edges, caller);
         vertexes.add(<N>caller);
@@ -310,6 +281,7 @@ export function getCallGraph<A extends AnalysisState|PrevAnalysisState,
             vertexes.add(<N>callee);
         }
     }
+    // @ts-ignore
     for (const [caller, callees] of a.functionToFunction) {
         const s = mapGetSet(edges, caller);
         vertexes.add(<N>caller);
@@ -319,4 +291,20 @@ export function getCallGraph<A extends AnalysisState|PrevAnalysisState,
         }
     }
     return [vertexes, edges];
+}
+
+type FunctionOrModule = GraphNode | DummyModuleInfo;
+
+type PrevFunctionOrModule = PrevGraphNode | PrevDummyModuleInfo;
+
+/**
+ * If the function/module info is related to source location, returns a string of that info with the code at that location.
+ */
+export function funcOrModuleToStringWithCode(info: FunctionOrModule | PrevFunctionOrModule): string {
+    if (info instanceof FunctionInfo)
+        return funcToStringWithCode(info);
+    else if (info instanceof PrevFunctionInfo){
+        return PrevStringCode.funcToStringWithCode(info);
+    } else
+        return info.toString();
 }
