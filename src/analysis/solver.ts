@@ -87,7 +87,16 @@ export default class Solver {
         time: 0,
         cpuTime: 0,
         codeSize: 0,
-        maxMemoryUsage: 0
+        maxMemoryUsage: 0,
+        errors: 0,
+        warnings: 0,
+        totalCallSites: 0,
+        callsWithUniqueCallee: 0,
+        callsWithNoCallee: 0,
+        nativeOnlyCalls: 0,
+        externalOnlyCalls: 0,
+        nativeOrExternalCalls: 0,
+        functionsWithZeroCallers: 0
     };
 
     readonly abort?: () => boolean;

@@ -23,4 +23,22 @@ export interface AnalysisDiagnostics {
     codeSize: number;
 
     maxMemoryUsage: number;
+
+    errors: number;
+
+    warnings: number;
+
+    totalCallSites: number;
+
+    callsWithUniqueCallee: number;
+
+    callsWithNoCallee: number;
+
+    nativeOnlyCalls: number;
+
+    externalOnlyCalls: number;
+
+    nativeOrExternalCalls: number;
+
+    functionsWithZeroCallers: number;
 }

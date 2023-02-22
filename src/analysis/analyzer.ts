@@ -231,24 +231,37 @@ export async function analyzeFiles(files: Array<string>, solver: Solver, returnF
     }
     solver.diagnostics.time = timer.elapsed();
     solver.diagnostics.cpuTime = timer.elapsedCPU();
+    solver.diagnostics.errors = a.errors;
+    solver.diagnostics.warnings = a.warnings;
+
     if (solver.diagnostics.aborted)
         logger.warn("Received abort signal, analysis aborted");
     else if (solver.diagnostics.timeout)
         logger.warn("Time limit reached, analysis aborted");
 
     // output statistics
-    if (!options.modulesOnly && logger.isInfoEnabled() && files.length > 0) {
+    if (!options.modulesOnly && files.length > 0) {
         const f = solver.fragmentState; // current fragment (not final if aborted due to timeout)
         const r = new AnalysisStateReporter(a, f);
+        const d = solver.diagnostics;
+        d.callsWithUniqueCallee = r.getOneCalleeCalls();
+        d.totalCallSites = a.callLocations.size;
+        d.callsWithNoCallee = r.getZeroCalleeCalls().size;
+        d.nativeOnlyCalls = r.getZeroButNativeCalleeCalls();
+        d.externalOnlyCalls = r.getZeroButExternalCalleeCalls();
+        d.nativeOrExternalCalls = r.getZeroButNativeOrExternalCalleeCalls();
+        d.functionsWithZeroCallers = r.getZeroCallerFunctions().size;
+        if (!logger.isInfoEnabled())
+            return fileMap;
         if (options.warningsUnsupported && !solver.diagnostics.aborted && !solver.diagnostics.timeout) {
             r.reportNonemptyUnhandledDynamicPropertyWrites();
             r.reportNonemptyUnhandledDynamicPropertyReads();
         }
         logger.info(`Analyzed packages: ${solver.diagnostics.packages}, modules: ${solver.diagnostics.modules}, functions: ${a.functionInfos.size}, code size: ${Math.round(solver.diagnostics.codeSize / 1024)}KB`);
-        const one = r.getOneCalleeCalls(), zero = r.getZeroCalleeCalls().size, native = r.getZeroButNativeCalleeCalls(), external = r.getZeroButExternalCalleeCalls(), nativeOrExternal = r.getZeroButNativeOrExternalCalleeCalls(), all = a.callLocations.size;
         logger.info(`Call edges function->function: ${a.numberOfFunctionToFunctionEdges}, call->function: ${a.numberOfCallToFunctionEdges}`);
-        logger.info(`Calls with unique callee: ${one}/${all - zero - native - external - nativeOrExternal}${all - zero - native - external - nativeOrExternal > 0 ? ` (${percent(one / (all - zero - native - external - nativeOrExternal))})` : ""}` +
-            ` (excluding ${zero} zero-callee, ${native} native-only, ${external} external-only and ${nativeOrExternal} native-or-external-only)`)
+        const n = d.totalCallSites - d.callsWithNoCallee - d.nativeOnlyCalls - d.nativeOnlyCalls - d.nativeOrExternalCalls;
+        logger.info(`Calls with unique callee: ${d.callsWithUniqueCallee}/${n}${n > 0 ? ` (${percent(d.callsWithUniqueCallee / n)})` : ""}` +
+            ` (excluding ${d.callsWithNoCallee} zero-callee, ${d.nativeOnlyCalls} native-only, ${d.externalOnlyCalls} external-only and ${d.nativeOrExternalCalls} native-or-external-only)`)
         logger.info(`Functions with zero callers: ${r.getZeroCallerFunctions().size}/${a.functionInfos.size}`);
         logger.info(`Analysis time: ${solver.diagnostics.time}ms, memory usage: ${solver.diagnostics.maxMemoryUsage}MB${!options.gc ? " (without --gc)" : ""}`);
         logger.info(`Analysis errors: ${a.errors}, warnings: ${a.warnings}${a.warnings > 0 && !options.warningsUnsupported ? " (show with --warnings-unsupported)" : ""}`);
