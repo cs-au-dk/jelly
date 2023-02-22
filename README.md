@@ -32,6 +32,8 @@ Proc. ACM Program. Lang. 4(OOPSLA): 187:1-187:25 (2020)
 
 ## Installing
 
+Running this application requires NodeJs 15 or later 
+
 ```bash
 npm install -g @cs-au-dk/jelly
 ```
