@@ -1,5 +1,5 @@
 import {AnalysisState} from "../analysis/analysisstate";
-import {readFileSync, writeFileSync} from "fs";
+import {existsSync, readFileSync, writeFileSync} from "fs";
 import {FunctionInfo, ModuleInfo, PackageInfo} from "../analysis/infos";
 import {addAll, getOrSet, mapGetMap} from "../misc/util";
 import {ConstraintVar, NodeVar, ObjectPropertyVar} from "../analysis/constraintvars";
@@ -9,6 +9,7 @@ import {isIdentifier} from "@babel/types";
 import {VulnerabilityResults} from "../patternmatching/vulnerabilitydetector";
 import {Vulnerability} from "vulnerabilities";
 import {constraintVarToStringWithCode, funcToStringWithCode} from "./tostringwithcode";
+import {join, sep} from "path";
 
 export interface VisualizerGraphs {
     graphs: Array<{
@@ -457,7 +458,26 @@ function getVisualizerDataFlowGraphs(a: AnalysisState, f: FragmentState): Visual
 
 function writeVisualizerHtml(filename: string, g: VisualizerGraphs) {
     const DATA = "$DATA";
-    const templateFile =  __dirname + (__filename.endsWith(".ts") ? "/.." : "") + "/../resources/visualizer.html"; // if using ts-node to run main.ts, the resources are in the ../../resources directory
+
+    // Resources directory location varies by deployment strategy. Look for it in anscestor paths,
+    // starting with `${__dirname}/..`.
+    const baseDir = __dirname;
+    const baseDirSegments = baseDir.split(sep).length - 1;
+    const resourcePath = join("resources", "visualizer.html");
+    let parentDir = "..";
+    let templateFile = null;
+    for (let i = 1; i < baseDirSegments; i++) {
+        const candidatePath = join(baseDir, parentDir, resourcePath);
+        if (existsSync(candidatePath)) {
+            templateFile = candidatePath;
+            break;
+        }
+        parentDir = join(parentDir, "..");
+    }
+    if (templateFile === null) {
+        throw new Error(`Failed to find template file in "${resourcePath}" in anscestor of directory "${baseDir}"`);
+    }
+
     const t = readFileSync(templateFile, "utf-8");
     const i = t.indexOf(DATA); // string.replace doesn't like very long strings
     const res = t.substring(0, i) + JSON.stringify(g) + t.substring(i + DATA.length);
