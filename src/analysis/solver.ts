@@ -35,7 +35,7 @@ import {nuutila} from "../misc/scc";
 import {options, patternProperties} from "../options";
 import Timer from "../misc/timer";
 import {setImmediate} from "timers/promises";
-import {AnalysisDiagnostics} from "diagnostics";
+import {AnalysisDiagnostics} from "../typings/diagnostics";
 import {getMemoryUsage} from "../misc/memory";
 
 export class AbortedException extends Error {}

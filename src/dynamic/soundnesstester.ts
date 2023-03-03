@@ -2,7 +2,7 @@ import {readFileSync} from "fs";
 import {DummyModuleInfo, FunctionInfo, ModuleInfo} from "../analysis/infos";
 import logger from "../misc/logger";
 import {arrayToString, percent, sourceLocationToStringWithFile, sourceLocationToStringWithFileAndEnd} from "../misc/util";
-import {CallGraph} from "callgraph";
+import {CallGraph} from "../typings/callgraph";
 import {AnalysisState} from "../analysis/analysisstate";
 import path from "path";
 import {options} from "../options";

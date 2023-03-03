@@ -9,7 +9,7 @@ import {analyzeFiles} from "../analysis/analyzer";
 import {dirname} from "path";
 import {expand, writeStreamedStringify} from "../misc/files";
 import logger, {setLogLevel} from "../misc/logger";
-import {AnalysisDiagnostics} from "diagnostics";
+import {AnalysisDiagnostics} from "../typings/diagnostics";
 import {AnalysisStateReporter} from "../output/analysisstatereporter";
 import Solver from "../analysis/solver";
 

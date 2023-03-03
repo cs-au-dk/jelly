@@ -10,8 +10,8 @@ import {options} from "../options";
 import {DummyModuleInfo, FunctionInfo, ModuleInfo} from "../analysis/infos";
 import {Function, isIdentifier, Node, SourceLocation} from "@babel/types";
 import assert from "assert";
-import {AnalysisDiagnostics} from "diagnostics";
-import {CallGraph} from "callgraph";
+import {AnalysisDiagnostics} from "../typings/diagnostics";
+import {CallGraph} from "../typings/callgraph";
 
 /**
  * Functions for reporting information about the analysis state.

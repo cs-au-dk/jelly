@@ -10,7 +10,7 @@
  * - calls to/from native functions, including 'eval', and event handlers
  * - calls to 'require' and import declarations
  */
-import {SourceLocationJSON} from "../src/misc/util";
+import {SourceLocationJSON} from "../misc/util";
 
 export type CallGraph = { // TODO: represent special call edges separately from ordinary call edges?
 

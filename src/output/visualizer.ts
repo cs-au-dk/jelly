@@ -7,7 +7,7 @@ import {FragmentState} from "../analysis/fragmentstate";
 import {NativeObjectToken, Token} from "../analysis/tokens";
 import {isIdentifier} from "@babel/types";
 import {VulnerabilityResults} from "../patternmatching/vulnerabilitydetector";
-import {Vulnerability} from "vulnerabilities";
+import {Vulnerability} from "../typings/vulnerabilities";
 import {constraintVarToStringWithCode, funcToStringWithCode} from "./tostringwithcode";
 
 export interface VisualizerGraphs {
@@ -457,7 +457,7 @@ function getVisualizerDataFlowGraphs(a: AnalysisState, f: FragmentState): Visual
 
 function writeVisualizerHtml(filename: string, g: VisualizerGraphs) {
     const DATA = "$DATA";
-    const templateFile =  __dirname + (__filename.endsWith(".ts") ? "/.." : "") + "/../resources/visualizer.html"; // if using ts-node to run main.ts, the resources are in the ../../resources directory
+    const templateFile =  __dirname + "/../../resources/visualizer.html";
     const t = readFileSync(templateFile, "utf-8");
     const i = t.indexOf(DATA); // string.replace doesn't like very long strings
     const res = t.substring(0, i) + JSON.stringify(g) + t.substring(i + DATA.length);

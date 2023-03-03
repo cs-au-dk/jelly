@@ -1,4 +1,4 @@
-import {CallGraph} from "callgraph";
+import {CallGraph} from "../typings/callgraph";
 import assert from "assert";
 
 /**

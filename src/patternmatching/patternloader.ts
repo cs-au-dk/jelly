@@ -1,4 +1,4 @@
-import {PatternWrapper, SemanticPatch, SemanticPatchNew} from "tapir";
+import {PatternWrapper, SemanticPatch, SemanticPatchNew} from "../typings/tapir";
 import {readFileSync} from "fs";
 import {AccessPathPatternCanonicalizer, parseDetectionPattern} from "./patternparser";
 import {DetectionPattern, ImportAccessPathPattern, PropertyAccessPathPattern} from "./patterns";

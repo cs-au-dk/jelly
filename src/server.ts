@@ -32,12 +32,12 @@ import {
     TSLibraryUsageRequest,
     TSLibraryUsageResponse,
     TypeScriptRequest
-} from "ipc";
+} from "./typings/ipc";
 import {options, resetOptions, setDefaultTrackedModules, setOptions, setPatternProperties} from "./options";
 import {autoDetectBaseDir, expand} from "./misc/files";
 import {analyzeFiles} from "./analysis/analyzer";
 import {TypeScriptTypeInferrer} from "./typescript/typeinferrer";
-import {PatternWrapper, SemanticPatch} from "tapir";
+import {PatternWrapper, SemanticPatch} from "./typings/tapir";
 import {DetectionPattern} from "./patternmatching/patterns";
 import {convertTapirPatterns, getGlobs, getProperties, loadTapirDetectionPatternFiles, removeObsoletePatterns} from "./patternmatching/patternloader";
 import {convertPatternMatchesToJSON, PatternMatcher} from "./patternmatching/patternmatcher";
@@ -50,7 +50,7 @@ import {AnalysisStateReporter} from "./output/analysisstatereporter";
 import {exportCallGraphHtml, exportDataFlowGraphHtml} from "./output/visualizer";
 import {VulnerabilityDetector, VulnerabilityResults} from "./patternmatching/vulnerabilitydetector";
 import {readFileSync} from "fs";
-import {Vulnerability} from "vulnerabilities";
+import {Vulnerability} from "./typings/vulnerabilities";
 import {addAll} from "./misc/util";
 
 const VERSION = require("../package.json").version;

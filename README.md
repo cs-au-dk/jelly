@@ -90,6 +90,7 @@ Build binary executables (optional), placed in `dist/`:
 sudo npm install -g pkg
 npm run pkg
 ```
+Note that the binary executables do not support dynamic call graph construction.
 
 ##  Docker
 
@@ -115,7 +116,7 @@ node lib/server.js
 ```
 See also the instructions above for how to build binary executables.
 
-Requests to the server are sent on stdin using the JSON format described in `typings/ipc.d.ts`.
+Requests to the server are sent on stdin using the JSON format described in `src/typings/ipc.ts`.
 Responses are returned (asynchronously) on stdout with the two-line header (including the empty line)
 ```
 Content-Length: <bytes>

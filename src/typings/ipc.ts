@@ -1,10 +1,10 @@
-import {options} from "../src/options";
-import {AnalysisDiagnostics} from "diagnostics";
-import {AccessPathPatternStringToNodes} from "../src/patternmatching/apiusage";
-import {PatternMatchesJSON} from "../src/patternmatching/patternmatcher";
-import {SemanticPatch} from "tapir";
-import {CallGraph} from "callgraph";
-import {LibraryUsageJSON} from "../src/typescript/typeinferrer";
+import {options} from "../options";
+import {AnalysisDiagnostics} from "./diagnostics";
+import {AccessPathPatternStringToNodes} from "../patternmatching/apiusage";
+import {PatternMatchesJSON} from "../patternmatching/patternmatcher";
+import {SemanticPatch} from "./tapir";
+import {CallGraph} from "./callgraph";
+import {LibraryUsageJSON} from "../typescript/typeinferrer";
 
 export interface Message {
     seq?: number;

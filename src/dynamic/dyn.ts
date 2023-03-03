@@ -52,7 +52,7 @@ if (!outfile) {
 
 console.log(`jelly: Running instrumented program: node ${process.argv.slice(4).join(" ")} (process ${process.pid})`);
 
-import {IID, Jalangi, SourceObject} from "jalangi";
+import {IID, Jalangi, SourceObject} from "../typings/jalangi";
 import fs from "fs";
 import path from "path";
 

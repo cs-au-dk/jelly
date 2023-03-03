@@ -19,18 +19,19 @@
     "program analysis"
   ],
   "files": [
-    "lib"
+    "lib",
+    "bin",
+    "resources"
   ],
   "bin": {
     "jelly": "lib/main.js",
     "jelly-server": "lib/server.js"
   },
   "scripts": {
-    "build": "npm run copy-bin-resources; npm run chmod; tsc --build tsconfig-build.json",
-    "build-watch": "npm run copy-bin-resources; npm run chmod; tsc --build tsconfig-build.json -w",
+    "build": "tsc --build tsconfig-build.json && npm run chmod",
+    "build-watch": "tsc --build tsconfig-build.json -w && npm run chmod",
     "start": "node lib/main.js",
-    "copy-bin-resources": "mkdir -p lib; cp -r bin resources lib",
-    "chmod": "touch lib/main.js lib/server.js; chmod +x lib/main.js lib/server.js bin/node",
+    "chmod": "chmod +x lib/main.js lib/server.js",
     "tests-install": "tests/install.sh",
     "test": "jest --selectProjects default",
     "differential": "jest --selectProjects differential",

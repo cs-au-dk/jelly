@@ -26,11 +26,11 @@ import {getMemoryLimit} from "./misc/memory";
 import Solver from "./analysis/solver";
 import {exportCallGraphHtml, exportDataFlowGraphHtml} from "./output/visualizer";
 import {VulnerabilityDetector, VulnerabilityResults} from "./patternmatching/vulnerabilitydetector";
-import {Vulnerability} from "vulnerabilities";
+import {Vulnerability} from "./typings/vulnerabilities";
 import {addAll} from "./misc/util";
 import {getAPIExported, reportAccessPaths, reportAPIExportedFunctions} from "./patternmatching/apiexported";
 import {merge} from "./output/merge";
-import {CallGraph} from "callgraph";
+import {CallGraph} from "./typings/callgraph";
 
 const VERSION = require("../package.json").version;
 const PKG = "pkg" in process;

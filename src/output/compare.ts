@@ -1,5 +1,5 @@
 import {readFileSync} from "fs";
-import {CallGraph} from "callgraph";
+import {CallGraph} from "../typings/callgraph";
 import {addAll, mapGetSet, percent} from "../misc/util";
 import logger from "../misc/logger";
 import assert from "assert";

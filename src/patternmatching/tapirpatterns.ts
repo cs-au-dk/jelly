@@ -1,4 +1,4 @@
-import {Match, PatchType, PatternWrapper, SemanticPatch} from "tapir";
+import {Match, PatchType, PatternWrapper, SemanticPatch} from "../typings/tapir";
 import {DetectionPattern} from "./patterns";
 import {
     convertTapirPatterns,
@@ -11,7 +11,7 @@ import {setDefaultTrackedModules, setPatternProperties} from "../options";
 import {AnalysisState} from "../analysis/analysisstate";
 import {FragmentState} from "../analysis/fragmentstate";
 import {TypeScriptTypeInferrer} from "../typescript/typeinferrer";
-import {AnalysisDiagnostics} from "diagnostics";
+import {AnalysisDiagnostics} from "../typings/diagnostics";
 import logger, {writeStdOutIfActive} from "../misc/logger";
 import {sourceLocationToStringWithFileAndEnd, SourceLocationWithFilename} from "../misc/util";
 import {TimeoutException} from "../misc/timer";
