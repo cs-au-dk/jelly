@@ -28,10 +28,10 @@
     "jelly-server": "lib/server.js"
   },
   "scripts": {
-    "build": "tsc --build tsconfig-build.json && npm run chmod",
-    "build-watch": "tsc --build tsconfig-build.json -w && npm run chmod",
+    "build": "npm run chmod; tsc --build tsconfig-build.json",
+    "build-watch": "npm run chmod; tsc --build tsconfig-build.json -w",
     "start": "node lib/main.js",
-    "chmod": "chmod +x lib/main.js lib/server.js",
+    "chmod": "mkdir -p lib; touch lib/main.js lib/server.js; chmod +x lib/main.js lib/server.js",
     "tests-install": "tests/install.sh",
     "test": "jest --selectProjects default",
     "differential": "jest --selectProjects differential",
