@@ -259,6 +259,15 @@ export function visit(ast: File, op: Operations) {
             if (!name && !anon)
                 a.warnUnsupported(fun, `Computed ${isFunctionDeclaration(path.node) || isFunctionExpression(path.node) ? "function" : "method"} name`); // TODO: handle functions/methods with unknown name?
 
+            // process destructuring for parameters and register identifier parameters
+            for (const param of fun.params) {
+                const paramVar = op.varProducer.nodeVar(param);
+                if (isIdentifier(param))
+                    a.registerFunctionParameter(paramVar, path.node);
+                else
+                    op.assign(paramVar, param, path);
+            }
+
             if (fun.generator) {
 
                 // function*
@@ -338,7 +347,7 @@ export function visit(ast: File, op: Operations) {
                 const oper = path.node.operator;
                 if (oper === '=' || oper === '||=' || oper === '&&=' || oper === '??=') {
                     const eVar = op.expVar(path.node.right, path);
-                    op.assign(eVar, path.node.left, path.node, a.getEnclosingFunctionOrModule(path, op.moduleInfo), path, false);
+                    op.assign(eVar, path.node.left, path);
 
                     // constraint: ⟦E⟧ ⊆ ⟦... = E⟧
                     if (!isParentExpressionStatement(path))
@@ -352,7 +361,7 @@ export function visit(ast: File, op: Operations) {
 
                 // X = E (as default value)
                 // constraint: ⟦E⟧ ⊆ ⟦X⟧ (if X is a simple identifier...)
-                op.assign(op.expVar(path.node.right, path), path.node.left, path.node, a.getEnclosingFunctionOrModule(path, op.moduleInfo), path, false);
+                op.assign(op.expVar(path.node.right, path), path.node.left, path);
             }
         },
 
@@ -362,7 +371,7 @@ export function visit(ast: File, op: Operations) {
 
                     // var/let/const X = E
                     // constraint: ⟦E⟧ ⊆ ⟦X⟧ (if X is a simple identifier...)
-                    op.assign(op.expVar(path.node.init, path), path.node.id, path.node, a.getEnclosingFunctionOrModule(path, op.moduleInfo), path, false);
+                    op.assign(op.expVar(path.node.init, path), path.node.id, path);
                 }
             }
         },
@@ -716,7 +725,7 @@ export function visit(ast: File, op: Operations) {
             // assign the temporary result to the l-value
             const lval = isLVal(path.node.left) ? path.node.left : path.node.left.declarations.length === 1 ? path.node.left.declarations[0]?.id : undefined;
             assert(lval, "Unexpected number of declarations at for-of");
-            op.assign(a.varProducer.nodeVar(path.node), lval, path.node, a.getEnclosingFunctionOrModule(path, op.moduleInfo), path, false);
+            op.assign(a.varProducer.nodeVar(path.node), lval, path);
             // note: 'for await' is handled trivially because the same abstract object is used for the AsyncGenerator and the iterator objects
         },
 

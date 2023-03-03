@@ -26,9 +26,25 @@ import {
 } from "@babel/types";
 import {NodePath} from "@babel/traverse";
 import {getKey, getProperty, isMaybeUsedAsPromise, isParentExpressionStatement} from "../misc/asthelpers";
-import {AccessPathToken, AllocationSiteToken, ArrayToken, ClassToken, FunctionToken, NativeObjectToken, ObjectToken, PackageObjectToken, Token} from "./tokens";
+import {
+    AccessPathToken,
+    AllocationSiteToken,
+    ArrayToken,
+    ClassToken,
+    FunctionToken,
+    NativeObjectToken,
+    ObjectToken,
+    PackageObjectToken,
+    Token
+} from "./tokens";
 import {ArgumentsVar, ConstraintVar, IntermediateVar, NodeVar} from "./constraintvars";
-import {CallResultAccessPath, IgnoredAccessPath, ModuleAccessPath, PropertyAccessPath, UnknownAccessPath} from "./accesspaths";
+import {
+    CallResultAccessPath,
+    IgnoredAccessPath,
+    ModuleAccessPath,
+    PropertyAccessPath,
+    UnknownAccessPath
+} from "./accesspaths";
 import Solver from "./solver";
 import {AnalysisState, globalLoc} from "./analysisstate";
 import {DummyModuleInfo, FunctionInfo, ModuleInfo, normalizeModuleName, PackageInfo} from "./infos";
@@ -36,9 +52,19 @@ import logger from "../misc/logger";
 import {builtinModules} from "../natives/nodejs";
 import {requireResolve} from "../misc/files";
 import {options} from "../options";
-import {FilePath, getOrSet, isArrayIndex, nodeToString, sourceLocationToStringWithFile} from "../misc/util";
+import {FilePath, getOrSet, isArrayIndex, sourceLocationToStringWithFile} from "../misc/util";
 import assert from "assert";
-import {ARRAY_PROTOTYPE, FUNCTION_PROTOTYPE, MAP_KEYS, MAP_VALUES, OBJECT_PROTOTYPE, PROMISE_FULFILLED_VALUES, PROMISE_PROTOTYPE, REGEXP_PROTOTYPE, SET_VALUES} from "../natives/ecmascript";
+import {
+    ARRAY_PROTOTYPE,
+    FUNCTION_PROTOTYPE,
+    MAP_KEYS,
+    MAP_VALUES,
+    OBJECT_PROTOTYPE,
+    PROMISE_FULFILLED_VALUES,
+    PROMISE_PROTOTYPE,
+    REGEXP_PROTOTYPE,
+    SET_VALUES
+} from "../natives/ecmascript";
 import {SpecialNativeObjects} from "../natives/nativebuilder";
 import {ConstraintVarProducer} from "./constraintvarproducer";
 import {TokenListener} from "./listeners";
@@ -158,8 +184,19 @@ export class Operations {
                     // constraint: ...: ⟦Ei⟧ ⊆ ⟦Xi⟧ for each argument/parameter i (Xi may be a pattern)
                     if (isExpression(arg)) {
                         const argVar = this.expVar(arg, path);
-                        if (i < t.fun.params.length)
-                            this.assign(argVar, t.fun.params[i], pars.node, caller, path, true, isRestElement(t.fun.params[i]) ? args.slice(i) : undefined, t.fun);
+                        if (i < t.fun.params.length) {
+                            const param = t.fun.params[i];
+                            if (isRestElement(param)) {
+                                // read the remaining arguments into a fresh array
+                                const rest = args.slice(i);
+                                const t = this.newArrayToken(param);
+                                for (const [i, arg] of rest.entries())
+                                    if (isExpression(arg)) // TODO: SpreadElement in arguments (warning emitted below)
+                                        this.solver.addSubsetConstraint(this.expVar(arg, path), this.varProducer.objPropVar(t, String(i)));
+                                this.solver.addTokenConstraint(t, this.a.varProducer.nodeVar(param));
+                            } else
+                                this.solver.addSubsetConstraint(argVar, this.varProducer.nodeVar(param));
+                        }
                         // constraint ...: ⟦Ei⟧ ⊆ ⟦t_arguments[i]⟧ for each argument i if the function uses 'arguments'
                         if (hasArguments)
                             this.solver.addSubsetConstraint(argVar, this.varProducer.objPropVar(argumentsToken!, String(i)));
@@ -415,27 +452,16 @@ export class Operations {
 
     /**
      * Models an assignment from a constraint variable to an l-value.
-     * @param src source constraint variable
-     * @param dst destination l-value
-     * @param node AST node of the assignment (used for setter call edges)
-     * @param enclosing enclosing function/module of the source
-     * @param path path of operation (at calls, this is the path of the call site, not the function definition)
-     * @param isCall true if the assignment is for parameter passing at a function call, otherwise false
-     * @param rest rest arguments, undefined if not applicable
-     * @param fun a function if the assignment is for parameter passing at a function call, otherwise undefined
      */
-    assign(src: ConstraintVar | undefined, dst: LVal | ParenthesizedExpression, node: Node, enclosing: FunctionInfo | ModuleInfo, path: NodePath, isCall: boolean, rest?: CallExpression["arguments"], fun?: Function) {
+    assign(src: ConstraintVar | undefined, dst: LVal | ParenthesizedExpression, path: NodePath) {
         while (isParenthesizedExpression(dst))
             dst = dst.expression as LVal | ParenthesizedExpression; // for parenthesized expressions, use the inner expression (the definition of LVal in @babel/types misses ParenthesizedExpression)
         if (isIdentifier(dst)) {
 
             // X = E
             // constraint: ⟦E⟧ ⊆ ⟦X⟧
-            const lVar = isCall ? this.a.varProducer.nodeVar(dst) : this.varProducer.identVar(dst, path);
+            const lVar = this.varProducer.identVar(dst, path);
             this.solver.addSubsetConstraint(src, lVar);
-
-            if (fun)
-                this.a.registerFunctionParameter(lVar, fun); // TODO: also register for some of the cases below?
 
         } else if (isMemberExpression(dst)) {
             const lVar = this.expVar(dst.object, path);
@@ -446,11 +472,11 @@ export class Operations {
 
                 const writeToSetter = (t: Token) => {
                     if (t instanceof FunctionToken && t.fun.params.length === 1) {
-                        this.assign(src, t.fun.params[0], node, enclosing, path, true); // TODO: recursive call to assign, skip if already called with these arguments?
+                        this.solver.addSubsetConstraint(src, this.varProducer.nodeVar(t.fun.params[0]));
                         if (this.a.functionsWithThis.has(t.fun))
                             this.solver.addSubsetConstraint(lVar, this.varProducer.thisVar(t.fun));
-                        this.a.registerCall(node, this.moduleInfo, {accessor: true});
-                        this.a.registerCallEdge(node, enclosing, this.a.functionInfos.get(t.fun)!, {accessor: true});
+                        this.a.registerCall(path.node, this.moduleInfo, {accessor: true});
+                        this.a.registerCallEdge(path.node, this.a.getEnclosingFunctionOrModule(path, this.moduleInfo), this.a.functionInfos.get(t.fun)!, {accessor: true});
                     }
                 }
 
@@ -517,7 +543,7 @@ export class Operations {
 
         } else if (isAssignmentPattern(dst))
             // delegate to dst.left (the default value dst.right is handled at AssignmentPattern)
-            this.assign(src, dst.left, dst, enclosing, path, isCall, undefined, fun);
+            this.assign(src, dst.left, path);
         else if (isObjectPattern(dst)) {
             const matched = new Set<string>();
             for (const p of dst.properties)
@@ -535,17 +561,17 @@ export class Operations {
                     });
                     this.solver.addTokenConstraint(t, this.a.varProducer.nodeVar(p));
                     // assign the object to the sub-l-value
-                    this.assign(this.a.varProducer.nodeVar(p), p.argument, dst, enclosing, path, isCall, undefined, fun);
+                    this.assign(this.a.varProducer.nodeVar(p), p.argument, path);
                 } else {
                     const prop = getKey(p);
                     if (prop) {
                         matched.add(prop);
                         // read the property using p for the temporary result
-                        this.readProperty(src, prop, this.a.varProducer.nodeVar(p), p, enclosing);
+                        this.readProperty(src, prop, this.a.varProducer.nodeVar(p), p, this.a.getEnclosingFunctionOrModule(path, this.moduleInfo));
                         // assign the temporary result at p to the locations represented by p.value
                         if (!isLVal(p.value))
                             assert.fail(`Unexpected expression ${p.value.type}, expected LVal at ${sourceLocationToStringWithFile(p.value.loc)}`);
-                        this.assign(this.a.varProducer.nodeVar(p), p.value, dst, enclosing, path, isCall, undefined, fun);
+                        this.assign(this.a.varProducer.nodeVar(p), p.value, path);
                     }
                 }
         } else if (isArrayPattern(dst)) {
@@ -566,28 +592,18 @@ export class Operations {
                         });
                         this.solver.addTokenConstraint(t, this.a.varProducer.nodeVar(p));
                         // assign the array to the sub-l-value
-                        this.assign(this.a.varProducer.nodeVar(p), p.argument, dst, enclosing, path, isCall, undefined, fun);
+                        this.assign(this.a.varProducer.nodeVar(p), p.argument, path);
                     } else {
                         // read the property using p for the temporary result
-                        this.readProperty(src, String(i), this.a.varProducer.nodeVar(p), p, enclosing);
+                        this.readProperty(src, String(i), this.a.varProducer.nodeVar(p), p, this.a.getEnclosingFunctionOrModule(path, this.moduleInfo));
                         // assign the temporary result at p to the locations represented by p
-                        this.assign(this.a.varProducer.nodeVar(p), p, dst, enclosing, path, isCall, undefined, fun);
+                        this.assign(this.a.varProducer.nodeVar(p), p, path);
                     }
         } else {
             if (!isRestElement(dst))
                 assert.fail(`Unexpected LVal type ${dst.type} at ${sourceLocationToStringWithFile(dst.loc)}`);
-            if (!rest) {
-                this.a.warnUnsupported(node, `rest arguments missing ${nodeToString(dst)}`); // FIXME: may occur when called (spuriously?) from writeToSetter (try analyzing package enzyme or jsdom)
-                return;
-            }
-            // read the remaining arguments into a fresh array at dst
-            const t = this.newArrayToken(dst);
-            for (const [i, arg] of rest.entries())
-                if (isExpression(arg)) // TODO: SpreadElement in arguments (warning emitted at visitCallOrNew)
-                    this.solver.addSubsetConstraint(this.expVar(arg, path), this.varProducer.objPropVar(t, String(i)));
-            this.solver.addTokenConstraint(t, this.a.varProducer.nodeVar(dst));
-            // assign the array to the sub-l-value
-            this.assign(this.a.varProducer.nodeVar(dst), dst.argument, dst, enclosing, path, isCall, undefined, fun);
+            // assign the array generated at callFunction to the sub-l-value
+            this.assign(this.a.varProducer.nodeVar(dst), dst.argument, path);
         }
     }
 

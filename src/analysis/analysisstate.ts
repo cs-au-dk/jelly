@@ -441,7 +441,7 @@ export class AnalysisState { // TODO: move some of these fields to FragmentState
     }
 
     /**
-     * Registers a constraint variable that represents a function parameter.
+     * Registers a constraint variable that represents a function parameter (identifiers only, excluding patterns).
      */
     registerFunctionParameter(v: ConstraintVar, fun: Function) {
         mapGetSet(this.functionParameters, fun).add(v);
