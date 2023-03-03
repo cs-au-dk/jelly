@@ -48,7 +48,7 @@ ENV NODE_OPTIONS --max-old-space-size=8000
 # install Jelly files built locally
 RUN mkdir /jelly
 WORKDIR /jelly
-COPY ./package.json ./package-lock.json ./
+COPY ./package.json ./package-lock.json ./resources ./bin ./
 RUN npm install --omit=dev
 COPY ./lib ./lib
 RUN npm link
