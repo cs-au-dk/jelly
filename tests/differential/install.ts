@@ -1,5 +1,6 @@
 import fs from "fs";
 import {execSync} from "child_process";
+import path from "path";
 
 /**
  * The git tag of the version to be installed.
@@ -19,11 +20,11 @@ export const packagesDir = `${__dirname}/../../tmp/packages`;
 // noinspection JSUnusedGlobalSymbols
 /**
  * Install the tagged version of Jelly if tests/node_modules/jelly-previous doesn't exist:
- * 1. Git clone the tagged version of Jelly
- * 2. Install its dependencies
- * 3. Rename the package name to jelly-previous
- * 4. Copy the utils.ts to cloned version
- * 5. Remove unnecessary files
+ * * Git clone the tagged version of Jelly
+ * * Rename the package name to jelly-previous
+ * * Patch the files
+ * * Install its dependencies
+ * * Remove unnecessary files
  * Executed via globalSetup in jest.config.js.
  */
 export default function() {
@@ -44,11 +45,15 @@ export default function() {
     console.log(`Installing previous version '${tag}' of Jelly...`);
     fs.mkdirSync(jellyPrevious, {recursive: true});
     execSync(`git clone --depth=1 --single-branch --branch ${tag} $(git remote get-url origin) -c advice.detachedHead=false ${jellyPrevious}`);
-    execSync(`cd ${jellyPrevious} && npm install --force`);
     const packageJson = require(packageJsonFile);
     packageJson.name = `jelly-${tag}`;
     packageJson.version = tag;
-    fs.writeFileSync(packageJsonFile, JSON.stringify(packageJson, null, 2));
+    // patches
+    fs.writeFileSync(packageJsonFile, JSON.stringify(packageJson, null, 2)); // patches package.json
+    replaceInFolder('"diagnostics"', '"./typings/diagnostics.d"', jellyPrevious, true);
+    // install dependencies
+    execSync(`cd ${jellyPrevious} && npm install --force`);
+    // clear unnecessary files
     fs.rmSync(`${jellyPrevious}/tests`, {recursive: true});
     fs.rmSync(`${jellyPrevious}/.idea`, {recursive: true});
     fs.rmSync(`${jellyPrevious}/.git`, {recursive: true});
@@ -88,4 +93,35 @@ export function preparePackage(name: string, version: string) {
         const npmInstall = `cd ${versionDir} && npm install --ignore-scripts --force`;
         execSync(npmInstall);
     }
+}
+
+/**
+ * Replace string to another string in file.
+ * @param searchValue
+ * @param replaceValue
+ * @param filePath
+ */
+function replaceInFile(searchValue: string | RegExp, replaceValue: string, filePath: string) {
+    const fileContent = fs.readFileSync(filePath, 'utf8');
+    const newContent = fileContent.replace(searchValue, replaceValue);
+    fs.writeFileSync(filePath, newContent, 'utf8');
+}
+
+/**
+ * Replace *.d.ts import string, from "x" to "./typings/x.d.ts", including sub-folders.
+ * @param replacePath if a replaceValue is a path, the value would be prefixed with "../" if replace happened in the sub-folder.
+ */
+function replaceInFolder(searchValue: string | RegExp, replaceValue: string, folderPath: string, replacePath: boolean = false): void {
+    const fileNames = fs.readdirSync(folderPath);
+
+    fileNames.forEach((fileName) => {
+        const filePath = path.join(folderPath, fileName);
+        const stats = fs.statSync(filePath);
+
+        if (stats.isDirectory() && !fileName.startsWith(".")) {
+            replaceInFolder(searchValue, replacePath ? '"../' + replaceValue.substring(1) : replaceValue, filePath, replacePath);
+        } else if (stats.isFile()) {
+            replaceInFile(searchValue, replaceValue, filePath);
+        }
+    });
 }
