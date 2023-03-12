@@ -19,6 +19,7 @@ import {Operations} from "./operations";
 import {Program} from "@babel/types";
 import {UnknownAccessPath} from "./accesspaths";
 import {Token} from "./tokens";
+import {preprocessAst} from "../parsing/extras";
 
 export async function analyzeFiles(files: Array<string>, solver: Solver, returnFileMap: boolean = false): Promise<Map<FilePath, {sourceCode: string, program: Program}>> {
     const a = solver.analysisState;
@@ -67,11 +68,14 @@ export async function analyzeFiles(files: Array<string>, solver: Solver, returnF
                     solver.prepare();
 
                     // prepare model of native library
-                    const [globals, specials] = buildNatives(solver, moduleInfo);
+                    const {globals, globalsHidden, specials} = buildNatives(solver, moduleInfo);
+
+                    // preprocess the AST
+                    preprocessAst(ast, file, globals, globalsHidden);
 
                     // traverse the AST
                     writeStdOutIfActive("Traversing AST...");
-                    visit(ast, new Operations(file, solver, globals, specials));
+                    visit(ast, new Operations(file, solver, specials));
 
                     // propagate tokens until fixpoint reached for the module
                     await solver.propagate();

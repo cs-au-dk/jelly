@@ -87,7 +87,7 @@ export class AnalysisStateReporter {
             const fileIndex = fileIndices.get(fun instanceof ModuleInfo ? fun : fun.moduleInfo);
             if (fileIndex === undefined)
                 assert.fail(`File index not found for ${fun}`);
-            fs.writeSync(fd, `${first ? "" : ","}\n  "${funIndex}": ${JSON.stringify(makeLocStr(fileIndex, fun.loc))}`);
+            fs.writeSync(fd, `${first ? "" : ","}\n  "${funIndex}": ${JSON.stringify(makeLocStr(fileIndex, fun.node?.loc))}`);
             first = false;
         }
         fs.writeSync(fd, `\n },\n "calls": {`);
@@ -176,7 +176,7 @@ export class AnalysisStateReporter {
             const fileIndex = fileIndices.get(fun instanceof ModuleInfo ? fun : fun.moduleInfo);
             if (fileIndex === undefined)
                 assert.fail(`File index not found for ${fun}`);
-            cg.functions[funIndex] = makeLocStr(fileIndex, fun.loc);
+            cg.functions[funIndex] = makeLocStr(fileIndex, fun.node?.loc);
         }
         const callIndices = new Map<Node, number>();
         for (const [m, calls] of this.a.calls)

@@ -2,7 +2,6 @@ import {
     CallExpression,
     Expression,
     Function,
-    Identifier,
     isArrayPattern,
     isAssignmentPattern,
     isExportDeclaration,
@@ -80,8 +79,6 @@ export class Operations {
 
     readonly solver: Solver;
 
-    readonly globals: Array<Identifier>;
-
     readonly natives: SpecialNativeObjects
 
     readonly a: AnalysisState; // shortcut to this.solver.analysisState
@@ -96,10 +93,9 @@ export class Operations {
 
     readonly exportsObjectToken: NativeObjectToken;
 
-    constructor(file: FilePath, solver: Solver, globals: Array<Identifier>, natives: SpecialNativeObjects) {
+    constructor(file: FilePath, solver: Solver, natives: SpecialNativeObjects) {
         this.file = file;
         this.solver = solver;
-        this.globals = globals;
         this.natives = natives;
 
         this.a = this.solver.analysisState;

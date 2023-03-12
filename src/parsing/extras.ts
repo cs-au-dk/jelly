@@ -1,6 +1,33 @@
 import {NodePath, PluginObj} from '@babel/core';
 import {TemplateBuilder} from '@babel/template';
-import {isTSExternalModuleReference, TSExportAssignment, TSImportEqualsDeclaration} from '@babel/types';
+import {
+    File,
+    Identifier,
+    identifier,
+    isClassMethod,
+    isClassProperty,
+    isIdentifier,
+    isImportSpecifier,
+    isJSXAttribute,
+    isJSXIdentifier,
+    isJSXMemberExpression,
+    isMemberExpression,
+    isObjectMethod,
+    isObjectProperty,
+    isOptionalMemberExpression,
+    isTSExternalModuleReference,
+    isVariableDeclarator,
+    Program,
+    TSExportAssignment,
+    TSImportEqualsDeclaration,
+    variableDeclaration,
+    variableDeclarator
+} from '@babel/types';
+import traverse from "@babel/traverse";
+import {globalLoc, undefinedIdentifier} from "../analysis/analysisstate";
+import logger from "../misc/logger";
+import {getClass} from "../misc/asthelpers";
+import assert from "assert";
 
 /**
  * Replaces TypeScript "export =" and "import =" syntax.
@@ -27,4 +54,89 @@ export function replaceTypeScriptImportExportAssignments({ template }: {template
             }
         }
     };
+}
+
+export const JELLY_NODE_ID = Symbol("JELLY_NODE_ID");
+
+/**
+ * Preprocesses the given AST.
+ */
+export function preprocessAst(ast: File, file: string, globals: Array<Identifier>, globalsHidden: Array<Identifier>) {
+    let nextNodeID = 0;
+
+    // assign unique index to each identifier in globals and globalsHidden
+    for (const n of [...globals, ...globalsHidden])
+        (n as any)[JELLY_NODE_ID] = ++nextNodeID;
+
+    // artificially declare all globals in the program scope (if not already declared)
+    traverse(ast, {
+        Program(path: NodePath<Program>) {
+            const decls = [...globals, undefinedIdentifier] // TODO: treat 'undefined' like other globals?
+                .filter(d => path.scope.getBinding(d.name) === undefined)
+                .map(id => {
+                    const d = variableDeclarator(id);
+                    d.loc = globalLoc;
+                    return d;
+                });
+            const d = variableDeclaration("var", decls);
+            d.loc = globalLoc;
+            path.scope.registerDeclaration(path.unshiftContainer("body", d)[0]);
+            path.stop();
+        }
+    });
+
+    traverse(ast, {
+        enter(path: NodePath) {
+            const n = path.node;
+
+            // assign unique index to each node (globals and globalsHidden are handled above)
+            if ((n as any)[JELLY_NODE_ID] === undefined)
+                (n as any)[JELLY_NODE_ID] = ++nextNodeID;
+
+            // workaround to ensure that AST nodes with undefined location (caused by desugaring) can be identified uniquely
+            if (!n.loc) {
+                let p: NodePath | null = path;
+                while (p && !p.node.loc)
+                    p = p.parentPath;
+                n.loc = {filename: file, start: p?.node.loc?.start, end: p?.node.loc?.end, nodeIndex: nextNodeID} as any; // see sourceLocationToString
+            }
+
+            // workarounds to match dyn.ts source locations
+            if (isClassMethod(n)) {
+                if (n.kind === "constructor") {
+                    // for constructors, use the class source location
+                    const cls = getClass(path);
+                    assert(cls);
+                    n.loc = cls.loc;
+                } else if (n.static) {
+                    // for static methods, use the identifier start location
+                    assert(n.loc && n.key.loc);
+                    n.loc.start = n.key.loc!.start;
+                }
+            }
+
+            // add bindings in global scope for identifiers with missing binding
+            if ((isIdentifier(n) || isJSXIdentifier(n)) &&
+                n.name !== "arguments" && !path.scope.getBinding(n.name) &&
+                !((isMemberExpression(path.parent) || isOptionalMemberExpression(path.parent) || isJSXMemberExpression(path.parent)) &&
+                    path.parent.property === path.node) &&
+                !isObjectProperty(path.parent) &&
+                !isObjectMethod(path.parent) &&
+                !isClassProperty(path.parent) &&
+                !isClassMethod(path.parent) &&
+                !isImportSpecifier(path.parent) &&
+                !isJSXAttribute(path.parent) &&
+                !isVariableDeclarator(path.parent)) {
+                const ps = path.scope.getProgramParent();
+                if (!ps.getBinding(n.name)?.identifier) {
+                    const d = identifier(n.name);
+                    d.loc = globalLoc;
+                    ps.push({id: d});
+                    if (logger.isDebugEnabled())
+                        logger.debug(`No binding for identifier ${n.name} (parent: ${path.parent.type}), creating one in program scope`);
+                } else if (logger.isDebugEnabled())
+                    logger.debug(`No binding for identifier ${n.name}, using the one in program scope`);
+            }
+        }
+    });
 }

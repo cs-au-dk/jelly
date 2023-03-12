@@ -115,11 +115,11 @@ function findFunctionAtLocation(a: AnalysisState, loc: string): FunctionInfo | M
         const file = resolve(loc.substring(0, i));
         const line = parseInt(loc.substring(i + 1), 10);
         const modinfo = a.moduleInfos.get(file);
-        if (line > 0 && modinfo && modinfo.loc && line <= modinfo.loc.end.line) {
+        if (line > 0 && modinfo && modinfo.node?.loc && line <= modinfo.node.loc.end.line) {
             let best: FunctionInfo | ModuleInfo = modinfo;
             for (const [fun, funinfo] of a.functionInfos)
                 if (fun.loc && sourceLocationContains(fun.loc, file, line))
-                    if (best.loc!.start.line < fun.loc.start.line || fun.loc.end.line < best.loc!.end.line)
+                    if (best.node!.loc!.start.line < fun.loc.start.line || fun.loc.end.line < best.node!.loc!.end.line)
                         best = funinfo; // assuming only a single best match on that line
             return best;
         }

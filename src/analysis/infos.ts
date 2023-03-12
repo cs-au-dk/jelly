@@ -1,5 +1,5 @@
-import {FilePath, sourceLocationToString} from "../misc/util";
-import {Function, SourceLocation} from "@babel/types";
+import {FilePath, sourceLocationToString, strHash} from "../misc/util";
+import {Function, Program} from "@babel/types";
 import {FragmentState} from "./fragmentstate";
 
 /**
@@ -57,15 +57,18 @@ export class ModuleInfo {
 
     readonly isEntry: boolean; // true for entry modules
 
-    loc: SourceLocation | null | undefined = null; // top-level source location (set by astvisitor)
+    node: Program | undefined; // top-level source location (set by astvisitor)
 
     fragmentState: FragmentState | undefined = undefined; // analysis solution after local analysis of this module
+
+    hash: number;
 
     constructor(relativePath: string, packageInfo: PackageInfo, path: FilePath, isEntry: boolean) {
         this.relativePath = relativePath;
         this.packageInfo = packageInfo;
         this.path = path;
         this.isEntry = isEntry;
+        this.hash = strHash(this.toString());
     }
 
     toString(): string {
@@ -110,7 +113,7 @@ export class FunctionInfo {
 
     readonly name: string | undefined; // function name
 
-    readonly loc: SourceLocation | null | undefined; // function source location
+    readonly node: Function; // function source location
 
     readonly moduleInfo: ModuleInfo; // module containing this function
 
@@ -120,13 +123,13 @@ export class FunctionInfo {
         return this.moduleInfo.packageInfo;
     }
 
-    constructor(name: string | undefined, loc: SourceLocation | null | undefined, moduleInfo: ModuleInfo) {
+    constructor(name: string | undefined, node: Function, moduleInfo: ModuleInfo) {
         this.name = name;
-        this.loc = loc;
+        this.node = node;
         this.moduleInfo = moduleInfo;
     }
 
     toString() {
-        return `${this.moduleInfo}:${sourceLocationToString(this.loc)}:${this.name ?? "<anonymous>"}`;
+        return `${this.moduleInfo}:${sourceLocationToString(this.node.loc)}:${this.name ?? "<anonymous>"}`;
     }
 }

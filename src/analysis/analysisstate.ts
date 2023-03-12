@@ -9,8 +9,7 @@ import {
     isNode,
     NewExpression,
     Node,
-    OptionalCallExpression,
-    SourceLocation
+    OptionalCallExpression
 } from "@babel/types";
 import {
     FilePath,
@@ -42,7 +41,7 @@ import {ConstraintVarProducer} from "./constraintvarproducer";
 import Timer from "../misc/timer";
 import {VulnerabilityDetector} from "../patternmatching/vulnerabilitydetector";
 
-export const globalLoc: SourceLocation = {start: {line: 0, column: 0}, end: {line: 0, column: 0}};
+export const globalLoc: SourceLocationWithFilename = {start: {line: 1, column: 0}, end: {line: 1, column: 0}, filename: "%global"};
 
 export const undefinedIdentifier = identifier("undefined"); // TODO: prevent writes to 'undefined'?
 undefinedIdentifier.loc = globalLoc;
@@ -537,9 +536,9 @@ export class AnalysisState { // TODO: move some of these fields to FragmentState
     /**
      * Registers a new FunctionInfo for a function/method/constructor.
      */
-    registerFunctionInfo(file: FilePath, path: NodePath<Function | Class>, name: string | undefined, fun: Function, loc: SourceLocation | null | undefined) {
+    registerFunctionInfo(file: FilePath, path: NodePath<Function | Class>, name: string | undefined, fun: Function) {
         const m = this.moduleInfos.get(file)!;
-        const f = new FunctionInfo(name, loc, m);
+        const f = new FunctionInfo(name, fun, m);
         this.functionInfos.set(fun, f);
         const parent = path.getFunctionParent()?.node;
         (parent ? this.functionInfos.get(parent)!.functions : m.functions).set(fun, f);

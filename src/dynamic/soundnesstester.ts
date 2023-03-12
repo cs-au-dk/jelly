@@ -19,13 +19,13 @@ export function testSoundness(jsonfile: string, analysisState: AnalysisState): [
     // collect all static functions including module top-level functions (excluding aliases)
     const staticFunctions = new Map<string, FunctionInfo | ModuleInfo>();
     for (const m of analysisState.moduleInfos.values())
-        if (m.loc) // TODO: m.loc may be empty with --ignore-dependencies
-            staticFunctions.set(`${m.path}:${m.loc.start.line}:${m.loc.start.column + 1}:${m.loc.end.line}:${m.loc.end.column + 1}`, m);
+        if (m.node?.loc) // TODO: m.node.loc may be empty with --ignore-dependencies
+            staticFunctions.set(`${m.path}:${m.node.loc.start.line}:${m.node.loc.start.column + 1}:${m.node.loc.end.line}:${m.node.loc.end.column + 1}`, m);
     for (const f of analysisState.functionInfos.values())
-        if (!f.loc || "nodeIndex" in f.loc)
+        if (!f.node?.loc || "nodeIndex" in f.node.loc)
             analysisState.warn(`Source location missing for function ${f.name || "<anonymous>"} in ${f.moduleInfo.path}`);
         else
-            staticFunctions.set(`${f.moduleInfo.path}:${f.loc.start.line}:${f.loc.start.column + 1}:${f.loc.end.line}:${f.loc.end.column + 1}`, f);
+            staticFunctions.set(`${f.moduleInfo.path}:${f.node.loc.start.line}:${f.node.loc.start.column + 1}:${f.node.loc.end.line}:${f.node.loc.end.column + 1}`, f);
 
     // log static locations
     if (logger.isDebugEnabled()) {

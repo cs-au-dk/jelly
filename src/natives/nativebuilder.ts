@@ -61,9 +61,10 @@ export type SpecialNativeObjects = Map<string, NativeObjectToken | PackageObject
  * Prepares models for the ECMAScript and Node.js native declarations.
  * Returns the global identifiers and the tokens for special native objects.
  */
-export function buildNatives(solver: Solver, moduleInfo: ModuleInfo): [Array<Identifier>, SpecialNativeObjects] {
+export function buildNatives(solver: Solver, moduleInfo: ModuleInfo): {globals: Array<Identifier>, globalsHidden: Array<Identifier>, specials: SpecialNativeObjects} {
     const globals: Array<Identifier> = [];
-    const natives: SpecialNativeObjects = new Map;
+    const globalsHidden: Array<Identifier> = [];
+    const specials: SpecialNativeObjects = new Map;
     const a = solver.analysisState;
 
     const models = [ecmascriptModels, nodejsModels];
@@ -84,13 +85,12 @@ export function buildNatives(solver: Solver, moduleInfo: ModuleInfo): [Array<Ide
             if (options.natives || m.name === "ecmascript" || (m.name === "nodejs" && ["exports", "module"].includes(name))) {
                 const id = identifier(name);
                 id.loc = loc;
-                if (!hidden)
-                    globals.push(id);
+                (hidden ? globalsHidden : globals).push(id);
                 const t = init
-                    ? init({solver, moduleInfo, natives, id})
+                    ? init({solver, moduleInfo, natives: specials, id})
                     : a.canonicalizeToken(new NativeObjectToken(name, moduleSpecific ? moduleInfo : undefined, invoke, constr));
                 solver.addTokenConstraint(t, a.varProducer.nodeVar(id));
-                natives.set(name, t);
+                specials.set(name, t);
             }
         }
 
@@ -107,9 +107,9 @@ export function buildNatives(solver: Solver, moduleInfo: ModuleInfo): [Array<Ide
         function definePrototypeObject(name: string): NativeObjectToken {
             const t = a.canonicalizeToken(new NativeObjectToken(`${name}.prototype`));
             if (m.name === "ecmascript")
-                natives.set(t.name, t);
+                specials.set(t.name, t);
             if (options.natives || m.name === "ecmascript")
-                solver.addTokenConstraint(t, a.varProducer.objPropVar(natives.get(name)!, "prototype"));
+                solver.addTokenConstraint(t, a.varProducer.objPropVar(specials.get(name)!, "prototype"));
             return t;
         }
 
@@ -127,8 +127,8 @@ export function buildNatives(solver: Solver, moduleInfo: ModuleInfo): [Array<Ide
             if (options.natives) {
                 const t = a.canonicalizeToken(new NativeObjectToken(`${x.name}.${f.name}`, undefined, f.invoke));
                 if (m.name === "ecmascript")
-                    natives.set(t.name, t);
-                solver.addTokenConstraint(t, a.varProducer.objPropVar(natives.get(x.name)!, f.name));
+                    specials.set(t.name, t);
+                solver.addTokenConstraint(t, a.varProducer.objPropVar(specials.get(x.name)!, f.name));
             }
         }
 
@@ -139,7 +139,7 @@ export function buildNatives(solver: Solver, moduleInfo: ModuleInfo): [Array<Ide
             if (options.natives) {
                 const t = a.canonicalizeToken(new NativeObjectToken(`${x.name}.prototype.${f.name}`, undefined, f.invoke));
                 if (m.name === "ecmascript")
-                    natives.set(t.name, t);
+                    specials.set(t.name, t);
                 solver.addTokenConstraint(t, a.varProducer.objPropVar(pro, f.name));
             }
         }
@@ -188,10 +188,10 @@ export function buildNatives(solver: Solver, moduleInfo: ModuleInfo): [Array<Ide
         if (m.init) {
             if (logger.isVerboseEnabled())
                 logger.verbose(`Running initialization for ${m.name}`);
-            m.init({solver, moduleInfo, natives});
+            m.init({solver, moduleInfo, natives: specials});
         }
     if (logger.isVerboseEnabled())
         logger.verbose("Adding natives completed");
 
-    return [globals, natives];
+    return {globals, globalsHidden, specials};
 }

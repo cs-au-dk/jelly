@@ -63,7 +63,6 @@ import {
     ObjectProperty,
     OptionalCallExpression,
     OptionalMemberExpression,
-    Program,
     RegExpLiteral,
     ReturnStatement,
     SequenceExpression,
@@ -72,8 +71,6 @@ import {
     TaggedTemplateExpression,
     ThisExpression,
     ThrowStatement,
-    variableDeclaration,
-    variableDeclarator,
     VariableDeclarator,
     WithStatement,
     YieldExpression
@@ -90,9 +87,8 @@ import {
 } from "./tokens";
 import {ModuleInfo} from "./infos";
 import logger from "../misc/logger";
-import {mapArrayAdd, sourceLocationToStringWithFile, SourceLocationWithFilename} from "../misc/util";
+import {mapArrayAdd, sourceLocationToStringWithFile} from "../misc/util";
 import assert from "assert";
-import {globalLoc, undefinedIdentifier} from "./analysisstate";
 import {options} from "../options";
 import {ComponentAccessPath, PropertyAccessPath, UnknownAccessPath} from "./accesspaths";
 import {ConstraintVar} from "./constraintvars";
@@ -118,43 +114,16 @@ export const IDENTIFIER_KIND = Symbol();
 export function visit(ast: File, op: Operations) {
     const solver = op.solver;
     const a = solver.analysisState;
-    let nextNodeIndex = 1;
 
     a.maybeEscaping.clear(); // TODO: move to method in AnalysisState?
+
+    // set module source location
+    op.moduleInfo.node = ast.program;
 
     // traverse the AST and extend the analysis result with information about the current module
     if (logger.isVerboseEnabled())
         logger.verbose(`Traversing AST of ${op.file}`);
     traverse(ast, {
-
-        enter(path: NodePath) {
-
-            // workaround to ensure that AST nodes with undefined location (caused by desugaring) can be identified uniquely
-            if (!path.node.loc) {
-                let p: NodePath | null = path;
-                while (p && !p.node.loc)
-                    p = p.parentPath;
-                path.node.loc = {filename: op.file, start: p?.node.loc?.start, end: p?.node.loc?.end, nodeIndex: nextNodeIndex++} as any; // see sourceLocationToString
-            }
-        },
-
-        Program(path: NodePath<Program>) {
-
-            // set module source location
-            op.moduleInfo.loc = path.node.loc;
-
-            // artificially declare all globals in the program scope (if not already declared)
-            const decls = [...op.globals, undefinedIdentifier] // TODO: treat 'undefined' like other globals?
-                .filter(d => path.scope.getBinding(d.name) === undefined)
-                .map(id => {
-                    const d = variableDeclarator(id);
-                    d.loc = globalLoc;
-                    return d;
-                });
-            const d = variableDeclaration("var", decls);
-            d.loc = globalLoc;
-            path.scope.registerDeclaration(path.unshiftContainer("body", d)[0]);
-        },
 
         ThisExpression(path: NodePath<ThisExpression>) {
 
@@ -249,13 +218,10 @@ export function visit(ast: File, op: Operations) {
                 (isObjectMethod(path.node) || isClassMethod(path.node)) ? getKey(path.node) :
                     cls ? cls.id?.name : undefined;// for constructors, use the class name if present
             const anon = isFunctionDeclaration(path.node) || isFunctionExpression(path.node) ? path.node.id === null : isArrowFunctionExpression(path.node);
-            const loc = cls ? cls.loc : // for constructors, use the class location (workaround to match dyn.ts)
-                isClassMethod(fun) && fun.static ? {filename: (fun.key.loc as SourceLocationWithFilename).filename, start: fun.key.loc!.start, end: fun.loc!.end} : // for static methods, use the identifier location (workaround to match dyn.ts)
-                    fun.loc;
             const msg = cls ? "constructor" : `${name ?? (anon ? "<anonymous>" : "<computed>")}`;
             if (logger.isVerboseEnabled())
-                logger.verbose(`Reached function ${msg} at ${sourceLocationToStringWithFile(loc)}`);
-            a.registerFunctionInfo(op.file, path, name, fun, loc);
+                logger.verbose(`Reached function ${msg} at ${sourceLocationToStringWithFile(fun.loc)}`);
+            a.registerFunctionInfo(op.file, path, name, fun);
             if (!name && !anon)
                 a.warnUnsupported(fun, `Computed ${isFunctionDeclaration(path.node) || isFunctionExpression(path.node) ? "function" : "method"} name`); // TODO: handle functions/methods with unknown name?
 

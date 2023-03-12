@@ -37,6 +37,7 @@ import Timer from "../misc/timer";
 import {setImmediate} from "timers/promises";
 import {AnalysisDiagnostics} from "../typings/diagnostics";
 import {getMemoryUsage} from "../misc/memory";
+import {JELLY_NODE_ID} from "../parsing/extras";
 
 export class AbortedException extends Error {}
 
@@ -49,9 +50,6 @@ export default class Solver {
     unprocessedTokens: Map<ConstraintVar, Array<Token>> = new Map;
 
     unprocessedSubsetEdges: Map<ConstraintVar, Set<ConstraintVar>> = new Map;
-
-    idSymbol = Symbol();
-    nextNodeID = 0;
 
     // TODO: move some of this into AnalysisDiagnostics?
     // for diagnostics only
@@ -335,12 +333,9 @@ export default class Solver {
      * Provides a unique ID for the given key and node.
      */
     private getListenerID(key: TokenListener, n: Node): ListenerID {
-        let id = (n as any)[this.idSymbol] as number | undefined;
-        if (id === undefined) {
-            id = this.nextNodeID++;
-            (n as any)[this.idSymbol] = id;
-        }
-        return (id << 10) + key;
+        let id = (n as any)[JELLY_NODE_ID];
+        assert(id !== undefined);
+        return ((id << 10) + key) ^ (this.analysisState.moduleInfos.get((n as any)?.loc?.filename)?.hash || 0);
     }
 
     /**
