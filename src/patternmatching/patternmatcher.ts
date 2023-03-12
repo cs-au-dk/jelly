@@ -325,9 +325,8 @@ export class PatternMatcher {
                 for (const level of confidenceLevels)
                     for (const [n, aps] of sub[level])
                         addAll(aps, mapGetSet(res[level], n));
-                const ap = a.canonicalizeAccessPath(new UnknownAccessPath());
                 for (const n of this.findUnknowns())
-                    mapGetSet(low, n).add(ap);
+                    mapGetSet(low, n).add(UnknownAccessPath.instance);
             } else if (p instanceof WildcardAccessPathPattern) {
                 // add all expressions that can be reached from matches to p.ap in zero or more calls or property accesses
                 let sub = this.findAccessPathPatternMatches(p.ap);

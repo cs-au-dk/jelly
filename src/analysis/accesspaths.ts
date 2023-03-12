@@ -81,6 +81,8 @@ export class ComponentAccessPath extends AccessPath {
  */
 export class IgnoredAccessPath extends AccessPath {
 
+    static instance = new IgnoredAccessPath();
+
     constructor() {
         super("Ignored");
     }
@@ -90,6 +92,8 @@ export class IgnoredAccessPath extends AccessPath {
  * Access path that represents unknown values.
  */
 export class UnknownAccessPath extends AccessPath {
+
+    static instance = new UnknownAccessPath();
 
     constructor() {
         super("Unknown");

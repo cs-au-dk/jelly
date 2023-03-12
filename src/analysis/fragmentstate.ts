@@ -61,7 +61,7 @@ export class FragmentState {
 
     ancestorListeners: Map<Token, Map<Node, (descendant: Token) => void>> = new Map;
 
-    readonly ancestorListenersProcessed: Map<Node, Set<Token>> = new Map; // TODO: make similar map/set for other kinds of listeners to avoid redundant listener calls?
+    readonly ancestorListenersProcessed: Map<Node, Set<Token>> = new Map;
 
     readonly arrayEntriesListeners: Map<ArrayToken, Map<ListenerID, (prop: string) => void>> = new Map;
 

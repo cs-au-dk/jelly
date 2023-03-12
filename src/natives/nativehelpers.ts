@@ -581,7 +581,7 @@ export function assignIteratorMapValuePairs(param: number, t: AllocationSiteToke
         const src = p.op.expVar(arg, p.path);
         const dst = a.varProducer.intermediateVar(p.path.node, "assignIteratorValuePairsToProperties");
         p.op.readIteratorValue(src, dst, p.path.node);
-        p.solver.addForAllConstraint(dst, TokenListener.NATIVE_8, p.path.node, (t2: Token) => {
+        p.solver.addForAllConstraint(dst, TokenListener.NATIVE_8, p.path.node.arguments[param], (t2: Token) => {
             if (t2 instanceof ArrayToken) {
                 if (keys)
                     p.solver.addSubsetConstraint(a.varProducer.objPropVar(t2, "0"), a.varProducer.objPropVar(t, keys));

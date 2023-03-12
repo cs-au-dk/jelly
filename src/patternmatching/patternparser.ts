@@ -1,13 +1,12 @@
 import {
     AccessPathPattern,
-    TypeFilter,
     CallDetectionPattern,
-    Filter,
-    FilterSelector,
     CallResultAccessPathPattern,
     DetectionPattern,
     DisjunctionAccessPathPattern,
     ExclusionAccessPathPattern,
+    Filter,
+    FilterSelector,
     Glob,
     ImportAccessPathPattern,
     ImportDetectionPattern,
@@ -17,6 +16,7 @@ import {
     ReadDetectionPattern,
     SimpleType,
     Type,
+    TypeFilter,
     WildcardAccessPathPattern,
     WriteDetectionPattern
 } from "./patterns";

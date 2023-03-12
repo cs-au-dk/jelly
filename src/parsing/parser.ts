@@ -6,7 +6,7 @@ import {replaceTypeScriptImportExportAssignments} from "./extras";
 import {AnalysisState} from "../analysis/analysisstate";
 
 /**
- * Parses and desugars the given file
+ * Parses and desugars the given file.
  * @param str the contents of the file
  * @param file the name of the file
  * @param a analysis state object

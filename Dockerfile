@@ -44,12 +44,13 @@ ENV PATH /opt/node/bin:$PATH
 ENV JAVA_HOME=/usr/lib/jvm/jdk
 ENV GRAAL_HOME=/usr/lib/jvm/graalvm
 ENV NODE_OPTIONS --max-old-space-size=8000
+ENV NODE_ENV production
 
 # install Jelly files built locally
 RUN mkdir /jelly
 WORKDIR /jelly
 COPY ./package.json ./package-lock.json ./resources ./bin ./
-RUN npm install --omit=dev
+RUN npm ci --omit=dev
 COPY ./lib ./lib
 RUN npm link
 ENTRYPOINT ["node", "/jelly/lib/main.js"]

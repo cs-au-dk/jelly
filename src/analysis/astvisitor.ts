@@ -94,7 +94,7 @@ import {mapArrayAdd, sourceLocationToStringWithFile, SourceLocationWithFilename}
 import assert from "assert";
 import {globalLoc, undefinedIdentifier} from "./analysisstate";
 import {options} from "../options";
-import {ComponentAccessPath, PropertyAccessPath} from "./accesspaths";
+import {ComponentAccessPath, PropertyAccessPath, UnknownAccessPath} from "./accesspaths";
 import {ConstraintVar} from "./constraintvars";
 import {
     getBaseAndProperty,
@@ -176,7 +176,7 @@ export function visit(ast: File, op: Operations) {
             }
 
             // constraint: @Unknown ∈ ⟦this⟧
-            solver.addAccessPath(op.theUnknownAccessPath, a.varProducer.nodeVar(path.node)); // TODO: omit this constraint in certain situations?
+            solver.addAccessPath(UnknownAccessPath.instance, a.varProducer.nodeVar(path.node)); // TODO: omit this constraint in certain situations?
         },
 
         Identifier(path: NodePath<Identifier>) {

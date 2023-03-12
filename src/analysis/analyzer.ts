@@ -317,7 +317,7 @@ async function patchDynamics(solver: Solver) {
                     logger.debug(`Empty object property read ${result} with dynamic write to base object ${base}`);
 
                 // constraint: ...: @Unknown ∈ ⟦E⟧ and k ∈ ⟦E.p⟧ (or ⟦E[..]⟧) where k is the package containing the property read operation
-                solver.addAccessPath(a.canonicalizeAccessPath(new UnknownAccessPath()), base);
+                solver.addAccessPath(UnknownAccessPath.instance, base);
                 solver.addTokenConstraint(pck, result); // TODO: omit?
                 count++;
             } else

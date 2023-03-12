@@ -57,7 +57,7 @@ export class AnalysisState { // TODO: move some of these fields to FragmentState
     /**
      * Map from AST node to canonical NodeVar object.
      */
-    readonly canonicalNodeVars: Map<Node, NodeVar> = new Map;
+    readonly canonicalNodeVars: WeakMap<Node, NodeVar> = new WeakMap;
 
     /**
      * Map from token string hash to canonical Token object.
@@ -680,7 +680,7 @@ export class AnalysisState { // TODO: move some of these fields to FragmentState
     getConstraintVarParent(v: ConstraintVar): PackageInfo | ModuleInfo | undefined {
         const p = v.getParent();
         if (isNode(p) || (p && "loc" in p && p.loc))
-            return this.moduleInfos.get((p.loc as SourceLocationWithFilename).filename)!;
+            return this.moduleInfos.get((p.loc as SourceLocationWithFilename).filename);
         return undefined;
     }
 }

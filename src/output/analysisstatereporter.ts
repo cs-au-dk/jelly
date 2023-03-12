@@ -149,7 +149,7 @@ export class AnalysisStateReporter {
      * Creates a JSON representation of the call graph using the format defined in callgraph.d.ts.
      */
     callGraphToJSON(files: Array<string>): CallGraph {
-        const cg: CallGraph & {entries: Array<String>, ignore: Array<SourceLocationJSON>} = {
+        const cg: CallGraph & {entries: Array<string>, ignore: Array<SourceLocationJSON>} = {
             time: new Date().toUTCString(),
             entries: [],
             files: [],
@@ -468,14 +468,7 @@ export class AnalysisStateReporter {
      * Reports the kinds of constraint variables and the number of occurrences for each kind.
      */
     reportVariableKinds() {
-        const varsWithListeners = new Set<ConstraintVar>();
-        for (const v of this.f.tokenListeners.keys())
-            varsWithListeners.add(v);
-        for (const [v1, m] of this.f.pairListeners1) {
-            varsWithListeners.add(v1);
-            for (const [v2,] of m.values())
-                varsWithListeners.add(v2);
-        }
+        const varsWithListeners = new Set<ConstraintVar>([...this.f.tokenListeners.keys(), ...this.f.pairListeners1.keys(), ...this.f.pairListeners2.keys()]);
         const counts = new Map<string, number>();
         const withListenersCounts = new Map<string, number>();
         const srcCounts = new Map<string, number>();

@@ -20,7 +20,7 @@ export abstract class ConstraintVar {
     /**
      * Finds the AST node, function, module or package this constraint variable belongs to.
      */
-    abstract getParent(): Node | PackageInfo | ModuleInfo | undefined;
+    abstract getParent(): Node | PackageInfo | ModuleInfo | undefined
 
     /**
      * Returns the kind of the constraint variable.
@@ -36,7 +36,7 @@ export abstract class ConstraintVar {
  */
 export class NodeVar extends ConstraintVar {
 
-    node: Node;
+    readonly node: Node;
 
     constructor(node: Node) {
         super();

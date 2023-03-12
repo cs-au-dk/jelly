@@ -1,6 +1,6 @@
 import {ModuleInfo} from "./infos";
 import {AccessPathToken, AllocationSiteToken, FunctionToken, NativeObjectToken, ObjectToken, Token} from "./tokens";
-import {ConstraintVar, FunctionReturnVar, ObjectPropertyVar} from "./constraintvars";
+import {ConstraintVar, ObjectPropertyVar} from "./constraintvars";
 import {mapGetArray} from "../misc/util";
 import logger from "../misc/logger";
 import {isIdentifier} from "@babel/types";
@@ -19,7 +19,7 @@ export function findEscapingObjects(m: ModuleInfo, solver: Solver): Set<ObjectTo
     const worklist: Array<Token> = [];
     const visited = new Set<Token>();
     const escaping = new Set<ObjectToken>();
-    const theUnknownAccessPathToken = a.canonicalizeToken(new AccessPathToken(a.canonicalizeAccessPath(new UnknownAccessPath())));
+    const theUnknownAccessPathToken = a.canonicalizeToken(new AccessPathToken(UnknownAccessPath.instance));
 
     /**
      * Adds the tokens of the given constraint variable to the worklist if not already visited.
@@ -68,7 +68,7 @@ export function findEscapingObjects(m: ModuleInfo, solver: Solver): Set<ObjectTo
         if (t instanceof FunctionToken) {
 
             // values returned from escaping functions are escaping
-            addToWorklist(a.canonicalizeVar(new FunctionReturnVar(t.fun)));
+            addToWorklist(a.varProducer.returnVar(t.fun));
 
             // add UnknownAccessPath at parameters
             for (const param of t.fun.params)

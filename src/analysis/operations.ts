@@ -96,10 +96,6 @@ export class Operations {
 
     readonly exportsObjectToken: NativeObjectToken;
 
-    readonly theUnknownAccessPath: UnknownAccessPath;
-
-    readonly theIgnoredModuleAccessPath: IgnoredAccessPath;
-
     constructor(file: FilePath, solver: Solver, globals: Array<Identifier>, natives: SpecialNativeObjects) {
         this.file = file;
         this.solver = solver;
@@ -113,8 +109,6 @@ export class Operations {
         this.packageInfo = this.moduleInfo.packageInfo;
         this.packageObjectToken = this.a.canonicalizeToken(new PackageObjectToken(this.packageInfo));
         this.exportsObjectToken = this.a.canonicalizeToken(new NativeObjectToken("exports", this.moduleInfo));
-        this.theUnknownAccessPath = this.a.canonicalizeAccessPath(new UnknownAccessPath());
-        this.theIgnoredModuleAccessPath = this.a.canonicalizeAccessPath(new IgnoredAccessPath());
     }
 
     /**
@@ -133,7 +127,7 @@ export class Operations {
 
             // the variable may be declared explicitly by unknown code
             // constraint: @Unknown ∈ ⟦X⟧
-            this.solver.addAccessPath(this.theUnknownAccessPath, v);
+            this.solver.addAccessPath(UnknownAccessPath.instance, v);
         }
         return v;
     }
@@ -244,7 +238,7 @@ export class Operations {
                                 this.a.registerCallEdge(pars.node, caller, this.a.functionInfos.get(at.fun)!, {external: true});
                                 for (let j = 0; j < at.fun.params.length; j++)
                                     if (isIdentifier(at.fun.params[j])) // TODO: non-identifier parameters?
-                                        this.solver.addAccessPath(this.theUnknownAccessPath, this.a.varProducer.nodeVar(at.fun.params[j]));
+                                        this.solver.addAccessPath(UnknownAccessPath.instance, this.a.varProducer.nodeVar(at.fun.params[j]));
                             }
                         });
                     else
@@ -357,7 +351,7 @@ export class Operations {
         } else { // TODO: handle dynamic property reads?
 
             this.a.registerEscaping(base); // unknown properties of the base object may escape
-            this.solver.addAccessPath(this.theUnknownAccessPath, dst);
+            this.solver.addAccessPath(UnknownAccessPath.instance, dst);
 
             // constraint: ∀ arrays t ∈ ⟦E⟧: ...
             if (dst)
@@ -399,7 +393,7 @@ export class Operations {
             if (!reexport) {
                 // standard library module: model with UnknownAccessPath
                 // constraint: @Unknown ∈ ⟦require(...)⟧
-                this.solver.addAccessPath(this.theUnknownAccessPath, resultVar);
+                this.solver.addAccessPath(UnknownAccessPath.instance, resultVar);
                 // TODO: models for parts of the standard library
             } else
                 this.a.warnUnsupported(path.node, `Ignoring re-export from built-in module '${str}'`); // TODO: re-exporting from built-in module
@@ -440,7 +434,7 @@ export class Operations {
                         micromatch.isMatch(m!.getOfficialName(), e) || micromatch.isMatch(s, e))
                     this.solver.addAccessPath(tracked ?
                             this.a.canonicalizeAccessPath(new ModuleAccessPath(m, s)) :
-                            this.theIgnoredModuleAccessPath,
+                            IgnoredAccessPath.instance,
                         resultVar);
                 }
 

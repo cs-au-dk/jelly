@@ -1,5 +1,5 @@
 import module from "module";
-import {NativeModelParams, NativeFunctionParams, NativeModel, NativeVariableParams} from "./nativebuilder";
+import {NativeFunctionParams, NativeModel, NativeModelParams, NativeVariableParams} from "./nativebuilder";
 
 /**
  * Names of Node.js built-in modules.

@@ -126,7 +126,9 @@ export function mapGetArray<K, V>(m: Map<K, Array<V>>, k: K): Array<V> {
     return mt;
 }
 
-export function getOrSet<K, V>(m: Map<K, V>, k: K, v: () => V): V {
+export function getOrSet<K, V>(m: Map<K, V> , k: K, v: () => V): V
+export function getOrSet<K extends object, V>(m: WeakMap<K, V>, k: K, v: () => V): V
+export function getOrSet<K, V>(m: Map<K, V> | WeakMap<any, V>, k: K, v: () => V): V {
     let r = m.get(k);
     if (!r) {
         r = v();

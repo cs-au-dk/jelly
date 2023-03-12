@@ -10,7 +10,7 @@ import {NativeFunctionAnalyzer} from "../natives/nativebuilder";
  */
 export abstract class Token {
 
-    abstract toString(): string;
+    abstract toString(): string
 }
 
 /**
@@ -18,9 +18,9 @@ export abstract class Token {
  */
 export class FunctionToken extends Token {
 
-    fun: Function;
+    readonly fun: Function;
 
-    moduleInfo: ModuleInfo;
+    readonly moduleInfo: ModuleInfo;
 
     constructor(fun: Function, moduleInfo: ModuleInfo) {
         super();
@@ -50,11 +50,11 @@ export type ObjectKind = "Object" | "Array" | "Class" | "Map" | "Set" | "WeakMap
  */
 export class AllocationSiteToken extends Token {
 
-    kind: ObjectKind;
+    readonly kind: ObjectKind;
 
-    allocSite: Node;
+    readonly allocSite: Node;
 
-    packageInfo: PackageInfo;
+    readonly packageInfo: PackageInfo;
 
     constructor(kind: ObjectKind, allocSite: Node, packageInfo: PackageInfo) {
         super();
@@ -132,7 +132,7 @@ export class NativeObjectToken extends Token {
  */
 export class PackageObjectToken extends Token {
 
-    kind: ObjectKind;
+    readonly kind: ObjectKind;
 
     readonly packageInfo: PackageInfo;
 

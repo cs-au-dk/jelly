@@ -48,7 +48,7 @@ export default class Solver {
 
     unprocessedTokens: Map<ConstraintVar, Array<Token>> = new Map;
 
-    unprocessedSubsetEdges:  Map<ConstraintVar, Set<ConstraintVar>> = new Map;
+    unprocessedSubsetEdges: Map<ConstraintVar, Set<ConstraintVar>> = new Map;
 
     idSymbol = Symbol();
     nextNodeID = 0;
