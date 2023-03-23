@@ -84,10 +84,19 @@ export function getPackageJsonInfo(tofile: FilePath): PackageJsonInfo {
             }
         }
     } else {
-        name = "<main>";
-        packagekey = "<unknown>";
-        version = undefined;
-        dir = ".";
+        if (dirname(tofile) === resolve(__dirname, '../mockbuiltin/')) {
+            // handle builtin modules in the graph
+            name = "<builtin modules>";
+            packagekey = "<unknown>";
+            version = undefined;
+            dir = "./src/mockbuiltin";
+        } else {
+            logger.debug(`Unknown package of tofile ${tofile}`);
+            name = "<main>";
+            packagekey = "<unknown>";
+            version = undefined;
+            dir = ".";
+        }
     }
     return {packagekey, name, version, main, dir}
 }

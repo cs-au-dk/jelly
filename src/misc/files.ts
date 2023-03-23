@@ -9,6 +9,7 @@ import {findPackageJson} from "./packagejson";
 import {AnalysisState} from "../analysis/analysisstate";
 import {tsResolveModuleName} from "../typescript/moduleresolver";
 import stringify from "stringify2stream";
+import {builtinModules} from "../natives/nodejs";
 
 /**
  * Expands the given list of file paths.
@@ -97,7 +98,16 @@ export function requireResolve(str: string, file: FilePath, loc: SourceLocation 
     }
     let filepath;
     try {
-        filepath = tsResolveModuleName(str, file);
+        if (builtinModules.has(str)) {
+            // mock the behavior of tsResolveModuleName for builtins like `require('http')`
+            filepath = resolveBuiltinModule(str);
+        } else if (str.startsWith("node:") && builtinModules.has(str.substring(5))) {
+            // mock the behavior of tsResolveModuleName for builtins like `require('node:http')`
+            filepath = resolveBuiltinModule(str.substring(5))
+        } else {
+            filepath = tsResolveModuleName(str, file);
+        }
+
         // TypeScript prioritizes .ts over .js, overrule if coming from a .js file
         if (file.endsWith(".js") && filepath.endsWith(".ts") && !str.endsWith(".ts")) {
             const p = filepath.substring(0, filepath.length - 3) + ".js";
@@ -119,11 +129,7 @@ export function requireResolve(str: string, file: FilePath, loc: SourceLocation 
         if (!filepath)
             throw e;
     }
-    if (!filepath.startsWith(options.basedir)) {
-        const msg = `Found module at ${filepath}, but not in basedir`;
-        logger.debug(msg);
-        throw new Error(msg);
-    }
+
     if (!filepath.endsWith(".js") && !filepath.endsWith(".jsx") && !filepath.endsWith(".es") && !filepath.endsWith(".mjs") &&
         !filepath.endsWith(".cjs") && !filepath.endsWith(".ts") && !filepath.endsWith(".tsx")) {
         a.warn(`Module '${filepath}' at ${sourceLocationToStringWithFile(loc)} has unrecognized extension, skipping it`);
@@ -217,4 +223,15 @@ export function writeStreamedStringify(value: any,
         if (chunk)
             writeSync(fd, chunk);
     }, replacer, space);
+}
+
+/**
+ * Resolve the path of standard module like 'http', 'fs' etc to a local file.
+ */
+export function resolveBuiltinModule(moduleName: string): FilePath {
+    const filepath = resolve(__dirname, `../mockbuiltin/${moduleName}.js`);
+    if (!existsSync(filepath)) {
+        throw new Error;
+    }
+    return filepath;
 }

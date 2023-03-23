@@ -48,7 +48,6 @@ import Solver from "./solver";
 import {AnalysisState, globalLoc} from "./analysisstate";
 import {DummyModuleInfo, FunctionInfo, ModuleInfo, normalizeModuleName, PackageInfo} from "./infos";
 import logger from "../misc/logger";
-import {builtinModules} from "../natives/nodejs";
 import {requireResolve} from "../misc/files";
 import {options} from "../options";
 import {FilePath, getOrSet, isArrayIndex, sourceLocationToStringWithFile} from "../misc/util";
@@ -384,59 +383,49 @@ export class Operations {
     requireModule(str: string, resultVar: ConstraintVar | undefined, path: NodePath): ModuleInfo | DummyModuleInfo | undefined { // see requireModule in modulefinder.ts
         const reexport = isExportDeclaration(path.node);
         let m: ModuleInfo | DummyModuleInfo | undefined;
-        if (builtinModules.has(str) || (str.startsWith("node:") && builtinModules.has(str.substring(5)))) {
+        try {
 
-            if (!reexport) {
-                // standard library module: model with UnknownAccessPath
-                // constraint: @Unknown ∈ ⟦require(...)⟧
-                this.solver.addAccessPath(UnknownAccessPath.instance, resultVar);
-                // TODO: models for parts of the standard library
-            } else
-                this.a.warnUnsupported(path.node, `Ignoring re-export from built-in module '${str}'`); // TODO: re-exporting from built-in module
-        } else {
-            try {
+            // try to locate the module
+            const filepath = requireResolve(str, this.file, path.node.loc, this.a);
+            if (filepath) {
 
-                // try to locate the module
-                const filepath = requireResolve(str, this.file, path.node.loc, this.a);
-                if (filepath) {
+                // register that the module is reached
+                m = this.a.reachedFile(filepath, path.getFunctionParent()?.node ?? this.file);
 
-                    // register that the module is reached
-                    m = this.a.reachedFile(filepath, path.getFunctionParent()?.node ?? this.file);
-
-                    if (!reexport) {
-                        // constraint: ⟦module_m.exports⟧ ⊆ ⟦require(...)⟧ where m denotes the module being loaded
-                        this.solver.addSubsetConstraint(this.varProducer.objPropVar(this.a.canonicalizeToken(new NativeObjectToken("module", m)), "exports"), resultVar);
-                    }
+                if (!reexport) {
+                    // constraint: ⟦module_m.exports⟧ ⊆ ⟦require(...)⟧ where m denotes the module being loaded
+                    this.solver.addSubsetConstraint(this.varProducer.objPropVar(this.a.canonicalizeToken(new NativeObjectToken("module", m)), "exports"), resultVar);
                 }
-            } catch {
-                if (options.ignoreUnresolved || options.ignoreDependencies) {
-                    if (logger.isVerboseEnabled())
-                        logger.verbose(`Ignoring unresolved module '${str}' at ${sourceLocationToStringWithFile(path.node.loc)}`);
-                } else // TODO: special warning if the require/import is placed in a try-block, an if statement, or a switch case?
-                    this.a.warn(`Unable to resolve module '${str}' at ${sourceLocationToStringWithFile(path.node.loc)}`); // TODO: may report duplicate error messages
-
-                // couldn't find module file (probably hasn't been installed), use a DummyModuleInfo if absolute module name
-                if (!"./#".includes(str[0]))
-                    m = getOrSet(this.a.dummyModuleInfos, str, () => new DummyModuleInfo(str));
             }
+        } catch {
+            if (options.ignoreUnresolved || options.ignoreDependencies) {
+                if (logger.isVerboseEnabled())
+                    logger.verbose(`Ignoring unresolved module '${str}' at ${sourceLocationToStringWithFile(path.node.loc)}`);
+            } else // TODO: special warning if the require/import is placed in a try-block, an if statement, or a switch case?
+                this.a.warn(`Unable to resolve module '${str}' at ${sourceLocationToStringWithFile(path.node.loc)}`); // TODO: may report duplicate error messages
 
-            if (m) {
-
-                // add access path token
-                const analyzed = m instanceof ModuleInfo && (!options.ignoreDependencies || this.a.entryFiles.has(m.path));
-                if (!analyzed || options.vulnerabilities) {
-                    const s = normalizeModuleName(str);
-                    const tracked = options.trackedModules && options.trackedModules.find(e =>
-                        micromatch.isMatch(m!.getOfficialName(), e) || micromatch.isMatch(s, e))
-                    this.solver.addAccessPath(tracked ?
-                            this.a.canonicalizeAccessPath(new ModuleAccessPath(m, s)) :
-                            IgnoredAccessPath.instance,
-                        resultVar);
-                }
-
-                this.a.registerRequireCall(path.node, this.a.getEnclosingFunctionOrModule(path, this.moduleInfo), m);
-            }
+            // couldn't find module file (probably hasn't been installed), use a DummyModuleInfo if absolute module name
+            if (!"./#".includes(str[0]))
+                m = getOrSet(this.a.dummyModuleInfos, str, () => new DummyModuleInfo(str));
         }
+
+        if (m) {
+
+            // add access path token
+            const analyzed = m instanceof ModuleInfo && (!options.ignoreDependencies || this.a.entryFiles.has(m.path));
+            if (!analyzed || options.vulnerabilities) {
+                const s = normalizeModuleName(str);
+                const tracked = options.trackedModules && options.trackedModules.find(e =>
+                    micromatch.isMatch(m!.getOfficialName(), e) || micromatch.isMatch(s, e))
+                this.solver.addAccessPath(tracked ?
+                        this.a.canonicalizeAccessPath(new ModuleAccessPath(m, s)) :
+                        IgnoredAccessPath.instance,
+                    resultVar);
+            }
+
+            this.a.registerRequireCall(path.node, this.a.getEnclosingFunctionOrModule(path, this.moduleInfo), m);
+        }
+
         return m;
     }
 
