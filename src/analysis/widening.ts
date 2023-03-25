@@ -16,7 +16,7 @@ import assert from "assert";
  * This roughly takes time proportional to the size of the information stored for the constraint variables and tokens.
  */
 export function widenObjects(m: ModuleInfo, widened: Set<ObjectToken>, solver: Solver) {
-    const a = solver.analysisState;
+    const a = solver.globalState;
     const f = solver.fragmentState;
     if (logger.isVerboseEnabled())
         logger.verbose(`Widening (constraint vars: ${f.getNumberOfVarsWithTokens()}, widened tokens: ${widened.size})`);
@@ -25,7 +25,7 @@ export function widenObjects(m: ModuleInfo, widened: Set<ObjectToken>, solver: S
             logger.debug(`Widening ${t}`);
     if (widened.size === 0)
         return;
-    addAll(widened, a.widened);
+    addAll(widened, f.widened);
     const timer = new Timer;
 
     const tokenMap: Map<ObjectToken, PackageObjectToken> = new Map;
@@ -89,7 +89,7 @@ export function widenObjects(m: ModuleInfo, widened: Set<ObjectToken>, solver: S
     function widenVar(v: ConstraintVar): ConstraintVar {
         if (v instanceof ObjectPropertyVar && v.obj instanceof ObjectToken && widened.has(v.obj)) {
             const vobj = v.obj;
-            return getOrSet(varMap, v, () => a.varProducer.packagePropVar(vobj.packageInfo, v.prop, v.accessor));
+            return getOrSet(varMap, v, () => f.varProducer.packagePropVar(vobj.packageInfo, v.prop, v.accessor));
         } else
             return v;
     }
@@ -140,26 +140,26 @@ export function widenObjects(m: ModuleInfo, widened: Set<ObjectToken>, solver: S
         solver.addSubsetEdge(v, rep); // ensures that tokens get transferred
         solver.redirect(v, rep);
     }
-    a.dynamicPropertyWrites = widenVarSet(a.dynamicPropertyWrites);
-    for (const e of a.maybeEmptyPropertyReads) {
+    f.dynamicPropertyWrites = widenVarSet(f.dynamicPropertyWrites);
+    for (const e of f.maybeEmptyPropertyReads) {
         e.result = widenVar(e.result);
         e.base = widenVar(e.base);
     }
-    for (const e of a.unhandledDynamicPropertyWrites.values())
+    for (const e of f.unhandledDynamicPropertyWrites.values())
         e.src = widenVar(e.src);
-    for (const m of [a.propertyReadAccessPaths, a.propertyWriteAccessPaths])
+    for (const m of [f.propertyReadAccessPaths, f.propertyWriteAccessPaths])
         for (const m1 of m.values())
             for (const m2 of m1.values())
                 for (const e of m2.values()) {
                     e.sub = widenVar(e.sub);
                     e.bp = widenPropertyAccessPath(e.bp);
                 }
-    for (const m of a.callResultAccessPaths.values())
+    for (const m of f.callResultAccessPaths.values())
         for (const e of m.values()) {
             e.sub = widenVar(e.sub);
             e.bp = widenCallResultAccessPath(e.bp);
         }
-    for (const m of a.componentAccessPaths.values())
+    for (const m of f.componentAccessPaths.values())
         for (const e of m.values()) {
             e.sub = widenVar(e.sub);
             e.bp = widenComponentAccessPath(e.bp);

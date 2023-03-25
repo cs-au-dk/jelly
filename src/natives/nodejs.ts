@@ -15,7 +15,7 @@ export const nodejsModels: NativeModel = {
     name: "nodejs",
     init: (p: NativeModelParams) => {
         // module.exports = exports
-        p.solver.addTokenConstraint(p.natives.get("exports")!, p.solver.analysisState.varProducer.objPropVar(p.natives.get("module")!, "exports"));
+        p.solver.addTokenConstraint(p.moduleSpecialNatives.get("exports")!, p.solver.fragmentState.varProducer.objPropVar(p.moduleSpecialNatives.get("module")!, "exports"));
     },
     params: [
         {
@@ -35,7 +35,7 @@ export const nodejsModels: NativeModel = {
         {
             name: "global",
             init: (p: NativeVariableParams) => {
-                return p.natives.get("globalThis")!; // TODO: 'global' is actually a property on globalThis
+                return p.globalSpecialNatives.get("globalThis")!; // TODO: 'global' is actually a property on globalThis
             }
         },
         {

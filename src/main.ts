@@ -175,7 +175,7 @@ async function main() {
                 logger.info("File missing, aborting");
                 return;
             }
-            cmd = `${__dirname}/bin/node`;
+            cmd = `${__dirname}/../bin/node`;
             args = program.args;
             cwd = process.cwd()
         }
@@ -256,11 +256,11 @@ async function main() {
             setPatternProperties(options.apiUsage ? undefined : (props || new Set()));
 
             const solver = new Solver();
-            const a = solver.analysisState;
+            const a = solver.globalState;
             a.vulnerabilities = vulnerabilityDetector;
             await analyzeFiles(files, solver);
             const f = solver.fragmentState;
-            const out = new AnalysisStateReporter(a, f);
+            const out = new AnalysisStateReporter(f);
 
             let typer: TypeScriptTypeInferrer | undefined;
             if (options.typescript)
@@ -268,31 +268,31 @@ async function main() {
 
             let vr: VulnerabilityResults = {};
             if (vulnerabilityDetector) {
-                vr.package = vulnerabilityDetector.findPackagesThatMayDependOnVulnerablePackages(a);
-                vr.module = vulnerabilityDetector.findModulesThatMayDependOnVulnerableModules(a);
-                vr.function = vulnerabilityDetector.findFunctionsThatMayReachVulnerableFunctions(a);
-                vr.call = vulnerabilityDetector.findCallsThatMayReachVulnerableFunctions(a, vr.function);
-                vulnerabilityDetector.reportResults(a, vr);
-                vr.matches = vulnerabilityDetector.patternMatch(a, f, typer, solver.diagnostics);
+                vr.package = vulnerabilityDetector.findPackagesThatMayDependOnVulnerablePackages(f);
+                vr.module = vulnerabilityDetector.findModulesThatMayDependOnVulnerableModules(f);
+                vr.function = vulnerabilityDetector.findFunctionsThatMayReachVulnerableFunctions(f);
+                vr.call = vulnerabilityDetector.findCallsThatMayReachVulnerableFunctions(f, vr.function);
+                vulnerabilityDetector.reportResults(f, vr);
+                vr.matches = vulnerabilityDetector.patternMatch(f, typer, solver.diagnostics);
                 // TODO: find functions that may reach functions in vulnerabilities.matches
             }
 
             if (options.callgraphHtml) {
                 const file = options.callgraphHtml;
-                exportCallGraphHtml(a, file, vr);
+                exportCallGraphHtml(f, file, vr);
                 logger.info(`Call graph written to ${file}`);
             }
 
             if (options.dataflowHtml) {
                 const file = options.dataflowHtml;
-                exportDataFlowGraphHtml(a, f, file); // TODO: also show pattern matches and reachability
+                exportDataFlowGraphHtml(f, file); // TODO: also show pattern matches and reachability
                 logger.info(`Data-flow graph written to ${file}`);
             }
 
             if (options.callgraphGraphviz) {
                 const file = options.callgraphGraphviz;
                 const fd = openSync(file, "w");
-                toDot(a, fd);
+                toDot(f, fd);
                 closeSync(fd);
                 logger.info(`Call graph written to ${file}`);
             }
@@ -318,22 +318,22 @@ async function main() {
                 out.reportReachablePackagesAndModules();
 
             if (options.soundness)
-                testSoundness(options.soundness, a);
+                testSoundness(options.soundness, f);
 
             if (tapirPatterns && patterns)
-                tapirPatternMatch(tapirPatterns, patterns, a, f, typer, undefined, solver.diagnostics);
+                tapirPatternMatch(tapirPatterns, patterns, f, typer, undefined, solver.diagnostics);
 
             if (options.apiUsage) {
-                const [r1, r2] = getAPIUsage(a);
+                const [r1, r2] = getAPIUsage(f);
                 reportAPIUsage(r1, r2);
             }
 
             if (options.apiExported || options.findAccessPaths) {
-                const r = getAPIExported(a, f);
+                const r = getAPIExported(f);
                 if (options.apiExported)
                     reportAPIExportedFunctions(r);
                 if (options.findAccessPaths)
-                    reportAccessPaths(a, r, options.findAccessPaths);
+                    reportAccessPaths(f, r, options.findAccessPaths);
             }
 
             if (options.higherOrderFunctions)

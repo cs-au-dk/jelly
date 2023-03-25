@@ -49,7 +49,9 @@ ENV NODE_ENV production
 # install Jelly files built locally
 RUN mkdir /jelly
 WORKDIR /jelly
-COPY ./package.json ./package-lock.json ./resources ./bin ./
+COPY ./package.json ./package-lock.json ./
+COPY ./resources ./resources
+COPY ./bin ./bin
 RUN npm ci --omit=dev
 COPY ./lib ./lib
 RUN npm link

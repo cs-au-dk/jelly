@@ -10,7 +10,7 @@ export abstract class DetectionPattern {
         this.ap = ap;
     }
 
-    abstract toString(): string;
+    abstract toString(): string
 }
 
 export class ImportDetectionPattern extends DetectionPattern {
@@ -90,9 +90,9 @@ export class CallDetectionPattern extends DetectionPattern { // TODO: introduce 
 
 export interface AccessPathPattern {
 
-    toString(): string;
+    toString(): string
 
-    visitAccessPathPatterns(visitor: (p: AccessPathPattern) => void): void;
+    visitAccessPathPatterns(visitor: (p: AccessPathPattern) => void): void
 }
 
 export class ImportAccessPathPattern {
@@ -266,7 +266,7 @@ export class PotentiallyUnknownAccessPathPattern {
 
 export abstract class Filter {
 
-    abstract toString(): string;
+    abstract toString(): string
 }
 
 export class NumArgsCallFilter extends Filter {

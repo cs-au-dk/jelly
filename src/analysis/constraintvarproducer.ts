@@ -2,7 +2,6 @@ import {
     Class,
     Expression,
     Function,
-    identifier,
     Identifier,
     isBigIntLiteral,
     isBinaryExpression,
@@ -35,19 +34,23 @@ import {
     ObjectPropertyVarObj,
     ThisVar
 } from "./constraintvars";
-import logger from "../misc/logger";
 import {ArrayToken, ObjectToken, PackageObjectToken} from "./tokens";
-import {FilePath, sourceLocationToStringWithFile} from "../misc/util";
+import {FilePath, sourceLocationToStringWithFile, SourceLocationWithFilename} from "../misc/util";
 import {PackageInfo} from "./infos";
-import {AnalysisState, globalLoc, undefinedIdentifier} from "./analysisstate";
+import {GlobalState} from "./globalstate";
 import {getClass} from "../misc/asthelpers";
+import {FragmentState} from "./fragmentstate";
+import assert from "assert";
 
 export class ConstraintVarProducer {
 
-    private readonly a: AnalysisState
+    private readonly f: FragmentState;
 
-    constructor(a: AnalysisState) {
-        this.a = a;
+    private readonly a: GlobalState; // shortcut to f.a
+
+    constructor(f: FragmentState) {
+        this.f = f;
+        this.a = f.a;
     }
 
     /**
@@ -63,7 +66,7 @@ export class ConstraintVarProducer {
             exp = exp.expression; // for parenthesized expressions, use the inner expression
         if (isIdentifier(exp) || isJSXIdentifier(exp)) {
             const id = this.identVar(exp, path);
-            if (id instanceof NodeVar && id.node === undefinedIdentifier)
+            if (id instanceof NodeVar && exp.name === "undefined" && (id.node?.loc as SourceLocationWithFilename)?.filename === "%ecmascript")
                 return undefined;
             return id;
         } else if (isNumericLiteral(exp) || isBigIntLiteral(exp) || isNullLiteral(exp) || isBooleanLiteral(exp) ||
@@ -73,12 +76,12 @@ export class ConstraintVarProducer {
         else if (isSuper(exp)) {
             const cl = getClass(path);
             if (!cl) {
-                this.a.warnUnsupported(exp, `Ignoring super in object expression at ${sourceLocationToStringWithFile(exp.loc)}`, true); // TODO: object expressions may have prototypes, e.g. __proto__
+                this.f.warnUnsupported(exp, `Ignoring super in object expression at ${sourceLocationToStringWithFile(exp.loc)}`, true); // TODO: object expressions may have prototypes, e.g. __proto__
                 return undefined;
             }
             return this.extendsVar(cl);
         }
-        return this.a.varProducer.nodeVar(exp); // other expressions are already canonical
+        return this.nodeVar(exp); // other expressions are already canonical
     }
 
     /**
@@ -92,29 +95,23 @@ export class ConstraintVarProducer {
             d = binding.identifier;
         } else {
             if (id.name === "arguments") {
-                const fun = this.a.registerArguments(path);
-                return fun ? this.a.canonicalizeVar(new ArgumentsVar(fun)) : this.a.varProducer.nodeVar(id); // using the identifier itself as fallback if no enclosing function
+                const fun = this.f.registerArguments(path);
+                return fun ? this.a.canonicalizeVar(new ArgumentsVar(fun)) : this.nodeVar(id); // using the identifier itself as fallback if no enclosing function
             } else {
                 const ps = path.scope.getProgramParent();
                 d = ps.getBinding(id.name)?.identifier;
-                if (!d) {
-                    d = identifier(id.name);
-                    d.loc = globalLoc;
-                    ps.push({id: d});
-                    if (logger.isDebugEnabled())
-                        logger.debug(`No binding for identifier ${id.name}, creating one in program scope`);
-                } else if (logger.isDebugEnabled())
-                    logger.debug(`No binding for identifier ${id.name}, using the one in program scope`);
+                if (!d)
+                    assert.fail(`No binding for identifier ${id.name}, should be set by preprocessAst`);
             }
         }
-        return this.a.varProducer.nodeVar(d); // Identifiers are already canonical
+        return this.nodeVar(d);
     }
 
     /**
      * Finds the constraint variable for a named object property.
      */
     objPropVar(obj: ObjectPropertyVarObj, prop: string, accessor: AccessorType = "normal"): ObjectPropertyVar {
-        if (obj instanceof ObjectToken && this.a.widened.has(obj))
+        if (obj instanceof ObjectToken && this.f.widened.has(obj))
             return this.packagePropVar(obj.packageInfo, prop, accessor);
         return this.a.canonicalizeVar(new ObjectPropertyVar(obj, prop, accessor));
     }

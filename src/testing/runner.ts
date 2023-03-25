@@ -40,7 +40,7 @@ if (!jsonFile || !outFile || !timeout) {
         await analyzeFiles(expand([`${options.basedir}/node_modules/${d}`]), solver);
         results[d] = solver.diagnostics;
         setLogLevel("verbose");
-        new AnalysisStateReporter(solver.analysisState, solver.fragmentState).reportLargestTokenSets();
+        new AnalysisStateReporter(solver.fragmentState).reportLargestTokenSets();
     }
     const fd = fs.openSync(outFile, "w");
     writeStreamedStringify(results, fd, undefined, 2);

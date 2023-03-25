@@ -1,6 +1,6 @@
 import logger from "../misc/logger";
 import {deleteAll, getOrSet, SourceLocationJSON, sourceLocationToStringWithFile, sourceLocationToStringWithFileAndEnd} from "../misc/util";
-import {AnalysisState} from "../analysis/analysisstate";
+import {GlobalState} from "../analysis/globalstate";
 import {FunctionToken, NativeObjectToken, Token} from "../analysis/tokens";
 import fs from "fs";
 import {ConstraintVar, FunctionReturnVar, NodeVar, ObjectPropertyVar} from "../analysis/constraintvars";
@@ -18,13 +18,13 @@ import {CallGraph} from "../typings/callgraph";
  */
 export class AnalysisStateReporter {
 
-    readonly a: AnalysisState;
-
     readonly f: FragmentState;
 
-    constructor(a: AnalysisState, f: FragmentState) {
-        this.a = a;
+    readonly a: GlobalState;
+
+    constructor(f: FragmentState) {
         this.f = f;
+        this.a = f.a;
     }
 
     /**
@@ -72,7 +72,7 @@ export class AnalysisStateReporter {
         first = true;
         for (const m of this.a.moduleInfos.values()) {
             fileIndices.set(m, fileIndices.size);
-            fs.writeSync(fd, `${first ? "" : ","}\n  ${JSON.stringify(relative(options.basedir, m.path))}`);
+            fs.writeSync(fd, `${first ? "" : ","}\n  ${JSON.stringify(relative(options.basedir, m.getPath()))}`);
             first = false;
         }
         fs.writeSync(fd, `\n ],\n "functions": {`);
@@ -93,7 +93,7 @@ export class AnalysisStateReporter {
         fs.writeSync(fd, `\n },\n "calls": {`);
         const callIndices = new Map<Node, number>();
         first = true;
-        for (const [m, calls] of this.a.calls)
+        for (const [m, calls] of this.f.calls)
             for (const call of calls) {
                 const callIndex = callIndices.size + functionIndices.size;
                 callIndices.set(call, callIndex);
@@ -105,7 +105,7 @@ export class AnalysisStateReporter {
             }
         fs.writeSync(fd, `\n },\n "fun2fun": [`);
         first = true;
-        for (const [caller, callees] of [...this.a.functionToFunction, ...(options.callgraphRequire ? this.a.requireGraph : [])])
+        for (const [caller, callees] of [...this.f.functionToFunction, ...(options.callgraphRequire ? this.f.requireGraph : [])])
             for (const callee of callees) {
                 const callerIndex = functionIndices.get(caller);
                 if (callerIndex === undefined)
@@ -119,8 +119,8 @@ export class AnalysisStateReporter {
         fs.writeSync(fd, `${first ? "" : "\n "}],\n "call2fun": [`);
         first = true;
         for (const [call, callIndex] of callIndices) {
-            const funs = this.a.callToFunction.get(call) || [];
-            const mods = this.a.callToModule.get(call) || [];
+            const funs = this.f.callToFunction.get(call) || [];
+            const mods = this.f.callToModule.get(call) || [];
             for (const callee of [...funs, ...mods]) {
                 if (callee instanceof DummyModuleInfo)
                     continue; // skipping require/import edges to modules that haven't been analyzed
@@ -133,7 +133,7 @@ export class AnalysisStateReporter {
         }
         fs.writeSync(fd, `${first ? "" : "\n "}],\n "ignore": [`);
         first = true;
-        for (const [m, n] of this.a.artificialFunctions) {
+        for (const [m, n] of this.f.artificialFunctions) {
             const fileIndex = fileIndices.get(m);
             if (fileIndex === undefined)
                 assert.fail(`File index not found for ${m}`);
@@ -164,7 +164,7 @@ export class AnalysisStateReporter {
         const fileIndices = new Map<ModuleInfo, number>();
         for (const m of this.a.moduleInfos.values()) {
             fileIndices.set(m, fileIndices.size);
-            cg.files.push(relative(options.basedir, m.path));
+            cg.files.push(relative(options.basedir, m.getPath()));
         }
         function makeLocStr(fileIndex: number, loc: SourceLocation | undefined | null): string {
             return `${fileIndex}:${loc ? `${loc.start.line}:${loc.start.column + 1}:${loc.end.line}:${loc.end.column + 1}` : "?:?:?:?"}`;
@@ -179,7 +179,7 @@ export class AnalysisStateReporter {
             cg.functions[funIndex] = makeLocStr(fileIndex, fun.node?.loc);
         }
         const callIndices = new Map<Node, number>();
-        for (const [m, calls] of this.a.calls)
+        for (const [m, calls] of this.f.calls)
             for (const call of calls) {
                 const callIndex = callIndices.size + functionIndices.size;
                 callIndices.set(call, callIndex);
@@ -188,7 +188,7 @@ export class AnalysisStateReporter {
                     assert.fail(`File index not found for ${m}`);
                 cg.calls[callIndex] = makeLocStr(fileIndex, call.loc);
             }
-        for (const [caller, callees] of [...this.a.functionToFunction, ...(options.callgraphRequire ? this.a.requireGraph : [])])
+        for (const [caller, callees] of [...this.f.functionToFunction, ...(options.callgraphRequire ? this.f.requireGraph : [])])
             for (const callee of callees) {
                 const callerIndex = functionIndices.get(caller);
                 if (callerIndex === undefined)
@@ -199,8 +199,8 @@ export class AnalysisStateReporter {
                 cg.fun2fun.push([callerIndex, calleeIndex]);
             }
         for (const [call, callIndex] of callIndices) {
-            const funs = this.a.callToFunction.get(call) || [];
-            const mods = this.a.callToModule.get(call) || [];
+            const funs = this.f.callToFunction.get(call) || [];
+            const mods = this.f.callToModule.get(call) || [];
             for (const callee of [...funs, ...mods]) {
                 if (callee instanceof DummyModuleInfo)
                     continue; // skipping require/import edges to modules that haven't been analyzed
@@ -210,7 +210,7 @@ export class AnalysisStateReporter {
                 cg.fun2fun.push([callIndex, calleeIndex]);
             }
         }
-        for (const [m, n] of this.a.artificialFunctions) {
+        for (const [m, n] of this.f.artificialFunctions) {
             const fileIndex = fileIndices.get(m);
             if (fileIndex === undefined)
                 assert.fail(`File index not found for ${m}`);
@@ -240,14 +240,14 @@ export class AnalysisStateReporter {
      * The source code and the tokens are included in the output if loglevel is verbose or higher.
      */
     reportNonemptyUnhandledDynamicPropertyWrites() {
-        for (const [node, {src, source}] of this.a.unhandledDynamicPropertyWrites.entries()) {
+        for (const [node, {src, source}] of this.f.unhandledDynamicPropertyWrites.entries()) {
             const [size, ts] = this.f.getTokensSize(this.f.getRepresentative(src));
             if (size > 0) {
                 let funs = 0;
                 for (const t of ts)
                     if (t instanceof FunctionToken)
                         funs++;
-                this.a.warn(`Nonempty dynamic property write (${funs} function${funs === 1 ? "" : "s"}) at ${sourceLocationToStringWithFile(node.loc)}`); // TODO: may report duplicate warnings
+                this.f.warn(`Nonempty dynamic property write (${funs} function${funs === 1 ? "" : "s"}) at ${sourceLocationToStringWithFile(node.loc)}`); // TODO: may report duplicate warnings
                 if (logger.isVerboseEnabled() && source !== undefined) {
                     logger.warn(source);
                     for (const t of ts)
@@ -261,8 +261,8 @@ export class AnalysisStateReporter {
      * Reports warnings about unhandled dynamic property read operations.
      */
     reportNonemptyUnhandledDynamicPropertyReads() {
-        for (const node of this.a.unhandledDynamicPropertyReads)
-            this.a.warn(`Dynamic property read at ${sourceLocationToStringWithFile(node.loc)}`); // TODO: may report duplicate warnings
+        for (const node of this.f.unhandledDynamicPropertyReads)
+            this.f.warn(`Dynamic property read at ${sourceLocationToStringWithFile(node.loc)}`); // TODO: may report duplicate warnings
     }
 
     /**
@@ -271,9 +271,9 @@ export class AnalysisStateReporter {
      */
     getZeroCalleeCalls(): Set<Node> {
         const calls = new Set<Node>();
-        for (const c of this.a.callLocations) {
-            if (!this.a.nativeCallLocations.has(c) && !this.a.externalCallLocations.has(c)) {
-                const cs = this.a.callToFunction.get(c);
+        for (const c of this.f.callLocations) {
+            if (!this.f.nativeCallLocations.has(c) && !this.f.externalCallLocations.has(c)) {
+                const cs = this.f.callToFunction.get(c);
                 if (!cs || cs.size === 0)
                     calls.add(c);
             }
@@ -294,9 +294,9 @@ export class AnalysisStateReporter {
      */
     getZeroButNativeCalleeCalls(): number {
         let r = 0;
-        for (const c of this.a.callLocations) {
-            if (this.a.nativeCallLocations.has(c) && !this.a.externalCallLocations.has(c)) {
-                const cs = this.a.callToFunction.get(c);
+        for (const c of this.f.callLocations) {
+            if (this.f.nativeCallLocations.has(c) && !this.f.externalCallLocations.has(c)) {
+                const cs = this.f.callToFunction.get(c);
                 if (!cs || cs.size === 0) {
                     r++;
                     if (logger.isDebugEnabled())
@@ -312,9 +312,9 @@ export class AnalysisStateReporter {
      */
     getZeroButExternalCalleeCalls(): number {
         let r = 0;
-        for (const c of this.a.callLocations) {
-            if (this.a.externalCallLocations.has(c) && !this.a.nativeCallLocations.has(c)) {
-                const cs = this.a.callToFunction.get(c);
+        for (const c of this.f.callLocations) {
+            if (this.f.externalCallLocations.has(c) && !this.f.nativeCallLocations.has(c)) {
+                const cs = this.f.callToFunction.get(c);
                 if (!cs || cs.size === 0) {
                     r++;
                     if (logger.isDebugEnabled())
@@ -330,9 +330,9 @@ export class AnalysisStateReporter {
      */
     getZeroButNativeOrExternalCalleeCalls(): number {
         let r = 0;
-        for (const c of this.a.callLocations) {
-            if (this.a.nativeCallLocations.has(c) && this.a.externalCallLocations.has(c)) {
-                const cs = this.a.callToFunction.get(c);
+        for (const c of this.f.callLocations) {
+            if (this.f.nativeCallLocations.has(c) && this.f.externalCallLocations.has(c)) {
+                const cs = this.f.callToFunction.get(c);
                 if (!cs || cs.size === 0) {
                     r++;
                     if (logger.isDebugEnabled())
@@ -348,8 +348,8 @@ export class AnalysisStateReporter {
      */
     getOneCalleeCalls() {
         let r = 0;
-        for (const c of this.a.callLocations) {
-            const cs = this.a.callToFunction.get(c);
+        for (const c of this.f.callLocations) {
+            const cs = this.f.callToFunction.get(c);
             if (cs)
                 if (cs.size === 1)
                     r++;
@@ -365,7 +365,7 @@ export class AnalysisStateReporter {
      */
     getZeroCallerFunctions(): Set<FunctionInfo> {
         let funs = new Set(this.a.functionInfos.values());
-        for (const fs of this.a.functionToFunction.values())
+        for (const fs of this.f.functionToFunction.values())
             deleteAll(fs.values(), funs);
         return funs;
     }
@@ -442,7 +442,7 @@ export class AnalysisStateReporter {
      */
     reportHigherOrderFunctions() {
         const funargs = new Map<Function, number>();
-        for (const [f, vs] of this.a.functionParameters) {
+        for (const [f, vs] of this.f.functionParameters) {
             for (const v of vs)
                 for (const t of this.f.getTokens(v))
                     if (t instanceof FunctionToken)

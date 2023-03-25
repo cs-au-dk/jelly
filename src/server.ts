@@ -295,7 +295,7 @@ async function main() {
                 return prepareResponse(false, req, {message: "Analysis results not available"});
             if (!options.apiUsage)
                 return prepareResponse(false, req, {message: "API usage not enabled, must be enabled before analyze"});
-            const [r1,] = getAPIUsage(solver.analysisState);
+            const [r1,] = getAPIUsage(solver.fragmentState);
             const body = convertAPIUsageToJSON(r1);
             const res: ApiUsageResponse = prepareResponse(true, req, {body});
             logger.info("Sending API usage");
@@ -329,7 +329,7 @@ async function main() {
                 return prepareResponse(false, req, {message: "Analysis results not available"});
             if (!tapirPatterns || !patterns)
                 return prepareResponse(false, req, {message: "Patterns have not been loaded"});
-            const matcher = new PatternMatcher(solver.analysisState, solver.fragmentState, typer);
+            const matcher = new PatternMatcher(solver.fragmentState, typer);
             const body = convertPatternMatchesToJSON(patterns, matcher);
             const res: PatternMatchResponse = prepareResponse(true, req, {body});
             logger.info("Sending pattern matching results");
@@ -339,7 +339,7 @@ async function main() {
         callgraph: async (req: CallGraphRequest) => {
             if (!solver || !files)
                 return prepareResponse(false, req, {message: "Analysis results not available"});
-            const res: CallGraphResponse = prepareResponse(true, req, {body: new AnalysisStateReporter(solver.analysisState, solver.fragmentState).callGraphToJSON(files)});
+            const res: CallGraphResponse = prepareResponse(true, req, {body: new AnalysisStateReporter(solver.fragmentState).callGraphToJSON(files)});
             logger.info("Sending call graph");
             return res;
         },
@@ -351,15 +351,15 @@ async function main() {
                 return prepareResponse(false, req, {message: "Option callgraphHtml not set"});
             let vr: VulnerabilityResults = {};
             if (vulnerabilityDetector && options.vulnerabilities) {
-                const a = solver.analysisState, f = solver.fragmentState;
-                vr.package = vulnerabilityDetector.findPackagesThatMayDependOnVulnerablePackages(a);
-                vr.module = vulnerabilityDetector.findModulesThatMayDependOnVulnerableModules(a);
-                vr.function = vulnerabilityDetector.findFunctionsThatMayReachVulnerableFunctions(a);
-                vr.call = vulnerabilityDetector.findCallsThatMayReachVulnerableFunctions(a, vr.function);
-                vr.matches = vulnerabilityDetector.patternMatch(a, f, typer, solver.diagnostics)
+                const f = solver.fragmentState;
+                vr.package = vulnerabilityDetector.findPackagesThatMayDependOnVulnerablePackages(f);
+                vr.module = vulnerabilityDetector.findModulesThatMayDependOnVulnerableModules(f);
+                vr.function = vulnerabilityDetector.findFunctionsThatMayReachVulnerableFunctions(f);
+                vr.call = vulnerabilityDetector.findCallsThatMayReachVulnerableFunctions(f, vr.function);
+                vr.matches = vulnerabilityDetector.patternMatch(f, typer, solver.diagnostics)
                 // TODO: include vulnerability pattern match reachability like in main.ts
             }
-            exportCallGraphHtml(solver.analysisState, options.callgraphHtml, vr);
+            exportCallGraphHtml(solver.fragmentState, options.callgraphHtml, vr);
             logger.info("Call graph HTML file generated");
             return prepareResponse(true, req);
         },
@@ -369,7 +369,7 @@ async function main() {
                 return prepareResponse(false, req, {message: "Analysis results not available"});
             if (!options.dataflowHtml)
                 return prepareResponse(false, req, {message: "Option dataflowHtml not set"});
-            exportDataFlowGraphHtml(solver.analysisState, solver.fragmentState, options.dataflowHtml);
+            exportDataFlowGraphHtml(solver.fragmentState, options.dataflowHtml);
             logger.info("Data-flow graph HTML file generated");
             return prepareResponse(true, req);
         },
@@ -386,7 +386,7 @@ async function main() {
             if (!solver)
                 return prepareResponse(false, req, {message: "Analysis results not available"});
             const packages: ReachablePackagesResponse["body"] = [];
-            for (const p of solver.analysisState.packageInfos.values())
+            for (const p of solver.globalState.packageInfos.values())
                 packages.push({
                     name: p.name,
                     version: p.version

@@ -5,7 +5,7 @@ import Solver, {AbortedException} from "./solver";
 import Timer, {TimeoutException} from "../misc/timer";
 import {addAll, FilePath, mapMapSize, percent} from "../misc/util";
 import {visit} from "./astvisitor";
-import {PackageInfo} from "./infos";
+import {ModuleInfo, PackageInfo} from "./infos";
 import {options, resolveBaseDir} from "../options";
 import assert from "assert";
 import {getComponents, nuutila} from "../misc/scc";
@@ -20,12 +20,25 @@ import {Program} from "@babel/types";
 import {UnknownAccessPath} from "./accesspaths";
 import {Token} from "./tokens";
 import {preprocessAst} from "../parsing/extras";
+import {FragmentState} from "./fragmentstate";
 
 export async function analyzeFiles(files: Array<string>, solver: Solver, returnFileMap: boolean = false): Promise<Map<FilePath, {sourceCode: string, program: Program}>> {
-    const a = solver.analysisState;
+    const a = solver.globalState;
     const timer = new Timer();
     resolveBaseDir();
+    const fragmentStates = new Map<ModuleInfo | PackageInfo, FragmentState>();
     const fileMap = new Map<FilePath, {sourceCode: string, program: Program}>();
+
+    function restore(mp: ModuleInfo | PackageInfo, propagate: boolean = true) {
+        const f = fragmentStates.get(mp);
+        if (f) {
+            if (logger.isDebugEnabled())
+                logger.debug(`Restoring state for ${mp}`);
+            solver.restore(f, propagate);
+        } else if (logger.isVerboseEnabled())
+            logger.verbose(`No state found for ${mp}`);
+    }
+
     try {
         if (files.length === 0)
             logger.info("Error: No files to analyze");
@@ -42,6 +55,9 @@ export async function analyzeFiles(files: Array<string>, solver: Solver, returnF
                 const file = a.pendingFiles.shift()!;
                 const moduleInfo = a.getModuleInfo(file);
 
+                // initialize analysis state for the module
+                solver.prepare();
+
                 solver.diagnostics.modules++;
                 if (!options.modulesOnly && options.printProgress)
                     logger.info(`Analyzing module ${file} (${solver.diagnostics.modules})`);
@@ -49,33 +65,34 @@ export async function analyzeFiles(files: Array<string>, solver: Solver, returnF
                 writeStdOutIfActive(`Parsing ${file}...`);
                 const str = fs.readFileSync(file, "utf8"); // TODO: OK to assume utf8? (ECMAScript says utf16??)
                 solver.diagnostics.codeSize += str.length;
-                const ast = parseAndDesugar(str, file, a);
+                const ast = parseAndDesugar(str, file, solver.fragmentState);
                 if (!ast) {
                     a.filesWithParseErrors.push(file);
                     continue;
                 }
+                moduleInfo.node = ast.program;
                 if (returnFileMap)
-                    fileMap.set(file, {sourceCode: str, program: ast.program})
+                    fileMap.set(file, {sourceCode: str, program: ast.program});
+                a.filesAnalyzed.push(file);
 
                 if (options.modulesOnly) {
 
                     // find modules only, no actual analysis
-                    findModules(ast, file, solver);
+                    findModules(ast, file, solver.fragmentState, moduleInfo);
 
                 } else {
 
-                    // initialize analysis state for the module
-                    solver.prepare();
-
-                    // prepare model of native library
-                    const {globals, globalsHidden, specials} = buildNatives(solver, moduleInfo);
+                    // add model of native library
+                    const {globals, globalsHidden, moduleSpecialNatives, globalSpecialNatives} = buildNatives(solver, moduleInfo);
+                    a.globalSpecialNatives = globalSpecialNatives;
 
                     // preprocess the AST
                     preprocessAst(ast, file, globals, globalsHidden);
 
                     // traverse the AST
                     writeStdOutIfActive("Traversing AST...");
-                    visit(ast, new Operations(file, solver, specials));
+                    solver.fragmentState.maybeEscaping.clear();
+                    visit(ast, new Operations(file, solver, moduleSpecialNatives));
 
                     // propagate tokens until fixpoint reached for the module
                     await solver.propagate();
@@ -91,9 +108,10 @@ export async function analyzeFiles(files: Array<string>, solver: Solver, returnF
                     await solver.propagate();
 
                     // store the analysis state for the module
-                    solver.store(moduleInfo);
+                    if (logger.isDebugEnabled())
+                        logger.debug(`Storing state for ${moduleInfo}`);
+                    fragmentStates.set(moduleInfo, solver.fragmentState);
 
-                    a.filesAnalyzed.push(file);
                     solver.updateDiagnostics();
                 }
             }
@@ -105,12 +123,12 @@ export async function analyzeFiles(files: Array<string>, solver: Solver, returnF
                     // combine analysis states for all modules
                     solver.prepare();
                     const totalNumPackages = Array.from(a.packageInfos.values()).reduce((acc, p) =>
-                        acc + (Array.from(p.modules.values()).some(m => m.fragmentState) ? 1 : 0), 0);
+                        acc + (Array.from(p.modules.values()).some(m => fragmentStates.has(m)) ? 1 : 0), 0);
                     for (const p of a.packageInfos.values()) {
                         await solver.checkAbort();
 
                         // skip the package if it doesn't contain any modules that have been analyzed
-                        if (!Array.from(p.modules.values()).some(m => m.fragmentState))
+                        if (!Array.from(p.modules.values()).some(m => fragmentStates.has(m)))
                             continue;
 
                         solver.diagnostics.packages++;
@@ -119,7 +137,7 @@ export async function analyzeFiles(files: Array<string>, solver: Solver, returnF
 
                         // restore analysis state for each module
                         for (const m of p.modules.values())
-                            solver.restore(m);
+                            restore(m);
 
                         // connect neighbors
                         for (const d of p.directDependencies)
@@ -131,6 +149,7 @@ export async function analyzeFiles(files: Array<string>, solver: Solver, returnF
 
                     await patchDynamics(solver);
 
+                    assert(a.pendingFiles.length === 0, "Unexpected module"); // (new modules shouldn't be discovered in this phase)
                 } else {
 
                     // compute strongly connected components from the package dependency graph
@@ -146,11 +165,11 @@ export async function analyzeFiles(files: Array<string>, solver: Solver, returnF
                     const transdeps = new Map<PackageInfo, Set<PackageInfo>>(); // direct and transitive dependencies in other components
                     const totalNumPackages = components.reduce((acc, scc) =>
                         acc + scc.reduce((acc, p) =>
-                            acc + (Array.from(p.modules.values()).some(m => m.fragmentState) ? 1 : 0), 0), 0);
+                            acc + (Array.from(p.modules.values()).some(m => fragmentStates.has(m)) ? 1 : 0), 0), 0);
                     for (const scc of components) {
 
                         // skip the component if it doesn't contain any modules that have been analyzed
-                        if (!(Array.from(scc).some(p => Array.from(p.modules.values()).some(m => m.fragmentState))))
+                        if (!(Array.from(scc).some(p => Array.from(p.modules.values()).some(m => fragmentStates.has(m)))))
                             continue;
 
                         solver.diagnostics.packages += scc.length;
@@ -168,7 +187,7 @@ export async function analyzeFiles(files: Array<string>, solver: Solver, returnF
 
                             // restore the tokens of the modules of the packages in the component
                             for (const m of p.modules.values())
-                                solver.restore(m);
+                                restore(m);
 
                             // collect dependencies in other components
                             const pd = new Set<PackageInfo>();
@@ -192,9 +211,9 @@ export async function analyzeFiles(files: Array<string>, solver: Solver, returnF
                             }
                         }
                         // restore tokens from the direct dependencies in other components
-                        for (const d of deps)
-                            if (!trans.has(d)) // transitive dependencies can safely be skipped
-                                solver.restore(d);
+                        for (const p of deps)
+                            if (!trans.has(p)) // transitive dependencies can safely be skipped
+                                restore(p);
 
                         // propagate tokens until fixpoint reached for the scc packages with their dependencies
                         await solver.propagate();
@@ -202,9 +221,11 @@ export async function analyzeFiles(files: Array<string>, solver: Solver, returnF
                         await patchDynamics(solver);
 
                         // store the tokens for the packages in the component
-                        for (const p of scc)
-                            solver.store(p);
-                        // TODO: persist package(/module?) tokens, seed when analyzing the package/module again (note: modules are only analyzed when reached)
+                        for (const p of scc) {
+                            if (logger.isDebugEnabled())
+                                logger.debug(`Storing state for ${p}`);
+                            fragmentStates.set(p, solver.fragmentState);
+                        }
 
                         assert(a.pendingFiles.length === 0, "Unexpected module"); // (new modules shouldn't be discovered in the bottom-up phase)
                     }
@@ -216,7 +237,7 @@ export async function analyzeFiles(files: Array<string>, solver: Solver, returnF
                             lastComponent = false;
                             continue;
                         }
-                        solver.restore(scc[0], false);
+                        restore(scc[0], false);
                     }
                 }
 
@@ -235,8 +256,8 @@ export async function analyzeFiles(files: Array<string>, solver: Solver, returnF
     }
     solver.diagnostics.time = timer.elapsed();
     solver.diagnostics.cpuTime = timer.elapsedCPU();
-    solver.diagnostics.errors = a.errors;
-    solver.diagnostics.warnings = a.warnings;
+    solver.diagnostics.errors = solver.fragmentState.errors;
+    solver.diagnostics.warnings = solver.fragmentState.warnings;
 
     if (solver.diagnostics.aborted)
         logger.warn("Received abort signal, analysis aborted");
@@ -246,10 +267,10 @@ export async function analyzeFiles(files: Array<string>, solver: Solver, returnF
     // output statistics
     if (!options.modulesOnly && files.length > 0) {
         const f = solver.fragmentState; // current fragment (not final if aborted due to timeout)
-        const r = new AnalysisStateReporter(a, f);
+        const r = new AnalysisStateReporter(f);
         const d = solver.diagnostics;
         d.callsWithUniqueCallee = r.getOneCalleeCalls();
-        d.totalCallSites = a.callLocations.size;
+        d.totalCallSites = f.callLocations.size;
         d.callsWithNoCallee = r.getZeroCalleeCalls().size;
         d.nativeOnlyCalls = r.getZeroButNativeCalleeCalls();
         d.externalOnlyCalls = r.getZeroButExternalCalleeCalls();
@@ -262,13 +283,13 @@ export async function analyzeFiles(files: Array<string>, solver: Solver, returnF
             r.reportNonemptyUnhandledDynamicPropertyReads();
         }
         logger.info(`Analyzed packages: ${solver.diagnostics.packages}, modules: ${solver.diagnostics.modules}, functions: ${a.functionInfos.size}, code size: ${Math.round(solver.diagnostics.codeSize / 1024)}KB`);
-        logger.info(`Call edges function->function: ${a.numberOfFunctionToFunctionEdges}, call->function: ${a.numberOfCallToFunctionEdges}`);
-        const n = d.totalCallSites - d.callsWithNoCallee - d.nativeOnlyCalls - d.nativeOnlyCalls - d.nativeOrExternalCalls;
+        logger.info(`Call edges function->function: ${f.numberOfFunctionToFunctionEdges}, call->function: ${f.numberOfCallToFunctionEdges}`);
+        const n = d.totalCallSites - d.callsWithNoCallee - d.nativeOnlyCalls - d.externalOnlyCalls - d.nativeOrExternalCalls;
         logger.info(`Calls with unique callee: ${d.callsWithUniqueCallee}/${n}${n > 0 ? ` (${percent(d.callsWithUniqueCallee / n)})` : ""}` +
             ` (excluding ${d.callsWithNoCallee} zero-callee, ${d.nativeOnlyCalls} native-only, ${d.externalOnlyCalls} external-only and ${d.nativeOrExternalCalls} native-or-external-only)`)
         logger.info(`Functions with zero callers: ${r.getZeroCallerFunctions().size}/${a.functionInfos.size}`);
         logger.info(`Analysis time: ${solver.diagnostics.time}ms, memory usage: ${solver.diagnostics.maxMemoryUsage}MB${!options.gc ? " (without --gc)" : ""}`);
-        logger.info(`Analysis errors: ${a.errors}, warnings: ${a.warnings}${a.warnings > 0 && !options.warningsUnsupported ? " (show with --warnings-unsupported)" : ""}`);
+        logger.info(`Analysis errors: ${f.errors}, warnings: ${f.warnings}${f.warnings > 0 && !options.warningsUnsupported ? " (show with --warnings-unsupported)" : ""}`);
         if (options.diagnostics) {
             logger.info(`Iterations: ${solver.diagnostics.iterations}, listener notification rounds: ${solver.listenerNotificationRounds}`);
             if (options.maxRounds !== undefined)
@@ -297,15 +318,14 @@ export async function analyzeFiles(files: Array<string>, solver: Solver, returnF
 async function patchDynamics(solver: Solver) {
     if (!options.patchDynamics)
         return;
-    const a = solver.analysisState;
     const f = solver.fragmentState;
     const dyns = new Set<Token>();
-    for (const v of a.dynamicPropertyWrites)
+    for (const v of f.dynamicPropertyWrites)
         addAll(f.getTokens(f.getRepresentative(v)), dyns);
     // constraint: for all E.p (or E[..]) where ⟦E.p⟧ (or ⟦E[..]⟧) is empty and ⟦E⟧ contains a token that is base of a dynamic property write
     let count = 0;
-    const r: typeof a.maybeEmptyPropertyReads = [];
-    for (const e of a.maybeEmptyPropertyReads) {
+    const r: typeof f.maybeEmptyPropertyReads = [];
+    for (const e of f.maybeEmptyPropertyReads) {
         const {result, base, pck} = e;
         const bs = f.getTokens(f.getRepresentative(base));
         const [size] = f.getTokensSize(f.getRepresentative(result));
@@ -328,7 +348,7 @@ async function patchDynamics(solver: Solver) {
                 r.push(e); // keep only the property reads that are still empty
         }
     }
-    a.maybeEmptyPropertyReads = r;
+    f.maybeEmptyPropertyReads = r;
     if (count > 0) {
         if (logger.isVerboseEnabled())
             logger.verbose(`${count} empty object property read${count === 1 ? "" : "s"} patched, propagating again`);

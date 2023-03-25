@@ -8,7 +8,6 @@ import {
     removeObsoletePatterns
 } from "./patternloader";
 import {setDefaultTrackedModules, setPatternProperties} from "../options";
-import {AnalysisState} from "../analysis/analysisstate";
 import {FragmentState} from "../analysis/fragmentstate";
 import {TypeScriptTypeInferrer} from "../typescript/typeinferrer";
 import {AnalysisDiagnostics} from "../typings/diagnostics";
@@ -33,14 +32,13 @@ export function tapirLoadPatterns(patternFiles: Array<string>): [Array<PatternWr
  * Performs pattern matching on the given analysis state.
  * @param tapirPatterns TAPIR patterns
  * @param patterns parsed patterns (or 'undefined', in case of parse errors)
- * @param analysisState analysis state
- * @param fragmentState fragment state
+ * @param fragmentState analysis state
  * @param typer TypeScript type inferrer
  * @param expected expected matches (optional)
  * @param diagnostics analysis diagnostics (optional), for setting aborted in case of timeout
  * @return number of matches and misses of different categories
  */
-export function tapirPatternMatch(tapirPatterns: Array<PatternWrapper | SemanticPatch>, patterns: Array<DetectionPattern | undefined>, analysisState: AnalysisState, fragmentState: FragmentState, typer?: TypeScriptTypeInferrer, expected?: (PatchType | Match)[], diagnostics?: AnalysisDiagnostics): {
+export function tapirPatternMatch(tapirPatterns: Array<PatternWrapper | SemanticPatch>, patterns: Array<DetectionPattern | undefined>, fragmentState: FragmentState, typer?: TypeScriptTypeInferrer, expected?: (PatchType | Match)[], diagnostics?: AnalysisDiagnostics): {
     matches: number,
     matchesLow: number,
     expectedMatches: number,
@@ -56,7 +54,7 @@ export function tapirPatternMatch(tapirPatterns: Array<PatternWrapper | Semantic
     missesFileNotAnalyzed: number
 } {
     writeStdOutIfActive("Pattern matching...");
-    const matcher = new PatternMatcher(analysisState, fragmentState, typer);
+    const matcher = new PatternMatcher(fragmentState, typer);
     let matches = 0, matchesLow = 0, expectedMatches = 0, unexpectedMatches = 0,
         expectedLow = 0, expectedHigh = 0, unexpectedLow = 0, unexpectedHigh = 0,
         matchesTapirFalsePositives = 0, missesTapirFalsePositives = 0,
@@ -76,7 +74,7 @@ export function tapirPatternMatch(tapirPatterns: Array<PatternWrapper | Semantic
             const tpVersion = "version" in tp ? ` (version ${tp.version})` : "";
             const p = patterns[i];
             if (p) {
-                analysisState.timeoutTimer.checkTimeout();
+                fragmentState.a.timeoutTimer.checkTimeout();
                 const ms = matcher.findDetectionPatternMatches(p); // the set of expressions that match tp and p
                 for (const m of ms) {
                     logger.info(`Pattern #${tpId}: ${tpPattern}${tpVersion} matches ${sourceLocationToStringWithFileAndEnd(m.exp.loc)} (confidence: ${isHigh(m) ? "high" : "low"})`);
@@ -141,21 +139,21 @@ export function tapirPatternMatch(tapirPatterns: Array<PatternWrapper | Semantic
         } else
             throw ex;
     }
-    if (analysisState.filesAnalyzed.length === 0)
+    if (fragmentState.a.filesAnalyzed.length === 0)
         logger.warn("Zero files analyzed");
     if (expected)
         for (const q of expectedRemaining) {
             const tapirFalsePositive = isTapirFalsePositive(q);
             const id = "classification" in q ? q.classification : q.semanticPatchId;
             const version = "semanticPatchVersion" in q ? ` (version ${q.semanticPatchVersion})` : "";
-            const fileAnalyzed = analysisState.filesAnalyzed.find(f => f.endsWith(q.file)) !== undefined;
+            const fileAnalyzed = fragmentState.a.filesAnalyzed.find(f => f.endsWith(q.file)) !== undefined;
             logger.warn(`Missed match for pattern #${id}${version} at ${q.file}:${"lineNumber" in q ? q.lineNumber : q.loc}` +
                 (tapirFalsePositive ? " (TAPIR false positive)" : "") +
                 ("highConfidence" in q ? ` (${q.highConfidence ? "high" : "low"} confidence)` : "") +
                 (fileAnalyzed ? "" : " (file not analyzed)"));
             if (tapirFalsePositive)
                 missesTapirFalsePositives++;
-            if (analysisState.filesWithParseErrors.find(f => f.endsWith(q.file)))
+            if (fragmentState.a.filesWithParseErrors.find(f => f.endsWith(q.file)))
                 missesParseErrors++;
             if (!fileAnalyzed)
                 missesFileNotAnalyzed++;

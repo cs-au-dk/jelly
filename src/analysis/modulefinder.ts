@@ -11,29 +11,29 @@ import {
 import {FilePath, sourceLocationToStringWithFile} from "../misc/util";
 import traverse, {NodePath} from "@babel/traverse";
 import logger from "../misc/logger";
-import Solver from "./solver";
 import {options} from "../options";
 import {builtinModules} from "../natives/nodejs";
 import {requireResolve} from "../misc/files";
+import {ModuleInfo} from "./infos";
+import {FragmentState} from "./fragmentstate";
 
 /**
  * Scans AST for 'require', 'import' and 'export' only (no proper analysis).
  */
-export function findModules(ast: File, file: FilePath, solver: Solver) {
-    const a = solver.analysisState;
+export function findModules(ast: File, file: FilePath, f: FragmentState, moduleInfo: ModuleInfo) {
 
     function requireModule(str: string, path: NodePath) { // see requireModule in operations.ts
         if (!(builtinModules.has(str) || (str.startsWith("node:") && builtinModules.has(str.substring(5)))))
             try {
-                const filepath = requireResolve(str, file, path.node.loc, a);
+                const filepath = requireResolve(str, file, path.node.loc, f);
                 if (filepath)
-                    a.reachedFile(filepath, path.getFunctionParent()?.node ?? file);
+                    f.a.reachedFile(filepath, moduleInfo);
             } catch {
                 if (options.ignoreUnresolved || options.ignoreDependencies) {
                     if (logger.isVerboseEnabled())
                         logger.verbose(`Ignoring unresolved module '${str}' at ${sourceLocationToStringWithFile(path.node.loc)}`);
                 } else// TODO: special warning if the require/import is placed in a try-block, an if statement, or a switch case?
-                    a.warn(`Unable to resolve module '${str}' at ${sourceLocationToStringWithFile(path.node.loc)}`);
+                    f.warn(`Unable to resolve module '${str}' at ${sourceLocationToStringWithFile(path.node.loc)}`);
             }
     }
 
@@ -49,7 +49,7 @@ export function findModules(ast: File, file: FilePath, solver: Solver) {
                 if (isStringLiteral(arg))
                     requireModule(arg.value, path);
                 else
-                    a.error(`Unhandled 'require' at ${sourceLocationToStringWithFile(path.node.loc)}`);
+                    f.error(`Unhandled 'require' at ${sourceLocationToStringWithFile(path.node.loc)}`);
             }
         },
 

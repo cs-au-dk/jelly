@@ -1,21 +1,19 @@
-import {
-    ConstraintVar,
-    IntermediateVar,
-    NodeVar,
-    ObjectPropertyVar,
-    ObjectPropertyVarObj
-} from "./constraintvars";
+import {ConstraintVar, IntermediateVar, NodeVar, ObjectPropertyVar, ObjectPropertyVarObj} from "./constraintvars";
 import logger, {isTTY, writeStdOut} from "../misc/logger";
 import {AccessPathToken, AllocationSiteToken, ArrayToken, FunctionToken, PackageObjectToken, Token} from "./tokens";
-import {AnalysisState} from "./analysisstate";
-import {ModuleInfo, PackageInfo} from "./infos";
+import {GlobalState} from "./globalstate";
+import {PackageInfo} from "./infos";
 import {
     addAll,
     isArrayIndex,
+    mapArrayPushAll,
     mapGetArray,
     mapGetMap,
     mapGetSet,
+    mapMapMapSetAll,
+    mapMapSetAll,
     mapSetAddAll,
+    setAll,
     sourceLocationToStringWithFileAndEnd
 } from "../misc/util";
 import assert from "assert";
@@ -43,9 +41,9 @@ export class AbortedException extends Error {}
 
 export default class Solver {
 
-    readonly analysisState: AnalysisState = new AnalysisState;
+    readonly globalState: GlobalState = new GlobalState;
 
-    fragmentState: FragmentState = new FragmentState;
+    fragmentState: FragmentState = new FragmentState(this.globalState);
 
     unprocessedTokens: Map<ConstraintVar, Array<Token>> = new Map;
 
@@ -106,11 +104,12 @@ export default class Solver {
     }
 
     updateDiagnostics() {
-        const a = this.analysisState;
+        const a = this.globalState;
+        const f = this.fragmentState;
         const d = this.diagnostics;
         d.functions = a.functionInfos.size;
-        d.functionToFunctionEdges = a.numberOfFunctionToFunctionEdges;
-        d.uniqueTokens = a.canonicalTokens.size;
+        d.functionToFunctionEdges = f.numberOfFunctionToFunctionEdges;
+        d.uniqueTokens = f.a.canonicalTokens.size;
         const usage = getMemoryUsage();
         if (logger.isVerboseEnabled())
             logger.verbose(`Memory usage: ${usage}MB`);
@@ -243,25 +242,24 @@ export default class Solver {
             return;
         const abstractProp = ap instanceof PropertyAccessPath && ap.prop !== "default" && patternProperties && !patternProperties.has(ap.prop);
         const ap2 = subap instanceof IgnoredAccessPath || (subap instanceof UnknownAccessPath && abstractProp) ? subap :
-            abstractProp ? this.analysisState.canonicalizeAccessPath(new PropertyAccessPath((ap as PropertyAccessPath).base, "?")) : ap; // abstracting irrelevant access paths
+            abstractProp ? this.globalState.canonicalizeAccessPath(new PropertyAccessPath((ap as PropertyAccessPath).base, "?")) : ap; // abstracting irrelevant access paths
         if (logger.isDebugEnabled())
             logger.debug(`Adding access path ${ap2}${ap2 !== ap ? ` (${ap})` : ""} at ${to}${subap ? ` (sub-expression access path: ${subap})` : ""}`);
-        const a = this.analysisState;
         const f = this.fragmentState;
         const asn = to instanceof NodeVar && isAssignmentExpression(to.node);
         if (!asn)
-            this.addToken(a.canonicalizeToken(new AccessPathToken(ap2)), f.getRepresentative(to));
+            this.addToken(f.a.canonicalizeToken(new AccessPathToken(ap2)), f.getRepresentative(to));
         // collect information for PatternMatcher
         const t = to instanceof IntermediateVar && to.label === "import" ? to.node : to instanceof NodeVar? to.node : undefined; // special treatment of 'import' expressions
         if (t !== undefined) {
             if (ap2 instanceof ModuleAccessPath)
-                mapGetSet(a.moduleAccessPaths, ap2).add(t);
+                mapGetSet(f.moduleAccessPaths, ap2).add(t);
             else if (ap2 instanceof PropertyAccessPath)
-                mapGetMap(mapGetMap(asn ? a.propertyWriteAccessPaths : a.propertyReadAccessPaths, subap!), ap2.prop).set(t, {bp: ap2, sub: ap2.base});
+                mapGetMap(mapGetMap(asn ? f.propertyWriteAccessPaths : f.propertyReadAccessPaths, subap!), ap2.prop).set(t, {bp: ap2, sub: ap2.base});
             else if (ap2 instanceof CallResultAccessPath)
-                mapGetMap(a.callResultAccessPaths, subap!).set(t, {bp: ap2, sub: ap2.caller});
+                mapGetMap(f.callResultAccessPaths, subap!).set(t, {bp: ap2, sub: ap2.caller});
             else if (ap2 instanceof ComponentAccessPath)
-                mapGetMap(a.componentAccessPaths, subap!).set(t, {bp: ap2, sub: ap2.component});
+                mapGetMap(f.componentAccessPaths, subap!).set(t, {bp: ap2, sub: ap2.component});
             else if (!(ap2 instanceof UnknownAccessPath || ap2 instanceof IgnoredAccessPath))
                 assert.fail("Unexpected AccessPath");
         }
@@ -284,13 +282,13 @@ export default class Solver {
             const d = new Date().getTime();
             if (d > this.lastPrintDiagnosticsTime + 100) { // only report every 100ms
                 this.lastPrintDiagnosticsTime = d;
-                const a = this.analysisState;
+                const a = this.globalState;
                 const f = this.fragmentState;
-                writeStdOut(`Packages: ${a.packageInfos.size}, modules: ${a.moduleInfos.size}, call edges: ${a.numberOfFunctionToFunctionEdges}, ` +
+                writeStdOut(`Packages: ${a.packageInfos.size}, modules: ${a.moduleInfos.size}, call edges: ${f.numberOfFunctionToFunctionEdges}, ` +
                     (options.diagnostics ? `vars: ${f.getNumberOfVarsWithTokens()}, tokens: ${f.numberOfTokens}, subsets: ${f.numberOfSubsetEdges}, round: ${this.fixpointRound}, ` : "") +
                     `iterations: ${this.diagnostics.iterations}, worklists: ${this.unprocessedTokensSize}+${this.unprocessedSubsetEdgesSize}` +
                     (options.diagnostics ? `, listeners: ${f.postponedListenerCalls.length}` : ""));
-                a.timeoutTimer.checkTimeout();
+                f.a.timeoutTimer.checkTimeout();
             }
         }
     }
@@ -335,7 +333,7 @@ export default class Solver {
     private getListenerID(key: TokenListener, n: Node): ListenerID {
         let id = (n as any)[JELLY_NODE_ID];
         assert(id !== undefined);
-        return ((id << 10) + key) ^ (this.analysisState.moduleInfos.get((n as any)?.loc?.filename)?.hash || 0);
+        return ((id << 10) + key) ^ (this.globalState.moduleInfosByPath.get((n as any)?.loc?.filename)?.hash || 0);
     }
 
     /**
@@ -630,7 +628,7 @@ export default class Solver {
      */
     collectPropertyRead(result: ConstraintVar | undefined, base: ConstraintVar | undefined, pck: PackageObjectToken) {
         if (result && base)
-            this.analysisState.maybeEmptyPropertyReads.push({result, base, pck});
+            this.fragmentState.maybeEmptyPropertyReads.push({result, base, pck});
     }
 
     /**
@@ -639,7 +637,7 @@ export default class Solver {
      */
     collectDynamicPropertyWrite(base: ConstraintVar | undefined) {
         if (base)
-            this.analysisState.dynamicPropertyWrites.add(base);
+            this.fragmentState.dynamicPropertyWrites.add(base);
     }
 
     /**
@@ -829,7 +827,7 @@ export default class Solver {
     incrementFixpointIterations() {
         this.diagnostics.iterations++;
         if (this.diagnostics.iterations % 100 === 0) {
-            this.analysisState.timeoutTimer.checkTimeout();
+            this.globalState.timeoutTimer.checkTimeout();
             this.printDiagnostics();
         }
     }
@@ -841,18 +839,17 @@ export default class Solver {
     async propagate() {
         if (logger.isDebugEnabled())
             logger.debug("Processing constraints until fixpoint...");
-        const a = this.analysisState;
         const f = this.fragmentState;
-        a.timeoutTimer.checkTimeout();
+        f.a.timeoutTimer.checkTimeout();
         await this.checkAbort();
         let round = 0;
         while (this.unprocessedTokens.size > 0 || this.unprocessedSubsetEdges.size > 0 || f.postponedListenerCalls.length > 0) {
             round++;
             this.fixpointRound = round;
             if (logger.isVerboseEnabled())
-                logger.verbose(`Fixpoint round: ${round} (call edges: ${a.numberOfFunctionToFunctionEdges}, vars: ${f.getNumberOfVarsWithTokens()}, tokens: ${f.numberOfTokens}, subsets: ${f.numberOfSubsetEdges})`);
+                logger.verbose(`Fixpoint round: ${round} (call edges: ${f.numberOfFunctionToFunctionEdges}, vars: ${f.getNumberOfVarsWithTokens()}, tokens: ${f.numberOfTokens}, subsets: ${f.numberOfSubsetEdges})`);
             if (options.maxRounds !== undefined && round > options.maxRounds) {
-                a.warn(`Fixpoint round limit reached, aborting propagation`);
+                f.warn(`Fixpoint round limit reached, aborting propagation`);
                 this.roundLimitReached++;
                 this.unprocessedTokensSize = 0;
                 this.unprocessedTokens.clear();
@@ -870,33 +867,37 @@ export default class Solver {
                         for (const w of ws)
                             nodes.add(w);
                     }
-                    // find strongly connected components
-                    const timer1 = new Timer();
-                    const [reps, repmap] = nuutila(nodes, (v: ConstraintVar) => f.subsetEdges.get(v) || []);
-                    if (logger.isVerboseEnabled())
-                        logger.verbose(`Cycle detection nodes: ${f.vars.size}, components: ${reps.length}`);
-                    // cycle elimination
-                    for (const [v, rep] of repmap)
-                        this.redirect(v, rep); // TODO: this includes processing pending edges and tokens for v, which may be unnecessary?
-                    this.totalCycleEliminationTime += timer1.elapsedCPU();
-                    this.totalCycleEliminationRuns++;
-                    // TODO: (transitive reduction:) mark subset edges a->b as "ignored" if there is another path a==>c==>b? then skip those edges when new tokens appear in a (represent ignored edges separately, only look at ignored edges when adding new edges) - detect during cycle detection?
-                    const timer2 = new Timer();
-                    // process new tokens and subset edges for the component representatives in topological order
-                    for (let i = reps.length - 1; i >= 0; i--) {
-                        const v = reps[i];
-                        const ws = this.unprocessedSubsetEdges.get(v);
-                        if (ws)
-                            for (const w of ws)
-                                this.processEdge(v, w);
-                        this.processTokens(v);
-                        await this.checkAbort(true);
+                    if (nodes.size > 0) {
+                        // find strongly connected components
+                        const timer1 = new Timer();
+                        const [reps, repmap] = nuutila(nodes, (v: ConstraintVar) => f.subsetEdges.get(v) || []);
+                        if (logger.isVerboseEnabled())
+                            logger.verbose(`Cycle detection nodes: ${f.vars.size}, roots: ${nodes.size}, components: ${reps.length}`);
+                        // cycle elimination
+                        for (const [v, rep] of repmap)
+                            this.redirect(v, rep); // TODO: this includes processing pending edges and tokens for v, which may be unnecessary?
+                        this.totalCycleEliminationTime += timer1.elapsedCPU();
+                        this.totalCycleEliminationRuns++;
+                        // TODO: (transitive reduction:) mark subset edges a->b as "ignored" if there is another path a==>c==>b? then skip those edges when new tokens appear in a (represent ignored edges separately, only look at ignored edges when adding new edges) - detect during cycle detection?
+                        const timer2 = new Timer();
+                        // process new tokens and subset edges for the component representatives in topological order
+                        for (let i = reps.length - 1; i >= 0; i--) {
+                            const v = reps[i];
+                            const ws = this.unprocessedSubsetEdges.get(v);
+                            if (ws)
+                                for (const w of ws)
+                                    this.processEdge(v, w);
+                            this.processTokens(v);
+                            await this.checkAbort(true);
+                        }
+                        this.totalPropagationTime += timer2.elapsedCPU();
+                        this.unprocessedSubsetEdges.clear();
                     }
-                    this.unprocessedSubsetEdges.clear();
                     // process remaining tokens outside the sub-graph reachable via the new edges
+                    const timer3 = new Timer();
                     for (const v of this.unprocessedTokens.keys())
                         this.processTokens(v);
-                    this.totalPropagationTime += timer2.elapsedCPU();
+                    this.totalPropagationTime += timer3.elapsedCPU();
                 } else {
                     // process all constraint variables and subset edges in worklists until empty
                     const timer = new Timer();
@@ -927,7 +928,7 @@ export default class Solver {
                 for (const [fun, args] of calls) {
                     (fun as Function).apply(undefined, Array.isArray(args) ? args : [args]);
                     if (++count % 100 === 0) {
-                        a.timeoutTimer.checkTimeout();
+                        f.a.timeoutTimer.checkTimeout();
                         this.printDiagnostics();
                     }
                 }
@@ -961,77 +962,96 @@ export default class Solver {
      * Initializes a new fragment state.
      */
     prepare() {
-        this.fragmentState = new FragmentState();
+        this.fragmentState = new FragmentState(this.globalState);
     }
 
     /**
-     * Stores the fragment state in the given module or package.
+     * Restores the given fragment state.
      */
-    store(mp: ModuleInfo | PackageInfo) {
-        if (logger.isDebugEnabled())
-            logger.debug(`Storing state for ${mp}`);
-        mp.fragmentState = this.fragmentState;
-    }
-
-    /**
-     * Restores the fragment state for the module or package.
-     */
-    restore(mp: ModuleInfo | PackageInfo, propagate: boolean = true) { // TODO: reconsider use of 'propagate' flag
-        const s = mp.fragmentState;
-        if (s) {
-            if (logger.isDebugEnabled())
-                logger.debug(`Restoring state for ${mp}`);
-            const f = this.fragmentState;
-            // represent redirections as two-way subset edges, but only if using cycle elimination
-            if (options.cycleElimination)
-                for (const [v, rep] of s.redirections) { // Note: because redirections are restored like this and no final cycle elimination is performed, listeners may re-add tokens and subset edges differently depending on choices of SCC representatives
-                    mapGetSet(s.subsetEdges, v).add(rep);
-                    mapGetSet(s.reverseSubsetEdges, rep).add(v);
-                    mapGetSet(s.subsetEdges, rep).add(v);
-                    mapGetSet(s.reverseSubsetEdges, v).add(rep);
-                }
-            // copy fragment state
-            addAll(s.vars, f.vars);
-            mapSetAddAll(s.ancestorListenersProcessed, f.ancestorListenersProcessed);
-            for (const [id, m] of s.pairListenersProcessed)
-                mapSetAddAll(m, mapGetMap(f.pairListenersProcessed, id));
-            for (const [v, m] of s.tokenListeners) {
-                const vRep = f.getRepresentative(v);
-                for (const [id, listener] of m)
-                    this.addForAllConstraintPrivate(vRep, id, listener);
+    restore(s: FragmentState, propagate: boolean = true) { // TODO: reconsider use of 'propagate' flag
+        const f = this.fragmentState;
+        // represent redirections as two-way subset edges, but only if using cycle elimination
+        if (options.cycleElimination)
+            for (const [v, rep] of s.redirections) { // Note: because redirections are restored like this and no final cycle elimination is performed, listeners may re-add tokens and subset edges differently depending on choices of SCC representatives
+                mapGetSet(s.subsetEdges, v).add(rep);
+                mapGetSet(s.reverseSubsetEdges, rep).add(v);
+                mapGetSet(s.subsetEdges, rep).add(v);
+                mapGetSet(s.reverseSubsetEdges, v).add(rep);
             }
-            for (const [v1, m] of s.pairListeners1) {
-                const v1Rep = f.getRepresentative(v1);
-                for (const [id, [v2, listener]] of m)
-                    this.addForAllPairsConstraintPrivate(v1Rep, f.getRepresentative(v2), id, listener);
-            }
-            for (const [k, m] of s.packageNeighborListeners)
-                for (const [n, listener] of m)
-                    this.addForAllPackageNeighborsConstraintPrivate(k, n, listener);
-            for (const [t, m] of s.ancestorListeners)
-                for (const [n, listener] of m)
-                    this.addForAllAncestorsConstraintPrivate(t, n, listener);
-            for (const [t, m] of s.arrayEntriesListeners)
-                for (const [id, listener] of m)
-                    this.addForAllArrayEntriesConstraintPrivate(t, id, listener);
-            for (const [t, m] of s.objectPropertiesListeners)
-                for (const [id, listener] of m)
-                    this.addForAllObjectPropertiesConstraintPrivate(t, id, listener);
-            for (const [v, ts] of s.getAllVarsAndTokens())
-                this.addTokens(ts, f.getRepresentative(v), propagate);
-            for (const [v, ws] of s.subsetEdges) {
-                const vRep = f.getRepresentative(v);
-                for (const w of ws)
-                    this.addSubsetEdge(vRep, f.getRepresentative(w), propagate);
-            }
-            for (const [c, ps] of s.inherits)
-                for (const p of ps)
-                    this.addInherits(c, p, propagate);
-            for (const [k, ns] of s.packageNeighbors)
-                for (const n of ns)
-                    this.addPackageNeighbor(k, n, propagate);
-            this.printDiagnostics();
-        } else if (logger.isVerboseEnabled())
-            logger.verbose(`No state found for ${mp}`);
+        // copy fragment state
+        addAll(s.vars, f.vars);
+        mapSetAddAll(s.ancestorListenersProcessed, f.ancestorListenersProcessed);
+        for (const [id, m] of s.pairListenersProcessed)
+            mapSetAddAll(m, mapGetMap(f.pairListenersProcessed, id));
+        for (const [v, m] of s.tokenListeners) {
+            const vRep = f.getRepresentative(v);
+            for (const [id, listener] of m)
+                this.addForAllConstraintPrivate(vRep, id, listener);
+        }
+        for (const [v1, m] of s.pairListeners1) {
+            const v1Rep = f.getRepresentative(v1);
+            for (const [id, [v2, listener]] of m)
+                this.addForAllPairsConstraintPrivate(v1Rep, f.getRepresentative(v2), id, listener);
+        }
+        for (const [k, m] of s.packageNeighborListeners)
+            for (const [n, listener] of m)
+                this.addForAllPackageNeighborsConstraintPrivate(k, n, listener);
+        for (const [t, m] of s.ancestorListeners)
+            for (const [n, listener] of m)
+                this.addForAllAncestorsConstraintPrivate(t, n, listener);
+        for (const [t, m] of s.arrayEntriesListeners)
+            for (const [id, listener] of m)
+                this.addForAllArrayEntriesConstraintPrivate(t, id, listener);
+        for (const [t, m] of s.objectPropertiesListeners)
+            for (const [id, listener] of m)
+                this.addForAllObjectPropertiesConstraintPrivate(t, id, listener);
+        for (const [v, ts] of s.getAllVarsAndTokens())
+            this.addTokens(ts, f.getRepresentative(v), propagate);
+        for (const [v, ws] of s.subsetEdges) {
+            const vRep = f.getRepresentative(v);
+            for (const w of ws)
+                this.addSubsetEdge(vRep, f.getRepresentative(w), propagate);
+        }
+        for (const [c, ps] of s.inherits)
+            for (const p of ps)
+                this.addInherits(c, p, propagate);
+        for (const [k, ns] of s.packageNeighbors)
+            for (const n of ns)
+                this.addPackageNeighbor(k, n, propagate);
+        mapSetAddAll(s.requireGraph, f.requireGraph);
+        mapSetAddAll(s.functionToFunction, f.functionToFunction);
+        mapSetAddAll(s.callToFunction, f.callToFunction);
+        mapSetAddAll(s.callToFunctionOrModule, f.callToFunctionOrModule);
+        setAll(s.callToContainingFunction, f.callToContainingFunction);
+        mapSetAddAll(s.callToModule, f.callToModule);
+        f.numberOfFunctionToFunctionEdges += s.numberOfFunctionToFunctionEdges;
+        f.numberOfCallToFunctionEdges += s.numberOfCallToFunctionEdges;
+        addAll(s.functionsWithArguments, f.functionsWithArguments);
+        addAll(s.functionsWithThis, f.functionsWithThis);
+        f.artificialFunctions.push(...s.artificialFunctions);
+        mapSetAddAll(s.calls, f.calls);
+        addAll(s.callLocations, f.callLocations);
+        addAll(s.nativeCallLocations, f.nativeCallLocations);
+        addAll(s.externalCallLocations, f.externalCallLocations);
+        addAll(s.callsWithUnusedResult, f.callsWithUnusedResult);
+        addAll(s.callsWithResultMaybeUsedAsPromise, f.callsWithResultMaybeUsedAsPromise);
+        mapSetAddAll(s.functionParameters, f.functionParameters);
+        addAll(s.invokedExpressions, f.invokedExpressions);
+        addAll(s.maybeEscaping, f.maybeEscaping);
+        addAll(s.widened, f.widened);
+        setAll(s.unhandledDynamicPropertyWrites, f.unhandledDynamicPropertyWrites);
+        addAll(s.unhandledDynamicPropertyReads, f.unhandledDynamicPropertyReads);
+        f.errors += s.errors;
+        f.warnings += s.errors;
+        addAll(s.nodesWithWarning, f.nodesWithWarning);
+        mapSetAddAll(s.moduleAccessPaths, f.moduleAccessPaths);
+        mapMapMapSetAll(s.propertyReadAccessPaths, f.propertyReadAccessPaths);
+        mapMapMapSetAll(s.propertyWriteAccessPaths, f.propertyWriteAccessPaths);
+        mapMapSetAll(s.callResultAccessPaths, f.callResultAccessPaths);
+        mapMapSetAll(s.componentAccessPaths, f.componentAccessPaths);
+        mapArrayPushAll(s.importDeclRefs, f.importDeclRefs);
+        f.maybeEmptyPropertyReads.push(...s.maybeEmptyPropertyReads);
+        addAll(s.dynamicPropertyWrites, f.dynamicPropertyWrites);
+        this.printDiagnostics();
     }
 }

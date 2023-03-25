@@ -1,6 +1,7 @@
 import {FilePath, sourceLocationToString, strHash} from "../misc/util";
 import {Function, Program} from "@babel/types";
-import {FragmentState} from "./fragmentstate";
+import {sep} from "path";
+import assert from "assert";
 
 /**
  * Information about a package.
@@ -13,15 +14,13 @@ export class PackageInfo {
 
     readonly main: string | undefined; // package main file, undefined if not available
 
-    readonly dir: FilePath; // absolute path to package root directory, or "." for the entry files if no package.json is found
+    readonly dir: FilePath; // absolute path to representative package root directory, or "." for the entry files if no package.json is found
 
     readonly modules: Map<string, ModuleInfo> = new Map; // map from path relative to the package root to module info
 
     readonly directDependencies: Set<PackageInfo> = new Set; // the direct dependencies of this package
 
     readonly isEntry: boolean; // true for entry packages
-
-    fragmentState: FragmentState | undefined = undefined; // analysis solutions after analysis of this package and its dependencies
 
     constructor(name: string, version: string | undefined, main: string | undefined, dir: FilePath, isEntry: boolean) {
         this.name = name;
@@ -51,28 +50,31 @@ export class ModuleInfo {
 
     readonly packageInfo: PackageInfo; // package containing this module
 
-    readonly path: FilePath; // normalized file path of the representative file (in analysisstate, different paths in moduleInfos may refer to the same ModuleInfo)
-
     readonly functions: Map<Function, FunctionInfo> = new Map; // functions directly inside this module
 
     readonly isEntry: boolean; // true for entry modules
 
-    node: Program | undefined; // top-level source location (set by astvisitor)
+    node: Program | undefined; // top-level source location (set by analyzeFiles)
 
-    fragmentState: FragmentState | undefined = undefined; // analysis solution after local analysis of this module
+    readonly hash: number;
 
-    hash: number;
-
-    constructor(relativePath: string, packageInfo: PackageInfo, path: FilePath, isEntry: boolean) {
+    constructor(relativePath: string, packageInfo: PackageInfo, isEntry: boolean) {
         this.relativePath = relativePath;
         this.packageInfo = packageInfo;
-        this.path = path;
         this.isEntry = isEntry;
         this.hash = strHash(this.toString());
     }
 
     toString(): string {
         return `${this.packageInfo}:${this.relativePath}`;
+    }
+
+    /**
+     * Returns normalized file path of the representative file (different paths may refer to the same ModuleInfo).
+     */
+    getPath(): FilePath {
+        assert(this.packageInfo.dir !== undefined);
+        return `${this.packageInfo.dir}${sep}${this.relativePath}`;
     }
 
     /**
@@ -91,18 +93,21 @@ export class ModuleInfo {
  */
 export class DummyModuleInfo { // used for module files that can't be found (typically because they haven't been installed)
 
-    readonly requireName: string; // require string (normalized but not resolved to a file)
+    readonly requireName: string;
+
+    readonly normalizedRequireName: string; // require string (normalized but not resolved to a file)
 
     constructor(requireName: string) {
-        this.requireName = normalizeModuleName(requireName);
+        this.requireName = requireName;
+        this.normalizedRequireName = normalizeModuleName(requireName);
     }
 
     toString(): string {
-        return `${this.requireName}[unresolved]`;
+        return `${this.normalizedRequireName}[unresolved]`;
     }
 
     getOfficialName(): string {
-        return this.requireName;
+        return this.normalizedRequireName;
     }
 }
 

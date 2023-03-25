@@ -1,4 +1,4 @@
-import {AnalysisState} from "../analysis/analysisstate";
+import {GlobalState} from "../analysis/globalstate";
 import {AccessPathPatternCanonicalizer} from "./patternparser";
 import {
     AllocationSiteToken,
@@ -26,7 +26,7 @@ const MAX_ACCESS_PATHS = 10;
 /**
  * Find the exported API of all modules.
  */
-export function getAPIExported(a: AnalysisState, f: FragmentState): Map<ObjectPropertyVarObj, Set<AccessPathPattern>> {
+export function getAPIExported(f: FragmentState): Map<ObjectPropertyVarObj, Set<AccessPathPattern>> {
     logger.info("Collecting exported API");
     const c = new AccessPathPatternCanonicalizer;
     const res = new Map<ObjectPropertyVarObj, Set<AccessPathPattern>>();
@@ -68,8 +68,8 @@ export function getAPIExported(a: AnalysisState, f: FragmentState): Map<ObjectPr
             mapGetSet(objprops, v.obj).add(v.prop);
 
     // find exports
-    for (const m of a.moduleInfos.values())
-        add(a.canonicalizeVar(new ObjectPropertyVar(a.canonicalizeToken(new NativeObjectToken("module", m)), "exports")),
+    for (const m of f.a.moduleInfos.values())
+        add(f.a.canonicalizeVar(new ObjectPropertyVar(f.a.canonicalizeToken(new NativeObjectToken("module", m)), "exports")),
             c.canonicalize(new ImportAccessPathPattern(m.getOfficialName()))); // TODO: technically, official-name is not a glob?
 
     // iteratively find reachable objects and functions
@@ -82,12 +82,12 @@ export function getAPIExported(a: AnalysisState, f: FragmentState): Map<ObjectPr
             // look at object properties
            if (t instanceof ObjectToken || t instanceof NativeObjectToken || t instanceof PackageObjectToken)
                 for (const prop of mapGetSet(objprops, t))
-                    add(a.canonicalizeVar(new ObjectPropertyVar(t, prop)),
+                    add(f.a.canonicalizeVar(new ObjectPropertyVar(t, prop)),
                         c.canonicalize(new PropertyAccessPathPattern(ap, [prop])))
 
             // look at function returns
             if (t instanceof FunctionToken)
-                add(a.canonicalizeVar(new FunctionReturnVar(t.fun)),
+                add(f.a.canonicalizeVar(new FunctionReturnVar(t.fun)),
                     c.canonicalize(new CallResultAccessPathPattern(ap)));
 
             // TODO: we don't have patterns for class instantiation, methods and fields are described as properties of the classes
@@ -109,12 +109,12 @@ export function reportAPIExportedFunctions(r: Map<ObjectPropertyVarObj, Set<Acce
 /**
  * Finds the function or module (as a top-level) at the given location.
  */
-function findFunctionAtLocation(a: AnalysisState, loc: string): FunctionInfo | ModuleInfo | undefined {
+function findFunctionAtLocation(a: GlobalState, loc: string): FunctionInfo | ModuleInfo | undefined {
     const i = loc.lastIndexOf(":");
     if (i != -1) {
         const file = resolve(loc.substring(0, i));
         const line = parseInt(loc.substring(i + 1), 10);
-        const modinfo = a.moduleInfos.get(file);
+        const modinfo = a.moduleInfosByPath.get(file);
         if (line > 0 && modinfo && modinfo.node?.loc && line <= modinfo.node.loc.end.line) {
             let best: FunctionInfo | ModuleInfo = modinfo;
             for (const [fun, funinfo] of a.functionInfos)
@@ -127,17 +127,17 @@ function findFunctionAtLocation(a: AnalysisState, loc: string): FunctionInfo | M
     return undefined;
 }
 
-function getReverseCallGraph(a: AnalysisState): Map<FunctionInfo, Set<FunctionInfo | ModuleInfo>> {
+function getReverseCallGraph(f: FragmentState): Map<FunctionInfo, Set<FunctionInfo | ModuleInfo>> {
     const r = new Map<FunctionInfo, Set<FunctionInfo | ModuleInfo>>();
-    for (const [from, tos] of a.functionToFunction)
+    for (const [from, tos] of f.functionToFunction)
             for (const to of tos)
                 mapGetSet(r, to).add(from);
     return r;
 }
 
-function getReverseRequireGraph(a: AnalysisState): Map<ModuleInfo, Set<FunctionInfo | ModuleInfo>> {
+function getReverseRequireGraph(f: FragmentState): Map<ModuleInfo, Set<FunctionInfo | ModuleInfo>> {
     const r = new Map<ModuleInfo, Set<FunctionInfo | ModuleInfo>>();
-    for (const [from, tos] of a.requireGraph)
+    for (const [from, tos] of f.requireGraph)
         for (const to of tos)
             mapGetSet(r, to).add(from);
     return r;
@@ -147,9 +147,9 @@ function getReverseRequireGraph(a: AnalysisState): Map<ModuleInfo, Set<FunctionI
  * Finds the functions and modules (as top-level functions) that may reach the given function.
  * The functions and modules are the keys of the resulting map; the values are the successors toward the given function.
  */
-function findReachingFunctions(a: AnalysisState, fun: FunctionInfo | ModuleInfo): Map<FunctionInfo | ModuleInfo, Set<FunctionInfo | ModuleInfo>> {
-    const callers = getReverseCallGraph(a);
-    const requires = getReverseRequireGraph(a);
+function findReachingFunctions(f: FragmentState, fun: FunctionInfo | ModuleInfo): Map<FunctionInfo | ModuleInfo, Set<FunctionInfo | ModuleInfo>> {
+    const callers = getReverseCallGraph(f);
+    const requires = getReverseRequireGraph(f);
     const r = new Map<FunctionInfo | ModuleInfo, Set<FunctionInfo | ModuleInfo>>();
     const w = new Set<FunctionInfo | ModuleInfo>();
     r.set(fun, new Set());
@@ -170,15 +170,15 @@ function findReachingFunctions(a: AnalysisState, fun: FunctionInfo | ModuleInfo)
 /**
  * Reports access paths for functions and modules (as top-level functions) that may reach the given location.
  */
-export function reportAccessPaths(a: AnalysisState, r: Map<ObjectPropertyVarObj, Set<AccessPathPattern>>, loc: string) {
-    const fun = findFunctionAtLocation(a, loc);
+export function reportAccessPaths(f: FragmentState, r: Map<ObjectPropertyVarObj, Set<AccessPathPattern>>, loc: string) {
+    const fun = findFunctionAtLocation(f.a, loc);
     if (!fun) {
         logger.error(`Location ${loc} not found`);
         return;
     }
     if (logger.isDebugEnabled())
         logger.debug(`${loc} belongs to ${fun}`);
-    const reach = findReachingFunctions(a, fun);
+    const reach = findReachingFunctions(f, fun);
     logger.info(`Functions that may reach ${loc} (nearest first):`);
     for (const [f, ns] of reach) {
         logger.info(` ${f}`);
@@ -193,9 +193,9 @@ export function reportAccessPaths(a: AnalysisState, r: Map<ObjectPropertyVarObj,
     const all = new Set<string>();
     for (const [t, aps] of r)
         if (t instanceof FunctionToken) {
-            const f = a.functionInfos.get(t.fun);
-            assert(f);
-            if (reach.has(f)) {
+            const n = f.a.functionInfos.get(t.fun);
+            assert(n);
+            if (reach.has(n)) {
                 for (const ap of aps)
                     all.add(ap.toString());
                 if (aps.size >= MAX_ACCESS_PATHS)

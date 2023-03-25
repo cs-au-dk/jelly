@@ -67,19 +67,19 @@ export const ecmascriptModels: NativeModel = {
     name: "ecmascript",
     init: (p: NativeModelParams) => {
         // establish essential inheritance relations
-        const thePackageObjectToken = p.solver.analysisState.canonicalizeToken(new PackageObjectToken(p.moduleInfo.packageInfo));
-        const theArrayPackageObjectToken = p.solver.analysisState.canonicalizeToken(new PackageObjectToken(p.moduleInfo.packageInfo, "Array"));
-        const theDatePackageObjectToken = p.solver.analysisState.canonicalizeToken(new PackageObjectToken(p.moduleInfo.packageInfo, "Date"));
-        const theRegExpPackageObjectToken = p.solver.analysisState.canonicalizeToken(new PackageObjectToken(p.moduleInfo.packageInfo, "RegExp"));
-        p.solver.addInherits(thePackageObjectToken, p.natives.get(OBJECT_PROTOTYPE)!);
-        p.solver.addInherits(theArrayPackageObjectToken, p.natives.get(ARRAY_PROTOTYPE)!);
-        p.solver.addInherits(theDatePackageObjectToken, p.natives.get(DATE_PROTOTYPE)!);
-        p.solver.addInherits(theRegExpPackageObjectToken, p.natives.get(REGEXP_PROTOTYPE)!);
-        p.solver.addInherits(p.natives.get(ARRAY_PROTOTYPE)!, p.natives.get(OBJECT_PROTOTYPE)!);
-        p.solver.addInherits(p.natives.get(DATE_PROTOTYPE)!, p.natives.get(OBJECT_PROTOTYPE)!);
-        p.solver.addInherits(p.natives.get(REGEXP_PROTOTYPE)!, p.natives.get(OBJECT_PROTOTYPE)!);
-        p.solver.addInherits(p.natives.get(FUNCTION_PROTOTYPE)!, p.natives.get(OBJECT_PROTOTYPE)!);
-        p.solver.addInherits(p.natives.get(PROMISE_PROTOTYPE)!, p.natives.get(OBJECT_PROTOTYPE)!);
+        const thePackageObjectToken = p.solver.globalState.canonicalizeToken(new PackageObjectToken(p.moduleInfo.packageInfo));
+        const theArrayPackageObjectToken = p.solver.globalState.canonicalizeToken(new PackageObjectToken(p.moduleInfo.packageInfo, "Array"));
+        const theDatePackageObjectToken = p.solver.globalState.canonicalizeToken(new PackageObjectToken(p.moduleInfo.packageInfo, "Date"));
+        const theRegExpPackageObjectToken = p.solver.globalState.canonicalizeToken(new PackageObjectToken(p.moduleInfo.packageInfo, "RegExp"));
+        p.solver.addInherits(thePackageObjectToken, p.globalSpecialNatives.get(OBJECT_PROTOTYPE)!);
+        p.solver.addInherits(theArrayPackageObjectToken, p.globalSpecialNatives.get(ARRAY_PROTOTYPE)!);
+        p.solver.addInherits(theDatePackageObjectToken, p.globalSpecialNatives.get(DATE_PROTOTYPE)!);
+        p.solver.addInherits(theRegExpPackageObjectToken, p.globalSpecialNatives.get(REGEXP_PROTOTYPE)!);
+        p.solver.addInherits(p.globalSpecialNatives.get(ARRAY_PROTOTYPE)!, p.globalSpecialNatives.get(OBJECT_PROTOTYPE)!);
+        p.solver.addInherits(p.globalSpecialNatives.get(DATE_PROTOTYPE)!, p.globalSpecialNatives.get(OBJECT_PROTOTYPE)!);
+        p.solver.addInherits(p.globalSpecialNatives.get(REGEXP_PROTOTYPE)!, p.globalSpecialNatives.get(OBJECT_PROTOTYPE)!);
+        p.solver.addInherits(p.globalSpecialNatives.get(FUNCTION_PROTOTYPE)!, p.globalSpecialNatives.get(OBJECT_PROTOTYPE)!);
+        p.solver.addInherits(p.globalSpecialNatives.get(PROMISE_PROTOTYPE)!, p.globalSpecialNatives.get(OBJECT_PROTOTYPE)!);
         // TODO: all ObjectToken objects should also inherit from Object.prototype and Array.prototype?
         // TODO: all FunctionToken objects should also inherit from Function.prototype?
         // TODO: all NativeObjectToken objects and AccessPathToken objects should also inherit from Object.prototype, Array.prototype and Function.prototype?
@@ -93,6 +93,9 @@ export const ecmascriptModels: NativeModel = {
         },
         {
             name: "NaN"
+        },
+        {
+            name: "undefined"
         }
     ],
     functions: [
@@ -452,7 +455,7 @@ export const ecmascriptModels: NativeModel = {
             name: "Date",
             invoke: (p: NativeFunctionParams) => {
                 if (isNewExpression(p.path.node))
-                    returnToken(newPackageObject("Date", p.natives.get(DATE_PROTOTYPE)!, p), p);
+                    returnToken(newPackageObject("Date", p.globalSpecialNatives.get(DATE_PROTOTYPE)!, p), p);
             },
             staticMethods: [
                 {
@@ -674,8 +677,10 @@ export const ecmascriptModels: NativeModel = {
                     name: "bind",
                     invoke: (p: NativeFunctionParams) => {
                         const bp = getBaseAndProperty(p.path);
-                        if (bp)
-                            p.solver.addSubsetConstraint(p.solver.analysisState.varProducer.expVar(bp.base, p.path), p.solver.analysisState.varProducer.expVar(p.path.node, p.path)); // TODO: move to nativehelpers
+                        if (bp) {
+                            const vp = p.solver.fragmentState.varProducer;
+                            p.solver.addSubsetConstraint(vp.expVar(bp.base, p.path), vp.expVar(p.path.node, p.path)); // TODO: move to nativehelpers
+                        }
                         if (!p.path.node.arguments.every(arg => isExpression(arg)))
                             warnNativeUsed("Function.prototype.bind", p, "with SpreadElement"); // TODO: SpreadElement
                         else if (p.path.node.arguments.length === 1)
@@ -794,7 +799,7 @@ export const ecmascriptModels: NativeModel = {
             name: "Map",
             invoke: (p: NativeFunctionParams) => {
                 if (isNewExpression(p.path.node)) {
-                    const t = newObject("Map", p.natives.get(MAP_PROTOTYPE)!, p);
+                    const t = newObject("Map", p.globalSpecialNatives.get(MAP_PROTOTYPE)!, p);
                     if (p.path.node.arguments.length > 0)
                         assignIteratorMapValuePairs(0, t, MAP_KEYS, MAP_VALUES, p);
                     returnToken(t, p);
@@ -1201,9 +1206,9 @@ export const ecmascriptModels: NativeModel = {
             name: "Promise",
             invoke: (p: NativeFunctionParams) => {
                 if (isNewExpression(p.path.node)) {
-                    const promise = newObject("Promise", p.natives.get(PROMISE_PROTOTYPE)!, p);
-                    const resolveFunction = newObject("PromiseResolve", p.natives.get(FUNCTION_PROTOTYPE)!, p);
-                    const rejectFunction = newObject("PromiseReject", p.natives.get(FUNCTION_PROTOTYPE)!, p);
+                    const promise = newObject("Promise", p.globalSpecialNatives.get(PROMISE_PROTOTYPE)!, p);
+                    const resolveFunction = newObject("PromiseResolve", p.globalSpecialNatives.get(FUNCTION_PROTOTYPE)!, p);
+                    const rejectFunction = newObject("PromiseReject", p.globalSpecialNatives.get(FUNCTION_PROTOTYPE)!, p);
                     callPromiseExecutor(promise, resolveFunction, rejectFunction, p);
                     returnToken(promise, p);
                 }
@@ -1307,7 +1312,7 @@ export const ecmascriptModels: NativeModel = {
         {
             name: "RegExp",
             invoke: (p: NativeFunctionParams) => {
-                returnToken(newPackageObject("RegExp", p.natives.get(REGEXP_PROTOTYPE)!, p), p);
+                returnToken(newPackageObject("RegExp", p.globalSpecialNatives.get(REGEXP_PROTOTYPE)!, p), p);
             },
             methods: [
                 {
@@ -1328,7 +1333,7 @@ export const ecmascriptModels: NativeModel = {
             name: "Set",
             invoke: (p: NativeFunctionParams) => {
                 if (isNewExpression(p.path.node)) {
-                    const t = newObject("Set", p.natives.get(SET_PROTOTYPE)!, p);
+                    const t = newObject("Set", p.globalSpecialNatives.get(SET_PROTOTYPE)!, p);
                     if (p.path.node.arguments.length > 0)
                         assignIteratorValuesToProperty(0, t, SET_VALUES, p);
                     returnToken(t, p);
@@ -1556,7 +1561,7 @@ export const ecmascriptModels: NativeModel = {
         {
             name: "WeakMap",
             invoke: (p: NativeFunctionParams) => {
-                const t = newObject("WeakMap", p.natives.get(WEAKMAP_PROTOTYPE)!, p);
+                const t = newObject("WeakMap", p.globalSpecialNatives.get(WEAKMAP_PROTOTYPE)!, p);
                 if (p.path.node.arguments.length > 0)
                     assignIteratorMapValuePairs(0, t, null, WEAKMAP_VALUES, p);
                 returnToken(t, p);
@@ -1590,7 +1595,7 @@ export const ecmascriptModels: NativeModel = {
             invoke: (p: NativeFunctionParams) => {
                 if (isNewExpression(p.path.node)) {
                     assignParameterToThisProperty(0, WEAKREF_VALUES, p);
-                    returnToken(newObject("WeakRef", p.natives.get(WEAKREF_PROTOTYPE)!, p), p);
+                    returnToken(newObject("WeakRef", p.globalSpecialNatives.get(WEAKREF_PROTOTYPE)!, p), p);
                 }
             },
             methods: [
@@ -1606,7 +1611,7 @@ export const ecmascriptModels: NativeModel = {
             name: "WeakSet",
             invoke: (p: NativeFunctionParams) => {
                 if (isNewExpression(p.path.node))
-                    returnToken(newObject("WeakSet", p.natives.get(WEAKSET_PROTOTYPE)!, p), p);
+                    returnToken(newObject("WeakSet", p.globalSpecialNatives.get(WEAKSET_PROTOTYPE)!, p), p);
             },
             methods: [
                 {

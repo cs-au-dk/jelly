@@ -5,8 +5,8 @@ import assert from "assert";
 import {testSoundness} from "../dynamic/soundnesstester";
 import {AnalysisStateReporter} from "../output/analysisstatereporter";
 import Solver from "../analysis/solver";
-import {AnalysisState} from "../analysis/analysisstate";
 import {getAPIUsage} from "../patternmatching/apiusage";
+import {FragmentState} from "../analysis/fragmentstate";
 
 export async function runTest(basedir: string,
                               app: string | Array<string>,
@@ -42,16 +42,16 @@ export async function runTest(basedir: string,
 
     let funFound, funTotal, callFound, callTotal;
     if (args.soundness)
-        [funFound, funTotal, callFound, callTotal] = testSoundness(args.soundness, solver.analysisState);
+        [funFound, funTotal, callFound, callTotal] = testSoundness(args.soundness, solver.fragmentState);
 
     if (args.functionInfos !== undefined)
-        expect(solver.analysisState.functionInfos.size).toBe(args.functionInfos);
+        expect(solver.globalState.functionInfos.size).toBe(args.functionInfos);
     if (args.moduleInfos !== undefined)
-        expect(solver.analysisState.moduleInfos.size).toBe(args.moduleInfos);
+        expect(solver.globalState.moduleInfos.size).toBe(args.moduleInfos);
     if (args.numberOfFunctionToFunctionEdges !== undefined)
-        expect(solver.analysisState.numberOfFunctionToFunctionEdges).toBe(args.numberOfFunctionToFunctionEdges);
+        expect(solver.fragmentState.numberOfFunctionToFunctionEdges).toBe(args.numberOfFunctionToFunctionEdges);
     if (args.oneCalleeCalls !== undefined)
-        expect(new AnalysisStateReporter(solver.analysisState, solver.fragmentState).getOneCalleeCalls()).toBe(args.oneCalleeCalls);
+        expect(new AnalysisStateReporter(solver.fragmentState).getOneCalleeCalls()).toBe(args.oneCalleeCalls);
     if (args.funFound !== undefined)
         expect(funFound).toBe(args.funFound);
     if (args.funTotal !== undefined)
@@ -62,13 +62,13 @@ export async function runTest(basedir: string,
         expect(callTotal).toBe(args.callTotal);
     if (args.matches) {
         assert(tapirPatterns !== undefined && detectionPatterns !== undefined);
-        const {matches, matchesLow} = tapirPatternMatch(tapirPatterns, detectionPatterns, solver.analysisState, solver.fragmentState);
+        const {matches, matchesLow} = tapirPatternMatch(tapirPatterns, detectionPatterns, solver.fragmentState);
         expect(matches).toBe(args.matches.total);
         if (args.matches.low !== undefined)
             expect(matchesLow).toBe(args.matches.low);
     }
     if (args.apiUsageAccessPathPatternsAtNodes !== undefined) {
-        const [r1,] = getAPIUsage(solver.analysisState);
+        const [r1,] = getAPIUsage(solver.fragmentState);
         let numAccessPathPatternsAtNodes = 0;
         for (const m of Object.values(r1))
             for (const ns of m.values())
@@ -77,8 +77,8 @@ export async function runTest(basedir: string,
     }
 }
 
-export function hasEdge(a: AnalysisState, fromStr: string, toStr: string): boolean {
-    for (const [from, tos] of a.functionToFunction)
+export function hasEdge(f: FragmentState, fromStr: string, toStr: string): boolean {
+    for (const [from, tos] of f.functionToFunction)
         for (const to of tos) {
             // console.log(`${from} -> ${to}`);
             if (from.toString().includes(fromStr) && to.toString().includes(toStr))

@@ -3,7 +3,7 @@ import logger from "../misc/logger";
 import {transformFromAstSync} from "@babel/core";
 import {parse, ParserOptions} from "@babel/parser";
 import {replaceTypeScriptImportExportAssignments} from "./extras";
-import {AnalysisState} from "../analysis/analysisstate";
+import {FragmentState} from "../analysis/fragmentstate";
 
 /**
  * Parses and desugars the given file.
@@ -12,7 +12,7 @@ import {AnalysisState} from "../analysis/analysisstate";
  * @param a analysis state object
  * @return AST, or null if error occurred
  */
-export function parseAndDesugar(str: string, file: string, a: AnalysisState): File | null {
+export function parseAndDesugar(str: string, file: string, f: FragmentState): File | null {
 
     // parse the file
     let originalAst: File;
@@ -43,7 +43,7 @@ export function parseAndDesugar(str: string, file: string, a: AnalysisState): Fi
             originalAst = parse(str, options);
         }
     } catch (e) {
-        a.error(`Unrecoverable parse error for ${file}${e instanceof Error ? `: ${e.message}` : ""}`);
+        f.error(`Unrecoverable parse error for ${file}${e instanceof Error ? `: ${e.message}` : ""}`);
         return null;
     }
 
@@ -62,11 +62,11 @@ export function parseAndDesugar(str: string, file: string, a: AnalysisState): Fi
             code: logger.isDebugEnabled()
         });
     } catch (e) {
-        a.error(`Babel transformation failed for ${file}${e instanceof Error ? `: ${e.message}` : ""}`);
+        f.error(`Babel transformation failed for ${file}${e instanceof Error ? `: ${e.message}` : ""}`);
         return null;
     }
     if (!res) {
-        a.error(`Babel transformation failed silently for ${file}`);
+        f.error(`Babel transformation failed silently for ${file}`);
         return null;
     }
     if (res.code) // set 'code: true' above to output desugared code

@@ -1,7 +1,7 @@
 // too many import from jelly-previous, so disable ts check, otherwise it has compile error when we run test the first time.
 import Solver from "../../src/analysis/solver";
 import {DummyModuleInfo, FunctionInfo, ModuleInfo} from "../../src/analysis/infos";
-import {AnalysisState} from "../../src/analysis/analysisstate";
+import {GlobalState} from "../../src/analysis/globalstate";
 import logger from "../../src/misc/logger";
 import {Token} from "../../src/analysis/tokens";
 import {mapGetSet, sourceLocationToString, SourceLocationWithFilename} from "../../src/misc/util";
@@ -59,7 +59,7 @@ export function compare(prevSolver: PrevSolver, currSolver: Solver, _package: st
     /**
      * Get the number of callsites in app scope with only one callee.
      */
-    function getOneCalleeCallsInAppScope(a: AnalysisState | PrevAnalysisState) {
+    function getOneCalleeCallsInAppScope(a: GlobalState | PrevAnalysisState) {
         let r = 0;
         for (const c of a.callLocations) {
             if (c.loc && "filename" in c.loc && entryModulePaths.includes(<string>c.loc.filename)) {
@@ -76,15 +76,15 @@ export function compare(prevSolver: PrevSolver, currSolver: Solver, _package: st
     }
 
     // 1. The reachable functions (in app scope) in call graph are more or equal to previous version.
-    expect(filterEntryFunctions(currSolver.analysisState.functionInfos).length,
+    expect(filterEntryFunctions(currSolver.globalState.functionInfos).length,
         `Unexpected analysisState.functionInfos.size`)
         .toBeGreaterThanOrEqual(filterEntryFunctions(prevSolver.analysisState.functionInfos).length);
     // 2. The reachable modules (in app scope) in call graph are greater or more to previous version.
-    expect(filterEntryModules(currSolver.analysisState.moduleInfos).length,
+    expect(filterEntryModules(currSolver.globalState.moduleInfos).length,
         `Unexpected analysisState.moduleInfos.size`)
         .toBeGreaterThanOrEqual(filterEntryModules(prevSolver.analysisState.moduleInfos).length);
     // 3. One callee calls (in app scope) are more or equal to previous version.
-    expect(getOneCalleeCallsInAppScope(currSolver.analysisState),
+    expect(getOneCalleeCallsInAppScope(currSolver.globalState),
         `Unexpected number of OneCalleeCalls`)
         .toBeGreaterThanOrEqual(getOneCalleeCallsInAppScope(prevSolver.analysisState));
 
@@ -125,8 +125,8 @@ export function compare(prevSolver: PrevSolver, currSolver: Solver, _package: st
     const currSubsetStrEdge = new Map<string, Set<string>>();
     for (const fromVar of currSolver.fragmentState.vars) {
         for (const toVar of mapGetSet(currSolver.fragmentState.subsetEdges, fromVar)) {
-            const m = currSolver.analysisState.getConstraintVarParent(fromVar);
-            const n = currSolver.analysisState.getConstraintVarParent(toVar);
+            const m = currSolver.globalState.getConstraintVarParent(fromVar);
+            const n = currSolver.globalState.getConstraintVarParent(toVar);
             if ((m && m.isEntry) || (n && n.isEntry)) {
                 const s = mapGetSet(currSubsetStrEdge, constraintVarToStringWithCode(fromVar));
                 const toVarStr = constraintVarToStringWithCode(toVar);
@@ -170,7 +170,7 @@ export function compare(prevSolver: PrevSolver, currSolver: Solver, _package: st
     // 8. The dataflow reachability from a app to app shouldn't be missing in current version.
     const currReachability = new Map<string, Set<string>>();
     for (const fromVar of currSolver.fragmentState.vars) {
-        const m = currSolver.analysisState.getConstraintVarParent(fromVar);
+        const m = currSolver.globalState.getConstraintVarParent(fromVar);
         if (m && m.isEntry) {
             const s = new Set<string>();
             const fromVarStr = constraintVarToStringWithCode(fromVar);
@@ -217,7 +217,7 @@ export function compare(prevSolver: PrevSolver, currSolver: Solver, _package: st
 
     // 9. The callgraph edge from a app's callsite to callee shouldn't missing in current version.
     let prevNode2callee = transformCallToFunctionOrModuleToStringMap(prevSolver.analysisState.callToFunctionOrModule);
-    let currNode2callee = transformCallToFunctionOrModuleToStringMap(currSolver.analysisState.callToFunctionOrModule);
+    let currNode2callee = transformCallToFunctionOrModuleToStringMap(currSolver.globalState.callToFunctionOrModule);
     for (const [caller, callees] of prevNode2callee)
         for (const callee of callees)
             expect(mapGetSet(currNode2callee, caller),
@@ -245,7 +245,7 @@ export function compare(prevSolver: PrevSolver, currSolver: Solver, _package: st
     }
 
     // 10. The callgraph reachability from a app to app shouldn't missing in current version.
-    const [_, currCGEdge] = getCallGraph(currSolver.analysisState);
+    const [_, currCGEdge] = getCallGraph(currSolver.globalState);
     const [__, currCGEdgeStr] = translateNodeGraphToStringGraph(currCGEdge);
     const [prevCGvertices, prevCGEdges] = getCallGraph(prevSolver.analysisState);
     for (const from of prevCGvertices)
@@ -267,8 +267,8 @@ type PrevGraphNode = PrevFunctionInfo | PrevModuleInfo;
  * @param a analysis state
  * @returns a tuple of vertexes and edges
  */
-export function getCallGraph<A extends AnalysisState | PrevAnalysisState,
-    N extends (A extends AnalysisState ? GraphNode : PrevGraphNode)>(a: A):
+export function getCallGraph<A extends GlobalState | PrevAnalysisState,
+    N extends (A extends GlobalState ? GraphNode : PrevGraphNode)>(a: A):
     [Set<N>, Map<N, Set<N>>] {
     const vertexes = new Set<N>();
     const edges = new Map<N, Set<N>>();

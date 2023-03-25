@@ -20,7 +20,6 @@ import {
     WriteDetectionPattern
 } from "./patterns";
 import assert from "assert";
-import {AnalysisState} from "../analysis/analysisstate";
 import {addAll, deleteAll, deleteMapSetAll, FilePath, mapGetSet, nodeToString, SourceLocationJSON, SourceLocationsToJSON, sourceLocationToStringWithFileAndEnd, Ternary} from "../misc/util";
 import {
     isAssignmentExpression,
@@ -100,8 +99,6 @@ export type PatternMatchJSON = {
 
 export class PatternMatcher {
 
-    private readonly analysisState: AnalysisState;
-
     private readonly fragmentState: FragmentState;
 
     private readonly typer: TypeScriptTypeInferrer | undefined;
@@ -126,8 +123,7 @@ export class PatternMatcher {
      */
     private unknownsCache: Array<Node> | undefined;
 
-    constructor(analysisState: AnalysisState, fragmentState: FragmentState, typer?: TypeScriptTypeInferrer) {
-        this.analysisState = analysisState;
+    constructor(fragmentState: FragmentState, typer?: TypeScriptTypeInferrer) {
         this.fragmentState = fragmentState;
         this.typer = typer;
     }
@@ -142,7 +138,7 @@ export class PatternMatcher {
             res = [];
             this.moduleCache.set(glob, res);
             const isMatch = micromatch.matcher(glob);
-            for (const [ap, ns] of this.analysisState.moduleAccessPaths) {
+            for (const [ap, ns] of this.fragmentState.moduleAccessPaths) {
                 const m = ap.moduleInfo;
                 if (isMatch(m.getOfficialName()) || (ap.requireName && isMatch(ap.requireName)))
                     if (options.patterns && m instanceof ModuleInfo && !options.ignoreDependencies)
@@ -164,7 +160,6 @@ export class PatternMatcher {
             const high = new Map, low = new Map;
             res = {high, low};
             cache.set(p, res);
-            const a = this.analysisState;
             const f = this.fragmentState;
 
             /**
@@ -260,7 +255,7 @@ export class PatternMatcher {
                 // workaround to support TAPIR's treatment of default imports
                 for (const aps of high.values())
                     for (const ap of aps) {
-                        const ps = a.propertyReadAccessPaths.get(ap);
+                        const ps = f.propertyReadAccessPaths.get(ap);
                         if (ps) {
                             const q = ps.get("default");
                             if (q)
@@ -275,7 +270,7 @@ export class PatternMatcher {
                     const subvs = new Map<Node, ConstraintVar>();
                     for (const aps of sub[level].values())
                         for (const ap of aps) { // ap is an access path that matches the sub-pattern
-                            const ps = (write ? a.propertyWriteAccessPaths : a.propertyReadAccessPaths).get(ap);
+                            const ps = (write ? f.propertyWriteAccessPaths : f.propertyReadAccessPaths).get(ap);
                             if (ps)
                                 for (const prop of p.props)
                                     addMatches(level, ap, ps.get(prop), tmp, subvs);
@@ -289,7 +284,7 @@ export class PatternMatcher {
                     const subvs = new Map<Node, ConstraintVar>();
                     for (const aps of sub[level].values())
                         for (const ap of aps)
-                            addMatches(level, ap, a.callResultAccessPaths.get(ap), tmp, subvs);
+                            addMatches(level, ap, f.callResultAccessPaths.get(ap), tmp, subvs);
                     transfer(level, sub, tmp, subvs);
                 }
             } else if (p instanceof DisjunctionAccessPathPattern) {
@@ -346,12 +341,12 @@ export class PatternMatcher {
                                 if (!visited[level].has(ap)) {
                                     visited[level].add(ap);
                                     // look for PropertyAccessPath matches
-                                    const ps = (write ? a.propertyWriteAccessPaths : a.propertyReadAccessPaths).get(ap);
+                                    const ps = (write ? f.propertyWriteAccessPaths : f.propertyReadAccessPaths).get(ap);
                                     if (ps)
                                         for (const q of ps.values())
                                             addMatches(level, ap, q, tmp, subvs, res[level]);
                                     // look for CallResultAccessPath matches
-                                    addMatches(level, ap, a.callResultAccessPaths.get(ap), tmp, subvs, res[level]);
+                                    addMatches(level, ap, f.callResultAccessPaths.get(ap), tmp, subvs, res[level]);
                                 }
                         transfer(level, sub, tmp, subvs, nextsub);
                     }
@@ -454,7 +449,7 @@ export class PatternMatcher {
             const sub = this.findAccessPathPatternMatches(d.ap);
             for (const level of confidenceLevels) {
                 for (const exp of sub[level].keys()) {
-                    if (!d.notInvoked || !this.analysisState.invokedExpressions.has(exp)) {
+                    if (!d.notInvoked || !this.fragmentState.invokedExpressions.has(exp)) {
                         const uncertainties: Array<Uncertainty> = [];
                         if (level === "low" && !d.baseFilter) // uncertainty is added through the base filter in this case
                             uncertainties.push("accessPath");
@@ -475,7 +470,7 @@ export class PatternMatcher {
                     }
                     // for identifier matches in imports, also include uses of the identifier
                     if (isIdentifier(exp)) {
-                        const refs = this.analysisState.importDeclRefs.get(exp);
+                        const refs = this.fragmentState.importDeclRefs.get(exp);
                         if (refs)
                             for (const n of refs) {
                                 const uncertainties: Array<Uncertainty> = [];
@@ -519,13 +514,14 @@ export class PatternMatcher {
             // 'call' patterns match entire call expressions but refer only to the functions being called,
             // so we wrap the access path pattern in a CallResultAccessPathPattern
             const sub = this.findAccessPathPatternMatches(new CallResultAccessPathPattern(d.ap));
+            const f = this.fragmentState;
             for (const level of confidenceLevels)
                 matches: for (const exp of sub[level].keys()) {
-                    if ((!d.onlyReturnChanged || !this.analysisState.callsWithUnusedResult.has(exp)) &&
+                    if ((!d.onlyReturnChanged || !f.callsWithUnusedResult.has(exp)) &&
                         (!d.onlyNonNewCalls || !isNewExpression(exp)) &&
-                        (!d.onlyWhenUsedAsPromise || this.analysisState.callsWithResultMaybeUsedAsPromise.has(exp))) {
+                        (!d.onlyWhenUsedAsPromise || f.callsWithResultMaybeUsedAsPromise.has(exp))) {
                         const uncertainties: Array<Uncertainty> = [];
-                        if (d.onlyWhenUsedAsPromise && this.analysisState.callsWithResultMaybeUsedAsPromise.has(exp))
+                        if (d.onlyWhenUsedAsPromise && f.callsWithResultMaybeUsedAsPromise.has(exp))
                             uncertainties.push("maybePromiseMatch");
                         if (level === "low" && !d.filters?.some(f => f instanceof TypeFilter && f.selector.head === "base")) // if uncertain and there is a base filter, an Uncertainty will be added below so skip here
                             uncertainties.push("accessPath");
