@@ -46,11 +46,13 @@ export function replaceTypeScriptImportExportAssignments({ template }: {template
                 }));
             },
             TSImportEqualsDeclaration(path: NodePath<TSImportEqualsDeclaration>) {
-                if (!path.node.isExport && path.node.importKind === "value" && isTSExternalModuleReference(path.node.moduleReference))
+                if (!path.node.isExport && path.node.importKind === "value" && isTSExternalModuleReference(path.node.moduleReference)) {
                     path.replaceWith(moduleImportsDeclaration({
                         ID: path.node.id,
                         MODULE: path.node.moduleReference.expression
                     }));
+                    path.scope.registerDeclaration(path);
+                }
                 // TODO: handle other forms of TSImportEqualsDeclaration?
             }
         }
@@ -124,13 +126,13 @@ export function preprocessAst(ast: File, file: string, globals: Array<Identifier
                 n.name !== "arguments" && !path.scope.getBinding(n.name) &&
                 !((isMemberExpression(path.parent) || isOptionalMemberExpression(path.parent) || isJSXMemberExpression(path.parent)) &&
                     path.parent.property === path.node) &&
-                !isObjectProperty(path.parent) &&
-                !isObjectMethod(path.parent) &&
-                !isClassProperty(path.parent) &&
-                !isClassMethod(path.parent) &&
+                !(isObjectProperty(path.parent) && path.parent.key === n) &&
+                !(isObjectMethod(path.parent) && path.parent.key === n) &&
+                !(isClassProperty(path.parent) && path.parent.key === n) &&
+                !(isClassMethod(path.parent) && path.parent.key === n) &&
                 !isImportSpecifier(path.parent) &&
                 !isJSXAttribute(path.parent) &&
-                !isVariableDeclarator(path.parent)) {
+                !(isVariableDeclarator(path.parent) && path.parent.id === n)) {
                 const ps = path.scope.getProgramParent();
                 if (!ps.getBinding(n.name)?.identifier) {
                     const d = identifier(n.name);
