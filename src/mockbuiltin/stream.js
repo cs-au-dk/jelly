@@ -1,4 +1,48 @@
+class WritableState {
+  constructor(...args) {
+    for (const arg of args) arg();
+  }
+  getBuffer(...args) {
+    for (const arg of args) arg();
+  }
+}
+
+class Writable extends Stream {
+  WritableState = WritableState;
+  constructor(...args) {
+    for (const arg of args) arg();
+  }
+  write(...args) {
+    for (const arg of args) arg();
+  }
+  end(...args) {
+    for (const arg of args) arg();
+  }
+  cork(...args) {
+    for (const arg of args) arg();
+  }
+  uncork(...args) {
+    for (const arg of args) arg();
+  }
+  setDefaultEncoding(...args) {
+    for (const arg of args) arg();
+  }
+  _write(...args) {
+    for (const arg of args) arg();
+  }
+  _writev(...args) {
+    for (const arg of args) arg();
+  }
+  _destroy(...args) {
+    for (const arg of args) arg();
+  }
+  _final(...args) {
+    for (const arg of args) arg();
+  }
+}
+
 class Stream {
+  Writable = Writable;
   constructor(...args) {
     for (const arg of args) arg();
   }
