@@ -108,17 +108,15 @@ import {
 } from "../natives/ecmascript";
 import {Operations} from "./operations";
 import {TokenListener} from "./listeners";
+import {JELLY_NODE_ID} from "../parsing/extras";
 
 export const IDENTIFIER_KIND = Symbol();
 
 export function visit(ast: File, op: Operations) {
     const solver = op.solver;
-    const a = solver.analysisState;
-
-    a.maybeEscaping.clear(); // TODO: move to method in AnalysisState?
-
-    // set module source location
-    op.moduleInfo.node = ast.program;
+    const f = solver.fragmentState;
+    const a = solver.globalState;
+    const vp = f.varProducer;
 
     // traverse the AST and extend the analysis result with information about the current module
     if (logger.isVerboseEnabled())
@@ -128,29 +126,29 @@ export function visit(ast: File, op: Operations) {
         ThisExpression(path: NodePath<ThisExpression>) {
 
             // this
-            a.registerThis(path);
+            f.registerThis(path);
 
             // constraint: t ∈ ⟦this⟧ where t denotes the package
-            solver.addTokenConstraint(op.packageObjectToken, a.varProducer.nodeVar(path.node));
+            solver.addTokenConstraint(op.packageObjectToken, vp.nodeVar(path.node));
 
             const fun = path.getFunctionParent();
             if (fun) {
 
                 // constraint: ⟦this_f⟧ ⊆ ⟦this⟧ where f is the enclosing function
-                solver.addSubsetConstraint(a.varProducer.thisVar(fun.node), a.varProducer.nodeVar(path.node));
+                solver.addSubsetConstraint(vp.thisVar(fun.node), vp.nodeVar(path.node));
             } else {
 
                 // constraint %globalThis ∈ ⟦this⟧
-                solver.addTokenConstraint(op.natives.get("globalThis")!, a.varProducer.nodeVar(path.node));
+                solver.addTokenConstraint(op.globalSpecialNatives.get("globalThis")!, vp.nodeVar(path.node));
             }
 
             // constraint: @Unknown ∈ ⟦this⟧
-            solver.addAccessPath(UnknownAccessPath.instance, a.varProducer.nodeVar(path.node)); // TODO: omit this constraint in certain situations?
+            solver.addAccessPath(UnknownAccessPath.instance, vp.nodeVar(path.node)); // TODO: omit this constraint in certain situations?
         },
 
         Identifier(path: NodePath<Identifier>) {
             if (path.node.name === "arguments") // registers use of 'arguments'
-                a.varProducer.identVar(path.node, path); // FIXME: registerArguments may be called too late if the function is recursive
+                vp.identVar(path.node, path); // FIXME: registerArguments may be called too late if the function is recursive
 
             if (options.variableKinds) {
                 const binding = path.scope.getBinding(path.node.name);
@@ -190,16 +188,16 @@ export function visit(ast: File, op: Operations) {
                             // find the iterator object (it is returned via Function)
                             // constraint: ... ⊆ ⟦i.value⟧ where i is the iterator object for the function
                             const iter = a.canonicalizeToken(new AllocationSiteToken("Iterator", fun.node.body, op.packageInfo));
-                            resVar = a.varProducer.objPropVar(iter, "value");
+                            resVar = vp.objPropVar(iter, "value");
                         } else {
                             // constraint: ... ⊆ ⟦ret_f⟧ where f is the enclosing function (ignoring top-level returns)
-                            resVar = a.varProducer.returnVar(fun.node);
+                            resVar = vp.returnVar(fun.node);
                         }
 
                         if (fun.node.async && !fun.node.generator) {
                             // make a new promise with the fulfilled value being the return value
                             const promise = op.newPromiseToken(fun.node);
-                            solver.addSubsetConstraint(expVar, a.varProducer.objPropVar(promise, PROMISE_FULFILLED_VALUES));
+                            solver.addSubsetConstraint(expVar, vp.objPropVar(promise, PROMISE_FULFILLED_VALUES));
                             solver.addTokenConstraint(promise!, resVar);
                         } else
                             solver.addSubsetConstraint(expVar, resVar);
@@ -223,13 +221,13 @@ export function visit(ast: File, op: Operations) {
                 logger.verbose(`Reached function ${msg} at ${sourceLocationToStringWithFile(fun.loc)}`);
             a.registerFunctionInfo(op.file, path, name, fun);
             if (!name && !anon)
-                a.warnUnsupported(fun, `Computed ${isFunctionDeclaration(path.node) || isFunctionExpression(path.node) ? "function" : "method"} name`); // TODO: handle functions/methods with unknown name?
+                f.warnUnsupported(fun, `Computed ${isFunctionDeclaration(path.node) || isFunctionExpression(path.node) ? "function" : "method"} name`); // TODO: handle functions/methods with unknown name?
 
             // process destructuring for parameters and register identifier parameters
             for (const param of fun.params) {
-                const paramVar = op.varProducer.nodeVar(param);
+                const paramVar = op.solver.fragmentState.varProducer.nodeVar(param);
                 if (isIdentifier(param))
-                    a.registerFunctionParameter(paramVar, path.node);
+                    f.registerFunctionParameter(paramVar, path.node);
                 else
                     op.assign(paramVar, param, path);
             }
@@ -240,11 +238,11 @@ export function visit(ast: File, op: Operations) {
 
                 // constraint: %(Async)Generator.prototype.next ⊆ ⟦i.next⟧ where i is the iterator object for the function
                 const iter = a.canonicalizeToken(new AllocationSiteToken("Iterator", fun.body, op.packageInfo));
-                const iterNext = a.varProducer.objPropVar(iter, "next");
-                solver.addTokenConstraint(op.natives.get(fun.async ? ASYNC_GENERATOR_PROTOTYPE_NEXT : GENERATOR_PROTOTYPE_NEXT)!, iterNext);
+                const iterNext = vp.objPropVar(iter, "next");
+                solver.addTokenConstraint(op.globalSpecialNatives.get(fun.async ? ASYNC_GENERATOR_PROTOTYPE_NEXT : GENERATOR_PROTOTYPE_NEXT)!, iterNext);
 
                 // constraint i ∈ ⟦ret_f⟧ where i is the iterator object for the function
-                solver.addTokenConstraint(iter, a.varProducer.returnVar(fun));
+                solver.addTokenConstraint(iter, vp.returnVar(fun));
             }
         },
 
@@ -254,7 +252,7 @@ export function visit(ast: File, op: Operations) {
                 // function f(...) {...}  (as declaration)
                 // constraint: t ∈ ⟦f⟧ where t denotes the function
                 const to = path.node.id ? path.node.id : path.node; // export default functions may not have names, use the FunctionDeclaration node as constraint variable in that situation
-                solver.addTokenConstraint(op.newFunctionToken(path.node), a.varProducer.nodeVar(to));
+                solver.addTokenConstraint(op.newFunctionToken(path.node), vp.nodeVar(to));
             }
         },
 
@@ -264,10 +262,10 @@ export function visit(ast: File, op: Operations) {
                 // function f(...) {...} (as expression, possibly without name)
                 // constraint: t ∈ ⟦function f(...) {...}⟧ where t denotes the function
                 if (!isParentExpressionStatement(path))
-                    solver.addTokenConstraint(op.newFunctionToken(path.node), a.varProducer.nodeVar(path.node));
+                    solver.addTokenConstraint(op.newFunctionToken(path.node), vp.nodeVar(path.node));
                 // constraint: t ∈ ⟦f⟧ (if the function is named) where t denotes the function
                 if (path.node.id)
-                    solver.addTokenConstraint(op.newFunctionToken(path.node), a.varProducer.nodeVar(path.node.id));
+                    solver.addTokenConstraint(op.newFunctionToken(path.node), vp.nodeVar(path.node.id));
             }
         },
 
@@ -277,10 +275,10 @@ export function visit(ast: File, op: Operations) {
                 // (...) => E
                 // constraint: t ∈ ⟦(...) => E⟧ where t denotes the function
                 if (!isParentExpressionStatement(path))
-                    solver.addTokenConstraint(op.newFunctionToken(path.node), a.varProducer.nodeVar(path.node));
+                    solver.addTokenConstraint(op.newFunctionToken(path.node), vp.nodeVar(path.node));
                 // constraint: ⟦E⟧ ⊆ ⟦ret_f⟧ where f is the function
                 if (isExpression(path.node.body))
-                    solver.addSubsetConstraint(op.expVar(path.node.body, path), a.varProducer.returnVar(path.node));
+                    solver.addSubsetConstraint(op.expVar(path.node.body, path), vp.returnVar(path.node));
             }
         },
 
@@ -317,7 +315,7 @@ export function visit(ast: File, op: Operations) {
 
                     // constraint: ⟦E⟧ ⊆ ⟦... = E⟧
                     if (!isParentExpressionStatement(path))
-                        solver.addSubsetConstraint(eVar, a.varProducer.nodeVar(path.node));
+                        solver.addSubsetConstraint(eVar, vp.nodeVar(path.node));
                 }
             }
         },
@@ -348,8 +346,8 @@ export function visit(ast: File, op: Operations) {
                 // E1 ? E2 : E3
                 // constraints: ⟦E2⟧ ⊆ ⟦E1 ? E2 : E3⟧, ⟦E3⟧ ⊆ ⟦E1 ? E2 : E3⟧
                 if (!isParentExpressionStatement(path)) {
-                    solver.addSubsetConstraint(op.expVar(path.node.consequent, path), a.varProducer.nodeVar(path.node));
-                    solver.addSubsetConstraint(op.expVar(path.node.alternate, path), a.varProducer.nodeVar(path.node));
+                    solver.addSubsetConstraint(op.expVar(path.node.consequent, path), vp.nodeVar(path.node));
+                    solver.addSubsetConstraint(op.expVar(path.node.alternate, path), vp.nodeVar(path.node));
                 }
             }
         },
@@ -362,8 +360,8 @@ export function visit(ast: File, op: Operations) {
                 // (the former can safely be omitted for && when only tracking functions and objects)
                 if (!isParentExpressionStatement(path)) {
                     if (path.node.operator !== "&&")
-                        solver.addSubsetConstraint(op.expVar(path.node.left, path), a.varProducer.nodeVar(path.node));
-                    solver.addSubsetConstraint(op.expVar(path.node.right, path), a.varProducer.nodeVar(path.node));
+                        solver.addSubsetConstraint(op.expVar(path.node.left, path), vp.nodeVar(path.node));
+                    solver.addSubsetConstraint(op.expVar(path.node.right, path), vp.nodeVar(path.node));
                 }
             }
         },
@@ -374,7 +372,7 @@ export function visit(ast: File, op: Operations) {
                 // (..., ..., E)
                 // constraint: ⟦E⟧ ⊆ ⟦(..., ..., E)⟧
                 if (!isParentExpressionStatement(path))
-                    solver.addSubsetConstraint(op.expVar(path.node.expressions[path.node.expressions.length - 1], path), a.varProducer.nodeVar(path.node));
+                    solver.addSubsetConstraint(op.expVar(path.node.expressions[path.node.expressions.length - 1], path), vp.nodeVar(path.node));
             }
         },
 
@@ -395,23 +393,23 @@ export function visit(ast: File, op: Operations) {
                         let dst;
                         if (options.alloc && isObjectProperty(path.node)) {
                             // constraint: ⟦E⟧ ⊆ ⟦i.p⟧ where i is the object literal
-                            dst = a.varProducer.objPropVar(a.canonicalizeToken(new ObjectToken(path.parentPath.node, op.packageInfo)), key);
+                            dst = vp.objPropVar(a.canonicalizeToken(new ObjectToken(path.parentPath.node, op.packageInfo)), key);
                         } else if (options.alloc && (isClassProperty(path.node) || isClassAccessorProperty(path.node) || isClassPrivateProperty(path.node)) && path.node.static) {
                             // constraint: ⟦E⟧ ⊆ ⟦c.p⟧ where c is the class
                             const cls = getClass(path);
                             assert(cls);
-                            dst = a.varProducer.objPropVar(a.canonicalizeToken(new ClassToken(cls, op.packageInfo)), key);
+                            dst = vp.objPropVar(a.canonicalizeToken(new ClassToken(cls, op.packageInfo)), key);
                         } else {
                             // constraint: ⟦E⟧ ⊆ ⟦k.p⟧ where k is the current package
-                            dst = a.varProducer.packagePropVar(op.file, key);
+                            dst = vp.packagePropVar(op.file, key);
                         }
                         solver.addSubsetConstraint(rightvar, dst);
                         // TODO: special treatment for ClassPrivateProperty? static properties?
                     }
                 } else
-                    a.warnUnsupported(path.node, "Computed property name"); // TODO: nontrivial computed property name
+                    f.warnUnsupported(path.node, "Computed property name"); // TODO: nontrivial computed property name
                 if (isClassProperty(path.node)) // dyn.ts treats class property initializers as functions
-                    a.registerArtificialFunction(op.moduleInfo, path.node.key);
+                    f.registerArtificialFunction(op.moduleInfo, path.node.key);
             }
         },
 
@@ -431,23 +429,23 @@ export function visit(ast: File, op: Operations) {
                             if (options.alloc && isObjectMethod(path.node)) {
                                 // constraint: t ∈ ⟦(ac)i.p⟧ where t denotes the function, i is the object literal,
                                 // and (ac) specifies whether it is a getter, setter or normal property
-                                dst = a.varProducer.objPropVar(a.canonicalizeToken(new ObjectToken(path.parentPath.node, op.packageInfo)), key, ac);
+                                dst = vp.objPropVar(a.canonicalizeToken(new ObjectToken(path.parentPath.node, op.packageInfo)), key, ac);
                             } else if (options.alloc && (isClassMethod(path.node) || isClassPrivateMethod(path.node)) && path.node.static) {
                                 // constraint: t ∈ ⟦(ac)c.p⟧ where t denotes the function, c is the class,
                                 // and (ac) specifies whether it is a getter, setter or normal property
                                 const cls = getClass(path);
                                 assert(cls);
-                                dst = a.varProducer.objPropVar(a.canonicalizeToken(new ClassToken(cls, op.packageInfo)), key, ac);
+                                dst = vp.objPropVar(a.canonicalizeToken(new ClassToken(cls, op.packageInfo)), key, ac);
 
                             } else {
                                 // constraint: t ∈ ⟦(ac)k.p⟧ where t denotes the function and k is the current package,
                                 // and (ac) specifies whether it is a getter, setter or normal property
-                                dst = a.varProducer.packagePropVar(op.file, key, ac);
+                                dst = vp.packagePropVar(op.file, key, ac);
                             }
                             solver.addTokenConstraint(t, dst);
                             // TODO: special treatment for ClassPrivateMethod? static properties?
                         } else
-                            a.warnUnsupported(path.node, "Computed method name"); // TODO: nontrivial computed method name
+                            f.warnUnsupported(path.node, "Computed method name"); // TODO: nontrivial computed method name
                         break;
                     case "constructor":
 
@@ -455,7 +453,7 @@ export function visit(ast: File, op: Operations) {
                         // constraint: t ∈ ⟦C⟧ where t denotes the constructor function
                         const cls = getClass(path);
                         if (cls && cls.id) // note: to match dyn.ts, the FunctionToken uses the actual constructor location, but the FunctionInfo uses the location of the class
-                            solver.addTokenConstraint(op.newFunctionToken(path.node), a.varProducer.nodeVar(cls.id));
+                            solver.addTokenConstraint(op.newFunctionToken(path.node), vp.nodeVar(cls.id));
                         break;
                 }
                 // TODO: currently ignoring generator, async, static (often easy to resolve!), override, optional, abstract
@@ -469,7 +467,7 @@ export function visit(ast: File, op: Operations) {
 
                     // class C extends E {...}
                     // constraint: ⟦E⟧ ⊆ ⟦extends_c⟧ where c is the class
-                    solver.addSubsetConstraint(op.expVar(path.node.superClass, path), a.varProducer.extendsVar(path.node)); // TODO: test class inheritance (see C11 in classes.js)
+                    solver.addSubsetConstraint(op.expVar(path.node.superClass, path), vp.extendsVar(path.node)); // TODO: test class inheritance (see C11 in classes.js)
                 }
 
                 let constructor: ClassMethod | ClassPrivateMethod | undefined;
@@ -483,20 +481,20 @@ export function visit(ast: File, op: Operations) {
                         // class ... {...}
                         // constraint: t ∈ ⟦class ... {...}⟧ where t denotes the constructor function
                         if (!isParentExpressionStatement(path) || exported)
-                            solver.addTokenConstraint(op.newFunctionToken(constructor), a.varProducer.nodeVar(path.node));
+                            solver.addTokenConstraint(op.newFunctionToken(constructor), vp.nodeVar(path.node));
                     }
                 } else // no explicit constructor (dyn.ts records a call to an implicit constructor)
-                    a.registerArtificialFunction(op.moduleInfo, path.node);
+                    f.registerArtificialFunction(op.moduleInfo, path.node);
 
                 // class ... {...}
                 // constraint: c ∈ ⟦class ... {...}⟧ where c is the ClassToken
                 const ct = op.newClassToken(path.node);
                 if (isClassExpression(path.node) || exported)
-                    solver.addTokenConstraint(ct, a.varProducer.nodeVar(path.node));
+                    solver.addTokenConstraint(ct, vp.nodeVar(path.node));
 
                 // constraint: c ∈ ⟦C⟧ where c is the ClassToken
                 if (path.node.id)
-                    solver.addTokenConstraint(ct, a.varProducer.nodeVar(path.node.id));
+                    solver.addTokenConstraint(ct, vp.nodeVar(path.node.id));
             }
         },
 
@@ -506,12 +504,12 @@ export function visit(ast: File, op: Operations) {
             if (!isParentExpressionStatement(path)) {
 
                 // constraint: t ∈ ⟦{...}⟧ where t is the object for this allocation site
-                solver.addTokenConstraint(op.newObjectToken(path.node), a.varProducer.nodeVar(path.node));
-                // TODO: fall back to field-based if an object token appears in a constraint variable together with >k other object tokens? (see analysisstate.add)
+                solver.addTokenConstraint(op.newObjectToken(path.node), vp.nodeVar(path.node));
+                // TODO: fall back to field-based if an object token appears in a constraint variable together with >k other object tokens?
 
                 for (const p of path.node.properties)
                     if (isSpreadElement(p)) {
-                        a.warnUnsupported(p, "SpreadElement in ObjectExpression"); // TODO: SpreadElement in ObjectExpression
+                        f.warnUnsupported(p, "SpreadElement in ObjectExpression"); // TODO: SpreadElement in ObjectExpression
                     } // (ObjectProperty and ObjectMethod are handled at rules Property and Method respectively)
             }
         },
@@ -523,26 +521,26 @@ export function visit(ast: File, op: Operations) {
 
                 // constraint: t ∈ ⟦{...}⟧ where t is the array for this allocation site
                 const t = op.newArrayToken(path.node);
-                solver.addTokenConstraint(t, a.varProducer.nodeVar(path.node));
+                solver.addTokenConstraint(t, vp.nodeVar(path.node));
 
                 for (const [index, e] of path.node.elements.entries())
                     if (isExpression(e)) {
 
                         // constraint: ⟦E⟧ ⊆ ⟦t.i⟧ for each array element E with index i
                         const prop = String(index);
-                        solver.addSubsetConstraint(op.expVar(e, path), a.varProducer.objPropVar(t, prop));
+                        solver.addSubsetConstraint(op.expVar(e, path), vp.objPropVar(t, prop));
                     } else if (e)
-                        a.warnUnsupported(e, "SpreadElement in ArrayExpression"); // TODO: SpreadElement in ArrayExpression
+                        f.warnUnsupported(e, "SpreadElement in ArrayExpression"); // TODO: SpreadElement in ArrayExpression
             }
         },
 
         StaticBlock(path: NodePath<StaticBlock>) {
-            a.registerArtificialFunction(op.moduleInfo, path.node); // dyn.ts treats static blocks as functions
+            f.registerArtificialFunction(op.moduleInfo, path.node); // dyn.ts treats static blocks as functions
         },
 
         ThrowStatement: {
             exit(path: NodePath<ThrowStatement>) {
-                a.registerEscaping(op.expVar(path.node.argument, path));
+                f.registerEscaping(op.expVar(path.node.argument, path));
             }
         },
 
@@ -551,13 +549,13 @@ export function visit(ast: File, op: Operations) {
         },
 
         Super(path: NodePath<Super>) {
-            a.warnUnsupported(path.node); // TODO: super
+            f.warnUnsupported(path.node); // TODO: super
         },
 
         ImportDeclaration(path: NodePath<ImportDeclaration>) {
 
             // model 'import' like 'require'
-            op.requireModule(path.node.source.value, a.varProducer.nodeVar(path.node), path); // TODO: see TODO in requireResolve about using import.meta.resolve
+            op.requireModule(path.node.source.value, vp.nodeVar(path.node), path); // TODO: see TODO in requireResolve about using import.meta.resolve
 
             let any = false;
             for (const imp of path.node.specifiers) {
@@ -565,7 +563,7 @@ export function visit(ast: File, op: Operations) {
                     case "ImportNamespaceSpecifier":
 
                         // bind the module export object to the namespace identifier
-                        solver.addSubsetConstraint(a.varProducer.nodeVar(path.node), a.varProducer.nodeVar(imp.local));
+                        solver.addSubsetConstraint(vp.nodeVar(path.node), vp.nodeVar(imp.local));
                         break;
 
                     case "ImportSpecifier":
@@ -577,21 +575,22 @@ export function visit(ast: File, op: Operations) {
                 const refs = path.scope.getBinding(imp.local.name)?.referencePaths;
                 if (refs)
                     for (const ref of refs)
-                        mapArrayAdd(imp.local, ref.node, a.importDeclRefs);
+                        if ((ref.node as any)[JELLY_NODE_ID]) // @babel/plugin-transform-typescript removes type annotations, so skip identifier uses with no JELLY_NODE_ID
+                            mapArrayAdd(imp.local, ref.node, f.importDeclRefs);
             }
             // bind each module export object property to the local identifier
             if (any) {
 
                 // constraint: ∀ objects t ∈ ⟦import...⟧: ⟦t.p⟧ ⊆ ⟦x⟧ where p is the property and x is the local identifier
                 // for each import specifier
-                solver.addForAllConstraint(a.varProducer.nodeVar(path.node), TokenListener.IMPORT_BASE, path.node, (t: Token) => {
+                solver.addForAllConstraint(vp.nodeVar(path.node), TokenListener.IMPORT_BASE, path.node, (t: Token) => {
                     for (const imp of path.node.specifiers)
                         if (isImportSpecifier(imp) || isImportDefaultSpecifier(imp)) {
                             const prop = getImportName(imp);
                             if (t instanceof AllocationSiteToken || t instanceof FunctionToken || t instanceof NativeObjectToken || t instanceof PackageObjectToken)
-                                solver.addSubsetConstraint(a.varProducer.objPropVar(t, prop), a.varProducer.nodeVar(imp.local));
+                                solver.addSubsetConstraint(vp.objPropVar(t, prop), vp.nodeVar(imp.local));
                             else if (t instanceof AccessPathToken) // TODO: treat as object along with other tokens above?
-                                solver.addAccessPath(a.canonicalizeAccessPath(new PropertyAccessPath(a.varProducer.nodeVar(path.node), prop)), a.varProducer.nodeVar(imp.local), t.ap); // TODO: describe this constraint...
+                                solver.addAccessPath(a.canonicalizeAccessPath(new PropertyAccessPath(vp.nodeVar(path.node), prop)), vp.nodeVar(imp.local), t.ap); // TODO: describe this constraint...
                         }
                 });
             }
@@ -611,13 +610,13 @@ export function visit(ast: File, op: Operations) {
                                 const from = decl.id ? decl.id : decl; // using the declaration node as constraint variable for anonymous functions and classes
                                 assert(isExportDefaultDeclaration(path.node) || decl.id, "Unexpected missing id");
                                 const prop = isExportDefaultDeclaration(path.node) ? "default" : decl.id!.name;
-                                solver.addSubsetConstraint(a.varProducer.nodeVar(from), a.varProducer.objPropVar(op.exportsObjectToken, prop));
+                                solver.addSubsetConstraint(vp.nodeVar(from), vp.objPropVar(op.exportsObjectToken, prop));
                                 break;
                             }
                             case "VariableDeclaration": { // example: export var x = ... (local declaration and init value handled at rule VariableDeclarator)
                                 function exportDeclared(lval: LVal) {
                                     if (isIdentifier(lval))
-                                        solver.addSubsetConstraint(a.varProducer.nodeVar(lval), a.varProducer.objPropVar(op.exportsObjectToken, lval.name));
+                                        solver.addSubsetConstraint(vp.nodeVar(lval), vp.objPropVar(op.exportsObjectToken, lval.name));
                                     else if (isAssignmentPattern(lval))
                                         exportDeclared(lval.left);
                                     else if (isObjectPattern(lval)) {
@@ -647,7 +646,7 @@ export function visit(ast: File, op: Operations) {
                                 if (isDeclaration(decl))
                                     assert.fail(`Unexpected declaration type ${decl.type} in ExportDeclaration`);
                                 if (isExpression(decl))
-                                    solver.addSubsetConstraint(op.expVar(decl, path), a.varProducer.objPropVar(op.exportsObjectToken, "default"));
+                                    solver.addSubsetConstraint(op.expVar(decl, path), vp.objPropVar(op.exportsObjectToken, "default"));
                                 break;
                             }
                         }
@@ -656,29 +655,29 @@ export function visit(ast: File, op: Operations) {
                             assert.fail(`Unexpected node type ${path.node.type}`);
                         const node = path.node;
                         function getExportVar(name: string): ConstraintVar | undefined {
-                            const m = node.source ? op.requireModule(node.source.value, a.varProducer.nodeVar(node), path) : undefined;
-                            return m instanceof ModuleInfo ? a.varProducer.objPropVar(a.canonicalizeToken(new NativeObjectToken("exports", m)), name) : undefined;
+                            const m = node.source ? op.requireModule(node.source.value, vp.nodeVar(node), path) : undefined;
+                            return m instanceof ModuleInfo ? vp.objPropVar(a.canonicalizeToken(new NativeObjectToken("exports", m)), name) : undefined;
                         }
                         for (const spec of path.node.specifiers)
                             switch (spec.type) {
                                 case "ExportSpecifier": // example: export {x as y} ...
                                 case "ExportDefaultSpecifier": // example: export x from "m"
-                                    const from = isExportDefaultSpecifier(spec) ? getExportVar("default") : node.source ? getExportVar(spec.local.name) : a.varProducer.identVar(spec.local, path);
-                                    solver.addSubsetConstraint(from, a.varProducer.objPropVar(op.exportsObjectToken, getExportName(spec.exported)));
+                                    const from = isExportDefaultSpecifier(spec) ? getExportVar("default") : node.source ? getExportVar(spec.local.name) : vp.identVar(spec.local, path);
+                                    solver.addSubsetConstraint(from, vp.objPropVar(op.exportsObjectToken, getExportName(spec.exported)));
                                     break;
                                 case "ExportNamespaceSpecifier": // example: export * as x from "m"
-                                    a.warnUnsupported(spec); // TODO: ExportNamespaceSpecifier, see https://babeljs.io/docs/en/babel-plugin-proposal-export-namespace-from
+                                    f.warnUnsupported(spec); // TODO: ExportNamespaceSpecifier, see https://babeljs.io/docs/en/babel-plugin-proposal-export-namespace-from
                                     break;
                             }
 
                     }
                     break;
                 case "ExportAllDeclaration": // example: export * from "m"
-                    const m = op.requireModule(path.node.source.value, a.varProducer.nodeVar(path.node), path);
+                    const m = op.requireModule(path.node.source.value, vp.nodeVar(path.node), path);
                     if (m instanceof ModuleInfo) {
                         const t = a.canonicalizeToken(new NativeObjectToken("exports", m));
                         solver.addForAllObjectPropertiesConstraint(t, TokenListener.EXPORT_BASE, path.node, (prop: string) => { // TODO: only exporting explicitly defined properties, not unknown computed
-                            solver.addSubsetConstraint(a.varProducer.objPropVar(t, prop), a.varProducer.objPropVar(op.exportsObjectToken, prop));
+                            solver.addSubsetConstraint(vp.objPropVar(t, prop), vp.objPropVar(op.exportsObjectToken, prop));
                         });
                     }
                     break;
@@ -687,11 +686,11 @@ export function visit(ast: File, op: Operations) {
 
         ForOfStatement(path: NodePath<ForOfStatement>) {
             // read iterator using path.node for the temporary result
-            op.readIteratorValue(op.expVar(path.node.right, path), a.varProducer.nodeVar(path.node), path.node);
+            op.readIteratorValue(op.expVar(path.node.right, path), vp.nodeVar(path.node), path.node);
             // assign the temporary result to the l-value
             const lval = isLVal(path.node.left) ? path.node.left : path.node.left.declarations.length === 1 ? path.node.left.declarations[0]?.id : undefined;
             assert(lval, "Unexpected number of declarations at for-of");
-            op.assign(a.varProducer.nodeVar(path.node), lval, path);
+            op.assign(vp.nodeVar(path.node), lval, path);
             // note: 'for await' is handled trivially because the same abstract object is used for the AsyncGenerator and the iterator objects
         },
 
@@ -699,7 +698,7 @@ export function visit(ast: File, op: Operations) {
             const fun = path.getFunctionParent()?.node;
             assert(fun, "yield not in function?!");
             const iter = a.canonicalizeToken(new AllocationSiteToken("Iterator", fun.body, op.packageInfo));
-            const iterValue = a.varProducer.objPropVar(iter, "value");
+            const iterValue = vp.objPropVar(iter, "value");
             if (path.node.argument) {
                 if (path.node.delegate) {
                     // yield* E
@@ -713,7 +712,7 @@ export function visit(ast: File, op: Operations) {
             }
             // constraint: ⟦i.value⟧ ⊆ ⟦yield(*) E⟧ where i is the iterator object for the function
             if (!isParentExpressionStatement(path))
-                solver.addSubsetConstraint(iterValue, a.varProducer.nodeVar(path.node));
+                solver.addSubsetConstraint(iterValue, vp.nodeVar(path.node));
         },
 
         AwaitExpression(path: NodePath<AwaitExpression>) {
@@ -725,11 +724,11 @@ export function visit(ast: File, op: Operations) {
         },
 
         RegExpLiteral(path: NodePath<RegExpLiteral>) {
-            solver.addTokenConstraint(op.newRegExpToken(), a.varProducer.nodeVar(path.node));
+            solver.addTokenConstraint(op.newRegExpToken(), vp.nodeVar(path.node));
         },
 
         WithStatement(path: NodePath<WithStatement>) {
-            a.warnUnsupported(path.node);
+            f.warnUnsupported(path.node);
         },
 
         JSXElement(path: NodePath<JSXElement>) {
@@ -737,7 +736,7 @@ export function visit(ast: File, op: Operations) {
             if (componentVar)
                 solver.addForAllConstraint(componentVar, TokenListener.JSX_ELEMENT, path.node, (t: Token) => {
                     if (t instanceof AccessPathToken)
-                        solver.addAccessPath(a.canonicalizeAccessPath(new ComponentAccessPath(componentVar)), a.varProducer.nodeVar(path.node), t.ap);
+                        solver.addAccessPath(a.canonicalizeAccessPath(new ComponentAccessPath(componentVar)), vp.nodeVar(path.node), t.ap);
                 });
         }
     });
@@ -760,6 +759,6 @@ export function visit(ast: File, op: Operations) {
         if (isAssignmentExpression(path.parent) && path.parent.left === path.node)
             return; // don't treat left-hand-sides of assignments as expressions
 
-        op.readProperty(op.expVar(path.node.object, path), getProperty(path.node), isParentExpressionStatement(path) ? undefined : a.varProducer.nodeVar(path.node), path.node, a.getEnclosingFunctionOrModule(path, op.moduleInfo));
+        op.readProperty(op.expVar(path.node.object, path), getProperty(path.node), isParentExpressionStatement(path) ? undefined : vp.nodeVar(path.node), path.node, a.getEnclosingFunctionOrModule(path, op.moduleInfo));
     }
 }

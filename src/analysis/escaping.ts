@@ -14,7 +14,7 @@ import {UnknownAccessPath} from "./accesspaths";
  * (unless also returned by an escaping function or passed as argument to an external function).
  */
 export function findEscapingObjects(m: ModuleInfo, solver: Solver): Set<ObjectToken> {
-    const a = solver.analysisState;
+    const a = solver.globalState;
     const f = solver.fragmentState;
     const worklist: Array<Token> = [];
     const visited = new Set<Token>();
@@ -40,7 +40,7 @@ export function findEscapingObjects(m: ModuleInfo, solver: Solver): Set<ObjectTo
             mapGetArray(objprops, v.obj).push(v);
 
     // first round, seed worklist with module.exports, find functions accessible via property reads
-    addToWorklist(a.varProducer.objPropVar(a.canonicalizeToken(new NativeObjectToken("module", m)), "exports"));
+    addToWorklist(f.varProducer.objPropVar(a.canonicalizeToken(new NativeObjectToken("module", m)), "exports"));
     const w2: Array<Token> = [];
     while (worklist.length !== 0) {
         const t = worklist.shift()!; // breadth-first
@@ -52,7 +52,7 @@ export function findEscapingObjects(m: ModuleInfo, solver: Solver): Set<ObjectTo
     }
     worklist.push(...w2);
     // add expressions collected during AST traversal
-    for (const v of solver.analysisState.maybeEscaping)
+    for (const v of f.maybeEscaping)
         addToWorklist(v);
 
     // FIXME: arguments to (non-modeled) native functions should also be considered escaped?
@@ -68,12 +68,12 @@ export function findEscapingObjects(m: ModuleInfo, solver: Solver): Set<ObjectTo
         if (t instanceof FunctionToken) {
 
             // values returned from escaping functions are escaping
-            addToWorklist(a.varProducer.returnVar(t.fun));
+            addToWorklist(f.varProducer.returnVar(t.fun));
 
             // add UnknownAccessPath at parameters
             for (const param of t.fun.params)
                 if (isIdentifier(param)) // TODO: Pattern|RestElement?
-                    solver.addToken(theUnknownAccessPathToken, f.getRepresentative(a.varProducer.nodeVar(param)));
+                    solver.addToken(theUnknownAccessPathToken, f.getRepresentative(f.varProducer.nodeVar(param)));
 
             // TODO: also consider inheritance, ClassExtendsVar?
         }

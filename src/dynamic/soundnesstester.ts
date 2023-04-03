@@ -3,9 +3,9 @@ import {DummyModuleInfo, FunctionInfo, ModuleInfo} from "../analysis/infos";
 import logger from "../misc/logger";
 import {arrayToString, percent, sourceLocationToStringWithFile, sourceLocationToStringWithFileAndEnd} from "../misc/util";
 import {CallGraph} from "../typings/callgraph";
-import {AnalysisState} from "../analysis/analysisstate";
 import path from "path";
 import {options} from "../options";
+import {FragmentState} from "../analysis/fragmentstate";
 
 /**
  * Performs soundness testing of the analysis result using the given dynamic call graph.
@@ -14,25 +14,25 @@ import {options} from "../options";
  *          number of dynamic call->function call edges matched,
  *          total number of dynamic call->function call edges]
  */
-export function testSoundness(jsonfile: string, analysisState: AnalysisState): [number, number, number, number] {
+export function testSoundness(jsonfile: string, f: FragmentState): [number, number, number, number] {
 
     // collect all static functions including module top-level functions (excluding aliases)
     const staticFunctions = new Map<string, FunctionInfo | ModuleInfo>();
-    for (const m of analysisState.moduleInfos.values())
+    for (const m of f.a.moduleInfos.values())
         if (m.node?.loc) // TODO: m.node.loc may be empty with --ignore-dependencies
-            staticFunctions.set(`${m.path}:${m.node.loc.start.line}:${m.node.loc.start.column + 1}:${m.node.loc.end.line}:${m.node.loc.end.column + 1}`, m);
-    for (const f of analysisState.functionInfos.values())
-        if (!f.node?.loc || "nodeIndex" in f.node.loc)
-            analysisState.warn(`Source location missing for function ${f.name || "<anonymous>"} in ${f.moduleInfo.path}`);
+            staticFunctions.set(`${m.getPath()}:${m.node.loc.start.line}:${m.node.loc.start.column + 1}:${m.node.loc.end.line}:${m.node.loc.end.column + 1}`, m);
+    for (const g of f.a.functionInfos.values())
+        if (!g.node?.loc || "nodeIndex" in g.node.loc)
+            f.warn(`Source location missing for function ${g.name || "<anonymous>"} in ${g.moduleInfo.getPath()}`);
         else
-            staticFunctions.set(`${f.moduleInfo.path}:${f.node.loc.start.line}:${f.node.loc.start.column + 1}:${f.node.loc.end.line}:${f.node.loc.end.column + 1}`, f);
+            staticFunctions.set(`${g.moduleInfo.getPath()}:${g.node.loc.start.line}:${g.node.loc.start.column + 1}:${g.node.loc.end.line}:${g.node.loc.end.column + 1}`, g);
 
     // log static locations
     if (logger.isDebugEnabled()) {
-        logger.debug(`Static files: ${arrayToString(Array.from(analysisState.moduleInfos.keys()), "\n  ")}`);
+        logger.debug(`Static files: ${arrayToString(Array.from(f.a.moduleInfosByPath.keys()), "\n  ")}`);
         logger.debug(`Static functions: ${arrayToString(Array.from(staticFunctions.keys()), "\n  ")}`);
-        logger.debug(`Static calls: ${arrayToString(Array.from(analysisState.callLocations), "\n  ")}`);
-        logger.debug(`Ignored functions: ${arrayToString(analysisState.artificialFunctions.map(([, n]) => sourceLocationToStringWithFile(n.loc)), "\n  ")}`);
+        logger.debug(`Static calls: ${arrayToString(Array.from(f.callLocations).map(n => sourceLocationToStringWithFileAndEnd(n.loc)), "\n  ")}`);
+        logger.debug(`Ignored functions: ${arrayToString(f.artificialFunctions.map(([, n]) => sourceLocationToStringWithFile(n.loc)), "\n  ")}`);
         // TODO: optionally ignore files that haven't been analyzed? (relevant with --ignore-dependencies)
     }
 
@@ -42,9 +42,9 @@ export function testSoundness(jsonfile: string, analysisState: AnalysisState): [
     // collect dynamic files and check that they have been analyzed
     const dynamicFiles = new Map<number, string>();
     for (const file of dyn.files) {
-        const f = path.resolve(options.basedir, file);
-        dynamicFiles.set(dynamicFiles.size, f);
-        if (!analysisState.moduleInfos.has(f))
+        const p = path.resolve(options.basedir, file);
+        dynamicFiles.set(dynamicFiles.size, p);
+        if (!f.a.moduleInfosByPath.has(p))
             logger.warn(`File ${file} not found in static call graph`);
         // else
         //     logger.debug(`Found file ${file}`);
@@ -55,15 +55,15 @@ export function testSoundness(jsonfile: string, analysisState: AnalysisState): [
         const c = loc.indexOf(":");
         const file = dynamicFiles.get(Number(loc.substring(0, c)))!;
         const rest = loc.substring(c + 1);
-        const m = analysisState.moduleInfos.get(file);
-        return `${m ? m.path : file}:${rest}`;
+        const m = f.a.moduleInfosByPath.get(file);
+        return `${m ? m.getPath() : file}:${rest}`;
     }
 
     // collect dynamic functions and check that they have been analyzed
     const dynamicFunctionLocs = new Map<number, string>();
     const dynamicFunctions = new Map<number, FunctionInfo | ModuleInfo>();
     const ignoredFunctions = new Set<string>();
-    for (const [,n] of analysisState.artificialFunctions)
+    for (const [,n] of f.artificialFunctions)
         ignoredFunctions.add(sourceLocationToStringWithFile(n.loc) + ":");
     const comp = ([, loc1]: [string, string], [, loc2]: [string, string]) => loc1 < loc2 ? -1 : loc1 > loc2 ? 1 : 0;
     for (const [f, loc] of Object.entries(dyn.functions).sort(comp)) {
@@ -83,7 +83,7 @@ export function testSoundness(jsonfile: string, analysisState: AnalysisState): [
 
     // collect dynamic calls and check whether they have been analyzed
     const callStrLocations = new Set<string>();
-    for (const n of analysisState.callLocations)
+    for (const n of f.callLocations)
         callStrLocations.add(sourceLocationToStringWithFileAndEnd(n.loc));
     const dynamicCallLocs = new Map<number, string>();
     for (const [f, loc] of Object.entries(dyn.calls).sort(comp)) {
@@ -103,11 +103,11 @@ export function testSoundness(jsonfile: string, analysisState: AnalysisState): [
         let found = false;
         if (callerFun && calleeFun) {
             if (calleeFun instanceof FunctionInfo) {
-                const fs = analysisState.functionToFunction.get(callerFun);
+                const fs = f.functionToFunction.get(callerFun);
                 if (fs && fs.has(calleeFun))
                     found = true;
             } else {
-                const ms = analysisState.requireGraph.get(callerFun);
+                const ms = f.requireGraph.get(callerFun);
                 if (ms && ms.has(calleeFun))
                     found = true;
             }
@@ -123,10 +123,10 @@ export function testSoundness(jsonfile: string, analysisState: AnalysisState): [
 
     // check call2fun edges
     const callStrToFunction = new Map<string, Set<FunctionInfo>>();
-    for (const [n, s] of analysisState.callToFunction)
+    for (const [n, s] of f.callToFunction)
         callStrToFunction.set(sourceLocationToStringWithFileAndEnd(n.loc), s);
     const callStrToModule = new Map<string, Set<ModuleInfo | DummyModuleInfo>>();
-    for (const [n, s] of analysisState.callToModule)
+    for (const [n, s] of f.callToModule)
         callStrToModule.set(sourceLocationToStringWithFileAndEnd(n.loc), s)
     let found2 = 0, missed2 = 0;
     for (const [from, to] of dyn.call2fun) {

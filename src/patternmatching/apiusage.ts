@@ -1,4 +1,3 @@
-import {AnalysisState} from "../analysis/analysisstate";
 import logger from "../misc/logger";
 import {mapGetSet, sourceLocationToStringWithFileAndEnd, SourceLocationWithFilename} from "../misc/util";
 import {
@@ -12,6 +11,7 @@ import {
 import {isCallExpression, isNewExpression, isOptionalCallExpression, Node} from "@babel/types";
 import {AccessPathPatternCanonicalizer} from "./patternparser";
 import {AccessPath} from "../analysis/accesspaths";
+import {FragmentState} from "../analysis/fragmentstate";
 
 export type PatternType = "import" | "read" | "write" | "call" | "component";
 
@@ -23,7 +23,7 @@ export type AccessPathPatternStringToNodes = Record<PatternType, Record<AccessPa
 /**
  * Finds the usage of the API of external modules.
  */
-export function getAPIUsage(a: AnalysisState): [AccessPathPatternToNodes, NodeToAccessPathPatterns] { // TODO: parameter to choose which map to produce?
+export function getAPIUsage(f: FragmentState): [AccessPathPatternToNodes, NodeToAccessPathPatterns] { // TODO: parameter to choose which map to produce?
     logger.info("Collecting API usage");
     const reached: AccessPathPatternToNodes = {import: new Map, read: new Map, write: new Map, call: new Map, component: new Map};
     const res1: AccessPathPatternToNodes = {import: new Map, read: new Map, write: new Map, call: new Map, component: new Map};
@@ -88,7 +88,7 @@ export function getAPIUsage(a: AnalysisState): [AccessPathPatternToNodes, NodeTo
             aps.add(n);
             function isReadAtCall(): boolean {
                 if (t === "read") {
-                    const m = a.callResultAccessPaths.get(ap);
+                    const m = f.callResultAccessPaths.get(ap);
                     if (m)
                         for (const f of m.keys())
                             if ((isCallExpression(f) || isOptionalCallExpression(f) || isNewExpression(f)) && f.callee === n)
@@ -107,7 +107,7 @@ export function getAPIUsage(a: AnalysisState): [AccessPathPatternToNodes, NodeTo
         }
     }
     // find imports
-    for (const [ap, ns] of a.moduleAccessPaths)
+    for (const [ap, ns] of f.moduleAccessPaths)
         for (const n of ns)
             add("import", c.canonicalize(new ImportAccessPathPattern(ap.moduleInfo.getOfficialName())), ap, n); // TODO: technically, official-name is not a glob?
     // iteratively find property reads, writes, calls and components
@@ -117,24 +117,24 @@ export function getAPIUsage(a: AnalysisState): [AccessPathPatternToNodes, NodeTo
             if (aps.size === 0)
                 worklist.delete(p);
             // property reads
-            const m1 = a.propertyReadAccessPaths.get(ap);
+            const m1 = f.propertyReadAccessPaths.get(ap);
             if (m1)
                 for (const [prop, np] of m1)
                     for (const [n2, {bp}] of np)
                         add("read", c.canonicalize(new PropertyAccessPathPattern(p, [prop])), bp, n2);
             // property writes
-            const m2 = a.propertyWriteAccessPaths.get(ap);
+            const m2 = f.propertyWriteAccessPaths.get(ap);
             if (m2)
                 for (const [prop, np] of m2)
                     for (const [n2, {bp}] of np)
                         add("write", c.canonicalize(new PropertyAccessPathPattern(p, [prop])), bp, n2);
             // calls
-            const m3 = a.callResultAccessPaths.get(ap);
+            const m3 = f.callResultAccessPaths.get(ap);
             if (m3)
                 for (const [n2, {bp}] of m3)
                     add("call", c.canonicalize(new CallResultAccessPathPattern(p)), bp, n2);
             // components
-            const m4 = a.componentAccessPaths.get(ap);
+            const m4 = f.componentAccessPaths.get(ap);
             if (m4)
                 for (const [n2, {bp}] of m4)
                     add("component", c.canonicalize(new ComponentAccessPathPattern(p)), bp, n2);

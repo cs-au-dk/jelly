@@ -1,4 +1,3 @@
-import {AnalysisState} from "../analysis/analysisstate";
 import {readFileSync, writeFileSync} from "fs";
 import {FunctionInfo, ModuleInfo, PackageInfo} from "../analysis/infos";
 import {addAll, getOrSet, mapGetMap} from "../misc/util";
@@ -75,21 +74,21 @@ class Elements {
 /**
  * Finds the functions that are reachable from the entries, and their modules and packages.
  */
-function getReachable(a: AnalysisState): Set<PackageInfo | ModuleInfo | FunctionInfo> {
+function getReachable(f: FragmentState): Set<PackageInfo | ModuleInfo | FunctionInfo> {
     const reachable = new Set<PackageInfo | ModuleInfo | FunctionInfo>();
     const w = new Set<ModuleInfo | FunctionInfo>();
     function reach(v: ModuleInfo | FunctionInfo) {
         if (!reachable.has(v) && !w.has(v))
             w.add(v);
     }
-    for (const e of a.entryFiles)
-        w.add(a.moduleInfos.get(e)!);
+    for (const e of f.a.entryFiles)
+        w.add(f.a.moduleInfosByPath.get(e)!);
     for (const v of w) {
        reachable.add(v);
-       for (const n of [...a.requireGraph.get(v) || [], ...a.functionToFunction.get(v) || []])
+       for (const n of [...f.requireGraph.get(v) || [], ...f.functionToFunction.get(v) || []])
            reach(n);
     }
-    for (const m of a.moduleInfos.values()) {
+    for (const m of f.a.moduleInfos.values()) {
         let r = false;
         for (const f of m.functions.values())
             if (reachable.has(f)) {
@@ -119,13 +118,13 @@ function isTrivialVar(v: ConstraintVar, ts: Iterable<Token>, size: number): bool
 /**
  * Produces the call graph.
  */
-function getVisualizerCallGraph(a: AnalysisState, vulnerabilities: VulnerabilityResults): VisualizerGraphs {
+function getVisualizerCallGraph(f: FragmentState, vulnerabilities: VulnerabilityResults): VisualizerGraphs {
     // count number of calls edges for all functions, modules and packages
     const functionCallCounts = new Map<FunctionInfo, number>();
     const moduleCallCounts = new Map<ModuleInfo, number>();
     const packageCallCounts = new Map<PackageInfo, number>();
     let maxFunctionCallCount = 1, maxModuleCallCount = 1, maxPackageCallCount = 1;
-    for (const dsts of a.functionToFunction.values())
+    for (const dsts of f.functionToFunction.values())
         for (const dst of dsts) {
             const fw = getOrSet(functionCallCounts, dst, () => 0) + 1;
             functionCallCounts.set(dst, fw);
@@ -140,7 +139,7 @@ function getVisualizerCallGraph(a: AnalysisState, vulnerabilities: Vulnerability
             if (fp > maxPackageCallCount)
                 maxPackageCallCount = fp;
         }
-    for (const dsts of a.requireGraph.values())
+    for (const dsts of f.requireGraph.values())
         for (const dst of dsts) {
             const fm = getOrSet(moduleCallCounts, dst, () => 0) + 1;
             moduleCallCounts.set(dst, fm);
@@ -152,11 +151,11 @@ function getVisualizerCallGraph(a: AnalysisState, vulnerabilities: Vulnerability
                 maxPackageCallCount = fp;
         }
     // prepare the new graph
-    const reachable = getReachable(a);
+    const reachable = getReachable(f);
     const id = IdGenerator<PackageInfo | ModuleInfo | FunctionInfo>();
     const e = new Elements();
     // add nodes for packages
-    for (const p of a.packageInfos.values()) {
+    for (const p of f.a.packageInfos.values()) {
         const packageCallCount = packageCallCounts.get(p) ?? 0;
         e.add({
             id: id(p),
@@ -170,7 +169,7 @@ function getVisualizerCallGraph(a: AnalysisState, vulnerabilities: Vulnerability
         });
     }
     // add nodes for modules
-    for (const m of a.moduleInfos.values()) {
+    for (const m of f.a.moduleInfos.values()) {
         const moduleCallCount = moduleCallCounts.get(m) ?? 0;
         e.add({
             id: id(m),
@@ -185,22 +184,22 @@ function getVisualizerCallGraph(a: AnalysisState, vulnerabilities: Vulnerability
         });
     }
     // add nodes for functions
-    for (const f of a.functionInfos.values()) {
-        const functionCallCount = functionCallCounts.get(f) ?? 0;
+    for (const n of f.a.functionInfos.values()) {
+        const functionCallCount = functionCallCounts.get(n) ?? 0;
         e.add({
-            id: id(f),
+            id: id(n),
             kind: "function",
-            parent: id(f.moduleInfo),
-            name: f.name ?? "<anon>",
-            fullName: funcToStringWithCode(f),
+            parent: id(n.moduleInfo),
+            name: n.name ?? "<anon>",
+            fullName: funcToStringWithCode(n),
             callWeight: Math.round(100 * functionCallCount / maxFunctionCallCount),
             callCount: functionCallCount,
-            isReachable: reachable.has(f) ? "true" : undefined
+            isReachable: reachable.has(n) ? "true" : undefined
         });
     }
     // add edges
     let numEdges = 0;
-    for (const [src, dsts] of a.functionToFunction)
+    for (const [src, dsts] of f.functionToFunction)
         for (const dst of dsts) {
             e.add({
                 kind: "call",
@@ -209,7 +208,7 @@ function getVisualizerCallGraph(a: AnalysisState, vulnerabilities: Vulnerability
             });
             numEdges++;
         }
-    for (const [src, dsts] of a.requireGraph)
+    for (const [src, dsts] of f.requireGraph)
         for (const dst of dsts) {
             e.add({
                 kind: "require",
@@ -284,7 +283,7 @@ function getVisualizerCallGraph(a: AnalysisState, vulnerabilities: Vulnerability
         graphs: [{
             kind: "callgraph",
             elements: e.elements,
-            info: `Packages: ${a.packageInfos.size}\nModules: ${a.moduleInfos.size}\nFunctions: ${a.functionInfos.size}\nCall edges: ${numEdges}\nMax number of calls for packages: ${maxPackageCallCount}, modules: ${maxModuleCallCount}, functions: ${maxFunctionCallCount}`,
+            info: `Packages: ${f.a.packageInfos.size}\nModules: ${f.a.moduleInfos.size}\nFunctions: ${f.a.functionInfos.size}\nCall edges: ${numEdges}\nMax number of calls for packages: ${maxPackageCallCount}, modules: ${maxModuleCallCount}, functions: ${maxFunctionCallCount}`,
             vulnerabilities: vuls
         }]
     };
@@ -293,7 +292,7 @@ function getVisualizerCallGraph(a: AnalysisState, vulnerabilities: Vulnerability
 /**
  * Produces the dataflow graphs.
  */
-function getVisualizerDataFlowGraphs(a: AnalysisState, f: FragmentState): VisualizerGraphs {
+function getVisualizerDataFlowGraphs(f: FragmentState): VisualizerGraphs {
     // count tokens for constraint variables, modules and packages and find the nontrivial constraint variables and their parents
     let maxVariableCount = 1, maxModuleTokenCount = 1, maxPackageTokenCount = 1;
     const moduleTokenCounts = new Map<ModuleInfo, number>();
@@ -303,7 +302,7 @@ function getVisualizerDataFlowGraphs(a: AnalysisState, f: FragmentState): Visual
     for (const [v, ts, size] of f.getAllVarsAndTokens()) {
         if (!isTrivialVar(v, ts, size)) {
             nontrivialVars.add(v);
-            const p = a.getConstraintVarParent(v);
+            const p = f.a.getConstraintVarParent(v);
             if (p)
                 parents.set(v, p);
         }
@@ -320,7 +319,7 @@ function getVisualizerDataFlowGraphs(a: AnalysisState, f: FragmentState): Visual
     // prepare the graphs
     const id = IdGenerator<PackageInfo | ModuleInfo | FunctionInfo | ConstraintVar>();
     const res: VisualizerGraphs = {graphs: []};
-    for (const p of a.packageInfos.values()) {
+    for (const p of f.a.packageInfos.values()) {
         // make a graph for each package
         let maxLocalVariableCount = 1, maxLocalModuleTokenCount = 1
         const e = new Elements();
@@ -392,7 +391,7 @@ function getVisualizerDataFlowGraphs(a: AnalysisState, f: FragmentState): Visual
     // prepare an overview graph
     const e = new Elements();
     // add the packages
-    for (const p of a.packageInfos.values()) {
+    for (const p of f.a.packageInfos.values()) {
         const packageTokenCount = packageTokenCounts.get(p) ?? 0;
         e.add({
             id: id(p),
@@ -404,7 +403,7 @@ function getVisualizerDataFlowGraphs(a: AnalysisState, f: FragmentState): Visual
         });
     }
     // add the modules
-    for (const m of a.moduleInfos.values()) {
+    for (const m of f.a.moduleInfos.values()) {
         const moduleTokenCount = moduleTokenCounts.get(m) ?? 0;
         e.add({
             id: id(m),
@@ -450,7 +449,7 @@ function getVisualizerDataFlowGraphs(a: AnalysisState, f: FragmentState): Visual
         title: "Packages and modules",
         kind: "dataflow",
         elements: e.elements,
-        info: `Packages: ${a.packageInfos.size}\nModules: ${a.moduleInfos.size}\nFunctions: ${a.functionInfos.size}\nMax number of values for packages: ${maxPackageTokenCount}, modules: ${maxModuleTokenCount}, variables: ${maxVariableCount}`
+        info: `Packages: ${f.a.packageInfos.size}\nModules: ${f.a.moduleInfos.size}\nFunctions: ${f.a.functionInfos.size}\nMax number of values for packages: ${maxPackageTokenCount}, modules: ${maxModuleTokenCount}, variables: ${maxVariableCount}`
     });
     return res;
 }
@@ -467,13 +466,13 @@ function writeVisualizerHtml(filename: string, g: VisualizerGraphs) {
 /**
  * Exports the call graph as an HTML file.
  */
-export function exportCallGraphHtml(a: AnalysisState, filename: string, vulnerabilities: VulnerabilityResults) {
-    writeVisualizerHtml(filename, getVisualizerCallGraph(a, vulnerabilities));
+export function exportCallGraphHtml(f: FragmentState, filename: string, vulnerabilities: VulnerabilityResults) {
+    writeVisualizerHtml(filename, getVisualizerCallGraph(f, vulnerabilities));
 }
 
 /**
  * Exports the data-flow graphs as an HTML file.
  */
-export function exportDataFlowGraphHtml(a: AnalysisState, f: FragmentState, filename: string) {
-    writeVisualizerHtml(filename, getVisualizerDataFlowGraphs(a, f));
+export function exportDataFlowGraphHtml(f: FragmentState, filename: string) {
+    writeVisualizerHtml(filename, getVisualizerDataFlowGraphs(f));
 }

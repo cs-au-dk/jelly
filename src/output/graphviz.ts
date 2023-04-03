@@ -3,7 +3,7 @@ import logger from "../misc/logger";
 import {options} from "../options";
 import {writeSync} from "fs";
 import {sourceLocationToString} from "../misc/util";
-import {AnalysisState} from "../analysis/analysisstate";
+import {FragmentState} from "../analysis/fragmentstate";
 
 // TODO: optionally mark reachable packages/modules/functions
 // TODO: optionally highlight call edges where the target package is not in the transitive dependencies of the source package (or vice versa)
@@ -13,7 +13,7 @@ import {AnalysisState} from "../analysis/analysisstate";
 /**
  * Write a Graphviz dot representation of the result to the given file.
  */
-export function toDot(a: AnalysisState, fd: number = process.stdout.fd) {
+export function toDot(f: FragmentState, fd: number = process.stdout.fd) {
     const ids = new Map<PackageInfo | ModuleInfo | FunctionInfo, number>();
     let next = 1;
 
@@ -68,7 +68,7 @@ export function toDot(a: AnalysisState, fd: number = process.stdout.fd) {
         " graph [ranksep=1];\n" +
         " compound=true;\n" +
         " node [shape=box,fillcolor=\"#ffffff\",style=filled]\n");
-    for (const [kp, p] of a.packageInfos)
+    for (const [kp, p] of f.a.packageInfos)
         if (isPackageIncluded(p)) {
             writeSync(fd, ` subgraph cluster${id(p)} {\n` +
                 `  label=\"${esc(kp)}\";\n` +
@@ -78,7 +78,7 @@ export function toDot(a: AnalysisState, fd: number = process.stdout.fd) {
             writeSync(fd, " }\n");
         }
     writeSync(fd, ` edge ${options?.dependenciesOnly ? "[color=\"#000000\",style=solid]" : "[color=\"#888888\",style=dashed]"};\n`);
-    for (const [from, tos] of a.requireGraph)
+    for (const [from, tos] of f.requireGraph)
         if (isPackageIncluded(from.packageInfo))
             for (const to of tos)
                 if (isPackageIncluded(to.packageInfo))
@@ -86,7 +86,7 @@ export function toDot(a: AnalysisState, fd: number = process.stdout.fd) {
     if (!options?.dependenciesOnly) {
         writeSync(fd, ` edge [color=\"#000000\",style=solid];\n`);
         const es = new Set<string>();
-        for (const [from, tos] of a.functionToFunction)
+        for (const [from, tos] of f.functionToFunction)
             if (isPackageIncluded(from.packageInfo))
                 for (const to of tos)
                     if (isPackageIncluded(to.packageInfo)) {

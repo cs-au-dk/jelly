@@ -15,7 +15,7 @@ import {IDENTIFIER_KIND} from "./astvisitor";
  */
 export abstract class ConstraintVar {
 
-    abstract toString(): string;
+    abstract toString(): string
 
     /**
      * Finds the AST node, function, module or package this constraint variable belongs to.

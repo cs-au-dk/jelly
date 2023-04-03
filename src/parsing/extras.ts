@@ -17,6 +17,7 @@ import {
     isOptionalMemberExpression,
     isTSExternalModuleReference,
     isVariableDeclarator,
+    Node,
     Program,
     TSExportAssignment,
     TSImportEqualsDeclaration,
@@ -24,10 +25,10 @@ import {
     variableDeclarator
 } from '@babel/types';
 import traverse from "@babel/traverse";
-import {globalLoc, undefinedIdentifier} from "../analysis/analysisstate";
 import logger from "../misc/logger";
 import {getClass} from "../misc/asthelpers";
 import assert from "assert";
+import {globalLoc} from "../misc/util";
 
 /**
  * Replaces TypeScript "export =" and "import =" syntax.
@@ -45,11 +46,13 @@ export function replaceTypeScriptImportExportAssignments({ template }: {template
                 }));
             },
             TSImportEqualsDeclaration(path: NodePath<TSImportEqualsDeclaration>) {
-                if (!path.node.isExport && path.node.importKind === "value" && isTSExternalModuleReference(path.node.moduleReference))
+                if (!path.node.isExport && path.node.importKind === "value" && isTSExternalModuleReference(path.node.moduleReference)) {
                     path.replaceWith(moduleImportsDeclaration({
                         ID: path.node.id,
                         MODULE: path.node.moduleReference.expression
                     }));
+                    path.scope.registerDeclaration(path);
+                }
                 // TODO: handle other forms of TSImportEqualsDeclaration?
             }
         }
@@ -64,18 +67,21 @@ export const JELLY_NODE_ID = Symbol("JELLY_NODE_ID");
 export function preprocessAst(ast: File, file: string, globals: Array<Identifier>, globalsHidden: Array<Identifier>) {
     let nextNodeID = 0;
 
+    function register(n: Node) {
+        (n as any)[JELLY_NODE_ID] = nextNodeID++;
+    }
+
     // assign unique index to each identifier in globals and globalsHidden
     for (const n of [...globals, ...globalsHidden])
-        (n as any)[JELLY_NODE_ID] = ++nextNodeID;
+        register(n);
 
-    // artificially declare all globals in the program scope (if not already declared)
+    // artificially declare all native globals in the program scope (if not already declared)
     traverse(ast, {
         Program(path: NodePath<Program>) {
-            const decls = [...globals, undefinedIdentifier] // TODO: treat 'undefined' like other globals?
-                .filter(d => path.scope.getBinding(d.name) === undefined)
+            const decls = globals.filter(d => path.scope.getBinding(d.name) === undefined)
                 .map(id => {
                     const d = variableDeclarator(id);
-                    d.loc = globalLoc;
+                    d.loc = id.loc;
                     return d;
                 });
             const d = variableDeclaration("var", decls);
@@ -91,7 +97,7 @@ export function preprocessAst(ast: File, file: string, globals: Array<Identifier
 
             // assign unique index to each node (globals and globalsHidden are handled above)
             if ((n as any)[JELLY_NODE_ID] === undefined)
-                (n as any)[JELLY_NODE_ID] = ++nextNodeID;
+                register(n);
 
             // workaround to ensure that AST nodes with undefined location (caused by desugaring) can be identified uniquely
             if (!n.loc) {
@@ -120,22 +126,21 @@ export function preprocessAst(ast: File, file: string, globals: Array<Identifier
                 n.name !== "arguments" && !path.scope.getBinding(n.name) &&
                 !((isMemberExpression(path.parent) || isOptionalMemberExpression(path.parent) || isJSXMemberExpression(path.parent)) &&
                     path.parent.property === path.node) &&
-                !isObjectProperty(path.parent) &&
-                !isObjectMethod(path.parent) &&
-                !isClassProperty(path.parent) &&
-                !isClassMethod(path.parent) &&
+                !(isObjectProperty(path.parent) && path.parent.key === n) &&
+                !(isObjectMethod(path.parent) && path.parent.key === n) &&
+                !(isClassProperty(path.parent) && path.parent.key === n) &&
+                !(isClassMethod(path.parent) && path.parent.key === n) &&
                 !isImportSpecifier(path.parent) &&
                 !isJSXAttribute(path.parent) &&
-                !isVariableDeclarator(path.parent)) {
+                !(isVariableDeclarator(path.parent) && path.parent.id === n)) {
                 const ps = path.scope.getProgramParent();
                 if (!ps.getBinding(n.name)?.identifier) {
                     const d = identifier(n.name);
-                    d.loc = globalLoc;
+                    d.loc = {start: {line: 0, column: 0}, end: {line: 0, column: 0}, filename: file, unbound: true} as any; // unbound used by expVar
                     ps.push({id: d});
                     if (logger.isDebugEnabled())
                         logger.debug(`No binding for identifier ${n.name} (parent: ${path.parent.type}), creating one in program scope`);
-                } else if (logger.isDebugEnabled())
-                    logger.debug(`No binding for identifier ${n.name}, using the one in program scope`);
+                }
             }
         }
     });

@@ -2,7 +2,7 @@
 
 export JELLY_BIN=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 export JELLY_OUT=${JELLY_OUT:-'/tmp/jelly.json'}
-DYNJS=$( dirname $JELLY_BIN )/dynamic/dyn.js
+DYNJS=$( dirname $JELLY_BIN )/lib/dynamic/dyn.js
 
 if [[ -z "${GRAAL_HOME}" ]]; then
   echo "Error: Environment variable GRAAL_HOME not set, aborting"

@@ -1,5 +1,4 @@
 import {isIdentifier, Node, SourceLocation} from "@babel/types";
-import {globalLoc} from "../analysis/analysisstate";
 import assert from "assert";
 
 export type SourceLocationWithFilename = SourceLocation & {filename: string};
@@ -7,6 +6,8 @@ export type SourceLocationWithFilename = SourceLocation & {filename: string};
 export type PatchedSourceLocation = {nodeIndex: number, start?: {line: number, column: number }, end?: {line: number, column: number}};
 
 export type SourceLocationJSON = string; // format: "<file index>:<start line>:<start column>:<end line>:<end column>"
+
+export const globalLoc: SourceLocationWithFilename = {start: {line: 0, column: 0}, end: {line: 0, column: 0}, filename: "%global"};
 
 /**
  * Normalized path to a file or directory.
@@ -56,8 +57,10 @@ export function nodeToString(n: Node): string {
  * Returns a string representation of the given source location.
  */
 export function sourceLocationToString(loc: SourceLocationWithFilename | SourceLocation | PatchedSourceLocation | null | undefined, withFilename: boolean = false, withEnd: boolean = false) {
-    if (!loc || loc === globalLoc)
+    if (!loc)
         return "?";
+    if (loc === globalLoc)
+        return "<global>";
     const file = withFilename && "filename" in loc ? `${loc.filename}` : "";
     const start = loc.start && loc.start.line !== 0 ? `${loc.start.line}:${loc.start.column + 1}` : "";
     const end = withEnd && loc.end && loc.end.line !== 0 ? `:${loc.end.line}:${loc.end.column + 1}` : "";
@@ -153,6 +156,21 @@ export function mapSetAddAll<K, V>(from: Map<K, Set<V>>, to: Map<K, Set<V>>) {
         addAll(vs, mapGetSet(to, k));
 }
 
+export function mapArrayPushAll<K, V>(from: Map<K, Array<V>>, to: Map<K, Array<V>>) {
+    for (const [k, vs] of from)
+        mapGetArray(to, k).push(...vs);
+}
+
+export function mapMapSetAll<K1, K2, V>(from: Map<K1, Map<K2, V>>, to: Map<K1, Map<K2, V>>) {
+    for (const [k, m] of from)
+        setAll(m, mapGetMap(to, k));
+}
+
+export function mapMapMapSetAll<K1, K2, K3, V>(from: Map<K1, Map<K2, Map<K3, V>>>, to: Map<K1, Map<K2, Map<K3, V>>>) {
+    for (const [k, m] of from)
+        mapMapSetAll(m, mapGetMap(to, k));
+}
+
 export function addAll<T>(from: Iterable<T> | Set<T> | Array<T> | undefined, to: Set<T>): number {
     if (!from)
         return 0;
@@ -160,6 +178,11 @@ export function addAll<T>(from: Iterable<T> | Set<T> | Array<T> | undefined, to:
     for (const x of from)
         to.add(x);
     return to.size - before;
+}
+
+export function setAll<K, V>(from: Map<K, V>, to: Map<K, V>) {
+    for (const [k, v] of from)
+        to.set(k, v);
 }
 
 export function mapArrayAdd<K, V>(k: K, v: V, m: Map<K, Array<V>>) {
