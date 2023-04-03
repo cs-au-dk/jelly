@@ -130,6 +130,14 @@ export function requireResolve(str: string, file: FilePath, loc: SourceLocation 
             throw e;
     }
 
+    // not in project basedir or mocked builtin dir, then it will be ignored
+    const mockBuiltinDir = resolve(__dirname, '..', 'mockbuiltin');
+    if (!filepath.startsWith(options.basedir) && !filepath.startsWith(mockBuiltinDir)) {
+        const msg = `Found module at ${filepath}, but not in basedir`;
+        logger.debug(msg);
+        throw new Error(msg);
+    }
+
     if (!filepath.endsWith(".js") && !filepath.endsWith(".jsx") && !filepath.endsWith(".es") && !filepath.endsWith(".mjs") &&
         !filepath.endsWith(".cjs") && !filepath.endsWith(".ts") && !filepath.endsWith(".tsx")) {
         f.warn(`Module '${filepath}' at ${sourceLocationToStringWithFile(loc)} has unrecognized extension, skipping it`);
