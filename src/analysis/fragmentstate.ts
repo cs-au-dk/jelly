@@ -42,7 +42,7 @@ export class FragmentState {
     private readonly tokens: Map<ConstraintVar, Token | Set<Token>> = new Map;
 
     /**
-     * The set of constraint variables (including those with no tokens or no subset edges, but excluding those that are redirected).
+     * The set of constraint variables (including those with tokens, subset edges, or listeners, but excluding those that are redirected).
      */
     readonly vars: Set<ConstraintVar> = new Set;
 
@@ -583,14 +583,11 @@ export class FragmentState {
     }
 
     /**
-     * Replaces all tokens according to the given function.
+     * Replaces tokens for a constraint variable.
      */
-    replaceTokens(f: (ts: Iterable<Token>) => Set<Token>) {
-        for (const [v, ts] of this.tokens) {
-            const r = f(ts instanceof Token ? [ts] : ts);
-            this.tokens.set(v, r.size === 1 ? r.values().next().value : r);
-            this.numberOfTokens += r.size - (ts instanceof Token ? 1 : ts.size);
-        }
+    replaceTokens(v: ConstraintVar, ts: Set<Token>, old: number) {
+        this.tokens.set(v, ts.size === 1 ? ts.values().next().value : ts);
+        this.numberOfTokens += ts.size - old;
     }
 
     /**

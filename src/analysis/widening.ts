@@ -2,7 +2,7 @@ import Solver from "./solver";
 import {ObjectToken, PackageObjectToken, Token} from "./tokens";
 import logger from "../misc/logger";
 import {ConstraintVar, ObjectPropertyVar} from "./constraintvars";
-import {addAll, getOrSet, mapGetSet} from "../misc/util";
+import {addAll, getOrSet, mapGetMap, mapGetSet} from "../misc/util";
 import {ModuleInfo} from "./infos";
 import Timer from "../misc/timer";
 import {CallResultAccessPath, ComponentAccessPath, PropertyAccessPath} from "./accesspaths";
@@ -36,7 +36,7 @@ export function widenObjects(m: ModuleInfo, widened: Set<ObjectToken>, solver: S
      * Returns the widened version of the given token, or the given token itself if it is not being widened.
      */
     function widenToken<T extends Token>(t: T): T | PackageObjectToken {
-        return tokenMap.get(t as any) ?? t;
+        return (t instanceof ObjectToken && tokenMap.get(t)) || t;
     }
 
     function widenTokenSet<T extends Token>(ts: Iterable<T>): Set<T | PackageObjectToken> {
@@ -60,7 +60,7 @@ export function widenObjects(m: ModuleInfo, widened: Set<ObjectToken>, solver: S
     function widenTokenMapSetKeys<T extends Token, V>(m: Map<T, Set<V>>): Map<T | PackageObjectToken, Set<V>> {
         const res: Map<T | PackageObjectToken, Set<V>> = new Map;
         for (const [t, vs] of m)
-            addAll(vs, mapGetSet(m, widenToken(t)));
+            addAll(vs, mapGetSet(res, widenToken(t)));
         return res;
     }
 
@@ -74,10 +74,13 @@ export function widenObjects(m: ModuleInfo, widened: Set<ObjectToken>, solver: S
         return res;
     }
 
-    function widenTokenMapKeys<T extends Token, V>(m: Map<T, V>): Map<T | PackageObjectToken, V> {
-        const res: Map<T | PackageObjectToken, V> = new Map;
-        for (const [t, v] of m)
-            res.set(widenToken(t), v); // possibly overriding existing different value, but should be a listener function with same behavior
+    function widenTokenMapMapKeys<T extends Token, K, V>(m: Map<T, Map<K, V>>): Map<T | PackageObjectToken, Map<K, V>> {
+        const res: Map<T | PackageObjectToken, Map<K, V>> = new Map;
+        for (const [t, m2] of m) {
+            const rm = mapGetMap(res, widenToken(t));
+            for (const [k, v] of m2)
+                rm.set(k, v); // possibly overriding existing different value, but should be a listener function with same behavior
+        }
         return res;
     }
 
@@ -113,7 +116,6 @@ export function widenObjects(m: ModuleInfo, widened: Set<ObjectToken>, solver: S
         if (w === ap.caller)
             return ap;
         return a.canonicalizeAccessPath(new CallResultAccessPath(w));
-
     }
 
     function widenComponentAccessPath(ap: ComponentAccessPath): ComponentAccessPath {
@@ -121,23 +123,22 @@ export function widenObjects(m: ModuleInfo, widened: Set<ObjectToken>, solver: S
         if (w === ap.component)
             return ap;
         return a.canonicalizeAccessPath(new ComponentAccessPath(w));
-
     }
 
     // update the tokens
    [solver.unprocessedTokens, solver.unprocessedTokensSize] = widenTokenMapArrayValues(solver.unprocessedTokens);
     assert(solver.unprocessedSubsetEdges.size === 0 && solver.unprocessedSubsetEdgesSize === 0);
-    f.replaceTokens(widenTokenSet);
+    solver.replaceTokens(tokenMap);
     f.inherits = widenTokenMapSetKeysValues(f.inherits);
     f.reverseInherits = widenTokenMapSetKeysValues(f.reverseInherits);
-    f.ancestorListeners = widenTokenMapKeys(f.ancestorListeners); // FIXME: if a token gets a new ancestor because of widening, ancestor listeners may need to be invoked?
-    f.objectPropertiesListeners = widenTokenMapKeys(f.objectPropertiesListeners); // FIXME: if an ObjectPropertyVarObj token gets a new property because of widening, object properties listeners may need to be invoked?
+    f.ancestorListeners = widenTokenMapMapKeys(f.ancestorListeners); // FIXME: if a token gets a new ancestor because of widening, ancestor listeners may need to be invoked?
+    f.objectPropertiesListeners = widenTokenMapMapKeys(f.objectPropertiesListeners); // FIXME: if an ObjectPropertyVarObj token gets a new property because of widening, object properties listeners may need to be invoked?
     f.objectProperties = widenTokenMapSetKeys(f.objectProperties);
 
     // update the constraint variables
     for (const v of f.vars) {
         const rep = f.getRepresentative(widenVar(v));
-        solver.addSubsetEdge(v, rep); // ensures that tokens get transferred
+        solver.addSubsetEdge(v, rep); // ensures that tokens get transferred at redirect
         solver.redirect(v, rep);
     }
     f.dynamicPropertyWrites = widenVarSet(f.dynamicPropertyWrites);
