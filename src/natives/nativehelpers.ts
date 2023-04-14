@@ -776,29 +776,39 @@ export function returnPromiseIterator(kind: "all" | "allSettled" | "any" | "race
                     break;
             }
             p.solver.addForAllConstraint(tmp, key, p.path.node, (t: Token) => {
-                if (t instanceof AllocationSiteToken && t.kind === "Promise") {
-                    switch (kind) {
-                        case "all":
+                switch (kind) {
+                    case "all":
+                        if (t instanceof AllocationSiteToken && t.kind === "Promise") {
                             // assign fulfilled values to the array and rejected values to the new promise
                             p.solver.addSubsetConstraint(vp.objPropVar(t, PROMISE_FULFILLED_VALUES), vp.arrayValueVar(array!));
                             p.solver.addSubsetConstraint(vp.objPropVar(t, PROMISE_REJECTED_VALUES), vp.objPropVar(promise, PROMISE_REJECTED_VALUES));
-                            break;
-                        case "allSettled":
+                        } else
+                            p.solver.addToken(t, vp.arrayValueVar(array!));
+                        break;
+                    case "allSettled":
+                        if (t instanceof AllocationSiteToken && t.kind === "Promise") {
                             // assign fulfilled and rejected values to the 'value' and 'reason' properties, respectively
                             p.solver.addSubsetConstraint(vp.objPropVar(t, PROMISE_FULFILLED_VALUES), vp.objPropVar(allSettledObjects!, "value"));
                             p.solver.addSubsetConstraint(vp.objPropVar(t, PROMISE_REJECTED_VALUES), vp.objPropVar(allSettledObjects!, "reason"));
-                            break;
-                        case "any":
+                        } else
+                            p.solver.addToken(t, vp.objPropVar(allSettledObjects!, "value"));
+                        break;
+                    case "any":
+                        if (t instanceof AllocationSiteToken && t.kind === "Promise") {
                             // assign fulfilled values to the new promise
                             p.solver.addSubsetConstraint(vp.objPropVar(t, PROMISE_FULFILLED_VALUES), vp.objPropVar(promise, PROMISE_FULFILLED_VALUES));
                             // TODO: assign rejected values to an AggregateError object and assign that object to the rejected value of the new promise
-                            break;
-                        case "race":
+                        } else
+                            p.solver.addToken(t, vp.objPropVar(promise, PROMISE_FULFILLED_VALUES));
+                        break;
+                    case "race":
+                        if (t instanceof AllocationSiteToken && t.kind === "Promise") {
                             // assign fulfilled and rejected values to the new promise
                             p.solver.addSubsetConstraint(vp.objPropVar(t, PROMISE_FULFILLED_VALUES), vp.objPropVar(promise, PROMISE_FULFILLED_VALUES));
                             p.solver.addSubsetConstraint(vp.objPropVar(t, PROMISE_REJECTED_VALUES), vp.objPropVar(promise, PROMISE_REJECTED_VALUES));
-                            break;
-                    }
+                        } else
+                            p.solver.addToken(t, vp.objPropVar(promise, PROMISE_FULFILLED_VALUES));
+                        break;
                 }
             });
         }

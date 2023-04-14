@@ -137,6 +137,7 @@ export function preprocessAst(ast: File, file: string, globals: Array<Identifier
                 if (!ps.getBinding(n.name)?.identifier) {
                     const d = identifier(n.name);
                     d.loc = {start: {line: 0, column: 0}, end: {line: 0, column: 0}, filename: file, unbound: true} as any; // unbound used by expVar
+                    register(d);
                     ps.push({id: d});
                     if (logger.isDebugEnabled())
                         logger.debug(`No binding for identifier ${n.name} (parent: ${path.parent.type}), creating one in program scope`);

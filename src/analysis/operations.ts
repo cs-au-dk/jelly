@@ -353,9 +353,9 @@ export class Operations {
                     }
                 });
 
-                if (t instanceof FunctionToken && prop === "prototype") { // FIXME: also model reads from "__proto__"
+                if ((t instanceof FunctionToken || t instanceof ClassToken) && prop === "prototype") { // FIXME: also model reads from "__proto__"
 
-                    // constraint: ... p="prototype" ∧ t is a function ⇒ k ∈ ⟦E.p⟧ where k represents the package
+                    // constraint: ... p="prototype" ∧ t is a function or class ⇒ k ∈ ⟦E.p⟧ where k represents the package
                     if (dst)
                         this.solver.addTokenConstraint(this.packageObjectToken, dst); // FIXME: use special prototype objects instead of PackageObjectToken!
                 }

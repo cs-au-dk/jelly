@@ -96,7 +96,7 @@ program
         "\nAll modules reachable by require/import from the given files are included in the analysis\n" +
         "(except when using --ignore-dependencies). If specifying directories instead\n" +
         "of files, the files in the directories and their subdirectories are used as entry points.\n" +
-        "The special argument -- can be used indicate end of options, typically after multi-argument options.\n" +
+        "The special argument -- indicates end of options, typically after multi-argument options.\n" +
         `Memory limit is ${getMemoryLimit()}MB.${PKG ? "" : " Change with, for example: NODE_OPTIONS=--max-old-space-size=4096"}`)
     .action(main)
     .showHelpAfterError()

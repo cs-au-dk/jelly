@@ -41,13 +41,20 @@ export function testSoundness(jsonfile: string, f: FragmentState): [number, numb
 
     // collect dynamic files and check that they have been analyzed
     const dynamicFiles = new Map<number, string>();
+    const cwd = process.cwd();
     for (const file of dyn.files) {
         const p = path.resolve(options.basedir, file);
-        dynamicFiles.set(dynamicFiles.size, p);
-        if (!f.a.moduleInfosByPath.has(p))
-            logger.warn(`File ${file} not found in static call graph`);
-        // else
-        //     logger.debug(`Found file ${file}`);
+
+        if (f.a.moduleInfosByPath.has(p)) {
+            // logger.debug(`Found file ${file}`);
+            dynamicFiles.set(dynamicFiles.size, p);
+        } else { // try to resolve the file relative to the current working directory
+            const p2 = path.resolve(cwd, file); // TODO: use basedir instead of cwd in dyn.ts for entries and files
+            if (f.a.moduleInfosByPath.has(p2))
+                dynamicFiles.set(dynamicFiles.size, p2);
+            else
+                logger.warn(`File ${file} not found in static call graph`);
+        }
     }
 
     // finds the representative for the given source location
@@ -111,12 +118,12 @@ export function testSoundness(jsonfile: string, f: FragmentState): [number, numb
                 if (ms && ms.has(calleeFun))
                     found = true;
             }
-        }
-        if (found)
-            found1++;
-        else {
-            warnings.push(`Call edge missing in static call graph: function ${dynamicFunctionLocs.get(from)} -> function ${dynamicFunctionLocs.get(to)}`);
-            missed1++;
+            if (found)
+                found1++;
+            else {
+                warnings.push(`Call edge missing in static call graph: function ${dynamicFunctionLocs.get(from)} -> function ${dynamicFunctionLocs.get(to)}`);
+                missed1++;
+            }
         }
     }
     const total1 = found1 + missed1;
@@ -143,12 +150,12 @@ export function testSoundness(jsonfile: string, f: FragmentState): [number, numb
                 if (ms && ms.has(calleeFun))
                     found = true;
             }
-        }
-        if (found)
-            found2++;
-        else {
-            warnings.push(`Call edge missing in static call graph: call ${dynamicCallLocs.get(from)} -> function ${dynamicFunctionLocs.get(to)}`);
-            missed2++;
+            if (found)
+                found2++;
+            else {
+                warnings.push(`Call edge missing in static call graph: call ${dynamicCallLocs.get(from)} -> function ${dynamicFunctionLocs.get(to)}`);
+                missed2++;
+            }
         }
     }
     const total2 = found2 + missed2;
