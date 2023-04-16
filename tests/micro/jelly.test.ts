@@ -15,9 +15,9 @@ test("tests/micro/classes", async () => {
         numberOfFunctionToFunctionEdges: 34,
         oneCalleeCalls: 32,
         funFound: 32,
-        funTotal: 45,
+        funTotal: 33,
         callFound: 36,
-        callTotal: 41
+        callTotal: 36
     });
 });
 
@@ -226,9 +226,9 @@ test("tests/micro/generators", async () => {
         numberOfFunctionToFunctionEdges: 26,
         oneCalleeCalls: 14,
         funFound: 15,
-        funTotal: 16,
+        funTotal: 15,
         callFound: 15,
-        callTotal: 16
+        callTotal: 15
     });
 });
 
@@ -470,6 +470,16 @@ test("tests/micro/prototypes", async () => {
     });
 });
 
+test("tests/micro/prototypes2", async () => {
+    await runTest("tests/micro", "prototypes2.js", {
+        soundness: "tests/micro/prototypes2.json",
+        functionInfos: 1,
+        moduleInfos: 1,
+        numberOfFunctionToFunctionEdges: 1,
+        oneCalleeCalls: 1
+    });
+});
+
 test("tests/micro/match1", async () => {
     options.ignoreDependencies = true;
     await runTest("tests/micro", "match1.js", {
@@ -578,6 +588,21 @@ test("tests/micro/promises", async () => {
         funTotal: 28,
         callFound: 24,
         callTotal: 28
+    });
+});
+
+test("tests/micro/promiseall", async () => {
+    options.callgraphNative = false;
+    await runTest("tests/micro", "promiseall.js", {
+        soundness: "tests/micro/promiseall.json",
+        functionInfos: 3,
+        moduleInfos: 1,
+        numberOfFunctionToFunctionEdges: 1,
+        oneCalleeCalls: 1,
+        funFound: 1,
+        funTotal: 1,
+        callFound: 1,
+        callTotal: 1
     });
 });
 

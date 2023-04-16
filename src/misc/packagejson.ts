@@ -30,7 +30,7 @@ export interface PackageJsonInfo {
     main: string | undefined;
 
     /**
-     * Directory containing the package.json file, or "." if the file is not found.
+     * Directory containing the package.json file, or current working directory if the file is not found.
      */
     dir: string;
 }
@@ -95,7 +95,7 @@ export function getPackageJsonInfo(tofile: FilePath): PackageJsonInfo {
             name = "<main>";
             packagekey = "<unknown>";
             version = undefined;
-            dir = ".";
+            dir = process.cwd();
         }
     }
     return {packagekey, name, version, main, dir}

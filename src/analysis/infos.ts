@@ -14,7 +14,7 @@ export class PackageInfo {
 
     readonly main: string | undefined; // package main file, undefined if not available
 
-    readonly dir: FilePath; // absolute path to representative package root directory, or "." for the entry files if no package.json is found
+    readonly dir: FilePath; // absolute path to representative package root directory, or current working directory if no package.json is found for the entry files (transient)
 
     readonly modules: Map<string, ModuleInfo> = new Map; // map from path relative to the package root to module info
 

@@ -282,7 +282,7 @@ export class NumArgsCallFilter extends Filter {
     }
 
     public toString(): string {
-        return `[${this.minArgs !== undefined ? this.maxArgs : ""},${this.maxArgs !== undefined ? this.maxArgs : ""}]`;
+        return `[${this.minArgs !== undefined ? this.minArgs : ""},${this.maxArgs !== undefined ? this.maxArgs : ""}]`;
     }
 }
 
