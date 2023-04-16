@@ -2,6 +2,10 @@ function arch(...args) {
   for (const arg of args) arg();
 }
 
+function availableParallelism(...args) {
+  for (const arg of args) arg();
+}
+
 function cpus(...args) {
   for (const arg of args) arg();
 }

@@ -1,3 +1,7 @@
+const Stream = require("./stream");
+const Readable = Stream.Readable;
+const Writable = Stream.Writable;
+
 function appendFile(...args) {
   for (const arg of args) arg();
 }
@@ -191,6 +195,10 @@ function open(...args) {
 }
 
 function openSync(...args) {
+  for (const arg of args) arg();
+}
+
+function openAsBlob(...args) {
   for (const arg of args) arg();
 }
 
@@ -397,15 +405,7 @@ class Dirent {
   }
 }
 
-class Stats extends StatsBase {
-  constructor(...args) {
-    for (const arg of args) arg();
-  }
 
-  _checkModeProperty(...args) {
-    for (const arg of args) arg();
-  }
-}
 
 class StatsBase {
   constructor(...args) {
@@ -441,6 +441,16 @@ class StatsBase {
   }
 }
 
+class Stats extends StatsBase {
+  constructor(...args) {
+    for (const arg of args) arg();
+  }
+
+  _checkModeProperty(...args) {
+    for (const arg of args) arg();
+  }
+}
+
 class Dir {
   constructor(...args) {
     for (const arg of args) arg();
@@ -471,10 +481,28 @@ class Dir {
   }
 }
 
-let ReadStream;
-let WriteStream;
-let FileReadStream;
-let FileWriteStream;
+class ReadStream extends Readable {
+  constructor(...args) {
+    for (const arg of args) arg();
+  }
+
+  close(...args) {
+    for (const arg of args) arg();
+  }
+}
+
+class WriteStream extends Writable {
+  constructor(...args) {
+    for (const arg of args) arg();
+  }
+
+  close(...args) {
+    for (const arg of args) arg();
+  }
+}
+
+class FileReadStream extends ReadStream { };
+class FileWriteStream extends WriteStream { };
 
 module.exports = fs = {
   appendFile,
@@ -570,39 +598,10 @@ module.exports = fs = {
   Dir,
   opendir,
   opendirSync,
-
-  get ReadStream() {
-    return ReadStream;
-  },
-
-  set ReadStream(val) {
-    ReadStream = val;
-  },
-
-  get WriteStream() {
-    return WriteStream;
-  },
-
-  set WriteStream(val) {
-    WriteStream = val;
-  },
-
-  get FileReadStream() {
-    return FileReadStream;
-  },
-
-  set FileReadStream(val) {
-    FileReadStream = val;
-  },
-
-  get FileWriteStream() {
-    return FileWriteStream;
-  },
-
-  set FileWriteStream(val) {
-    FileWriteStream = val;
-  },
-
-  // For tests
   _toUnixTimestamp: toUnixTimestamp,
+
+  ReadStream,
+  WriteStream,
+  FileReadStream,
+  FileWriteStream,
 };

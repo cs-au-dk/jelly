@@ -1,4 +1,4 @@
-const { Writable } = require("stream");
+const { Writable } = require("./stream");
 
 function checkPrime(...args) {
   for (const arg of args) arg();
@@ -238,7 +238,9 @@ class LazyTransform {
   getAuthTag(...args) {
     for (const arg of args) arg();
   }
-
+  setAuthTag(...args) {
+    for (const arg of args) arg();
+  }
   setAutoPadding(...args) {
     for (const arg of args) arg();
   }

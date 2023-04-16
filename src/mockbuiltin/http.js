@@ -414,7 +414,12 @@ function setMaxIdleHTTPParsers(...args) {
   for (const arg of args) arg();
 }
 
+function _connectionListener(...args) {
+  for (const arg of args) arg();
+}
+
 module.exports = {
+  _connectionListener,
   Agent,
   ClientRequest,
   IncomingMessage,

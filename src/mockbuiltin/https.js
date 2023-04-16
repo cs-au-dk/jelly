@@ -237,6 +237,15 @@ class Agent {
     for (const arg of args) arg();
     return this;
   }
+  _getSession(...args) {
+    for (const arg of args) arg();
+  }
+  _cacheSession(...args) {
+    for (const arg of args) arg();
+  }
+  _evictSession(...args) {
+    for (const arg of args) arg();
+  }
 }
 
 function createServer(...args) {
