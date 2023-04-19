@@ -739,11 +739,16 @@ export default class Solver {
                         this.processEdge(v, w);
                     this.unprocessedSubsetEdges.delete(v);
                 }
-                // propagate worklist tokens (assuming there is a subset path from v to rep)
+                // propagate v's worklist tokens (assuming there is a subset path from v to rep)
                 this.processTokens(v);
                 const [size, has] = this.fragmentState.getSizeAndHas(v);
                 this.fragmentState.deleteVar(v);
                 f.numberOfTokens -= size;
+                // find tokens in rep that are not in v
+                const rts: Set<Token> = new Set;
+                for (const t of f.getTokens(rep))
+                    if (!has(t))
+                        rts.add(t);
                 // redirect subset edges
                 const repOut = mapGetSet(f.subsetEdges, rep);
                 const repIn = mapGetSet(f.reverseSubsetEdges, rep);
@@ -759,6 +764,7 @@ export default class Solver {
                                 qs.add(rep);
                                 f.numberOfSubsetEdges++;
                             }
+                            this.addTokens(rts, w);
                         }
                     }
                     f.numberOfSubsetEdges -= vOut.size;
@@ -786,11 +792,7 @@ export default class Solver {
                     f.subsetEdges.delete(rep);
                 if (repIn.size === 0)
                     f.reverseSubsetEdges.delete(rep);
-                // redirect listeners, invoke on existing tokens in rep that are not in v
-                const rts: Set<Token> = new Set;
-                for (const t of f.getTokens(rep))
-                    if (!has(t))
-                        rts.add(t);
+                // redirect listeners, invoke on tokens in rep that are not in v
                 const tr = f.tokenListeners.get(v);
                 if (tr) {
                     const qr = mapGetMap(f.tokenListeners, rep);
