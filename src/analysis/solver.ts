@@ -141,7 +141,7 @@ export default class Solver {
      * Enqueues a listener call consisting of a listener and its argument(s).
      */
     private enqueueListenerCall(la: [(t: Token) => void, Token]
-        | [(t1: AllocationSiteToken, t2: FunctionToken) => void, [AllocationSiteToken, FunctionToken]]
+        | [(t1: AllocationSiteToken, t2: FunctionToken | AccessPathToken) => void, [AllocationSiteToken, FunctionToken | AccessPathToken]]
         | [(neighbor: PackageInfo) => void, PackageInfo]
         | [(prop: string) => void, string]) {
         this.fragmentState.postponedListenerCalls.push(la);
@@ -181,8 +181,8 @@ export default class Solver {
         f.vars.add(toRep);
         let ws: Array<Token> | undefined = undefined;
         let tr: Map<ListenerID, (t: Token) => void> | undefined = undefined;
-        let tr1: Map<ListenerID, [ConstraintVar, (t1: AllocationSiteToken, t2: FunctionToken) => void]> | undefined = undefined;
-        let tr2: Map<ListenerID, [ConstraintVar, (t1: AllocationSiteToken, t2: FunctionToken) => void]> | undefined = undefined;
+        let tr1: Map<ListenerID, [ConstraintVar, (t1: AllocationSiteToken, t2: FunctionToken | AccessPathToken) => void]> | undefined = undefined;
+        let tr2: Map<ListenerID, [ConstraintVar, (t1: AllocationSiteToken, t2: FunctionToken | AccessPathToken) => void]> | undefined = undefined;
         let any = false;
         for (const t of f.addTokens(ts, toRep)) {
             any = true;
@@ -214,8 +214,8 @@ export default class Solver {
             let any = false;
             let ws: Array<Token> | undefined = undefined;
             let tr: Map<ListenerID, (t: Token) => void> | undefined = undefined;
-            let tr1: Map<ListenerID, [ConstraintVar, (t1: AllocationSiteToken, t2: FunctionToken) => void]> | undefined = undefined;
-            let tr2: Map<ListenerID, [ConstraintVar, (t1: AllocationSiteToken, t2: FunctionToken) => void]> | undefined = undefined;
+            let tr1: Map<ListenerID, [ConstraintVar, (t1: AllocationSiteToken, t2: FunctionToken | AccessPathToken) => void]> | undefined = undefined;
+            let tr2: Map<ListenerID, [ConstraintVar, (t1: AllocationSiteToken, t2: FunctionToken | AccessPathToken) => void]> | undefined = undefined;
             for (const t of ts) {
                 const q = t instanceof ObjectToken && m.get(t);
                 if (q) {
@@ -238,8 +238,8 @@ export default class Solver {
 
     private tokenAdded(toRep: ConstraintVar, t: Token,
                        tr: Map<ListenerID, (t: Token) => void> | undefined,
-                       tr1: Map<ListenerID, [ConstraintVar, (t1: AllocationSiteToken, t2: FunctionToken) => void]> | undefined,
-                       tr2: Map<ListenerID, [ConstraintVar, (t1: AllocationSiteToken, t2: FunctionToken) => void]> | undefined,
+                       tr1: Map<ListenerID, [ConstraintVar, (t1: AllocationSiteToken, t2: FunctionToken | AccessPathToken) => void]> | undefined,
+                       tr2: Map<ListenerID, [ConstraintVar, (t1: AllocationSiteToken, t2: FunctionToken | AccessPathToken) => void]> | undefined,
                        ws?: Array<Token>): Array<Token> | undefined {
         if (logger.isDebugEnabled())
             logger.debug(`Added token ${t} to ${toRep}`);
@@ -258,9 +258,9 @@ export default class Solver {
         if (t instanceof AllocationSiteToken && tr1)
             for (const [id, [v2, listener]] of tr1)
                 for (const t2 of f.getTokens(f.getRepresentative(v2)))
-                    if (t2 instanceof FunctionToken)
+                    if (t2 instanceof FunctionToken || t2 instanceof AccessPathToken)
                         this.callPairListener(id, listener, t, t2);
-        if (t instanceof FunctionToken && tr2)
+        if ((t instanceof FunctionToken || t instanceof AccessPathToken) && tr2)
             for (const [id, [v1, listener]] of tr2)
                 for (const t1 of f.getTokens(f.getRepresentative(v1)))
                     if (t1 instanceof AllocationSiteToken)
@@ -404,7 +404,7 @@ export default class Solver {
      * Only allocation site tokens are considered for the first constraint variable, and only function tokens are considered for the second constraint variable.
      * Each constraint variable together with the key and the node must uniquely determine the function and the other constraint variable.
      */
-    addForAllPairsConstraint(v1: ConstraintVar | undefined, v2: ConstraintVar | undefined, key: TokenListener, n: Node, listener: (t1: AllocationSiteToken, t2: FunctionToken) => void) {
+    addForAllPairsConstraint(v1: ConstraintVar | undefined, v2: ConstraintVar | undefined, key: TokenListener, n: Node, listener: (t1: AllocationSiteToken, t2: FunctionToken | AccessPathToken) => void) {
         if (v1 === undefined || v2 === undefined)
             return;
         assert(key !== undefined);
@@ -417,9 +417,9 @@ export default class Solver {
         const id = this.getListenerID(key, n);
         if (!m1.has(id)) {
             // run listener on all existing tokens
-            const funs: Array<FunctionToken> = [];
+            const funs: Array<FunctionToken | AccessPathToken> = [];
             for (const t2 of f.getTokens(v2Rep))
-                if (t2 instanceof FunctionToken)
+                if (t2 instanceof FunctionToken || t2 instanceof AccessPathToken)
                     funs.push(t2);
             for (const t1 of f.getTokens(v1Rep))
                 if (t1 instanceof AllocationSiteToken)
@@ -436,7 +436,7 @@ export default class Solver {
     /**
      * Enqueues a call to a token pair listener if it hasn't been done before.
      */
-    private callPairListener(id: ListenerID, listener: (t1: AllocationSiteToken, t2: FunctionToken) => void, t1: AllocationSiteToken, t2: FunctionToken) {
+    private callPairListener(id: ListenerID, listener: (t1: AllocationSiteToken, t2: FunctionToken | AccessPathToken) => void, t1: AllocationSiteToken, t2: FunctionToken | AccessPathToken) {
         const s = mapGetSet(mapGetMap(this.fragmentState.pairListenersProcessed, id), t1);
         if (!s.has(t2)) {
             s.add(t2);
@@ -816,7 +816,7 @@ export default class Solver {
                         qr1.set(k, v2l);
                         const [v2, listener] = v2l;
                         for (const t2 of f.getTokens(v2))
-                            if (t2 instanceof FunctionToken)
+                            if (t2 instanceof FunctionToken || t2 instanceof AccessPathToken)
                                 for (const t of bases)
                                     this.callPairListener(k, listener, t, t2);
                     }
@@ -824,9 +824,9 @@ export default class Solver {
                 }
                 const tr2 = f.pairListeners2.get(v);
                 if (tr2) {
-                    const funs: Array<FunctionToken> = [];
+                    const funs: Array<FunctionToken | AccessPathToken> = [];
                     for (const t of rts)
-                        if (t instanceof FunctionToken)
+                        if (t instanceof FunctionToken || t instanceof AccessPathToken)
                             funs.push(t);
                     const qr2 = mapGetMap(f.pairListeners2, rep)
                     for (const [k, v1l] of tr2) {
@@ -1074,9 +1074,9 @@ export default class Solver {
                     if (t instanceof AllocationSiteToken && ntr1)
                         for (const [id, [v2, listener]] of ntr1)
                             for (const t2 of [...f.getTokens(f.getRepresentative(v2)), ...s.getTokens(s.getRepresentative(v2))])
-                                if (t2 instanceof FunctionToken)
+                                if (t2 instanceof FunctionToken || t2 instanceof AccessPathToken)
                                     this.callPairListener(id, listener, t, t2);
-                    if (t instanceof FunctionToken && ntr2)
+                    if ((t instanceof FunctionToken || t instanceof AccessPathToken) && ntr2)
                         for (const [id, [v1, listener]] of ntr2)
                             for (const t1 of [...f.getTokens(f.getRepresentative(v1)), ...s.getTokens(s.getRepresentative(v1))])
                                 if (t1 instanceof AllocationSiteToken)
@@ -1152,8 +1152,9 @@ export default class Solver {
         addAll(s.callsWithResultMaybeUsedAsPromise, f.callsWithResultMaybeUsedAsPromise);
         mapSetAddAll(s.functionParameters, f.functionParameters);
         addAll(s.invokedExpressions, f.invokedExpressions);
-        addAll(s.maybeEscaping, f.maybeEscaping);
+        addAll(s.maybeEscapingFromModule, f.maybeEscapingFromModule);
         addAll(s.widened, f.widened);
+        mapSetAddAll(s.maybeEscapingToExternal, f.maybeEscapingToExternal);
         setAll(s.unhandledDynamicPropertyWrites, f.unhandledDynamicPropertyWrites);
         addAll(s.unhandledDynamicPropertyReads, f.unhandledDynamicPropertyReads);
         f.errors += s.errors;

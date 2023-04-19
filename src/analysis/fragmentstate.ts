@@ -1,5 +1,13 @@
 import {ConstraintVar, ObjectPropertyVarObj} from "./constraintvars";
-import {AllocationSiteToken, ArrayToken, FunctionToken, ObjectToken, PackageObjectToken, Token} from "./tokens";
+import {
+    AccessPathToken,
+    AllocationSiteToken,
+    ArrayToken,
+    FunctionToken,
+    ObjectToken,
+    PackageObjectToken,
+    Token
+} from "./tokens";
 import {DummyModuleInfo, FunctionInfo, ModuleInfo, PackageInfo} from "./infos";
 import {
     CallExpression,
@@ -75,11 +83,11 @@ export class FragmentState {
 
     readonly tokenListeners: Map<ConstraintVar, Map<ListenerID, (t: Token) => void>> = new Map;
 
-    readonly pairListeners1: Map<ConstraintVar, Map<ListenerID, [ConstraintVar, (t1: AllocationSiteToken, t2: FunctionToken) => void]>> = new Map;
+    readonly pairListeners1: Map<ConstraintVar, Map<ListenerID, [ConstraintVar, (t1: AllocationSiteToken, t2: FunctionToken | AccessPathToken) => void]>> = new Map;
 
-    readonly pairListeners2: Map<ConstraintVar, Map<ListenerID, [ConstraintVar, (t1: AllocationSiteToken, t2: FunctionToken) => void]>> = new Map;
+    readonly pairListeners2: Map<ConstraintVar, Map<ListenerID, [ConstraintVar, (t1: AllocationSiteToken, t2: FunctionToken | AccessPathToken) => void]>> = new Map;
 
-    readonly pairListenersProcessed: Map<ListenerID, Map<AllocationSiteToken, Set<FunctionToken>>> = new Map;
+    readonly pairListenersProcessed: Map<ListenerID, Map<AllocationSiteToken, Set<FunctionToken | AccessPathToken>>> = new Map;
 
     readonly packageNeighborListeners: Map<PackageInfo, Map<Node, (neighbor: PackageInfo) => void>> = new Map;
 
@@ -93,7 +101,7 @@ export class FragmentState {
 
     readonly packageNeighbors: Map<PackageInfo, Set<PackageInfo>> = new Map;
 
-    readonly postponedListenerCalls: Array<[(t: Token) => void, Token] | [(t1: AllocationSiteToken, t2: FunctionToken) => void, [AllocationSiteToken, FunctionToken]] | [(neighbor: PackageInfo) => void, PackageInfo] | [(prop: string) => void, string]> = [];
+    readonly postponedListenerCalls: Array<[(t: Token) => void, Token] | [(t1: AllocationSiteToken, t2: FunctionToken | AccessPathToken) => void, [AllocationSiteToken, FunctionToken | AccessPathToken]] | [(neighbor: PackageInfo) => void, PackageInfo] | [(prop: string) => void, string]> = [];
 
     /**
      * Map that provides for each function/module the set of modules being required.
@@ -195,12 +203,18 @@ export class FragmentState {
      * Constraint variables that represent expressions whose values may escape to other modules.
      * Includes arguments to functions from other modules.
      */
-    readonly maybeEscaping: Set<ConstraintVar> = new Set;
+    readonly maybeEscapingFromModule: Set<ConstraintVar> = new Set;
 
     /**
      * Object tokens that have been widened.
      */
     readonly widened: Set<ObjectToken> = new Set;
+
+    /**
+     * Constraint variables whose values may escape to external code.
+     * The corresponding nodes are where the escaping occurs.
+     */
+    readonly maybeEscapingToExternal: Map<ConstraintVar, Set<Node>> = new Map;
 
     /**
      * Unhandled dynamic property write operations.
@@ -375,18 +389,30 @@ export class FragmentState {
     /**
      * Registers that values of the expression represented by the given constraint variable may escape to other modules.
      */
-    registerEscaping(v: ConstraintVar | undefined) {
+    registerEscapingFromModule(v: ConstraintVar | undefined) {
         if (v)
-            this.maybeEscaping.add(v);
+            this.maybeEscapingFromModule.add(v);
     }
 
     /**
      * Registers a call to another module.
      */
-    registerEscapingArguments(args: CallExpression["arguments"], path: NodePath<CallExpression | OptionalCallExpression | NewExpression>) {
+    registerEscapingFromModuleArguments(args: CallExpression["arguments"], path: NodePath<CallExpression | OptionalCallExpression | NewExpression>) {
         for (const arg of args)
             if (isExpression(arg)) // TODO: handle non-Expression arguments?
-                this.registerEscaping(this.varProducer.expVar(arg, path));
+                this.registerEscapingFromModule(this.varProducer.expVar(arg, path));
+    }
+
+    /**
+     * Registers a constraint variable whose values may escape to external code.
+     * Ignored if options.externalMatches is disabled.
+     */
+    registerEscapingToExternal(v: ConstraintVar | undefined, n: Node) {
+        if (v && options.externalMatches) {
+            if (logger.isDebugEnabled())
+                logger.debug(`Values of ${v} escape to non-analyzed code at ${sourceLocationToStringWithFileAndEnd(n.loc)}`);
+            mapGetSet(this.maybeEscapingToExternal, v).add(n);
+        }
     }
 
     /**

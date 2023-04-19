@@ -91,7 +91,7 @@ export async function analyzeFiles(files: Array<string>, solver: Solver, returnF
 
                     // traverse the AST
                     writeStdOutIfActive("Traversing AST...");
-                    solver.fragmentState.maybeEscaping.clear();
+                    solver.fragmentState.maybeEscapingFromModule.clear();
                     visit(ast, new Operations(file, solver, moduleSpecialNatives));
 
                     // propagate tokens until fixpoint reached for the module

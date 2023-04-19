@@ -540,7 +540,7 @@ export function visit(ast: File, op: Operations) {
 
         ThrowStatement: {
             exit(path: NodePath<ThrowStatement>) {
-                f.registerEscaping(op.expVar(path.node.argument, path));
+                f.registerEscapingFromModule(op.expVar(path.node.argument, path));
             }
         },
 

@@ -1,5 +1,6 @@
-import {CallExpression, Expression, isExpression, isIdentifier} from "@babel/types";
+import {CallExpression, Expression, Function, isExpression, isIdentifier} from "@babel/types";
 import {
+    AccessPathToken,
     AllocationSiteToken,
     ArrayToken,
     FunctionToken,
@@ -214,7 +215,7 @@ export function returnPackageObject(p: NativeFunctionParams) {
 export function widenArgument(arg: Node, p: NativeFunctionParams) {
     if (isExpression(arg)) { // TODO: non-Expression arguments?
         const vp = p.solver.fragmentState.varProducer;
-        p.solver.fragmentState.registerEscaping(vp.expVar(arg, p.path)); // triggers widening to field-based
+        p.solver.fragmentState.registerEscapingFromModule(vp.expVar(arg, p.path)); // triggers widening to field-based
     }
 }
 
@@ -401,15 +402,19 @@ export function invokeCallback(kind: CallbackKind, p: NativeFunctionParams, arg:
             const baseVar = vp.expVar(bp.base, p.path);
             const funVar = vp.expVar(funarg, p.path);
             const caller = a.getEnclosingFunctionOrModule(p.path, p.moduleInfo);
-            p.solver.addForAllPairsConstraint(baseVar, funVar, key, p.path.node, (bt: AllocationSiteToken, ft: FunctionToken) => { // TODO: ignoring native functions etc.
+            p.solver.addForAllPairsConstraint(baseVar, funVar, key, p.path.node, (bt: AllocationSiteToken, ft: FunctionToken | AccessPathToken) => { // TODO: ignoring native functions etc.
                 f.registerCall(p.path.node, p.moduleInfo, {native: true});
-                f.registerCallEdge(p.path.node, caller, a.functionInfos.get(ft.fun)!, {native: true}); // TODO: call graph edges for promise-related calls?
-                const param1 = ft.fun.params.length > 0 && isIdentifier(ft.fun.params[0]) ? ft.fun.params[0] : undefined; // TODO: non-Identifier parameters?
-                const param2 = ft.fun.params.length > 1 && isIdentifier(ft.fun.params[1]) ? ft.fun.params[1] : undefined;
-                const param3 = ft.fun.params.length > 2 && isIdentifier(ft.fun.params[2]) ? ft.fun.params[2] : undefined;
-                const param4 = ft.fun.params.length > 3 && isIdentifier(ft.fun.params[3]) ? ft.fun.params[3] : undefined;
+                type Param = Function["params"][0] | undefined;
+                let param1: Param, param2: Param, param3: Param, param4: Param;
+                if (ft instanceof FunctionToken) {
+                    f.registerCallEdge(p.path.node, caller, a.functionInfos.get(ft.fun)!, {native: true}); // TODO: call graph edges for promise-related calls?
+                    param1 = ft.fun.params.length > 0 && isIdentifier(ft.fun.params[0]) ? ft.fun.params[0] : undefined; // TODO: non-Identifier parameters?
+                    param2 = ft.fun.params.length > 1 && isIdentifier(ft.fun.params[1]) ? ft.fun.params[1] : undefined;
+                    param3 = ft.fun.params.length > 2 && isIdentifier(ft.fun.params[2]) ? ft.fun.params[2] : undefined;
+                    param4 = ft.fun.params.length > 3 && isIdentifier(ft.fun.params[3]) ? ft.fun.params[3] : undefined;
+                }
                 const connectThis = () => { // TODO: only bind 'this' if the callback is a proper function (not a lambda?)
-                    if (args.length > 1 && isExpression(args[1])) { // TODO: SpreadElement
+                    if (ft instanceof FunctionToken && args.length > 1 && isExpression(args[1])) { // TODO: SpreadElement
                         // bind thisArg to 'this' of the callback
                         const thisArgVar = vp.expVar(args[1], p.path);
                         p.solver.addSubsetConstraint(thisArgVar, vp.thisVar(ft.fun));
@@ -433,7 +438,8 @@ export function invokeCallback(kind: CallbackKind, p: NativeFunctionParams, arg:
                             case "Array.prototype.map":
                                 // return new array with elements from the callback return values
                                 const t = newArray(p);
-                                p.solver.addSubsetConstraint(vp.returnVar(ft.fun), vp.arrayValueVar(t));
+                                if (ft instanceof FunctionToken)
+                                    p.solver.addSubsetConstraint(vp.returnVar(ft.fun), vp.arrayValueVar(t));
                                 returnToken(t, p);
                                 break;
                             case "Array.prototype.flatMap":
@@ -458,9 +464,11 @@ export function invokeCallback(kind: CallbackKind, p: NativeFunctionParams, arg:
                             p.solver.addSubsetConstraint(thisArgVar, vp.nodeVar(param1));
                         }
                         // connect callback return value to previousValue and to result
-                        const retVar = vp.returnVar(ft.fun);
-                        p.solver.addSubsetConstraint(retVar, vp.nodeVar(param1));
-                        p.solver.addSubsetConstraint(retVar, vp.expVar(p.path.node, p.path));
+                        if (ft instanceof FunctionToken) {
+                            const retVar = vp.returnVar(ft.fun);
+                            p.solver.addSubsetConstraint(retVar, vp.nodeVar(param1));
+                            p.solver.addSubsetConstraint(retVar, vp.expVar(p.path.node, p.path));
+                        }
                         break;
                     case "Array.prototype.sort":
                         // write array elements to param1 and param2 and to the array
@@ -521,17 +529,18 @@ export function invokeCallback(kind: CallbackKind, p: NativeFunctionParams, arg:
                             p.solver.addSubsetConstraint(vp.objPropVar(bt, prop), vp.nodeVar(param1));
                         }
                         // for all return values of the callback...
-                        p.solver.addForAllConstraint(vp.returnVar(ft.fun), key, p.path.node, (t: Token) => {
-                            if (t instanceof AllocationSiteToken && t.kind === "Promise") {
-                                // callback return value is a promise, transfer its values to the new promise
-                                if (kind !== "Promise.prototype.finally$onFinally")
-                                    p.solver.addSubsetConstraint(vp.objPropVar(t, PROMISE_FULFILLED_VALUES), vp.objPropVar(thenPromise, PROMISE_FULFILLED_VALUES));
-                                p.solver.addSubsetConstraint(vp.objPropVar(t, PROMISE_REJECTED_VALUES), vp.objPropVar(thenPromise, PROMISE_REJECTED_VALUES));
-                            } else if (kind !== "Promise.prototype.finally$onFinally") {
-                                // callback return value is a non-promise value, assign it to the fulfilled value of the new promise
-                                p.solver.addTokenConstraint(t, vp.objPropVar(thenPromise, PROMISE_FULFILLED_VALUES));
-                            }
-                        });
+                        if (ft instanceof FunctionToken)
+                            p.solver.addForAllConstraint(vp.returnVar(ft.fun), key, p.path.node, (t: Token) => {
+                                if (t instanceof AllocationSiteToken && t.kind === "Promise") {
+                                    // callback return value is a promise, transfer its values to the new promise
+                                    if (kind !== "Promise.prototype.finally$onFinally")
+                                        p.solver.addSubsetConstraint(vp.objPropVar(t, PROMISE_FULFILLED_VALUES), vp.objPropVar(thenPromise, PROMISE_FULFILLED_VALUES));
+                                    p.solver.addSubsetConstraint(vp.objPropVar(t, PROMISE_REJECTED_VALUES), vp.objPropVar(thenPromise, PROMISE_REJECTED_VALUES));
+                                } else if (kind !== "Promise.prototype.finally$onFinally") {
+                                    // callback return value is a non-promise value, assign it to the fulfilled value of the new promise
+                                    p.solver.addTokenConstraint(t, vp.objPropVar(thenPromise, PROMISE_FULFILLED_VALUES));
+                                }
+                            });
                         // use identity function as onFulfilled handler at catch
                         if (kind === "Promise.prototype.catch$onRejected")
                             p.solver.addSubsetConstraint(vp.objPropVar(bt, PROMISE_FULFILLED_VALUES), vp.objPropVar(thenPromise, PROMISE_FULFILLED_VALUES));
@@ -544,6 +553,11 @@ export function invokeCallback(kind: CallbackKind, p: NativeFunctionParams, arg:
                         // return the new promise
                         p.solver.addTokenConstraint(thenPromise, vp.expVar(p.path.node, p.path));
                         break;
+                }
+                if (ft instanceof AccessPathToken) {
+                    f.registerEscapingToExternal(funVar, funarg);
+
+                    // TODO: see case AccessPathToken in Operations.callFunction
                 }
             });
         }

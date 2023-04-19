@@ -1,0 +1,9 @@
+{
+  "name": "peerdep",
+  "version": "1.0.0",
+  "dependencies": {
+  },
+  "peerDependencies": {
+    "ajv": "^8.12.0"
+  }
+}

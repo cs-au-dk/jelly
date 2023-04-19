@@ -169,7 +169,7 @@ export class Operations {
             if (t instanceof FunctionToken) {
                 f.registerCallEdge(pars.node, caller, this.a.functionInfos.get(t.fun)!);
                 if (t.moduleInfo !== this.moduleInfo)
-                    f.registerEscapingArguments(args, path);
+                    f.registerEscapingFromModuleArguments(args, path);
                 const hasArguments = f.functionsWithArguments.has(t.fun);
                 const argumentsToken = hasArguments ? this.a.canonicalizeToken(new ArrayToken(t.fun.body, this.packageInfo)) : undefined;
                 for (let i = 0; i < args.length; i++) {
@@ -229,26 +229,28 @@ export class Operations {
             } else if (t instanceof AccessPathToken) {
                 assert(calleeVar);
                 f.registerCall(pars.node, this.moduleInfo, {external: true});
-                f.registerEscapingArguments(args, path);
+                f.registerEscapingFromModuleArguments(args, path);
 
                 // constraint: add CallResultAccessPath
                 this.solver.addAccessPath(this.a.canonicalizeAccessPath(new CallResultAccessPath(calleeVar)), resultVar, t.ap);
 
-                // constraint: assign UnknownAccessPath to arguments to function arguments for external functions, also add (artificial) call edge
                 for (let i = 0; i < args.length; i++) {
                     const arg = args[i];
-                    if (isExpression(arg))
-                        this.solver.addForAllConstraint(this.expVar(arg, path), TokenListener.CALL_FUNCTION_EXTERNAL, arg, (at: Token) => {
+                    if (isExpression(arg)) {
+                        const argVar = this.expVar(arg, path);
+                        this.solver.addForAllConstraint(argVar, TokenListener.CALL_FUNCTION_EXTERNAL, arg, (at: Token) => {
                             const f = this.solver.fragmentState;
                             const vp = f.varProducer;
                             if (at instanceof FunctionToken) {
+                                // constraint: assign UnknownAccessPath to arguments to function arguments for external functions, also add (artificial) call edge
                                 f.registerCallEdge(pars.node, caller, this.a.functionInfos.get(at.fun)!, {external: true});
                                 for (let j = 0; j < at.fun.params.length; j++)
                                     if (isIdentifier(at.fun.params[j])) // TODO: non-identifier parameters?
                                         this.solver.addAccessPath(UnknownAccessPath.instance, vp.nodeVar(at.fun.params[j]));
                             }
                         });
-                    else
+                        f.registerEscapingToExternal(argVar, arg);
+                    } else
                         f.warnUnsupported(arg, "SpreadElement in arguments to external function"); // TODO: SpreadElement in arguments to external function
                 }
                 // TODO: also add arguments (and everything reachable from them) to escaping?
@@ -364,7 +366,7 @@ export class Operations {
         } else { // TODO: handle dynamic property reads?
 
             const f = this.solver.fragmentState;
-            f.registerEscaping(base); // unknown properties of the base object may escape
+            f.registerEscapingFromModule(base); // unknown properties of the base object may escape
             this.solver.addAccessPath(UnknownAccessPath.instance, dst);
 
             // constraint: ∀ arrays t ∈ ⟦E⟧: ...
@@ -516,6 +518,10 @@ export class Operations {
                         // constraint: ...: ∀ functions t2 ∈ ⟦(set)t.p⟧: ⟦E2⟧ ⊆ ⟦x⟧ where x is the parameter of t2
                         this.solver.addForAllConstraint(vp.objPropVar(t, prop, "set"), TokenListener.ASSIGN_SETTER, path.node, writeToSetter);
 
+                        // values written to native object escape
+                        if (t instanceof NativeObjectToken) // TODO: || t instanceof PackageObjectToken ?
+                            f.registerEscapingToExternal(src, path.node);
+
                     } else if (lVar && t instanceof AccessPathToken) {
 
                         // constraint: ...: ⟦E2⟧ ⊆ ⟦k.p⟧ where k is the current PackageObjectToken
@@ -523,6 +529,9 @@ export class Operations {
 
                         // collect property write operation @E1.p
                         this.solver.addAccessPath(this.a.canonicalizeAccessPath(new PropertyAccessPath(lVar, prop)), vp.nodeVar(path.node), t.ap);
+
+                        // values written to external objects escape
+                        f.registerEscapingToExternal(src, path.node);
 
                         // TODO: the following apparently has no effect on call graph or pattern matching...
                         // // constraint: assign UnknownAccessPath to arguments to function values for external functions
@@ -545,7 +554,7 @@ export class Operations {
 
                 // E1[...] = E2
                 this.solver.collectDynamicPropertyWrite(lVar);
-                f.registerEscaping(src);
+                f.registerEscapingFromModule(src);
 
                 // constraint: ∀ arrays t ∈ ⟦E1⟧: ...
                 this.solver.addForAllConstraint(lVar, TokenListener.ASSIGN_DYNAMIC_BASE, path.node, (t: Token) => {
