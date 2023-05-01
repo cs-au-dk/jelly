@@ -29,12 +29,12 @@ export async function analyzeFiles(files: Array<string>, solver: Solver, returnF
     const fragmentStates = new Map<ModuleInfo | PackageInfo, FragmentState>();
     const fileMap = new Map<FilePath, {sourceCode: string, program: Program}>();
 
-    function restore(mp: ModuleInfo | PackageInfo, propagate: boolean = true) {
+    function merge(mp: ModuleInfo | PackageInfo, propagate: boolean = true) {
         const f = fragmentStates.get(mp);
         if (f) {
             if (logger.isDebugEnabled())
-                logger.debug(`Restoring state for ${mp}`);
-            solver.restore(f, propagate);
+                logger.debug(`Merging state for ${mp}`);
+            solver.merge(f, propagate);
         } else if (logger.isVerboseEnabled())
             logger.verbose(`No state found for ${mp}`);
     }
@@ -107,9 +107,9 @@ export async function analyzeFiles(files: Array<string>, solver: Solver, returnF
                     // propagate tokens (again) until fixpoint reached
                     await solver.propagate();
 
-                    // store the analysis state for the module
+                    // shelve the module state
                     if (logger.isDebugEnabled())
-                        logger.debug(`Storing state for ${moduleInfo}`);
+                        logger.debug(`Shelving state for ${moduleInfo}`);
                     fragmentStates.set(moduleInfo, solver.fragmentState);
 
                     solver.updateDiagnostics();
@@ -135,9 +135,9 @@ export async function analyzeFiles(files: Array<string>, solver: Solver, returnF
                         if (options.printProgress)
                             logger.info(`Analyzing package ${p} (${solver.diagnostics.packages}/${totalNumPackages})`);
 
-                        // restore analysis state for each module
+                        // merge analysis state for each module
                         for (const m of p.modules.values())
-                            restore(m);
+                            merge(m);
 
                         // connect neighbors
                         for (const d of p.directDependencies)
@@ -146,10 +146,8 @@ export async function analyzeFiles(files: Array<string>, solver: Solver, returnF
 
                     // propagate tokens until fixpoint reached
                     await solver.propagate();
-
                     await patchDynamics(solver);
 
-                    assert(a.pendingFiles.length === 0, "Unexpected module"); // (new modules shouldn't be discovered in this phase)
                 } else {
 
                     // compute strongly connected components from the package dependency graph
@@ -185,9 +183,9 @@ export async function analyzeFiles(files: Array<string>, solver: Solver, returnF
                         const trans = new Set<PackageInfo>(); // transitive dependencies in other components
                         for (const p of scc) {
 
-                            // restore the tokens of the modules of the packages in the component
+                            // merge state for the modules of the packages in the component
                             for (const m of p.modules.values())
-                                restore(m);
+                                merge(m);
 
                             // collect dependencies in other components
                             const pd = new Set<PackageInfo>();
@@ -210,37 +208,37 @@ export async function analyzeFiles(files: Array<string>, solver: Solver, returnF
                                 solver.addPackageNeighbor(p, d);
                             }
                         }
-                        // restore tokens from the direct dependencies in other components
+                        // merge state from the direct dependencies in other components
                         for (const p of deps)
                             if (!trans.has(p)) // transitive dependencies can safely be skipped
-                                restore(p);
+                                merge(p);
 
                         // propagate tokens until fixpoint reached for the scc packages with their dependencies
                         await solver.propagate();
 
                         await patchDynamics(solver);
 
-                        // store the tokens for the packages in the component
+                        // shelve the analysis state for the packages in the component
                         for (const p of scc) {
                             if (logger.isDebugEnabled())
-                                logger.debug(`Storing state for ${p}`);
+                                logger.debug(`Shelving state for ${p}`);
                             fragmentStates.set(p, solver.fragmentState);
                         }
 
                         assert(a.pendingFiles.length === 0, "Unexpected module"); // (new modules shouldn't be discovered in the bottom-up phase)
                     }
 
-                    // restore all tokens (safe to restore for one package of each component and to skip the last component)
+                    // merge state (safe to restore for one package of each component and to skip the last component)
                     let lastComponent = true;
                     for (const scc of components.reverse()) {
                         if (lastComponent) {
                             lastComponent = false;
                             continue;
                         }
-                        restore(scc[0], false);
+                        merge(scc[0], false);
                     }
                 }
-
+                assert(a.pendingFiles.length === 0, "Unexpected module"); // (new modules shouldn't be discovered in this phase)
                 solver.updateDiagnostics();
             }
         }

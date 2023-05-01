@@ -1025,9 +1025,9 @@ export default class Solver {
     }
 
     /**
-     * Restores the given fragment state.
+     * Merges the given fragment state into the current fragment state.
      */
-    restore(s: FragmentState, propagate: boolean = true) { // TODO: reconsider use of 'propagate' flag
+    merge(s: FragmentState, propagate: boolean = true) { // TODO: reconsider use of 'propagate' flag
         const f = this.fragmentState;
         // merge redirections
         if (options.cycleElimination)
