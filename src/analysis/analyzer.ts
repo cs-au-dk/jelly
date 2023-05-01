@@ -62,8 +62,8 @@ export async function analyzeFiles(files: Array<string>, solver: Solver, returnF
                 if (!options.modulesOnly && options.printProgress)
                     logger.info(`Analyzing module ${file} (${solver.diagnostics.modules})`);
 
-                writeStdOutIfActive(`Parsing ${file}...`);
                 const str = fs.readFileSync(file, "utf8"); // TODO: OK to assume utf8? (ECMAScript says utf16??)
+                writeStdOutIfActive(`Parsing ${file} (${Math.ceil(str.length / 1024)}KB)...`);
                 solver.diagnostics.codeSize += str.length;
                 const ast = parseAndDesugar(str, file, solver.fragmentState);
                 if (!ast) {
@@ -280,7 +280,7 @@ export async function analyzeFiles(files: Array<string>, solver: Solver, returnF
             r.reportNonemptyUnhandledDynamicPropertyWrites();
             r.reportNonemptyUnhandledDynamicPropertyReads();
         }
-        logger.info(`Analyzed packages: ${solver.diagnostics.packages}, modules: ${solver.diagnostics.modules}, functions: ${a.functionInfos.size}, code size: ${Math.round(solver.diagnostics.codeSize / 1024)}KB`);
+        logger.info(`Analyzed packages: ${solver.diagnostics.packages}, modules: ${solver.diagnostics.modules}, functions: ${a.functionInfos.size}, code size: ${Math.ceil(solver.diagnostics.codeSize / 1024)}KB`);
         logger.info(`Call edges function->function: ${f.numberOfFunctionToFunctionEdges}, call->function: ${f.numberOfCallToFunctionEdges}`);
         const n = d.totalCallSites - d.callsWithNoCallee - d.nativeOnlyCalls - d.externalOnlyCalls - d.nativeOrExternalCalls;
         logger.info(`Calls with unique callee: ${d.callsWithUniqueCallee}/${n}${n > 0 ? ` (${percent(d.callsWithUniqueCallee / n)})` : ""}` +
