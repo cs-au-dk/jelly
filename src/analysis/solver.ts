@@ -922,11 +922,8 @@ export default class Solver {
                 if (options.cycleElimination) {
                     // find vars that are end points of new or restored subset edges
                     const nodes = new Set<ConstraintVar>();
-                    for (const [v, ws] of [...this.unprocessedSubsetEdges, ...this.restoredSubsetEdges]) {
-                        nodes.add(v);
-                        for (const w of ws)
-                            nodes.add(w);
-                    }
+                    for (const v of [...this.unprocessedSubsetEdges.keys(), ...this.restoredSubsetEdges.keys()])
+                        nodes.add(f.getRepresentative(v));
                     if (nodes.size > 0) {
                         // find strongly connected components
                         const timer1 = new Timer();
@@ -1032,12 +1029,13 @@ export default class Solver {
      */
     restore(s: FragmentState, propagate: boolean = true) { // TODO: reconsider use of 'propagate' flag
         const f = this.fragmentState;
-        // represent redirections as two-way subset edges, but only if using cycle elimination
+        // merge redirections
         if (options.cycleElimination)
-            for (const [v, rep] of s.redirections) { // Note: because redirections are restored like this and no final cycle elimination is performed, listeners may re-add tokens and subset edges differently depending on choices of SCC representatives
-                mapGetSet(s.subsetEdges, v).add(rep); // (safe to omit reverseSubsetEdges here)
-                mapGetSet(s.subsetEdges, rep).add(v);
-                s.vars.add(v);
+            for (const [v, rep] of s.redirections) {
+                const fRep = f.getRepresentative(v);
+                const repRep = f.getRepresentative(rep);
+                this.addSubsetEdge(fRep, repRep);
+                this.redirect(fRep, repRep);
             }
         // add constraint variables and processed listeners
         addAll(s.vars, f.vars);
