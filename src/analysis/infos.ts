@@ -50,7 +50,7 @@ export class ModuleInfo {
 
     readonly packageInfo: PackageInfo; // package containing this module
 
-    readonly functions: Map<Function, FunctionInfo> = new Map; // functions directly inside this module
+    readonly functions: Set<FunctionInfo> = new Set; // functions directly inside this module
 
     readonly isEntry: boolean; // true for entry modules
 
@@ -122,7 +122,7 @@ export class FunctionInfo {
 
     readonly moduleInfo: ModuleInfo; // module containing this function
 
-    readonly functions: Map<Function, FunctionInfo> = new Map; // functions directly inside this function
+    readonly functions: Set<FunctionInfo> = new Set; // functions directly inside this function
 
     get packageInfo(): PackageInfo {
         return this.moduleInfo.packageInfo;

@@ -44,7 +44,7 @@ export function toDot(f: FragmentState, fd: number = process.stdout.fd) {
                 `${ind(i)} label=\"${f.name ?? "<anon>"}@${sourceLocationToString(f.node.loc)}\";\n` +
                 `${ind(i)} bgcolor=\"#ffffff\";\n` +
                 `${ind(i)}node${id(f)}[style=invis,shape=point];\n`);
-        for (const fs of f.functions.values())
+        for (const fs of f.functions)
             writeFunction(fs, i + 1, moduleId);
         if (!options.graphvizElideFunctions && !options.dependenciesOnly)
             writeSync(fd, `${ind(i)}}\n`);
@@ -55,7 +55,7 @@ export function toDot(f: FragmentState, fd: number = process.stdout.fd) {
             `${ind(i)} label=\"${esc(km)}\";\n` +
             `${ind(i)} bgcolor=\"#ffffff\";\n` +
             `${ind(i)}node${id(m)}[style=invis,shape=point];\n`);
-        for (const f of m.functions.values())
+        for (const f of m.functions)
             writeFunction(f, i + 1, id(m));
         writeSync(fd, `${ind(i)}}\n`);
     }

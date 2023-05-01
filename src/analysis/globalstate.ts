@@ -185,7 +185,7 @@ export class GlobalState {
         const f = new FunctionInfo(name, fun, m);
         this.functionInfos.set(fun, f);
         const parent = path.getFunctionParent()?.node;
-        (parent ? this.functionInfos.get(parent)!.functions : m.functions).set(fun, f);
+        (parent ? this.functionInfos.get(parent)!.functions : m.functions).add(f);
         if (this.vulnerabilities)
             this.vulnerabilities.reachedFunction(path, f); // TODO: move to FragmentState?
     }
