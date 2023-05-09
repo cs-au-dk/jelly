@@ -1,5 +1,5 @@
 import {Class, Function, Identifier, isNode, Node} from "@babel/types";
-import {FilePath, getOrSet, sourceLocationToString, SourceLocationWithFilename, strHash} from "../misc/util";
+import {FilePath, getOrSet, sourceLocationToString, SourceLocationWithFilename} from "../misc/util";
 import {ConstraintVar, NodeVar} from "./constraintvars";
 import {Token} from "./tokens";
 import {getPackageJsonInfo, PackageJsonInfo} from "../misc/packagejson";
@@ -22,7 +22,7 @@ export class GlobalState {
     /**
      * Map from constraint variable string hash to canonical ConstraintVar object.
      */
-    readonly canonicalConstraintVars: Map<number, ConstraintVar> = new Map;
+    readonly canonicalConstraintVars: Map<string, ConstraintVar> = new Map;
 
     /**
      * Map from AST node to canonical NodeVar object.
@@ -32,12 +32,12 @@ export class GlobalState {
     /**
      * Map from token string hash to canonical Token object.
      */
-    readonly canonicalTokens: Map<number, Token> = new Map;
+    readonly canonicalTokens: Map<string, Token> = new Map;
 
     /**
      * Map from access path string hash to canonical AccessPath object.
      */
-    readonly canonicalAccessPaths: Map<number, AccessPath> = new Map;
+    readonly canonicalAccessPaths: Map<string, AccessPath> = new Map;
 
     /**
      * Canonical global identifiers.
@@ -148,7 +148,7 @@ export class GlobalState {
         if (v instanceof NodeVar)
             return getOrSet(this.canonicalNodeVars, v.node, () => v) as unknown as T;
         else
-            return getOrSet(this.canonicalConstraintVars, strHash(v.toString()), () => v) as T;
+            return getOrSet(this.canonicalConstraintVars, v.toString(), () => v) as T;
     }
 
     /**
@@ -156,7 +156,7 @@ export class GlobalState {
      */
     canonicalizeToken<T extends Token>(t: T): T {
         this.numberOfCanonicalizeTokenCalls++;
-        return getOrSet(this.canonicalTokens, strHash(t.toString()), () => t) as T;
+        return getOrSet(this.canonicalTokens, t.toString(), () => t) as T;
     }
 
     /**
@@ -164,7 +164,7 @@ export class GlobalState {
      */
     canonicalizeAccessPath<T extends AccessPath>(t: T): T {
         this.numberOfCanonicalizeAccessPathCalls++;
-        return getOrSet(this.canonicalAccessPaths, strHash(t.toString()), () => t) as T;
+        return getOrSet(this.canonicalAccessPaths, t.toString(), () => t) as T;
     }
 
     /**
@@ -185,7 +185,7 @@ export class GlobalState {
         const f = new FunctionInfo(name, fun, m);
         this.functionInfos.set(fun, f);
         const parent = path.getFunctionParent()?.node;
-        (parent ? this.functionInfos.get(parent)!.functions : m.functions).set(fun, f);
+        (parent ? this.functionInfos.get(parent)!.functions : m.functions).add(f);
         if (this.vulnerabilities)
             this.vulnerabilities.reachedFunction(path, f); // TODO: move to FragmentState?
     }

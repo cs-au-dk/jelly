@@ -627,3 +627,30 @@ test("tests/micro/jsx", async () => {
         apiUsageAccessPathPatternsAtNodes: 6
     });
 });
+
+test("tests/micro/escape", async () => {
+    options.ignoreDependencies = true;
+    options.externalMatches = true;
+    await runTest("tests/micro", "escape.js",  {
+        patterns: ["tests/micro/escape-patterns.json"],
+        matches: {total: 16, low: 16}
+    });
+});
+
+test("tests/micro/externmap", async () => {
+    options.ignoreDependencies = true;
+    options.externalMatches = true;
+    await runTest("tests/micro", "externmap.js",  {
+        patterns: ["tests/micro/externmap-patterns.json"],
+        matches: {total: 1, low: 1}
+    });
+});
+
+test("tests/micro/peerdep", async () => {
+    options.ignoreDependencies = true;
+    options.externalMatches = true;
+    await runTest("tests/micro/peerdep", "peerdep.js",  {
+        patterns: ["tests/micro/peerdep/peerdep-patterns.json"],
+        matches: {total: 0, low: 0} // TODO: should report 1 match
+    });
+});

@@ -58,7 +58,8 @@ export const options: {
     higherOrderFunctions: boolean,
     zeros: boolean,
     variableKinds: boolean,
-    vulnerabilities: string | undefined
+    vulnerabilities: string | undefined,
+    externalMatches: boolean
 } = {
     callgraphHtml: undefined,
     dataflowHtml: undefined,
@@ -112,7 +113,8 @@ export const options: {
     higherOrderFunctions: false,
     zeros: false,
     variableKinds: false,
-    vulnerabilities: undefined
+    vulnerabilities: undefined,
+    externalMatches: false
 };
 
 export function setOptions(opts: OptionValues & Partial<typeof options>) {
@@ -123,6 +125,8 @@ export function setOptions(opts: OptionValues & Partial<typeof options>) {
     }
     if (options.apiUsage)
         options.ignoreDependencies = true;
+    if (options.vulnerabilities)
+        options.externalMatches = true;
 }
 
 /**

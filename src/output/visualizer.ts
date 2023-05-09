@@ -90,7 +90,7 @@ function getReachable(f: FragmentState): Set<PackageInfo | ModuleInfo | Function
     }
     for (const m of f.a.moduleInfos.values()) {
         let r = false;
-        for (const f of m.functions.values())
+        for (const f of m.functions)
             if (reachable.has(f)) {
                 r = true;
                 break;

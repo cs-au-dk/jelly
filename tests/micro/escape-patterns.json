@@ -1,0 +1,18 @@
+[
+  {
+    "id": "1",
+    "pattern": "call <lodash>.template"
+  },
+  {
+    "id": "2",
+    "pattern": "call <lodash>.template.foo"
+  },
+  {
+    "id": "3",
+    "pattern": "write <lodash>.template.bar"
+  },
+  {
+    "id": "4",
+    "pattern": "read <lodash>.template.baz"
+  }
+]

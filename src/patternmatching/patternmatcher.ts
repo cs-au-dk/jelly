@@ -20,7 +20,18 @@ import {
     WriteDetectionPattern
 } from "./patterns";
 import assert from "assert";
-import {addAll, deleteAll, deleteMapSetAll, FilePath, mapGetSet, nodeToString, SourceLocationJSON, SourceLocationsToJSON, sourceLocationToStringWithFileAndEnd, Ternary} from "../misc/util";
+import {
+    addAll,
+    deleteAll,
+    deleteMapSetAll,
+    FilePath,
+    mapGetSet,
+    nodeToString,
+    SourceLocationJSON,
+    SourceLocationsToJSON,
+    sourceLocationToStringWithFileAndEnd,
+    Ternary
+} from "../misc/util";
 import {
     isAssignmentExpression,
     isCallExpression,
@@ -37,7 +48,13 @@ import micromatch from "micromatch";
 import {AccessPathToken} from "../analysis/tokens";
 import logger from "../misc/logger";
 import {ConstraintVar, NodeVar} from "../analysis/constraintvars";
-import {AccessPath, CallResultAccessPath, ModuleAccessPath, PropertyAccessPath, UnknownAccessPath} from "../analysis/accesspaths";
+import {
+    AccessPath,
+    CallResultAccessPath,
+    ModuleAccessPath,
+    PropertyAccessPath,
+    UnknownAccessPath
+} from "../analysis/accesspaths";
 import {isDefaultImport} from "./astpatterns";
 import {FragmentState} from "../analysis/fragmentstate";
 import {expressionMatchesType} from "./typematcher";
@@ -123,6 +140,11 @@ export class PatternMatcher {
      */
     private unknownsCache: Array<Node> | undefined;
 
+    /**
+     * Access paths that escape to external code, with the AST nodes where they escape.
+     */
+    private readonly escapingToExternal = new Map<AccessPath, Set<Node>>();
+
     constructor(fragmentState: FragmentState, typer?: TypeScriptTypeInferrer) {
         this.fragmentState = fragmentState;
         this.typer = typer;
@@ -132,7 +154,7 @@ export class PatternMatcher {
      * Finds the (non-analyzed) modules that match the given glob.
      * Emits error if an analyzed module matches.
      */
-    findGlobMatches(glob: Glob): Array<[ModuleAccessPath, Set<Node>]> {
+    private findGlobMatches(glob: Glob): Array<[ModuleAccessPath, Set<Node>]> {
         let res = this.moduleCache.get(glob);
         if (!res) {
             res = [];
@@ -153,7 +175,7 @@ export class PatternMatcher {
     /**
      * Finds the AST nodes that match the given access path pattern, together with the associated access paths.
      */
-    findAccessPathPatternMatches(p: AccessPathPattern, write?: boolean): AccessPathPatternMatches {
+    private findAccessPathPatternMatches(p: AccessPathPattern, write?: boolean): AccessPathPatternMatches {
         let cache = write ? this.writeExpressionCache : this.expressionCache;
         let res = cache.get(p);
         if (!res) {
@@ -248,6 +270,18 @@ export class PatternMatcher {
                     }
             }
 
+            /**
+             * If the given access path escapes to external code, add it together with
+             * the corresponding AST nodes as low-confidence matches.
+             */
+            const addEscapingToExternal = (ap: AccessPath, write?: boolean) => {
+                const esc = this.escapingToExternal.get(ap);
+                if (esc)
+                    for (const n of esc)
+                        if (!write || (isAssignmentExpression(n) && isMemberExpression(n.left)))
+                            mapGetSet(res!.low, n).add(ap);
+            }
+
             if (p instanceof ImportAccessPathPattern) {
                 for (const [ap, ns] of this.findGlobMatches(p.glob))
                     for (const n of ns)
@@ -274,6 +308,7 @@ export class PatternMatcher {
                             if (ps)
                                 for (const prop of p.props)
                                     addMatches(level, ap, ps.get(prop), tmp, subvs);
+                           addEscapingToExternal(ap);
                         }
                     transfer(level, sub, tmp, subvs);
                 }
@@ -283,8 +318,10 @@ export class PatternMatcher {
                     const tmp = new Map<Node, Set<CallResultAccessPath>>();
                     const subvs = new Map<Node, ConstraintVar>();
                     for (const aps of sub[level].values())
-                        for (const ap of aps)
+                        for (const ap of aps) {
                             addMatches(level, ap, f.callResultAccessPaths.get(ap), tmp, subvs);
+                            addEscapingToExternal(ap);
+                        }
                     transfer(level, sub, tmp, subvs);
                 }
             } else if (p instanceof DisjunctionAccessPathPattern) {
@@ -366,7 +403,7 @@ export class PatternMatcher {
     /**
      * Finds the AST nodes that have UnknownAccessPath.
      */
-    findUnknowns(): Array<Node> {
+    private findUnknowns(): Array<Node> {
         if (!this.unknownsCache) {
             this.unknownsCache = [];
             for (const [v, ts] of this.fragmentState.getAllVarsAndTokens()) // only includes representatives, but always followed by property read
@@ -385,7 +422,7 @@ export class PatternMatcher {
      * Checks whether the given AST node matches the given filter.
      * Also returns the relevant (sub-)expression (or the expression itself if a spread expression appears).
      */
-    filterMatches(n: Node, filter: Filter): [Ternary, Node] {
+    private filterMatches(n: Node, filter: Filter): [Ternary, Node] {
         if (!(isCallExpression(n) || isOptionalCallExpression(n) || isNewExpression(n)))
             assert.fail(`Unexpected node type ${n.type}`);
         if (filter instanceof NumArgsCallFilter) {
@@ -417,8 +454,7 @@ export class PatternMatcher {
                 arg = n.callee.object;
             else
                 return [Ternary.Maybe, n];
-        }
-        else if (filter.selector.head < 0) {
+        } else if (filter.selector.head < 0) {
             if (n.arguments.length + filter.selector.head >= 0)
                 arg = n.arguments[n.arguments.length + filter.selector.head];
             else
@@ -433,10 +469,21 @@ export class PatternMatcher {
     }
 
     /**
+     * Find the access paths that escape to external code.
+     */
+    findEscapingAccessPathsToExternal() {
+        for (const [v, ns] of this.fragmentState.maybeEscapingToExternal)
+            for (const t of this.fragmentState.getTokens(v))
+                if (t instanceof AccessPathToken)
+                    addAll(ns, mapGetSet(this.escapingToExternal, t.ap));
+    }
+
+    /**
      * Finds the AST nodes that match the given detection pattern,
      * with descriptions of the causes of uncertainty for low-confidence matches.
      */
     findDetectionPatternMatches(d: DetectionPattern): Array<DetectionPatternMatch> {
+        this.findEscapingAccessPathsToExternal();
         const res: Array<DetectionPatternMatch> = [];
         if (d instanceof ImportDetectionPattern) {
             const sub = this.findAccessPathPatternMatches(d.ap);
@@ -485,29 +532,27 @@ export class PatternMatcher {
             const sub = this.findAccessPathPatternMatches(d.ap, true);
             for (const level of confidenceLevels)
                 for (const exp of sub[level].keys()) {
-                    if (!isAssignmentExpression(exp))
-                        assert.fail(`Unexpected node type ${exp.type}, expected AssignmentExpression`);
-                    if (!isMemberExpression(exp.left))
-                        assert.fail(`Unexpected node type ${exp.left.type}, expected MemberExpression`);
                     const uncertainties: Array<Uncertainty> = [];
                     if (level === "low")
                         uncertainties.push("accessPath");
-                    if (d.valueFilter)
-                        switch (expressionMatchesType(exp.right, undefined, d.valueFilter, this.typer)) {
-                            case Ternary.False:
-                                continue;
-                            case Ternary.Maybe:
-                                uncertainties.push({type: "type", exp: exp.right, kind: "value", typesToMatch: d.valueFilter});
-                                break;
-                        }
-                    if (d.baseFilter)
-                        switch (expressionMatchesType(exp.left.object, undefined, d.baseFilter, this.typer)) {
-                            case Ternary.False:
-                                continue;
-                            case Ternary.Maybe:
-                                uncertainties.push({type: "type", exp: exp.left.object, kind: "base", typesToMatch: d.baseFilter});
-                                break;
-                        }
+                    if (isAssignmentExpression(exp) && isMemberExpression(exp.left)) {
+                        if (d.valueFilter)
+                            switch (expressionMatchesType(exp.right, undefined, d.valueFilter, this.typer)) {
+                                case Ternary.False:
+                                    continue;
+                                case Ternary.Maybe:
+                                    uncertainties.push({type: "type", exp: exp.right, kind: "value", typesToMatch: d.valueFilter});
+                                    break;
+                            }
+                        if (d.baseFilter)
+                            switch (expressionMatchesType(exp.left.object, undefined, d.baseFilter, this.typer)) {
+                                case Ternary.False:
+                                    continue;
+                                case Ternary.Maybe:
+                                    uncertainties.push({type: "type", exp: exp.left.object, kind: "base", typesToMatch: d.baseFilter});
+                                    break;
+                            }
+                    }
                     res.push({exp, uncertainties});
                 }
         } else if (d instanceof CallDetectionPattern) {
