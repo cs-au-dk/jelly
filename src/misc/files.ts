@@ -131,7 +131,7 @@ export function requireResolve(str: string, file: FilePath, loc: SourceLocation 
     }
 
     // not in project basedir or mocked builtin dir, then it will be ignored
-    const mockBuiltinDir = resolve(__dirname, '..', 'mockbuiltin');
+    const mockBuiltinDir = resolve(__dirname, '..', 'natives', 'mocks');
     if (!filepath.startsWith(options.basedir) && !filepath.startsWith(mockBuiltinDir)) {
         const msg = `Found module at ${filepath}, but not in basedir`;
         logger.debug(msg);
@@ -237,7 +237,7 @@ export function writeStreamedStringify(value: any,
  * Resolve the path of standard module like 'http', 'fs' etc to a local file.
  */
 export function resolveBuiltinModule(moduleName: string): FilePath {
-    const filepath = resolve(__dirname, `../mockbuiltin/${moduleName}.js`);
+    const filepath = resolve(__dirname, `../natives/mocks/${moduleName}.js`);
     if (!existsSync(filepath)) {
         throw new Error;
     }

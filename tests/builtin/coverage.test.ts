@@ -50,7 +50,7 @@ describe('all standard library modules', () => {
     ];
     for (const module of modules) {
       const obj = require(module);
-      const mocked = require(`../../src/mockbuiltin/${module}`);
+      const mocked = require(`../../src/natives/mocks/${module}`);
       testCoverage(module, obj, mocked);
     }
   });
