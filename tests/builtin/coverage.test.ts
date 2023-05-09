@@ -46,7 +46,6 @@ describe('all standard library modules', () => {
       '_http_common',
       '_http_incoming',
       '_http_outgoing',
-      'buffer',
     ];
     for (const module of modules) {
       const obj = require(module);
