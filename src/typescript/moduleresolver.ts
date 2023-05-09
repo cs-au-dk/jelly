@@ -22,6 +22,6 @@ export function tsResolveModuleName(str: string, file: FilePath): FilePath {
     const t = str.endsWith(".ts") ? str.substring(0, str.length - 3) : str;
     const filepath = ts.resolveModuleName(t, file, options, host).resolvedModule?.resolvedFileName;
     if (!filepath)
-        throw new Error;
+        throw new Error(`Module ${str} not found`);
     return filepath;
 }

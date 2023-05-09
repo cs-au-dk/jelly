@@ -98,14 +98,13 @@ export function requireResolve(str: string, file: FilePath, loc: SourceLocation 
     }
     let filepath;
     try {
-        if (builtinModules.has(str)) {
-            // mock the behavior of tsResolveModuleName for builtins like `require('http')`
-            filepath = resolveBuiltinModule(str);
-        } else if (str.startsWith("node:") && builtinModules.has(str.substring(5))) {
-            // mock the behavior of tsResolveModuleName for builtins like `require('node:http')`
-            filepath = resolveBuiltinModule(str.substring(5))
-        } else {
+        // "node:http" will be changed to "http" how "node:express"?
+        const moduleName = str.startsWith("node:") ? str.substring(5) : str;
+        if (moduleName === str && !builtinModules.has(moduleName)) {
             filepath = tsResolveModuleName(str, file);
+        } else {
+            // mock the behavior of tsResolveModuleName for builtins like `require('http')`
+            filepath = resolveBuiltinModule(moduleName);
         }
 
         // TypeScript prioritizes .ts over .js, overrule if coming from a .js file
@@ -239,7 +238,7 @@ export function writeStreamedStringify(value: any,
 export function resolveBuiltinModule(moduleName: string): FilePath {
     const filepath = resolve(__dirname, `../natives/mocks/${moduleName}.js`);
     if (!existsSync(filepath)) {
-        throw new Error;
+        throw new Error(`Mock for ${moduleName} not found`);
     }
     return filepath;
 }
