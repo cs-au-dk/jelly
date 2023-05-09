@@ -48,7 +48,6 @@ import Solver from "./solver";
 import {GlobalState} from "./globalstate";
 import {DummyModuleInfo, FunctionInfo, ModuleInfo, normalizeModuleName, PackageInfo} from "./infos";
 import logger from "../misc/logger";
-import {builtinModules} from "../natives/nodejs";
 import {requireResolve} from "../misc/files";
 import {options} from "../options";
 import {FilePath, getOrSet, isArrayIndex, sourceLocationToStringWithFile} from "../misc/util";
@@ -409,49 +408,39 @@ export class Operations {
         const vp = f.varProducer;
         const reexport = isExportDeclaration(path.node);
         let m: ModuleInfo | DummyModuleInfo | undefined;
-        if (builtinModules.has(str) || (str.startsWith("node:") && builtinModules.has(str.substring(5)))) {
 
-            if (!reexport) {
-                // standard library module: model with UnknownAccessPath
-                // constraint: @Unknown ∈ ⟦require(...)⟧
-                this.solver.addAccessPath(UnknownAccessPath.instance, resultVar);
-                // TODO: models for parts of the standard library
-            } else
-                f.warnUnsupported(path.node, `Ignoring re-export from built-in module '${str}'`); // TODO: re-exporting from built-in module
-        } else {
-            try {
+        try {
 
-                // try to locate the module
-                const filepath = requireResolve(str, this.file, path.node.loc, f);
-                if (filepath) {
+            // try to locate the module
+            const filepath = requireResolve(str, this.file, path.node.loc, f);
+            if (filepath) {
 
-                    // register that the module is reached
-                    m = this.a.reachedFile(filepath, this.moduleInfo);
+                // register that the module is reached
+                m = this.a.reachedFile(filepath, this.moduleInfo);
 
-                    // extend the require graph
-                    const fp = path.getFunctionParent()?.node;
-                    const from = fp ? this.a.functionInfos.get(fp)! : this.moduleInfo;
-                    const to = this.a.moduleInfosByPath.get(filepath)!;
-                    f.registerRequireEdge(from, to);
+                // extend the require graph
+                const fp = path.getFunctionParent()?.node;
+                const from = fp ? this.a.functionInfos.get(fp)! : this.moduleInfo;
+                const to = this.a.moduleInfosByPath.get(filepath)!;
+                f.registerRequireEdge(from, to);
 
-                    if (!reexport) {
-                        // constraint: ⟦module_m.exports⟧ ⊆ ⟦require(...)⟧ where m denotes the module being loaded
-                        this.solver.addSubsetConstraint(vp.objPropVar(this.a.canonicalizeToken(new NativeObjectToken("module", m)), "exports"), resultVar);
-                    }
+                if (!reexport) {
+                    // constraint: ⟦module_m.exports⟧ ⊆ ⟦require(...)⟧ where m denotes the module being loaded
+                    this.solver.addSubsetConstraint(vp.objPropVar(this.a.canonicalizeToken(new NativeObjectToken("module", m)), "exports"), resultVar);
                 }
-            } catch {
-                if (options.ignoreUnresolved || options.ignoreDependencies) {
-                    if (logger.isVerboseEnabled())
-                        logger.verbose(`Ignoring unresolved module '${str}' at ${sourceLocationToStringWithFile(path.node.loc)}`);
-                } else // TODO: special warning if the require/import is placed in a try-block, an if statement, or a switch case?
-                    f.warn(`Unable to resolve module '${str}' at ${sourceLocationToStringWithFile(path.node.loc)}`); // TODO: may report duplicate error messages
-
-                // couldn't find module file (probably hasn't been installed), use a DummyModuleInfo if absolute module name
-                if (!"./#".includes(str[0]))
-                    m = getOrSet(this.a.dummyModuleInfos, str, () => new DummyModuleInfo(str));
             }
+        } catch {
+            if (options.ignoreUnresolved || options.ignoreDependencies) {
+                if (logger.isVerboseEnabled())
+                    logger.verbose(`Ignoring unresolved module '${str}' at ${sourceLocationToStringWithFile(path.node.loc)}`);
+            } else // TODO: special warning if the require/import is placed in a try-block, an if statement, or a switch case?
+                f.warn(`Unable to resolve module '${str}' at ${sourceLocationToStringWithFile(path.node.loc)}`); // TODO: may report duplicate error messages
 
-            if (m) {
+            // couldn't find module file (probably hasn't been installed), use a DummyModuleInfo if absolute module name
+            if (!"./#".includes(str[0]))
+                m = getOrSet(this.a.dummyModuleInfos, str, () => new DummyModuleInfo(str));
+        }
+        if (m) {
 
                 // add access path token
                 const analyzed = m instanceof ModuleInfo && (!options.ignoreDependencies || this.a.entryFiles.has(m.getPath()));
@@ -467,7 +456,6 @@ export class Operations {
 
                 f.registerRequireCall(path.node, this.a.getEnclosingFunctionOrModule(path, this.moduleInfo), m);
             }
-        }
         return m;
     }
 

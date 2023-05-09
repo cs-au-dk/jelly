@@ -8,6 +8,7 @@ import {SourceLocation} from "@babel/types";
 import {findPackageJson} from "./packagejson";
 import {tsResolveModuleName} from "../typescript/moduleresolver";
 import stringify from "stringify2stream";
+import {builtinModules} from "../natives/nodejs";
 import {FragmentState} from "../analysis/fragmentstate";
 
 /**
@@ -97,7 +98,15 @@ export function requireResolve(str: string, file: FilePath, loc: SourceLocation 
     }
     let filepath;
     try {
-        filepath = tsResolveModuleName(str, file);
+        // "node:http" will be changed to "http" how "node:express"?
+        const moduleName = str.startsWith("node:") ? str.substring(5) : str;
+        if (moduleName === str && !builtinModules.has(moduleName)) {
+            filepath = tsResolveModuleName(str, file);
+        } else {
+            // mock the behavior of tsResolveModuleName for builtins like `require('http')`
+            filepath = resolveBuiltinModule(moduleName);
+        }
+
         // TypeScript prioritizes .ts over .js, overrule if coming from a .js file
         if (file.endsWith(".js") && filepath.endsWith(".ts") && !str.endsWith(".ts")) {
             const p = filepath.substring(0, filepath.length - 3) + ".js";
@@ -119,11 +128,15 @@ export function requireResolve(str: string, file: FilePath, loc: SourceLocation 
         if (!filepath)
             throw e;
     }
-    if (!filepath.startsWith(options.basedir)) {
+
+    // not in project basedir or mocked builtin dir, then it will be ignored
+    const mockBuiltinDir = resolve(__dirname, '..', 'natives', 'mocks');
+    if (!filepath.startsWith(options.basedir) && !filepath.startsWith(mockBuiltinDir)) {
         const msg = `Found module at ${filepath}, but not in basedir`;
         logger.debug(msg);
         throw new Error(msg);
     }
+
     if (!filepath.endsWith(".js") && !filepath.endsWith(".jsx") && !filepath.endsWith(".es") && !filepath.endsWith(".mjs") &&
         !filepath.endsWith(".cjs") && !filepath.endsWith(".ts") && !filepath.endsWith(".tsx")) {
         f.warn(`Module '${filepath}' at ${sourceLocationToStringWithFile(loc)} has unrecognized extension, skipping it`);
@@ -217,4 +230,15 @@ export function writeStreamedStringify(value: any,
         if (chunk)
             writeSync(fd, chunk);
     }, replacer, space);
+}
+
+/**
+ * Resolve the path of standard module like 'http', 'fs' etc to a local file.
+ */
+export function resolveBuiltinModule(moduleName: string): FilePath {
+    const filepath = resolve(__dirname, `../natives/mocks/${moduleName}.js`);
+    if (!existsSync(filepath)) {
+        throw new Error(`Mock for ${moduleName} not found`);
+    }
+    return filepath;
 }
