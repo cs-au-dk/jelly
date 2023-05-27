@@ -28,7 +28,8 @@ import traverse from "@babel/traverse";
 import logger from "../misc/logger";
 import {getClass} from "../misc/asthelpers";
 import assert from "assert";
-import {globalLoc} from "../misc/util";
+import {globalLoc, Location} from "../misc/util";
+import {ModuleInfo} from "../analysis/infos";
 
 /**
  * Replaces TypeScript "export =" and "import =" syntax.
@@ -64,8 +65,8 @@ export const JELLY_NODE_ID = Symbol("JELLY_NODE_ID");
 /**
  * Preprocesses the given AST.
  */
-export function preprocessAst(ast: File, file: string, globals: Array<Identifier>, globalsHidden: Array<Identifier>) {
-    let nextNodeID = 0;
+export function preprocessAst(ast: File, file: string, module: ModuleInfo, globals: Array<Identifier>, globalsHidden: Array<Identifier>) {
+    let nextNodeID = 1;
 
     function register(n: Node) {
         (n as any)[JELLY_NODE_ID] = nextNodeID++;
@@ -101,11 +102,16 @@ export function preprocessAst(ast: File, file: string, globals: Array<Identifier
 
             // workaround to ensure that AST nodes with undefined location (caused by desugaring) can be identified uniquely
             if (!n.loc) {
-                let p: NodePath | null = path;
-                while (p && !p.node.loc)
+                let p = path;
+                while (!p.node.loc) {
+                    assert(p.parentPath);
                     p = p.parentPath;
-                n.loc = {filename: file, start: p?.node.loc?.start, end: p?.node.loc?.end, nodeIndex: nextNodeID} as any; // see sourceLocationToString
+                }
+                n.loc = {start: p?.node.loc?.start, end: p?.node.loc?.end, nodeIndex: (n as any)[JELLY_NODE_ID]} as Location; // see sourceLocationToString
             }
+
+            // set module name
+            (n.loc as Location).module = module;
 
             // workarounds to match dyn.ts source locations
             if (isClassMethod(n)) {
@@ -136,7 +142,7 @@ export function preprocessAst(ast: File, file: string, globals: Array<Identifier
                 const ps = path.scope.getProgramParent();
                 if (!ps.getBinding(n.name)?.identifier) {
                     const d = identifier(n.name);
-                    d.loc = {start: {line: 0, column: 0}, end: {line: 0, column: 0}, filename: file, unbound: true} as any; // unbound used by expVar
+                    d.loc = {start: {line: 0, column: 0}, end: {line: 0, column: 0}, module, unbound: true} as any; // unbound used by expVar
                     register(d);
                     ps.push({id: d});
                     if (logger.isDebugEnabled())

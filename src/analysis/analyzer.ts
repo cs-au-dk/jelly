@@ -83,7 +83,7 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
                     a.globalSpecialNatives = globalSpecialNatives;
 
                     // preprocess the AST
-                    preprocessAst(ast, file, globals, globalsHidden);
+                    preprocessAst(ast, file, moduleInfo, globals, globalsHidden);
 
                     // traverse the AST
                     writeStdOutIfActive("Traversing AST...");

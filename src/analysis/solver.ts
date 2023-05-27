@@ -14,6 +14,7 @@ import {PackageInfo} from "./infos";
 import {
     addAll,
     isArrayIndex,
+    Location,
     mapArrayPushAll,
     mapGetArray,
     mapGetMap,
@@ -370,7 +371,7 @@ export default class Solver {
     private getListenerID(key: TokenListener, n: Node): ListenerID {
         let id = (n as any)[JELLY_NODE_ID];
         assert(id !== undefined);
-        return ((id << 10) + key) ^ (this.globalState.moduleInfosByPath.get((n as any)?.loc?.filename)?.hash || 0); // TODO: hash collision possible
+        return ((id << 10) + key) ^ ((n.loc && (n.loc as Location).module?.hash) ?? 0); // TODO: hash collision possible
     }
 
     /**

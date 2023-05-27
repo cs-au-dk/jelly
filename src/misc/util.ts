@@ -1,13 +1,12 @@
 import {isIdentifier, Node, SourceLocation} from "@babel/types";
 import assert from "assert";
+import {ModuleInfo} from "../analysis/infos";
 
-export type SourceLocationWithFilename = SourceLocation & {filename: string};
+export type Location = SourceLocation & {module?: ModuleInfo, native?: string, nodeIndex?: number};
 
-export type PatchedSourceLocation = {nodeIndex: number, start?: {line: number, column: number }, end?: {line: number, column: number}};
+export type LocationJSON = string; // format: "<file index>:<start line>:<start column>:<end line>:<end column>"
 
-export type SourceLocationJSON = string; // format: "<file index>:<start line>:<start column>:<end line>:<end column>"
-
-export const globalLoc: SourceLocationWithFilename = {start: {line: 0, column: 0}, end: {line: 0, column: 0}, filename: "%global"};
+export const globalLoc: Location = {start: {line: 0, column: 0}, end: {line: 0, column: 0}, native: "%global"};
 
 /**
  * Normalized path to a file or directory.
@@ -56,12 +55,12 @@ export function nodeToString(n: Node): string {
 /**
  * Returns a string representation of the given source location.
  */
-export function sourceLocationToString(loc: SourceLocationWithFilename | SourceLocation | PatchedSourceLocation | null | undefined, withFilename: boolean = false, withEnd: boolean = false) {
+export function sourceLocationToString(loc: Location | null | undefined, withFilename: boolean = false, withEnd: boolean = false) {
     if (!loc)
         return "?";
     if (loc === globalLoc)
         return "<global>";
-    const file = withFilename && "filename" in loc ? `${loc.filename}` : "";
+    const file = withFilename && "module" in loc && loc.module ? loc.module.getPath() : "";
     const start = loc.start && loc.start.line !== 0 ? `${loc.start.line}:${loc.start.column + 1}` : "";
     const end = withEnd && loc.end && loc.end.line !== 0 ? `:${loc.end.line}:${loc.end.column + 1}` : "";
     const extra = "nodeIndex" in loc ? `$${loc.nodeIndex}` : ""; // for uniquely naming AST nodes with missing source location
@@ -71,22 +70,22 @@ export function sourceLocationToString(loc: SourceLocationWithFilename | SourceL
 /**
  * Returns a string representation of the given source location, including filename.
  */
-export function sourceLocationToStringWithFile(loc: SourceLocationWithFilename | SourceLocation | PatchedSourceLocation | null | undefined) {
+export function sourceLocationToStringWithFile(loc: Location | null | undefined) {
     return sourceLocationToString(loc, true);
 }
 
 /**
  * Returns a string representation of the given source location, including filename and end position.
  */
-export function sourceLocationToStringWithFileAndEnd(loc: SourceLocationWithFilename | SourceLocation | PatchedSourceLocation | null | undefined) {
+export function sourceLocationToStringWithFileAndEnd(loc: Location | null | undefined) {
     return sourceLocationToString(loc, true, true);
 }
 
 /**
  * Checks whether the given file and line belong to the source location range.
  */
-export function sourceLocationContains(loc: SourceLocationWithFilename | SourceLocation | PatchedSourceLocation | null | undefined, file: string, line: number): boolean {
-    return Boolean(loc && loc.start && loc.end && "filename" in loc && loc.filename === file && loc.start.line <= line && line <= loc.end.line);
+export function sourceLocationContains(loc: Location | null | undefined, file: string, line: number): boolean {
+    return Boolean(loc && loc.start && loc.end && "module" in loc && loc.module && loc.module.getPath() === file && loc.start.line <= line && line <= loc.end.line);
 }
 
 /**
@@ -252,8 +251,9 @@ export class SourceLocationsToJSON {
         return n;
     }
 
-    makeLocString(loc: SourceLocationWithFilename | SourceLocation | undefined | null): SourceLocationJSON {
-        assert(loc && "filename" in loc); // TODO: assertion may fail?
-        return `${this.getFileIndex(loc.filename)}:${loc.start.line}:${loc.start.column + 1}:${loc.end.line}:${loc.end.column + 1}`;
+    makeLocString(loc: (SourceLocation & {filename?: string}) | Location | null | undefined): LocationJSON {
+        assert(loc && ("module" in loc && loc.module || "filename" in loc && loc.filename)); // TODO: assertion may fail?
+        // @ts-ignore
+        return `${this.getFileIndex(loc.module ? loc.module.getPath() : loc.filename)}:${loc.start.line}:${loc.start.column + 1}:${loc.end.line}:${loc.end.column + 1}`;
     }
 }

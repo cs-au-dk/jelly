@@ -8,7 +8,7 @@ import {nodejsModels} from "./nodejs";
 import {options} from "../options";
 import logger from "../misc/logger";
 import {Operations} from "../analysis/operations";
-import {SourceLocationWithFilename} from "../misc/util";
+import {Location} from "../misc/util";
 
 export type CallNodePath = NodePath<CallExpression | OptionalCallExpression | NewExpression>;
 
@@ -77,12 +77,12 @@ export function buildNatives(solver: Solver, moduleInfo: ModuleInfo): {globals: 
     const globalSpecialNatives: SpecialNativeObjects = new Map;
     const f = solver.fragmentState;
     const a = solver.globalState;
-    const moduleLoc: SourceLocationWithFilename = {start: {line: 0, column: 0}, end: {line: 0, column: 0}, filename: moduleInfo.getPath()};
+    const moduleLoc: Location = {start: {line: 0, column: 0}, end: {line: 0, column: 0}, module: moduleInfo};
 
     const models = [ecmascriptModels, nodejsModels];
 
     for (const m of models) {
-        const loc = {start: {line: 0, column: 0}, end: {line: 0, column: 0}, filename: `%${m.name}`}; // dummy location for global identifiers
+        const loc: Location = {start: {line: 0, column: 0}, end: {line: 0, column: 0}, native: `%${m.name}`}; // dummy location for global identifiers
 
         /**
          * Adds an identifier to the global scope.

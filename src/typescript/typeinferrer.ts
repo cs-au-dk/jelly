@@ -2,7 +2,14 @@ import * as ts from 'typescript';
 import {SymbolFlags, TypeFlags} from 'typescript';
 import {SourceLocation} from "@babel/types";
 import logger, {writeStdOutIfActive} from "../misc/logger";
-import {FilePath, mapArrayAdd, SourceLocationJSON, SourceLocationsToJSON, sourceLocationToStringWithFileAndEnd, SourceLocationWithFilename} from "../misc/util";
+import {
+    FilePath,
+    Location,
+    LocationJSON,
+    mapArrayAdd,
+    SourceLocationsToJSON,
+    sourceLocationToStringWithFileAndEnd
+} from "../misc/util";
 import {dirname, resolve} from "path";
 import Timer from "../misc/timer";
 import {Type} from "../patternmatching/patterns";
@@ -12,11 +19,11 @@ import {options} from "../options";
 /**
  * Map from package name to locations of TypeScript AST nodes with a type from that package.
  */
-export type LibraryUsage = Map<string, Array<[SourceLocationWithFilename, ts.Type]>>;
+export type LibraryUsage = Map<string, Array<[SourceLocation & {filename: string}, ts.Type]>>;
 
 export type LibraryUsageJSON = {
     files: Array<FilePath>,
-    packages: Record<string, Array<[SourceLocationJSON, string]>>
+    packages: Record<string, Array<[LocationJSON, string]>>
 };
 
 /**
@@ -89,8 +96,8 @@ export class TypeScriptTypeInferrer {
     /**
      * Returns the TypeScript type for the given location (with filename), or undefined if not found.
      */
-    getType(loc: SourceLocationWithFilename | SourceLocation): ts.Type | undefined {
-        const file = "filename" in loc && this.files.get(loc.filename);
+    getType(loc: Location | SourceLocation): ts.Type | undefined {
+        const file = "module" in loc && this.files.get(loc.module!.getPath());
         if (!file)
             return undefined;
         try {
@@ -224,7 +231,7 @@ export class TypeScriptTypeInferrer {
         const res: LibraryUsageJSON = {files: [], packages: {}};
         const locs = new SourceLocationsToJSON(res.files);
         for (const [p, as] of u) {
-            const bs: Array<[SourceLocationJSON, string]> = [];
+            const bs: Array<[LocationJSON, string]> = [];
             for (const [loc, type] of as)
                 bs.push([locs.makeLocString(loc), this.checker.typeToString(type)]);
             res.packages[p] = bs;

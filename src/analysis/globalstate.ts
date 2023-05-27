@@ -1,5 +1,5 @@
 import {Class, Function, Identifier, isNode, Node} from "@babel/types";
-import {FilePath, getOrSet, sourceLocationToString, SourceLocationWithFilename} from "../misc/util";
+import {FilePath, getOrSet, sourceLocationToString, Location} from "../misc/util";
 import {ConstraintVar, NodeVar} from "./constraintvars";
 import {Token} from "./tokens";
 import {getPackageJsonInfo, PackageJsonInfo} from "../misc/packagejson";
@@ -225,7 +225,7 @@ export class GlobalState {
 
             if (moduleInfo) {
 
-                // modules has been reached before in another directory
+                // module has been reached before in another directory
                 if (logger.isVerboseEnabled())
                     logger.verbose(`${moduleInfo} already encountered in another directory`);
             } else {
@@ -284,7 +284,7 @@ export class GlobalState {
     getConstraintVarParent(v: ConstraintVar): PackageInfo | ModuleInfo | undefined {
         const p = v.getParent();
         if (isNode(p) || (p && "loc" in p && p.loc))
-            return this.moduleInfosByPath.get((p.loc as SourceLocationWithFilename).filename);
+            return (p.loc as Location).module;
         return undefined;
     }
 }

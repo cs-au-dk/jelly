@@ -2,7 +2,7 @@ import {closeSync, existsSync, lstatSync, openSync, readdirSync, readFileSync, r
 import {basename, relative, resolve, sep} from "path";
 import {options} from "../options";
 import micromatch from "micromatch";
-import {FilePath, sourceLocationToStringWithFile} from "./util";
+import {FilePath, Location, sourceLocationToStringWithFile} from "./util";
 import logger from "./logger";
 import {SourceLocation} from "@babel/types";
 import {findPackageJson} from "./packagejson";
@@ -174,22 +174,22 @@ const codeCache: Map<SourceLocationStr, string> = new Map<SourceLocationStr, str
  * Reads the code for a source location.
  * If cached, returns the cached value. If the code is too long, only returns the head and tail of the code.
  */
-export function codeFromLocation(loc: SourceLocation | null | undefined): string {
+export function codeFromLocation(loc: Location | null | undefined): string {
     if (!loc)
         return "-";
     let locStr = JSON.stringify(loc);
     let content = codeCache.get(locStr);
     if (!content) {
         content = "";
-        if (loc && "filename" in loc) {
-            let fileContent = readFileSync(<string>loc.filename).toString().split(/\r?\n/);
+        if (loc && loc.module) {
+            let fileContent = readFileSync(loc.module.getPath()).toString().split(/\r?\n/);
             let startRecord = false;
             for (let i = loc.start.line; i <= loc.end.line; i++) {
                 let currLine = fileContent[i - 1];
                 for (let j = 0; j < currLine.length; j++) {
-                    if (i == loc.start.line && loc.start.column == j)
+                    if (i === loc.start.line && loc.start.column === j)
                         startRecord = true;
-                    if (i == loc.end.line && j == loc.end.column) {
+                    if (i === loc.end.line && j === loc.end.column) {
                         startRecord = false;
                         break;
                     }
@@ -199,7 +199,7 @@ export function codeFromLocation(loc: SourceLocation | null | undefined): string
             }
             content = content.replaceAll(/\s+/g, " ");
             if (content.length > 50)
-                content = `${content.substring(0, 20)}/*...*/$${content.substring(content.length - 20)}`;
+                content = `${content.substring(0, 20)}...$${content.substring(content.length - 20)}`;
         }
         codeCache.set(locStr, content);
     }

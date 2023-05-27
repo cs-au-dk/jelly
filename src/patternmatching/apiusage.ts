@@ -1,5 +1,5 @@
 import logger from "../misc/logger";
-import {mapGetSet, sourceLocationToStringWithFileAndEnd, SourceLocationWithFilename} from "../misc/util";
+import {mapGetSet, sourceLocationToStringWithFileAndEnd, Location} from "../misc/util";
 import {
     AbbreviatedPathPattern,
     AccessPathPattern,
@@ -18,7 +18,7 @@ export type PatternType = "import" | "read" | "write" | "call" | "component";
 export type AccessPathPatternToNodes = Record<PatternType, Map<AccessPathPattern, Set<Node>>>;
 export type NodeToAccessPathPatterns = Record<PatternType, Map<Node, Set<AccessPathPattern>>>;
 export type AccessPathString = string;
-export type AccessPathPatternStringToNodes = Record<PatternType, Record<AccessPathString, Array<SourceLocationWithFilename>>>;
+export type AccessPathPatternStringToNodes = Record<PatternType, Record<AccessPathString, Array<Location>>>;
 
 /**
  * Finds the usage of the API of external modules.
@@ -167,11 +167,11 @@ export function reportAPIUsage(r1: AccessPathPatternToNodes, r2: NodeToAccessPat
 export function convertAPIUsageToJSON(r: AccessPathPatternToNodes): AccessPathPatternStringToNodes {
     const res: AccessPathPatternStringToNodes = {import: {}, read: {}, write: {}, call: {}, component: {}};
     for (const type of Object.getOwnPropertyNames(r) as Array<PatternType>) {
-        const t: Record<AccessPathString, Array<SourceLocationWithFilename>> = {};
+        const t: Record<AccessPathString, Array<Location>> = {};
         for (const [p, nodes] of r[type]) {
-            const a: Array<SourceLocationWithFilename> = [];
+            const a: Array<Location> = [];
             for (const n of nodes)
-                a.push(n.loc as SourceLocationWithFilename);
+                a.push(n.loc as Location);
             t[p.toString()] = a;
         }
         res[type] = t;

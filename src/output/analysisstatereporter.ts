@@ -1,5 +1,5 @@
 import logger from "../misc/logger";
-import {deleteAll, getOrSet, SourceLocationJSON, sourceLocationToStringWithFile, sourceLocationToStringWithFileAndEnd} from "../misc/util";
+import {deleteAll, getOrSet, LocationJSON, sourceLocationToStringWithFile, sourceLocationToStringWithFileAndEnd} from "../misc/util";
 import {GlobalState} from "../analysis/globalstate";
 import {FunctionToken, NativeObjectToken, Token} from "../analysis/tokens";
 import fs from "fs";
@@ -149,7 +149,7 @@ export class AnalysisStateReporter {
      * Creates a JSON representation of the call graph using the format defined in callgraph.d.ts.
      */
     callGraphToJSON(files: Array<string>): CallGraph {
-        const cg: CallGraph & {entries: Array<string>, ignore: Array<SourceLocationJSON>} = {
+        const cg: CallGraph & {entries: Array<string>, ignore: Array<LocationJSON>} = {
             time: new Date().toUTCString(),
             entries: [],
             files: [],

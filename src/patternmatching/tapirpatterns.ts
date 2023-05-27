@@ -12,7 +12,7 @@ import {FragmentState} from "../analysis/fragmentstate";
 import {TypeScriptTypeInferrer} from "../typescript/typeinferrer";
 import {AnalysisDiagnostics} from "../typings/diagnostics";
 import logger, {writeStdOutIfActive} from "../misc/logger";
-import {sourceLocationToStringWithFileAndEnd, SourceLocationWithFilename} from "../misc/util";
+import {Location, sourceLocationToStringWithFileAndEnd} from "../misc/util";
 import {TimeoutException} from "../misc/timer";
 import {DetectionPatternMatch, generateQuestion, PatternMatcher} from "./patternmatcher";
 
@@ -90,7 +90,7 @@ export function tapirPatternMatch(tapirPatterns: Array<PatternWrapper | Semantic
                         for (const q of expected) {
                             let c1, c2, c3;
                             // noinspection CommaExpressionJS
-                            if (("classification" in q ? q.classification : q.semanticPatchId) === tpId && (m.exp.loc as SourceLocationWithFilename)?.filename?.endsWith(q.file) &&
+                            if (("classification" in q ? q.classification : q.semanticPatchId) === tpId && m.exp.loc && "module" in m.exp.loc && (m.exp.loc as Location).module?.getPath().endsWith(q.file) &&
                                 ("semanticPatchVersion" in q && "version" in tp ? q.semanticPatchVersion === tp.version : true) &&
                                 ("lineNumber" in q ? q.lineNumber === m.exp.loc?.start.line :
                                         (c1 = q.loc.indexOf(":"), q.loc.substring(0, c1) === m.exp.loc?.start.line.toString() &&

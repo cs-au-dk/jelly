@@ -27,7 +27,7 @@ import {
     FilePath,
     mapGetSet,
     nodeToString,
-    SourceLocationJSON,
+    LocationJSON,
     SourceLocationsToJSON,
     sourceLocationToStringWithFileAndEnd,
     Ternary
@@ -73,8 +73,8 @@ export type Uncertainty =
 
 export type UncertaintyJSON =
     "accessPath" |
-    {type: "type", loc?: SourceLocationJSON, kind: "base" | number | "value", propNames?: Array<string>, typesToMatch: Array<Type>} | // TODO: loc may be undefined for base filters only, see getPropertyReadObject
-    {type: "numArg", loc?: SourceLocationJSON, numMinArgs: number | undefined, numMaxArgs: number | undefined} |
+    {type: "type", loc?: LocationJSON, kind: "base" | number | "value", propNames?: Array<string>, typesToMatch: Array<Type>} | // TODO: loc may be undefined for base filters only, see getPropertyReadObject
+    {type: "numArg", loc?: LocationJSON, numMinArgs: number | undefined, numMaxArgs: number | undefined} |
     "maybePromiseMatch";
 
 /**
@@ -107,7 +107,7 @@ export type PatternMatchesJSON = {
 };
 
 export type PatternMatchJSON = {
-    loc: SourceLocationJSON,
+    loc: LocationJSON,
     uncertainties?: Array<{
         text: string,
         uncertainty: UncertaintyJSON

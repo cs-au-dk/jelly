@@ -10,7 +10,7 @@
  * - calls to/from native functions, including 'eval', and event handlers
  * - calls to 'require' and import declarations
  */
-import {SourceLocationJSON} from "../misc/util";
+import {LocationJSON} from "../misc/util";
 
 export type CallGraph = { // TODO: represent special call edges separately from ordinary call edges?
 
@@ -34,14 +34,14 @@ export type CallGraph = { // TODO: represent special call edges separately from 
      * Indices and source locations of functions.
      */
     functions: {
-        [index: number]: SourceLocationJSON;
+        [index: number]: LocationJSON;
     },
 
     /**
      * Indices and source locations of calls.
      */
     calls: {
-        [index: number]: SourceLocationJSON;
+        [index: number]: LocationJSON;
     },
 
     /**
@@ -59,5 +59,5 @@ export type CallGraph = { // TODO: represent special call edges separately from 
      * This is used for skipping spurious functions that appear in dynamic call graph construction
      * but are not known to be spurious until running static call graph construction.
      */
-    ignore?: Array<SourceLocationJSON>;
+    ignore?: Array<LocationJSON>;
 }

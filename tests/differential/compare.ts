@@ -4,7 +4,7 @@ import {DummyModuleInfo, FunctionInfo, ModuleInfo} from "../../src/analysis/info
 import {GlobalState} from "../../src/analysis/globalstate";
 import logger from "../../src/misc/logger";
 import {Token} from "../../src/analysis/tokens";
-import {mapGetSet, sourceLocationToString, SourceLocationWithFilename} from "../../src/misc/util";
+import {mapGetSet, sourceLocationToString, Location} from "../../src/misc/util";
 import {Node} from "@babel/core";
 import {ConstraintVar} from "../../src/analysis/constraintvars";
 import {codeFromLocation} from "../../src/misc/files";
@@ -106,13 +106,13 @@ export function compare(prevSolver: PrevSolver, currSolver: Solver, _package: st
                 // @ts-ignore
                 .filter((t: Token) => {
                     const loc = PrevStringCode.getTokenLocation(t);
-                    return loc && entryModulePaths.includes((<SourceLocationWithFilename>loc).filename);
+                    return loc && entryModulePaths.includes((<Location>loc).filename);
                 }).map((t: any) => t.toString());
             const currTokens = getTokensByPrevConstraintVar(prevConstraintVar, currSolver);
             const currTokenStrings = currTokens
                 .filter((t: Token) => {
                     const loc = getTokenLocation(t);
-                    return loc && entryModulePaths.includes((<SourceLocationWithFilename>loc).filename);
+                    return loc && entryModulePaths.includes((<Location>loc).filename);
                 }).map((t: any) => t.toString());
             for (const prevTokenString of prevTokenStrings) {
                 expect(currTokenStrings,
