@@ -188,7 +188,7 @@ async function main() {
                 ...process.env,
                 JELLY_OUT: dyn,
                 GRAAL_HOME: graalHome ? path.resolve(graalHome) : undefined,
-                PATH: `${__dirname}/bin${path.delimiter}${process.env.PATH}`
+                PATH: `${__dirname}/../bin${path.delimiter}${process.env.PATH}`
             }
         });
         if (t.status === null) {
@@ -207,6 +207,7 @@ async function main() {
                     unlinkSync(p);
                 }
             }
+        logger.verbose(`Collected ${cgs.length} call graphs from instrumented execution.`)
         const fd = openSync(dyn, "w");
         writeStreamedStringify(merge(cgs), fd); // TODO: alert if the call graph is empty?
         closeSync(fd);
