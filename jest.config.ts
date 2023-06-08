@@ -16,34 +16,6 @@ const base = {
     // Automatically clear mock calls, instances and results before every test
     // clearMocks: false,
 
-    // Indicates whether the coverage information should be collected while executing the test
-    collectCoverage: true,
-
-    // An array of glob patterns indicating a set of files for which coverage information should be collected
-    // collectCoverageFrom: undefined,
-
-    // The directory where Jest should output its coverage files
-    coverageDirectory: "tmp/coverage",
-
-    // An array of regexp pattern strings used to skip coverage collection
-    // coveragePathIgnorePatterns: [
-    //   "/node_modules/"
-    // ],
-
-    // Indicates which provider should be used to instrument code for coverage
-    coverageProvider: "v8",
-
-    // A list of reporter names that Jest uses when writing coverage reports
-    // coverageReporters: [
-    //   "json",
-    //   "text",
-    //   "lcov",
-    //   "clover"
-    // ],
-
-    // An object that configures minimum threshold enforcement for coverage results
-    // coverageThreshold: undefined,
-
     // A path to a custom dependency extractor
     // dependencyExtractor: undefined,
 
@@ -188,6 +160,38 @@ const base = {
 };
 
 export default {
+    // The coverage-related options are put in the root (global configuration)
+    // instead of in the project-specific configuration (through base) until
+    // https://github.com/jestjs/jest/issues/13576 is resolved.
+
+    // Indicates whether the coverage information should be collected while executing the test
+    collectCoverage: true,
+
+    // An array of glob patterns indicating a set of files for which coverage information should be collected
+    // collectCoverageFrom: undefined,
+
+    // The directory where Jest should output its coverage files
+    coverageDirectory: "tmp/coverage",
+
+    // An array of regexp pattern strings used to skip coverage collection
+    // coveragePathIgnorePatterns: [
+    //   "/node_modules/"
+    // ],
+
+    // Indicates which provider should be used to instrument code for coverage
+    coverageProvider: "v8",
+
+    // A list of reporter names that Jest uses when writing coverage reports
+    // coverageReporters: [
+    //   "json",
+    //   "text",
+    //   "lcov",
+    //   "clover"
+    // ],
+
+    // An object that configures minimum threshold enforcement for coverage results
+    // coverageThreshold: undefined,
+
     projects: [
         {
             displayName: "default",
