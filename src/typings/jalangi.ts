@@ -36,7 +36,7 @@ export interface Jalangi {
 
   analysis?: JalangiAnalysis;
 
-  smemory?: {
+  smemory: {
 
     getShadowObject(
       obj: object,
@@ -89,9 +89,9 @@ export interface JalangiAnalysis {
       hasGetterSetter: boolean
   ): { result: any } | void;
 
-  forinObject?(
+  forObject?(
       iid: IID,
-      val: any
+      isForIn: boolean
   ): { result: any } | void;
 
   declare?(
@@ -312,5 +312,27 @@ export interface JalangiAnalysis {
       valAwaited: any,
       result: any,
       rejected: boolean
+  ): void;
+
+  startExpression?(
+      iid : IID,
+      type: String
+  ): void;
+
+  startStatement?(
+      iid : IID,
+      type : String
+  ): void;
+
+  endStatement?(
+      iid : IID,
+      type : String
+  ): void;
+
+  declarePre?(
+      iid : IID,
+      name : String,
+      type : String,
+      kind : String
   ): void;
 }
