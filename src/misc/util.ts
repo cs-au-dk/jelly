@@ -2,11 +2,16 @@ import {isIdentifier, Node, SourceLocation} from "@babel/types";
 import assert from "assert";
 import {ModuleInfo} from "../analysis/infos";
 
-export type Location = SourceLocation & {module?: ModuleInfo, native?: string, nodeIndex?: number};
+/**
+ * Source location with extra information.
+ * 'module' is set if the location belongs to a specific module, and undefined for globals.
+ * 'native' is set if the location comes from a native model.
+ * 'nodeIndex' is set by AST preprocessing at nodes with missing source location (see sourceLocationToString).
+ * 'unbound' set to true if this is a location for an artificially declared unbound identifier.
+ */
+export type Location = SourceLocation & {module?: ModuleInfo, native?: string, nodeIndex?: number, unbound?: boolean};
 
 export type LocationJSON = string; // format: "<file index>:<start line>:<start column>:<end line>:<end column>"
-
-export const globalLoc: Location = {start: {line: 0, column: 0}, end: {line: 0, column: 0}, native: "%global"};
 
 /**
  * Normalized path to a file or directory.
@@ -47,38 +52,42 @@ export function ternaryToString(t: Ternary): string {
  */
 export function nodeToString(n: Node): string {
     if (isIdentifier(n))
-        return `'${n.name}'[${sourceLocationToStringWithFile(n.loc)}]`;
+        return `'${n.name}'[${sourceLocationToStringWithFile(n.loc, true)}]`;
     else
-        return `[${sourceLocationToStringWithFileAndEnd(n.loc)}]`;
+        return `[${sourceLocationToStringWithFileAndEnd(n.loc, true)}]`;
 }
 
 /**
  * Returns a string representation of the given source location.
  */
-export function sourceLocationToString(loc: Location | null | undefined, withFilename: boolean = false, withEnd: boolean = false) {
+export function sourceLocationToString(loc: Location | null | undefined, withFilename: boolean = false, withEnd: boolean = false, useModuleName?: boolean) {
     if (!loc)
         return "?";
-    if (loc === globalLoc)
-        return "<global>";
-    const file = withFilename && "module" in loc && loc.module ? loc.module.getPath() : "";
+    const file =
+        withFilename ?
+            useModuleName ?
+                "module" in loc ? loc.module?.toString() : "" :
+                "filename" in loc ? loc.filename : "?" :
+            "";
     const start = loc.start && loc.start.line !== 0 ? `${loc.start.line}:${loc.start.column + 1}` : "";
     const end = withEnd && loc.end && loc.end.line !== 0 ? `:${loc.end.line}:${loc.end.column + 1}` : "";
     const extra = "nodeIndex" in loc ? `$${loc.nodeIndex}` : ""; // for uniquely naming AST nodes with missing source location
-    return file + (file && start ? ":" : "") + start + end + extra;
+    const native = loc.native ?? "";
+    return file + (file && start ? ":" : "") + start + end + extra + native;
 }
 
 /**
  * Returns a string representation of the given source location, including filename.
  */
-export function sourceLocationToStringWithFile(loc: Location | null | undefined) {
-    return sourceLocationToString(loc, true);
+export function sourceLocationToStringWithFile(loc: Location | null | undefined, useModuleName?: boolean) {
+    return sourceLocationToString(loc, true, false, useModuleName);
 }
 
 /**
  * Returns a string representation of the given source location, including filename and end position.
  */
-export function sourceLocationToStringWithFileAndEnd(loc: Location | null | undefined) {
-    return sourceLocationToString(loc, true, true);
+export function sourceLocationToStringWithFileAndEnd(loc: Location | null | undefined, useModuleName?: boolean) {
+    return sourceLocationToString(loc, true, true, useModuleName);
 }
 
 /**

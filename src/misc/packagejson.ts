@@ -73,7 +73,7 @@ export function getPackageJsonInfo(tofile: FilePath): PackageJsonInfo {
         if (!f.version)
             logger.verbose(`Package version missing in ${p.packageJson}`);
         version = f.version;
-        packagekey = `${name}${version ?? "?"}`
+        packagekey = `${name}@${version ?? "?"}`
         if (f.main) {
             try {
                 // normalize main file path
@@ -86,7 +86,6 @@ export function getPackageJsonInfo(tofile: FilePath): PackageJsonInfo {
     } else {
         name = "<main>";
         packagekey = "<unknown>";
-        version = undefined;
         dir = process.cwd();
     }
     return {packagekey, name, version, main, dir}

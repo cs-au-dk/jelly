@@ -2,6 +2,9 @@ import {OptionValues} from "commander";
 import {resolve} from "path";
 import logger from "./misc/logger";
 
+export const VERSION = require("../package.json").version;
+export const PKG = "pkg" in process;
+
 /**
  * Command line options (see usage in main.ts).
  */
@@ -163,6 +166,6 @@ export let patternProperties: Set<string> | undefined = undefined;
 /**
  * Sets pattern properties. If defined, object properties not in this set are not tracked in access paths.
  */
-export function setPatternProperties(props: Set<string> | undefined) {
+export function setPatternProperties(props?: Set<string>) {
     patternProperties = props;
 }

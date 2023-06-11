@@ -25,9 +25,9 @@ import {
     deleteAll,
     deleteMapSetAll,
     FilePath,
+    LocationJSON,
     mapGetSet,
     nodeToString,
-    LocationJSON,
     SourceLocationsToJSON,
     sourceLocationToStringWithFileAndEnd,
     Ternary

@@ -2,7 +2,7 @@ import {closeSync, existsSync, lstatSync, openSync, readdirSync, readFileSync, r
 import {basename, relative, resolve, sep} from "path";
 import {options} from "../options";
 import micromatch from "micromatch";
-import {FilePath, Location, sourceLocationToStringWithFile} from "./util";
+import {FilePath, Location, sourceLocationToStringWithFile, sourceLocationToStringWithFileAndEnd} from "./util";
 import logger from "./logger";
 import {SourceLocation} from "@babel/types";
 import {findPackageJson} from "./packagejson";
@@ -177,7 +177,7 @@ const codeCache: Map<SourceLocationStr, string> = new Map<SourceLocationStr, str
 export function codeFromLocation(loc: Location | null | undefined): string {
     if (!loc)
         return "-";
-    let locStr = JSON.stringify(loc);
+    let locStr = sourceLocationToStringWithFileAndEnd(loc, true);
     let content = codeCache.get(locStr);
     if (!content) {
         content = "";

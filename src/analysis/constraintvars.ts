@@ -127,7 +127,7 @@ export class FunctionReturnVar extends ConstraintVar {
     }
 
     toString() {
-        return `Return[${sourceLocationToStringWithFileAndEnd(this.fun.loc)}]`
+        return `Return[${sourceLocationToStringWithFileAndEnd(this.fun.loc, true)}]`
     }
 
     getParent(): Node {
@@ -148,7 +148,7 @@ export class ThisVar extends ConstraintVar {
     }
 
     toString() {
-        return `This[${sourceLocationToStringWithFileAndEnd(this.fun.loc)}]`;
+        return `This[${sourceLocationToStringWithFileAndEnd(this.fun.loc, true)}]`;
     }
 
     getParent(): Node {
@@ -169,7 +169,7 @@ export class ArgumentsVar extends ConstraintVar {
     }
 
     toString() {
-        return `Arguments[${sourceLocationToStringWithFileAndEnd(this.fun.loc)}]`;
+        return `Arguments[${sourceLocationToStringWithFileAndEnd(this.fun.loc, true)}]`;
     }
 
     getParent(): Node {
@@ -190,7 +190,7 @@ export class ClassExtendsVar extends ConstraintVar {
     }
 
     toString() {
-        return `Extends[${sourceLocationToStringWithFileAndEnd(this.cl.loc)}]`
+        return `Extends[${sourceLocationToStringWithFileAndEnd(this.cl.loc, true)}]`
     }
 
     getParent(): Node {
@@ -214,7 +214,7 @@ export class IntermediateVar extends ConstraintVar {
     }
 
     toString() {
-        return `#${this.label}[${sourceLocationToStringWithFileAndEnd(this.node.loc)}]`
+        return `#${this.label}[${sourceLocationToStringWithFileAndEnd(this.node.loc, true)}]`
     }
 
     getParent(): Node {

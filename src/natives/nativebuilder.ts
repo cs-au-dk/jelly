@@ -77,12 +77,11 @@ export function buildNatives(solver: Solver, moduleInfo: ModuleInfo): {globals: 
     const globalSpecialNatives: SpecialNativeObjects = new Map;
     const f = solver.fragmentState;
     const a = solver.globalState;
-    const moduleLoc: Location = {start: {line: 0, column: 0}, end: {line: 0, column: 0}, module: moduleInfo};
 
     const models = [ecmascriptModels, nodejsModels];
-
     for (const m of models) {
-        const loc: Location = {start: {line: 0, column: 0}, end: {line: 0, column: 0}, native: `%${m.name}`}; // dummy location for global identifiers
+        const moduleLoc: Location = {start: {line: 0, column: 0}, end: {line: 0, column: 0}, module: moduleInfo, native: `%${m.name}`};
+        const globalLoc: Location = {start: {line: 0, column: 0}, end: {line: 0, column: 0}, native: `%${m.name}`}; // dummy location for global identifiers
 
         /**
          * Adds an identifier to the global scope.
@@ -98,7 +97,7 @@ export function buildNatives(solver: Solver, moduleInfo: ModuleInfo): {globals: 
                 let id = solver.globalState.canonicalGlobals.get(name);
                 if (!id) {
                     id = identifier(name);
-                    id.loc = moduleSpecific ? moduleLoc : loc;
+                    id.loc = moduleSpecific ? moduleLoc : globalLoc;
                     if (!moduleSpecific)
                         solver.globalState.canonicalGlobals.set(name, id);
                 }

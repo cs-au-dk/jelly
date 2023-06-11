@@ -66,6 +66,7 @@ export class ModuleInfo {
     }
 
     toString(): string {
+        assert(this.packageInfo !== undefined && this.relativePath !== undefined);
         return `${this.packageInfo}:${this.relativePath}`;
     }
 

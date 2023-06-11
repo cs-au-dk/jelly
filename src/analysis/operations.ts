@@ -51,7 +51,7 @@ import logger from "../misc/logger";
 import {builtinModules} from "../natives/nodejs";
 import {requireResolve} from "../misc/files";
 import {options} from "../options";
-import {FilePath, getOrSet, isArrayIndex, sourceLocationToStringWithFile} from "../misc/util";
+import {FilePath, getOrSet, isArrayIndex, Location, sourceLocationToStringWithFile} from "../misc/util";
 import assert from "assert";
 import {
     ARRAY_PROTOTYPE,
@@ -115,7 +115,7 @@ export class Operations {
         const v = vp.expVar(exp, path);
 
         // if the expression is a variable that has not been declared normally... (unbound set by preprocessAst)
-        if (v instanceof NodeVar && isIdentifier(v.node) && (v.node.loc as any).unbound) {
+        if (v instanceof NodeVar && isIdentifier(v.node) && (v.node.loc as Location).unbound) {
 
             // the variable may be a property of globalThis
             // constraint: globalThis.X ∈ ⟦X⟧

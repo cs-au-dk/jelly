@@ -29,7 +29,7 @@ export class FunctionToken extends Token {
     }
 
     toString() {
-        return `Function[${sourceLocationToStringWithFileAndEnd(this.fun.loc)}]`;
+        return `Function[${sourceLocationToStringWithFileAndEnd(this.fun.loc, true)}]`;
     }
 }
 
@@ -67,7 +67,7 @@ export class AllocationSiteToken extends Token {
     }
 
     toString() {
-        return `${this.kind}[${sourceLocationToStringWithFileAndEnd(this.allocSite.loc)}]`;
+        return `${this.kind}[${sourceLocationToStringWithFileAndEnd(this.allocSite.loc, true)}]`;
     }
 }
 

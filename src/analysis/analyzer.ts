@@ -42,11 +42,9 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
             logger.info("Error: No files to analyze");
         else {
 
-            // resolve entry files relative to basedir
+            // analyze files reachable from the entry files top-down
             for (const file of files)
                 a.entryFiles.add(resolve(options.basedir, file)); // TODO: optionally resolve using require.resolve instead?
-
-            // analyze files reachable from the entry files top-down
             for (const file of a.entryFiles)
                 a.reachedFile(file);
             while (a.pendingFiles.length > 0) {
@@ -234,7 +232,7 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
                         merge(scc[0], false);
                     }
                 }
-                assert(a.pendingFiles.length === 0, "Unexpected module"); // (new modules shouldn't be discovered in this phase)
+                assert(a.pendingFiles.length === 0, "Unexpected module"); // (new modules shouldn't be discovered in the second phase)
                 solver.updateDiagnostics();
             }
         }
@@ -282,7 +280,7 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
                 ` (excluding ${d.callsWithNoCallee} zero-callee, ${d.nativeOnlyCalls} native-only, ${d.externalOnlyCalls} external-only and ${d.nativeOrExternalCalls} native-or-external-only)`)
             logger.info(`Functions with zero callers: ${r.getZeroCallerFunctions().size}/${a.functionInfos.size}`);
             logger.info(`Analysis time: ${solver.diagnostics.time}ms, memory usage: ${solver.diagnostics.maxMemoryUsage}MB${!options.gc ? " (without --gc)" : ""}`);
-            logger.info(`Analysis errors: ${f.errors}, warnings: ${f.warnings}${f.warnings > 0 && !options.warningsUnsupported ? " (show with --warnings-unsupported)" : ""}`);
+            logger.info(`Analysis errors: ${f.errors}, warnings: ${f.warnings}${f.warnings > 0 && !options.warningsUnsupported ? " (show all with --warnings-unsupported)" : ""}`);
             if (options.diagnostics) {
                 logger.info(`Iterations: ${solver.diagnostics.iterations}, listener notification rounds: ${solver.listenerNotificationRounds}`);
                 if (options.maxRounds !== undefined)

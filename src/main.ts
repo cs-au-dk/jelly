@@ -5,7 +5,7 @@ import {closeSync, openSync, readdirSync, readFileSync, unlinkSync} from "fs";
 import {program} from "commander";
 import logger, {logToFile, setLogLevel} from "./misc/logger";
 import {testSoundness} from "./dynamic/soundnesstester";
-import {options, setDefaultTrackedModules, setOptions, setPatternProperties} from "./options";
+import {options, PKG, setDefaultTrackedModules, setOptions, setPatternProperties, VERSION} from "./options";
 import {spawnSync} from "child_process";
 import path from "path";
 import {autoDetectBaseDir, expand, writeStreamedStringify} from "./misc/files";
@@ -31,9 +31,6 @@ import {addAll} from "./misc/util";
 import {getAPIExported, reportAccessPaths, reportAPIExportedFunctions} from "./patternmatching/apiexported";
 import {merge} from "./output/merge";
 import {CallGraph} from "./typings/callgraph";
-
-const VERSION = require("../package.json").version;
-const PKG = "pkg" in process;
 
 program
     .name("jelly")
@@ -207,7 +204,7 @@ async function main() {
                     unlinkSync(p);
                 }
             }
-        logger.verbose(`Collected ${cgs.length} call graphs from instrumented execution.`)
+        logger.verbose(`Collected ${cgs.length} call graphs from instrumented execution`);
         const fd = openSync(dyn, "w");
         writeStreamedStringify(merge(cgs), fd); // TODO: alert if the call graph is empty?
         closeSync(fd);

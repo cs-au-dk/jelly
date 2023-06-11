@@ -719,7 +719,7 @@ export function visit(ast: File, op: Operations) {
             op.awaitPromise(op.expVar(path.node.argument, path), op.expVar(path.node, path), path.node);
         },
 
-        TaggedTemplateExpression(path: NodePath<TaggedTemplateExpression>) {
+        TaggedTemplateExpression(_path: NodePath<TaggedTemplateExpression>) {
             assert.fail("TaggedTemplateExpression should be handled by @babel/plugin-transform-template-literals");
         },
 

@@ -28,7 +28,7 @@ import traverse from "@babel/traverse";
 import logger from "../misc/logger";
 import {getClass} from "../misc/asthelpers";
 import assert from "assert";
-import {globalLoc, Location} from "../misc/util";
+import {Location} from "../misc/util";
 import {ModuleInfo} from "../analysis/infos";
 
 /**
@@ -66,7 +66,7 @@ export const JELLY_NODE_ID = Symbol("JELLY_NODE_ID");
  * Preprocesses the given AST.
  */
 export function preprocessAst(ast: File, file: string, module: ModuleInfo, globals: Array<Identifier>, globalsHidden: Array<Identifier>) {
-    let nextNodeID = 1;
+    let nextNodeID = 0;
 
     function register(n: Node) {
         (n as any)[JELLY_NODE_ID] = nextNodeID++;
@@ -86,7 +86,7 @@ export function preprocessAst(ast: File, file: string, module: ModuleInfo, globa
                     return d;
                 });
             const d = variableDeclaration("var", decls);
-            d.loc = globalLoc;
+            (d.loc as Location) = {start: {line: 0, column: 0}, end: {line: 0, column: 0}, native: "%ecmascript"};
             path.scope.registerDeclaration(path.unshiftContainer("body", d)[0]);
             path.stop();
         }
@@ -110,8 +110,9 @@ export function preprocessAst(ast: File, file: string, module: ModuleInfo, globa
                 n.loc = {start: p?.node.loc?.start, end: p?.node.loc?.end, nodeIndex: (n as any)[JELLY_NODE_ID]} as Location; // see sourceLocationToString
             }
 
-            // set module name
-            (n.loc as Location).module = module;
+            // set module (if not already set and not native)
+            if ((n.loc as Location).module === undefined && (n.loc as Location).native === undefined)
+                (n.loc as Location).module = module;
 
             // workarounds to match dyn.ts source locations
             if (isClassMethod(n)) {
@@ -142,7 +143,7 @@ export function preprocessAst(ast: File, file: string, module: ModuleInfo, globa
                 const ps = path.scope.getProgramParent();
                 if (!ps.getBinding(n.name)?.identifier) {
                     const d = identifier(n.name);
-                    d.loc = {start: {line: 0, column: 0}, end: {line: 0, column: 0}, module, unbound: true} as any; // unbound used by expVar
+                    (d.loc as Location) = {start: {line: 0, column: 0}, end: {line: 0, column: 0}, module, unbound: true}; // unbound used by expVar
                     register(d);
                     ps.push({id: d});
                     if (logger.isDebugEnabled())

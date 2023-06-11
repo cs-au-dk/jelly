@@ -1,5 +1,5 @@
-import {Class, Function, Identifier, isNode, Node} from "@babel/types";
-import {FilePath, getOrSet, sourceLocationToString, Location} from "../misc/util";
+import {Class, Function, Identifier, Node} from "@babel/types";
+import {FilePath, getOrSet, Location, sourceLocationToString} from "../misc/util";
 import {ConstraintVar, NodeVar} from "./constraintvars";
 import {Token} from "./tokens";
 import {getPackageJsonInfo, PackageJsonInfo} from "../misc/packagejson";
@@ -128,7 +128,7 @@ export class GlobalState {
     /**
      * Vulnerability information, only used if options.vulnerabilities is set.
      */
-    vulnerabilities: VulnerabilityDetector | undefined;
+    vulnerabilities: VulnerabilityDetector | undefined; // TODO: move to FragmentState?
 
     /**
      * Native objects that are shared for all modules.
@@ -283,7 +283,7 @@ export class GlobalState {
      */
     getConstraintVarParent(v: ConstraintVar): PackageInfo | ModuleInfo | undefined {
         const p = v.getParent();
-        if (isNode(p) || (p && "loc" in p && p.loc))
+        if (p && "loc" in p && p.loc)
             return (p.loc as Location).module;
         return undefined;
     }

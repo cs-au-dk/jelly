@@ -66,7 +66,7 @@ export class ConstraintVarProducer {
             exp = exp.expression; // for parenthesized expressions, use the inner expression
         if (isIdentifier(exp) || isJSXIdentifier(exp)) {
             const id = this.identVar(exp, path);
-            if (id instanceof NodeVar && exp.name === "undefined" && id.node?.loc && (id.node.loc as Location).native === "%ecmascript")
+            if (id instanceof NodeVar && exp.name === "undefined" && (id.node?.loc as Location)?.native === "%ecmascript")
                 return undefined;
             return id;
         } else if (isNumericLiteral(exp) || isBigIntLiteral(exp) || isNullLiteral(exp) || isBooleanLiteral(exp) ||
