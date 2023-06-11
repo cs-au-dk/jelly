@@ -3,7 +3,7 @@ import {resolve} from "path";
 import logger, {writeStdOutIfActive} from "../misc/logger";
 import Solver, {AbortedException} from "./solver";
 import Timer, {TimeoutException} from "../misc/timer";
-import {addAll, FilePath, mapMapSize, percent} from "../misc/util";
+import {addAll, mapMapSize, percent} from "../misc/util";
 import {visit} from "./astvisitor";
 import {ModuleInfo, PackageInfo} from "./infos";
 import {options, resolveBaseDir} from "../options";
@@ -16,18 +16,16 @@ import {findEscapingObjects} from "./escaping";
 import {buildNatives} from "../natives/nativebuilder";
 import {AnalysisStateReporter} from "../output/analysisstatereporter";
 import {Operations} from "./operations";
-import {Program} from "@babel/types";
 import {UnknownAccessPath} from "./accesspaths";
 import {Token} from "./tokens";
 import {preprocessAst} from "../parsing/extras";
 import {FragmentState} from "./fragmentstate";
 
-export async function analyzeFiles(files: Array<string>, solver: Solver, returnFileMap: boolean = false): Promise<Map<FilePath, {sourceCode: string, program: Program}>> {
+export async function analyzeFiles(files: Array<string>, solver: Solver) {
     const a = solver.globalState;
     const timer = new Timer();
     resolveBaseDir();
     const fragmentStates = new Map<ModuleInfo | PackageInfo, FragmentState>();
-    const fileMap = new Map<FilePath, {sourceCode: string, program: Program}>();
 
     function merge(mp: ModuleInfo | PackageInfo, propagate: boolean = true) {
         const f = fragmentStates.get(mp);
@@ -71,8 +69,6 @@ export async function analyzeFiles(files: Array<string>, solver: Solver, returnF
                     continue;
                 }
                 moduleInfo.node = ast.program;
-                if (returnFileMap)
-                    fileMap.set(file, {sourceCode: str, program: ast.program});
                 a.filesAnalyzed.push(file);
 
                 if (options.modulesOnly) {
@@ -274,40 +270,38 @@ export async function analyzeFiles(files: Array<string>, solver: Solver, returnF
         d.externalOnlyCalls = r.getZeroButExternalCalleeCalls();
         d.nativeOrExternalCalls = r.getZeroButNativeOrExternalCalleeCalls();
         d.functionsWithZeroCallers = r.getZeroCallerFunctions().size;
-        if (!logger.isInfoEnabled())
-            return fileMap;
-        if (options.warningsUnsupported && !solver.diagnostics.aborted && !solver.diagnostics.timeout) {
-            r.reportNonemptyUnhandledDynamicPropertyWrites();
-            r.reportNonemptyUnhandledDynamicPropertyReads();
-        }
-        logger.info(`Analyzed packages: ${solver.diagnostics.packages}, modules: ${solver.diagnostics.modules}, functions: ${a.functionInfos.size}, code size: ${Math.ceil(solver.diagnostics.codeSize / 1024)}KB`);
-        logger.info(`Call edges function->function: ${f.numberOfFunctionToFunctionEdges}, call->function: ${f.numberOfCallToFunctionEdges}`);
-        const n = d.totalCallSites - d.callsWithNoCallee - d.nativeOnlyCalls - d.externalOnlyCalls - d.nativeOrExternalCalls;
-        logger.info(`Calls with unique callee: ${d.callsWithUniqueCallee}/${n}${n > 0 ? ` (${percent(d.callsWithUniqueCallee / n)})` : ""}` +
-            ` (excluding ${d.callsWithNoCallee} zero-callee, ${d.nativeOnlyCalls} native-only, ${d.externalOnlyCalls} external-only and ${d.nativeOrExternalCalls} native-or-external-only)`)
-        logger.info(`Functions with zero callers: ${r.getZeroCallerFunctions().size}/${a.functionInfos.size}`);
-        logger.info(`Analysis time: ${solver.diagnostics.time}ms, memory usage: ${solver.diagnostics.maxMemoryUsage}MB${!options.gc ? " (without --gc)" : ""}`);
-        logger.info(`Analysis errors: ${f.errors}, warnings: ${f.warnings}${f.warnings > 0 && !options.warningsUnsupported ? " (show with --warnings-unsupported)" : ""}`);
-        if (options.diagnostics) {
-            logger.info(`Iterations: ${solver.diagnostics.iterations}, listener notification rounds: ${solver.listenerNotificationRounds}`);
-            if (options.maxRounds !== undefined)
-                logger.info(`Fixpoint round limit reached: ${solver.roundLimitReached} time${solver.roundLimitReached !== 1 ? "s" : ""}`);
-            logger.info(`Constraint vars: ${f.getNumberOfVarsWithTokens()} (${f.vars.size}), tokens: ${f.numberOfTokens}, subset edges: ${f.numberOfSubsetEdges}, max tokens: ${solver.largestTokenSetSize}, max subset out: ${solver.largestSubsetEdgeOutDegree}`);
-            logger.info(`Listeners (notifications) normal: ${mapMapSize(f.tokenListeners)} (${solver.tokenListenerNotifications}), ` +
-                `pair: ${mapMapSize(f.pairListeners1) + mapMapSize(f.pairListeners2)} (${solver.pairListenerNotifications}), ` +
-                `neighbor: ${mapMapSize(f.packageNeighborListeners)} (${solver.packageNeighborListenerNotifications}), ` +
-                `inheritance: ${mapMapSize(f.ancestorListeners)} (${solver.ancestorListenerNotifications}), ` +
-                `array: ${mapMapSize(f.arrayEntriesListeners)} (${solver.arrayEntriesListenerNotifications}), ` +
-                `obj: ${mapMapSize(f.objectPropertiesListeners)} (${solver.objectPropertiesListenerNotifications})`);
-            logger.info(`Canonicalize vars: ${a.canonicalConstraintVars.size} (${a.numberOfCanonicalizeVarCalls}), tokens: ${a.canonicalTokens.size} (${a.numberOfCanonicalizeTokenCalls}), access paths: ${a.canonicalAccessPaths.size} (${a.numberOfCanonicalizeAccessPathCalls})`);
-            logger.info(`CPU time: ${solver.diagnostics.cpuTime}ms, propagation: ${solver.totalPropagationTime}ms, listeners: ${solver.totalListenerCallTime}` +
-                `ms${options.alloc && options.widening ? `, widening: ${solver.totalWideningTime}ms` : ""}`);
-            if (options.cycleElimination)
-                logger.info(`Cycle elimination time: ${solver.totalCycleEliminationTime}ms, runs: ${solver.totalCycleEliminationRuns}, nodes removed: ${f.redirections.size}`);
+        if (logger.isInfoEnabled()) {
+            if (options.warningsUnsupported && !solver.diagnostics.aborted && !solver.diagnostics.timeout) {
+                r.reportNonemptyUnhandledDynamicPropertyWrites();
+                r.reportNonemptyUnhandledDynamicPropertyReads();
+            }
+            logger.info(`Analyzed packages: ${solver.diagnostics.packages}, modules: ${solver.diagnostics.modules}, functions: ${a.functionInfos.size}, code size: ${Math.ceil(solver.diagnostics.codeSize / 1024)}KB`);
+            logger.info(`Call edges function->function: ${f.numberOfFunctionToFunctionEdges}, call->function: ${f.numberOfCallToFunctionEdges}`);
+            const n = d.totalCallSites - d.callsWithNoCallee - d.nativeOnlyCalls - d.externalOnlyCalls - d.nativeOrExternalCalls;
+            logger.info(`Calls with unique callee: ${d.callsWithUniqueCallee}/${n}${n > 0 ? ` (${percent(d.callsWithUniqueCallee / n)})` : ""}` +
+                ` (excluding ${d.callsWithNoCallee} zero-callee, ${d.nativeOnlyCalls} native-only, ${d.externalOnlyCalls} external-only and ${d.nativeOrExternalCalls} native-or-external-only)`)
+            logger.info(`Functions with zero callers: ${r.getZeroCallerFunctions().size}/${a.functionInfos.size}`);
+            logger.info(`Analysis time: ${solver.diagnostics.time}ms, memory usage: ${solver.diagnostics.maxMemoryUsage}MB${!options.gc ? " (without --gc)" : ""}`);
+            logger.info(`Analysis errors: ${f.errors}, warnings: ${f.warnings}${f.warnings > 0 && !options.warningsUnsupported ? " (show with --warnings-unsupported)" : ""}`);
+            if (options.diagnostics) {
+                logger.info(`Iterations: ${solver.diagnostics.iterations}, listener notification rounds: ${solver.listenerNotificationRounds}`);
+                if (options.maxRounds !== undefined)
+                    logger.info(`Fixpoint round limit reached: ${solver.roundLimitReached} time${solver.roundLimitReached !== 1 ? "s" : ""}`);
+                logger.info(`Constraint vars: ${f.getNumberOfVarsWithTokens()} (${f.vars.size}), tokens: ${f.numberOfTokens}, subset edges: ${f.numberOfSubsetEdges}, max tokens: ${solver.largestTokenSetSize}, max subset out: ${solver.largestSubsetEdgeOutDegree}`);
+                logger.info(`Listeners (notifications) normal: ${mapMapSize(f.tokenListeners)} (${solver.tokenListenerNotifications}), ` +
+                    `pair: ${mapMapSize(f.pairListeners1) + mapMapSize(f.pairListeners2)} (${solver.pairListenerNotifications}), ` +
+                    `neighbor: ${mapMapSize(f.packageNeighborListeners)} (${solver.packageNeighborListenerNotifications}), ` +
+                    `inheritance: ${mapMapSize(f.ancestorListeners)} (${solver.ancestorListenerNotifications}), ` +
+                    `array: ${mapMapSize(f.arrayEntriesListeners)} (${solver.arrayEntriesListenerNotifications}), ` +
+                    `obj: ${mapMapSize(f.objectPropertiesListeners)} (${solver.objectPropertiesListenerNotifications})`);
+                logger.info(`Canonicalize vars: ${a.canonicalConstraintVars.size} (${a.numberOfCanonicalizeVarCalls}), tokens: ${a.canonicalTokens.size} (${a.numberOfCanonicalizeTokenCalls}), access paths: ${a.canonicalAccessPaths.size} (${a.numberOfCanonicalizeAccessPathCalls})`);
+                logger.info(`CPU time: ${solver.diagnostics.cpuTime}ms, propagation: ${solver.totalPropagationTime}ms, listeners: ${solver.totalListenerCallTime}` +
+                    `ms${options.alloc && options.widening ? `, widening: ${solver.totalWideningTime}ms` : ""}`);
+                if (options.cycleElimination)
+                    logger.info(`Cycle elimination time: ${solver.totalCycleEliminationTime}ms, runs: ${solver.totalCycleEliminationRuns}, nodes removed: ${f.redirections.size}`);
+            }
         }
     }
-
-    return fileMap;
 }
 
 /**

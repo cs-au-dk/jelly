@@ -57,6 +57,7 @@ export default class Solver {
     unprocessedTokens: Map<ConstraintVar, Array<Token>> = new Map;
 
     unprocessedSubsetEdges: Map<ConstraintVar, Set<ConstraintVar>> = new Map;
+
     restoredSubsetEdges: Map<ConstraintVar, Set<ConstraintVar>> = new Map;
 
     // TODO: move some of this into AnalysisDiagnostics?
@@ -75,11 +76,11 @@ export default class Solver {
     arrayEntriesListenerNotifications: number = 0;
     objectPropertiesListenerNotifications: number = 0;
     roundLimitReached: number = 0;
-    totalCycleEliminationTime = 0;
-    totalCycleEliminationRuns = 0;
-    totalPropagationTime = 0;
-    totalListenerCallTime = 0;
-    totalWideningTime = 0;
+    totalCycleEliminationTime: number = 0;
+    totalCycleEliminationRuns: number = 0;
+    totalPropagationTime: number = 0;
+    totalListenerCallTime: number = 0;
+    totalWideningTime: number = 0;
 
     diagnostics: AnalysisDiagnostics = {
         packages: 0,
@@ -251,10 +252,8 @@ export default class Solver {
             this.printDiagnostics();
         // notify listeners
         if (tr)
-            for (const listener of tr.values()) {
-                this.enqueueListenerCall([listener, t]);
-                this.tokenListenerNotifications++;
-            }
+            for (const [id, listener] of tr)
+                this.callListener(id, listener, t);
         if (t instanceof AllocationSiteToken && tr1)
             for (const [id, [v2, listener]] of tr1)
                 for (const t2 of f.getTokens(f.getRepresentative(v2)))
@@ -389,10 +388,8 @@ export default class Solver {
         const id = this.getListenerID(key, n);
         if (!m.has(id)) {
             // run listener on all existing tokens
-            for (const t of f.getTokens(vRep)) {
-                this.enqueueListenerCall([listener, t]);
-                this.tokenListenerNotifications++;
-            }
+            for (const t of f.getTokens(vRep))
+                this.callListener(id, listener, t);
             // register listener for future tokens
             m.set(id, listener);
         }
@@ -431,6 +428,18 @@ export default class Solver {
         }
         f.vars.add(v1Rep);
         f.vars.add(v2Rep);
+    }
+
+    /**
+     * Enqueues a call to a token listener if it hasn't been done before.
+     */
+    private callListener(id: ListenerID, listener: (t: Token) => void, t: Token) {
+        const s = mapGetSet(this.fragmentState.listenersProcessed, id);
+        if (!s.has(t)) {
+            s.add(t);
+            this.enqueueListenerCall([listener, t]);
+            this.tokenListenerNotifications++;
+        }
     }
 
     /**
@@ -798,10 +807,8 @@ export default class Solver {
                     const qr = mapGetMap(f.tokenListeners, rep);
                     for (const [k, listener] of tr) {
                         qr.set(k, listener);
-                        for (const t of rts) {
-                            this.enqueueListenerCall([listener, t]);
-                            this.tokenListenerNotifications++;
-                        }
+                        for (const t of rts)
+                            this.callListener(k, listener, t);
                     }
                     f.tokenListeners.delete(v);
                 }
@@ -935,7 +942,6 @@ export default class Solver {
                             this.redirect(v, rep); // TODO: this includes processing pending edges and tokens for v, which may be unnecessary?
                         this.totalCycleEliminationTime += timer1.elapsedCPU();
                         this.totalCycleEliminationRuns++;
-                        // TODO: (transitive reduction:) mark subset edges a->b as "ignored" if there is another path a==>c==>b? then skip those edges when new tokens appear in a (represent ignored edges separately, only look at ignored edges when adding new edges) - detect during cycle detection?
                         const timer2 = new Timer();
                         // process new tokens and subset edges for the component representatives in topological order
                         for (let i = reps.length - 1; i >= 0; i--) {
@@ -1040,6 +1046,7 @@ export default class Solver {
         // add constraint variables and processed listeners
         addAll(s.vars, f.vars);
         mapSetAddAll(s.ancestorListenersProcessed, f.ancestorListenersProcessed);
+        mapSetAddAll(s.listenersProcessed, f.listenersProcessed);
         for (const [id, m] of s.pairListenersProcessed)
             mapSetAddAll(m, mapGetMap(f.pairListenersProcessed, id));
         // run new array entry listeners on existing entries
@@ -1065,10 +1072,8 @@ export default class Solver {
                 // run new token listeners on existing tokens
                 for (const t of f.getTokens(vRep)) {
                     if (ntr)
-                        for (const listener of ntr.values()) {
-                            this.enqueueListenerCall([listener, t]);
-                            this.tokenListenerNotifications++;
-                        }
+                        for (const [id, listener] of ntr)
+                            this.callListener(id, listener, t);
                     if (t instanceof AllocationSiteToken && ntr1)
                         for (const [id, [v2, listener]] of ntr1)
                             for (const t2 of [...f.getTokens(f.getRepresentative(v2)), ...s.getTokens(s.getRepresentative(v2))])

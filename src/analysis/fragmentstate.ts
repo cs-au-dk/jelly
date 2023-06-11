@@ -87,6 +87,8 @@ export class FragmentState {
 
     readonly pairListeners2: Map<ConstraintVar, Map<ListenerID, [ConstraintVar, (t1: AllocationSiteToken, t2: FunctionToken | AccessPathToken) => void]>> = new Map;
 
+    readonly listenersProcessed: Map<ListenerID, Set<Token>> = new Map;
+
     readonly pairListenersProcessed: Map<ListenerID, Map<AllocationSiteToken, Set<FunctionToken | AccessPathToken>>> = new Map;
 
     readonly packageNeighborListeners: Map<PackageInfo, Map<Node, (neighbor: PackageInfo) => void>> = new Map;
@@ -477,13 +479,9 @@ export class FragmentState {
 
     /**
      * Registers that the current function uses 'arguments'.
-     * Returns the enclosing (non-arrow) function, or undefined if no such function.
      */
     registerArguments(path: NodePath): Function | undefined {
-        let p: NodePath | NodePath<Function> | null | undefined = path, f: Function | undefined;
-        do {
-            f = (p = p?.getFunctionParent())?.node;
-        } while (f && isArrowFunctionExpression(f));
+        const f = this.getEnclosingFunction(path);
         if (f) {
             this.functionsWithArguments.add(f);
             if (logger.isDebugEnabled())
@@ -496,15 +494,23 @@ export class FragmentState {
      * Registers that the current function uses 'this'.
      */
     registerThis(path: NodePath): Function | undefined {
-        let p: NodePath | NodePath<Function> | null | undefined = path, f: Function | undefined;
-        do {
-            f = (p = p?.getFunctionParent())?.node;
-        } while (f && isArrowFunctionExpression(f));
+        const f = this.getEnclosingFunction(path);
         if (f) {
             this.functionsWithThis.add(f);
             if (logger.isDebugEnabled())
                 logger.debug(`Function uses 'this': ${sourceLocationToStringWithFile(f.loc)}`);
         }
+        return f;
+    }
+
+    /**
+     * Returns the enclosing (non-arrow) function, or undefined if no such function.
+     */
+    getEnclosingFunction(path: NodePath): Function | undefined {
+        let p: NodePath | NodePath<Function> | null | undefined = path, f: Function | undefined;
+        do {
+            f = (p = p?.getFunctionParent())?.node;
+        } while (f && isArrowFunctionExpression(f));
         return f;
     }
 
