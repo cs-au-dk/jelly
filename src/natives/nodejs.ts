@@ -122,10 +122,6 @@ export const nodejsModels: NativeModel = {
             // TODO
         },
         {
-            name: "FinalizationRegistry"
-            // TODO
-        },
-        {
             name: "MessageChannel"
             // TODO
         },
