@@ -24,13 +24,11 @@ export type NativeFunctionParams = NativeModelParams & {
     path: CallNodePath
 };
 
-export type NativeVariableParams = NativeModelParams & {id: Identifier};
-
 export type NativeFunctionAnalyzer = (p: NativeFunctionParams) => void;
 
 export type NativeModelInitializer = (p: NativeModelParams) => void;
 
-export type NativeVariableInitializer = (p: NativeVariableParams) => NativeObjectToken;
+export type NativeVariableInitializer = (p: NativeModelParams) => NativeObjectToken;
 
 export type NativeModel = {
     name: string,
@@ -103,7 +101,7 @@ export function buildNatives(solver: Solver, moduleInfo: ModuleInfo): {globals: 
                 }
                 (hidden ? globalsHidden : globals).push(id);
                 const t = init
-                    ? init({solver, moduleInfo, moduleSpecialNatives, globalSpecialNatives, id})
+                    ? init({solver, moduleInfo, moduleSpecialNatives, globalSpecialNatives})
                     : a.canonicalizeToken(new NativeObjectToken(name, moduleSpecific ? moduleInfo : undefined, invoke, constr));
                 solver.addTokenConstraint(t, f.varProducer.nodeVar(id));
                 (moduleSpecific ? moduleSpecialNatives : globalSpecialNatives).set(name, t);

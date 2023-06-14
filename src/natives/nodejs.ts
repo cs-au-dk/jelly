@@ -1,5 +1,5 @@
 import module from "module";
-import {NativeFunctionParams, NativeModel, NativeModelParams, NativeVariableParams} from "./nativebuilder";
+import {NativeFunctionParams, NativeModel, NativeModelParams} from "./nativebuilder";
 
 /**
  * Names of Node.js built-in modules.
@@ -34,7 +34,7 @@ export const nodejsModels: NativeModel = {
         },
         {
             name: "global",
-            init: (p: NativeVariableParams) => {
+            init: (p: NativeModelParams) => {
                 return p.globalSpecialNatives.get("globalThis")!; // TODO: 'global' is actually a property on globalThis
             }
         },
