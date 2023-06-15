@@ -1,5 +1,5 @@
 import logger from "../misc/logger";
-import {deleteAll, getOrSet, LocationJSON, sourceLocationToStringWithFile, sourceLocationToStringWithFileAndEnd} from "../misc/util";
+import {deleteAll, getOrSet, LocationJSON, locationToStringWithFile, locationToStringWithFileAndEnd} from "../misc/util";
 import {GlobalState} from "../analysis/globalstate";
 import {FunctionToken, NativeObjectToken, Token} from "../analysis/tokens";
 import fs from "fs";
@@ -247,7 +247,7 @@ export class AnalysisStateReporter {
                 for (const t of ts)
                     if (t instanceof FunctionToken)
                         funs++;
-                this.f.warn(`Nonempty dynamic property write (${funs} function${funs === 1 ? "" : "s"}) at ${sourceLocationToStringWithFile(node.loc)}`); // TODO: may report duplicate warnings
+                this.f.warn(`Nonempty dynamic property write (${funs} function${funs === 1 ? "" : "s"}) at ${locationToStringWithFile(node.loc)}`); // TODO: may report duplicate warnings
                 if (logger.isVerboseEnabled() && source !== undefined) {
                     logger.warn(source);
                     for (const t of ts)
@@ -262,7 +262,7 @@ export class AnalysisStateReporter {
      */
     reportNonemptyUnhandledDynamicPropertyReads() {
         for (const node of this.f.unhandledDynamicPropertyReads)
-            this.f.warn(`Dynamic property read at ${sourceLocationToStringWithFile(node.loc)}`); // TODO: may report duplicate warnings
+            this.f.warn(`Dynamic property read at ${locationToStringWithFile(node.loc)}`); // TODO: may report duplicate warnings
     }
 
     /**
@@ -286,7 +286,7 @@ export class AnalysisStateReporter {
      */
     reportZeroCalleeCalls(calls: Set<Node>) {
         for (const c of calls)
-            logger.info(`Call with zero callees at ${sourceLocationToStringWithFileAndEnd(c.loc)}`);
+            logger.info(`Call with zero callees at ${locationToStringWithFileAndEnd(c.loc)}`);
     }
 
     /**
@@ -300,7 +300,7 @@ export class AnalysisStateReporter {
                 if (!cs || cs.size === 0) {
                     r++;
                     if (logger.isDebugEnabled())
-                        logger.debug(`Call with native-only callees at ${sourceLocationToStringWithFile(c.loc)}`);
+                        logger.debug(`Call with native-only callees at ${locationToStringWithFile(c.loc)}`);
                 }
             }
         }
@@ -318,7 +318,7 @@ export class AnalysisStateReporter {
                 if (!cs || cs.size === 0) {
                     r++;
                     if (logger.isDebugEnabled())
-                        logger.debug(`Call with external-only callees at ${sourceLocationToStringWithFile(c.loc)}`);
+                        logger.debug(`Call with external-only callees at ${locationToStringWithFile(c.loc)}`);
                 }
             }
         }
@@ -336,7 +336,7 @@ export class AnalysisStateReporter {
                 if (!cs || cs.size === 0) {
                     r++;
                     if (logger.isDebugEnabled())
-                        logger.debug(`Call with native-or-external-only callees at ${sourceLocationToStringWithFile(c.loc)}`);
+                        logger.debug(`Call with native-or-external-only callees at ${locationToStringWithFile(c.loc)}`);
                 }
             }
         }
@@ -355,7 +355,7 @@ export class AnalysisStateReporter {
                     r++;
                 else if (cs.size > 1)
                     if (logger.isDebugEnabled())
-                        logger.debug(`Call with multiple callees at ${sourceLocationToStringWithFile(c.loc)}: ${cs.size}`);
+                        logger.debug(`Call with multiple callees at ${locationToStringWithFile(c.loc)}: ${cs.size}`);
         }
         return r;
     }
@@ -457,7 +457,7 @@ export class AnalysisStateReporter {
         logger.info("Higher-order functions (function arguments + function return values):");
         const a = [];
         for (const f of [...funargs.keys(), ...funreturns.keys()])
-            a.push(`${sourceLocationToStringWithFileAndEnd(f.loc)} (${funargs.get(f) ?? 0}+${funreturns.get(f) ?? 0})`);
+            a.push(`${locationToStringWithFileAndEnd(f.loc)} (${funargs.get(f) ?? 0}+${funreturns.get(f) ?? 0})`);
         a.sort();
         for (const f of a)
             logger.info(f);

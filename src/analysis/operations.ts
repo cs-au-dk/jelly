@@ -51,7 +51,7 @@ import logger from "../misc/logger";
 import {builtinModules} from "../natives/nodejs";
 import {requireResolve} from "../misc/files";
 import {options} from "../options";
-import {FilePath, getOrSet, isArrayIndex, Location, sourceLocationToStringWithFile} from "../misc/util";
+import {FilePath, getOrSet, isArrayIndex, Location, locationToStringWithFile} from "../misc/util";
 import assert from "assert";
 import {
     ARRAY_PROTOTYPE,
@@ -442,9 +442,9 @@ export class Operations {
             } catch {
                 if (options.ignoreUnresolved || options.ignoreDependencies) {
                     if (logger.isVerboseEnabled())
-                        logger.verbose(`Ignoring unresolved module '${str}' at ${sourceLocationToStringWithFile(path.node.loc)}`);
+                        logger.verbose(`Ignoring unresolved module '${str}' at ${locationToStringWithFile(path.node.loc)}`);
                 } else // TODO: special warning if the require/import is placed in a try-block, an if statement, or a switch case?
-                    f.warn(`Unable to resolve module '${str}' at ${sourceLocationToStringWithFile(path.node.loc)}`); // TODO: may report duplicate error messages
+                    f.warn(`Unable to resolve module '${str}' at ${locationToStringWithFile(path.node.loc)}`); // TODO: may report duplicate error messages
 
                 // couldn't find module file (probably hasn't been installed), use a DummyModuleInfo if absolute module name
                 if (!"./#".includes(str[0]))
@@ -608,7 +608,7 @@ export class Operations {
                         this.readProperty(src, prop, vp.nodeVar(p), p, this.a.getEnclosingFunctionOrModule(path, this.moduleInfo));
                         // assign the temporary result at p to the locations represented by p.value
                         if (!isLVal(p.value))
-                            assert.fail(`Unexpected expression ${p.value.type}, expected LVal at ${sourceLocationToStringWithFile(p.value.loc)}`);
+                            assert.fail(`Unexpected expression ${p.value.type}, expected LVal at ${locationToStringWithFile(p.value.loc)}`);
                         this.assign(vp.nodeVar(p), p.value, path);
                     }
                 }
@@ -641,7 +641,7 @@ export class Operations {
                     }
         } else {
             if (!isRestElement(dst))
-                assert.fail(`Unexpected LVal type ${dst.type} at ${sourceLocationToStringWithFile(dst.loc)}`);
+                assert.fail(`Unexpected LVal type ${dst.type} at ${locationToStringWithFile(dst.loc)}`);
             // assign the array generated at callFunction to the sub-l-value
             this.assign(vp.nodeVar(dst), dst.argument, path);
         }

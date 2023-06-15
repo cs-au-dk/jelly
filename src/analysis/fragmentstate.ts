@@ -21,7 +21,7 @@ import {
     OptionalCallExpression
 } from "@babel/types";
 import assert from "assert";
-import {mapGetSet, sourceLocationToStringWithFile, sourceLocationToStringWithFileAndEnd} from "../misc/util";
+import {mapGetSet, locationToStringWithFile, locationToStringWithFileAndEnd} from "../misc/util";
 import {AccessPath, CallResultAccessPath, ComponentAccessPath, ModuleAccessPath, PropertyAccessPath} from "./accesspaths";
 import {options} from "../options";
 import logger from "../misc/logger";
@@ -320,7 +320,7 @@ export class FragmentState {
             if (!cs.has(to)) {
                 this.numberOfCallToFunctionEdges++;
                 if (logger.isVerboseEnabled())
-                    logger.verbose(`Adding call edge from call ${sourceLocationToStringWithFileAndEnd(call.loc)}, function ${from} -> ${to}`);
+                    logger.verbose(`Adding call edge from call ${locationToStringWithFileAndEnd(call.loc)}, function ${from} -> ${to}`);
             }
             cs.add(to);
         }
@@ -341,7 +341,7 @@ export class FragmentState {
             (native && !this.nativeCallLocations.has(n)) ||
             (external && !this.externalCallLocations.has(n))) {
             if (logger.isDebugEnabled())
-                logger.debug(`Adding ${native ? "native " : external ? "external " : accessor ? "accessor " : ""}call ${sourceLocationToStringWithFileAndEnd(n.loc!)}`);
+                logger.debug(`Adding ${native ? "native " : external ? "external " : accessor ? "accessor " : ""}call ${locationToStringWithFileAndEnd(n.loc!)}`);
             this.callLocations.add(n);
             if (native)
                 this.nativeCallLocations.add(n);
@@ -412,7 +412,7 @@ export class FragmentState {
     registerEscapingToExternal(v: ConstraintVar | undefined, n: Node) {
         if (v && options.externalMatches) {
             if (logger.isDebugEnabled())
-                logger.debug(`Values of ${v} escape to non-analyzed code at ${sourceLocationToStringWithFileAndEnd(n.loc)}`);
+                logger.debug(`Values of ${v} escape to non-analyzed code at ${locationToStringWithFileAndEnd(n.loc)}`);
             mapGetSet(this.maybeEscapingToExternal, v).add(n);
         }
     }
@@ -472,7 +472,7 @@ export class FragmentState {
             this.nodesWithWarning.add(node);
         }
         if (options.warningsUnsupported)
-            this.warn(`${msg} at ${sourceLocationToStringWithFile(node.loc)}`);
+            this.warn(`${msg} at ${locationToStringWithFile(node.loc)}`);
         else
             this.warnings++;
     }
@@ -485,7 +485,7 @@ export class FragmentState {
         if (f) {
             this.functionsWithArguments.add(f);
             if (logger.isDebugEnabled())
-                logger.debug(`Function uses 'arguments': ${sourceLocationToStringWithFile(f.loc)}`);
+                logger.debug(`Function uses 'arguments': ${locationToStringWithFile(f.loc)}`);
         }
         return f;
     }
@@ -498,7 +498,7 @@ export class FragmentState {
         if (f) {
             this.functionsWithThis.add(f);
             if (logger.isDebugEnabled())
-                logger.debug(`Function uses 'this': ${sourceLocationToStringWithFile(f.loc)}`);
+                logger.debug(`Function uses 'this': ${locationToStringWithFile(f.loc)}`);
         }
         return f;
     }

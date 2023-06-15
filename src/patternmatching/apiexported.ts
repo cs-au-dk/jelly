@@ -15,7 +15,7 @@ import {
     PropertyAccessPathPattern
 } from "./patterns";
 import logger from "../misc/logger";
-import {mapGetSet, sourceLocationContains, sourceLocationToStringWithFileAndEnd} from "../misc/util";
+import {mapGetSet, locationContains, locationToStringWithFileAndEnd} from "../misc/util";
 import {ConstraintVar, FunctionReturnVar, ObjectPropertyVar, ObjectPropertyVarObj} from "../analysis/constraintvars";
 import {resolve} from "path";
 import {FunctionInfo, ModuleInfo} from "../analysis/infos";
@@ -55,7 +55,7 @@ export function getAPIExported(f: FragmentState): Map<ObjectPropertyVarObj, Set<
                     logger.debug(`Added access path for ${t}: ${ap}`);
                 if (logger.isVerboseEnabled())
                     if (t instanceof FunctionToken)
-                        logger.info(`Access path for ${t.fun.type} at ${sourceLocationToStringWithFileAndEnd(t.fun.loc)}: ${ap}`);
+                        logger.info(`Access path for ${t.fun.type} at ${locationToStringWithFileAndEnd(t.fun.loc)}: ${ap}`);
                 aps.add(ap);
                 mapGetSet(worklist, t).add(ap);
             }
@@ -103,7 +103,7 @@ export function reportAPIExportedFunctions(r: Map<ObjectPropertyVarObj, Set<Acce
     for (const [t, aps] of r)
         for (const ap of aps)
             if (t instanceof FunctionToken)
-                logger.info(`${sourceLocationToStringWithFileAndEnd(t.fun.loc)}: ${ap}`);
+                logger.info(`${locationToStringWithFileAndEnd(t.fun.loc)}: ${ap}`);
 }
 
 /**
@@ -118,7 +118,7 @@ function findFunctionAtLocation(a: GlobalState, loc: string): FunctionInfo | Mod
         if (line > 0 && modinfo && modinfo.node?.loc && line <= modinfo.node.loc.end.line) {
             let best: FunctionInfo | ModuleInfo = modinfo;
             for (const [fun, funinfo] of a.functionInfos)
-                if (fun.loc && sourceLocationContains(fun.loc, file, line))
+                if (fun.loc && locationContains(fun.loc, file, line))
                     if (best.node!.loc!.start.line < fun.loc.start.line || fun.loc.end.line < best.node!.loc!.end.line)
                         best = funinfo; // assuming only a single best match on that line
             return best;

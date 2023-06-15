@@ -2,7 +2,7 @@ import {closeSync, existsSync, lstatSync, openSync, readdirSync, readFileSync, r
 import {basename, relative, resolve, sep} from "path";
 import {options} from "../options";
 import micromatch from "micromatch";
-import {FilePath, Location, sourceLocationToStringWithFile, sourceLocationToStringWithFileAndEnd} from "./util";
+import {FilePath, Location, locationToStringWithFile, locationToStringWithFileAndEnd} from "./util";
 import logger from "./logger";
 import {SourceLocation} from "@babel/types";
 import {findPackageJson} from "./packagejson";
@@ -126,7 +126,7 @@ export function requireResolve(str: string, file: FilePath, loc: SourceLocation 
     }
     if (!filepath.endsWith(".js") && !filepath.endsWith(".jsx") && !filepath.endsWith(".es") && !filepath.endsWith(".mjs") &&
         !filepath.endsWith(".cjs") && !filepath.endsWith(".ts") && !filepath.endsWith(".tsx")) {
-        f.warn(`Module '${filepath}' at ${sourceLocationToStringWithFile(loc)} has unrecognized extension, skipping it`);
+        f.warn(`Module '${filepath}' at ${locationToStringWithFile(loc)} has unrecognized extension, skipping it`);
         return undefined;
     }
     if (logger.isDebugEnabled())
@@ -177,7 +177,7 @@ const codeCache: Map<SourceLocationStr, string> = new Map<SourceLocationStr, str
 export function codeFromLocation(loc: Location | null | undefined): string {
     if (!loc)
         return "-";
-    let locStr = sourceLocationToStringWithFileAndEnd(loc, true);
+    let locStr = locationToStringWithFileAndEnd(loc, true);
     let content = codeCache.get(locStr);
     if (!content) {
         content = "";

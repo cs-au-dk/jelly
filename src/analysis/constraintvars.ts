@@ -1,5 +1,5 @@
 import {Class, Function, isIdentifier, Node} from "@babel/types";
-import {nodeToString, sourceLocationToStringWithFileAndEnd} from "../misc/util";
+import {nodeToString, locationToStringWithFileAndEnd} from "../misc/util";
 import {
     AllocationSiteToken,
     ArrayToken,
@@ -127,7 +127,7 @@ export class FunctionReturnVar extends ConstraintVar {
     }
 
     toString() {
-        return `Return[${sourceLocationToStringWithFileAndEnd(this.fun.loc, true)}]`
+        return `Return[${locationToStringWithFileAndEnd(this.fun.loc, true)}]`
     }
 
     getParent(): Node {
@@ -148,7 +148,7 @@ export class ThisVar extends ConstraintVar {
     }
 
     toString() {
-        return `This[${sourceLocationToStringWithFileAndEnd(this.fun.loc, true)}]`;
+        return `This[${locationToStringWithFileAndEnd(this.fun.loc, true)}]`;
     }
 
     getParent(): Node {
@@ -169,7 +169,7 @@ export class ArgumentsVar extends ConstraintVar {
     }
 
     toString() {
-        return `Arguments[${sourceLocationToStringWithFileAndEnd(this.fun.loc, true)}]`;
+        return `Arguments[${locationToStringWithFileAndEnd(this.fun.loc, true)}]`;
     }
 
     getParent(): Node {
@@ -190,7 +190,7 @@ export class ClassExtendsVar extends ConstraintVar {
     }
 
     toString() {
-        return `Extends[${sourceLocationToStringWithFileAndEnd(this.cl.loc, true)}]`
+        return `Extends[${locationToStringWithFileAndEnd(this.cl.loc, true)}]`
     }
 
     getParent(): Node {
@@ -214,7 +214,7 @@ export class IntermediateVar extends ConstraintVar {
     }
 
     toString() {
-        return `#${this.label}[${sourceLocationToStringWithFileAndEnd(this.node.loc, true)}]`
+        return `#${this.label}[${locationToStringWithFileAndEnd(this.node.loc, true)}]`
     }
 
     getParent(): Node {

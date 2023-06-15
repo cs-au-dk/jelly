@@ -1,7 +1,7 @@
 import {readFileSync} from "fs";
 import {DummyModuleInfo, FunctionInfo, ModuleInfo} from "../analysis/infos";
 import logger from "../misc/logger";
-import {arrayToString, percent, sourceLocationToStringWithFile, sourceLocationToStringWithFileAndEnd} from "../misc/util";
+import {arrayToString, percent, locationToStringWithFile, locationToStringWithFileAndEnd} from "../misc/util";
 import {CallGraph} from "../typings/callgraph";
 import path from "path";
 import {options} from "../options";
@@ -31,8 +31,8 @@ export function testSoundness(jsonfile: string, f: FragmentState): [number, numb
     if (logger.isDebugEnabled()) {
         logger.debug(`Static files: ${arrayToString(Array.from(f.a.moduleInfosByPath.keys()), "\n  ")}`);
         logger.debug(`Static functions: ${arrayToString(Array.from(staticFunctions.keys()), "\n  ")}`);
-        logger.debug(`Static calls: ${arrayToString(Array.from(f.callLocations).map(n => sourceLocationToStringWithFileAndEnd(n.loc)), "\n  ")}`);
-        logger.debug(`Ignored functions: ${arrayToString(f.artificialFunctions.map(([, n]) => sourceLocationToStringWithFile(n.loc)), "\n  ")}`);
+        logger.debug(`Static calls: ${arrayToString(Array.from(f.callLocations).map(n => locationToStringWithFileAndEnd(n.loc)), "\n  ")}`);
+        logger.debug(`Ignored functions: ${arrayToString(f.artificialFunctions.map(([, n]) => locationToStringWithFile(n.loc)), "\n  ")}`);
         // TODO: optionally ignore files that haven't been analyzed? (relevant with --ignore-dependencies)
     }
 
@@ -71,7 +71,7 @@ export function testSoundness(jsonfile: string, f: FragmentState): [number, numb
     const dynamicFunctions = new Map<number, FunctionInfo | ModuleInfo>();
     const ignoredFunctions = new Set<string>();
     for (const [,n] of f.artificialFunctions)
-        ignoredFunctions.add(sourceLocationToStringWithFile(n.loc) + ":");
+        ignoredFunctions.add(locationToStringWithFile(n.loc) + ":");
     const comp = ([, loc1]: [string, string], [, loc2]: [string, string]) => loc1 < loc2 ? -1 : loc1 > loc2 ? 1 : 0;
     for (const [f, loc] of Object.entries(dyn.functions).sort(comp)) {
         const reploc = findRepresentativeLocation(loc);
@@ -91,7 +91,7 @@ export function testSoundness(jsonfile: string, f: FragmentState): [number, numb
     // collect dynamic calls and check whether they have been analyzed
     const callStrLocations = new Set<string>();
     for (const n of f.callLocations)
-        callStrLocations.add(sourceLocationToStringWithFileAndEnd(n.loc));
+        callStrLocations.add(locationToStringWithFileAndEnd(n.loc));
     const dynamicCallLocs = new Map<number, string>();
     for (const [f, loc] of Object.entries(dyn.calls).sort(comp)) {
         const reploc = findRepresentativeLocation(loc);
@@ -131,10 +131,10 @@ export function testSoundness(jsonfile: string, f: FragmentState): [number, numb
     // check call2fun edges
     const callStrToFunction = new Map<string, Set<FunctionInfo>>();
     for (const [n, s] of f.callToFunction)
-        callStrToFunction.set(sourceLocationToStringWithFileAndEnd(n.loc), s);
+        callStrToFunction.set(locationToStringWithFileAndEnd(n.loc), s);
     const callStrToModule = new Map<string, Set<ModuleInfo | DummyModuleInfo>>();
     for (const [n, s] of f.callToModule)
-        callStrToModule.set(sourceLocationToStringWithFileAndEnd(n.loc), s)
+        callStrToModule.set(locationToStringWithFileAndEnd(n.loc), s)
     let found2 = 0, missed2 = 0;
     for (const [from, to] of dyn.call2fun) {
         const callLoc = dynamicCallLocs.get(from);

@@ -4,7 +4,7 @@ import {DummyModuleInfo, FunctionInfo, ModuleInfo} from "../../src/analysis/info
 import {GlobalState} from "../../src/analysis/globalstate";
 import logger from "../../src/misc/logger";
 import {Token} from "../../src/analysis/tokens";
-import {mapGetSet, sourceLocationToString, Location} from "../../src/misc/util";
+import {mapGetSet, locationToString, Location} from "../../src/misc/util";
 import {Node} from "@babel/core";
 import {ConstraintVar} from "../../src/analysis/constraintvars";
 import {codeFromLocation} from "../../src/misc/files";
@@ -209,7 +209,7 @@ export function compare(prevSolver: PrevSolver, currSolver: Solver, _package: st
                 const s = new Set<string>();
                 for (const callee of funcOrModules)
                     s.add(funcOrModuleToStringWithCode(callee));
-                ret.set(`'${codeFromLocation(callNode.loc)}'${sourceLocationToString(callNode.loc, true, true)}`, s);
+                ret.set(`'${codeFromLocation(callNode.loc)}'${locationToString(callNode.loc, true, true)}`, s);
             }
         }
         return ret;

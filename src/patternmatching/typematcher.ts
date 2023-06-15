@@ -1,6 +1,6 @@
 import {isNode, Node} from "@babel/types";
 import {Type} from "./patterns";
-import {sourceLocationToStringWithFileAndEnd, Ternary, ternaryOr, ternaryToString} from "../misc/util";
+import {locationToStringWithFileAndEnd, Ternary, ternaryOr, ternaryToString} from "../misc/util";
 import {followProps, getNumberOfFunctionParams, getSimpleType, getValueType} from "./astpatterns";
 import {TypeScriptTypeInferrer} from "../typescript/typeinferrer";
 import logger from "../misc/logger";
@@ -24,22 +24,22 @@ function getType(n: Node, typer: TypeScriptTypeInferrer | undefined): Type | und
             if (logger.isDebugEnabled() && t1.toString() !== t2.toString() &&
                 !(t1.simpleType === "function" && t2.simpleType === "function" && t1.functionArgs !== undefined && t2.functionArgs === undefined) && // TODO: ignoring info currently not supported by typeinferrer
                 !(t1.simpleType === "empty-array" && t2.simpleType === "array"))
-                logger.debug(`Inferred types differ at ${sourceLocationToStringWithFileAndEnd(n.loc)}: ${t1} <-> ${t2}`);
+                logger.debug(`Inferred types differ at ${locationToStringWithFileAndEnd(n.loc)}: ${t1} <-> ${t2}`);
             const m12 = matches(t1, t2);
             const m21 = matches(t2, t1);
             if (m12 === Ternary.False || m21 === Ternary.False)
-                logger.warn(`Warning: Incompatible types inferred at ${sourceLocationToStringWithFileAndEnd(n.loc)}: ${t1} <-> ${t2}`);
+                logger.warn(`Warning: Incompatible types inferred at ${locationToStringWithFileAndEnd(n.loc)}: ${t1} <-> ${t2}`);
             else if (matches(t2, t1) === Ternary.True) {
                 if (logger.isDebugEnabled() && t1.toString() !== t2.toString())
                     logger.debug(`Choosing TypeScript type ${t2} over ${t1}`);
                 return t2;
             }
         } else if (typer)
-            logger.warn(`Warning: No TypeScript type inferred for ${t1} at ${sourceLocationToStringWithFileAndEnd(n.loc)}`);
+            logger.warn(`Warning: No TypeScript type inferred for ${t1} at ${locationToStringWithFileAndEnd(n.loc)}`);
         return t1;
     } else {
         if (logger.isDebugEnabled() && t2 && (t2.simpleType !== undefined || t2.valueType !== undefined))
-            logger.debug(`No pattern type inferred for ${t2} at ${sourceLocationToStringWithFileAndEnd(n.loc)}`);
+            logger.debug(`No pattern type inferred for ${t2} at ${locationToStringWithFileAndEnd(n.loc)}`);
         return t2;
     }
 }
@@ -83,6 +83,6 @@ export function expressionMatchesType(n: Node, props: Array<string> | undefined,
         res = ternaryOr(res, matches(mt, t));
     }
     if (logger.isDebugEnabled())
-        logger.debug(`expressionMatchesType node: ${sourceLocationToStringWithFileAndEnd(n.loc)}, type: ${ts.join(",")}, result: ${ternaryToString(res)}`);
+        logger.debug(`expressionMatchesType node: ${locationToStringWithFileAndEnd(n.loc)}, type: ${ts.join(",")}, result: ${ternaryToString(res)}`);
     return res;
 }

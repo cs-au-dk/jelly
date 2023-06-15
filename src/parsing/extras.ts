@@ -107,7 +107,7 @@ export function preprocessAst(ast: File, file: string, module: ModuleInfo, globa
                     assert(p.parentPath);
                     p = p.parentPath;
                 }
-                n.loc = {start: p?.node.loc?.start, end: p?.node.loc?.end, nodeIndex: (n as any)[JELLY_NODE_ID]} as Location; // see sourceLocationToString
+                n.loc = {start: p?.node.loc?.start, end: p?.node.loc?.end, nodeIndex: (n as any)[JELLY_NODE_ID]} as Location; // see locationToString
             }
 
             // set module (if not already set and not native)

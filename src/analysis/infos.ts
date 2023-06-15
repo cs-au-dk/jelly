@@ -1,4 +1,4 @@
-import {FilePath, sourceLocationToString, strHash} from "../misc/util";
+import {FilePath, locationToString, strHash} from "../misc/util";
 import {Function, Program} from "@babel/types";
 import {sep} from "path";
 import assert from "assert";
@@ -136,6 +136,6 @@ export class FunctionInfo {
     }
 
     toString() {
-        return `${this.moduleInfo}:${sourceLocationToString(this.node.loc)}:${this.name ?? "<anonymous>"}`;
+        return `${this.moduleInfo}:${locationToString(this.node.loc)}:${this.name ?? "<anonymous>"}`;
     }
 }

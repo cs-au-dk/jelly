@@ -87,7 +87,7 @@ import {
 } from "./tokens";
 import {ModuleInfo} from "./infos";
 import logger from "../misc/logger";
-import {mapArrayAdd, sourceLocationToStringWithFile} from "../misc/util";
+import {mapArrayAdd, locationToStringWithFile} from "../misc/util";
 import assert from "assert";
 import {options} from "../options";
 import {ComponentAccessPath, PropertyAccessPath, UnknownAccessPath} from "./accesspaths";
@@ -218,7 +218,7 @@ export function visit(ast: File, op: Operations) {
             const anon = isFunctionDeclaration(path.node) || isFunctionExpression(path.node) ? path.node.id === null : isArrowFunctionExpression(path.node);
             const msg = cls ? "constructor" : `${name ?? (anon ? "<anonymous>" : "<computed>")}`;
             if (logger.isVerboseEnabled())
-                logger.verbose(`Reached function ${msg} at ${sourceLocationToStringWithFile(fun.loc)}`);
+                logger.verbose(`Reached function ${msg} at ${locationToStringWithFile(fun.loc)}`);
             a.registerFunctionInfo(op.file, path, name, fun);
             if (!name && !anon)
                 f.warnUnsupported(fun, `Computed ${isFunctionDeclaration(path.node) || isFunctionExpression(path.node) ? "function" : "method"} name`); // TODO: handle functions/methods with unknown name?
@@ -381,12 +381,12 @@ export function visit(ast: File, op: Operations) {
                 if (isPattern(path.parent))
                     return; // pattern properties are handled at assign
                 if (isClassAccessorProperty(path.node))
-                    assert.fail(`Encountered ClassAccessorProperty at ${sourceLocationToStringWithFile(path.node.loc)}`); // https://github.com/tc39/proposal-grouped-and-auto-accessors
+                    assert.fail(`Encountered ClassAccessorProperty at ${locationToStringWithFile(path.node.loc)}`); // https://github.com/tc39/proposal-grouped-and-auto-accessors
                 const key = getKey(path.node);
                 if (key) {
                     if (path.node.value) {
                         if (!isExpression(path.node.value))
-                            assert.fail(`Unexpected Property value type ${path.node.value?.type} at ${sourceLocationToStringWithFile(path.node.loc)}`);
+                            assert.fail(`Unexpected Property value type ${path.node.value?.type} at ${locationToStringWithFile(path.node.loc)}`);
 
                         // {..., p: E, ...} or class... {...; p = E; ...} (static or non-static, private or public)
                         const rightvar = op.expVar(path.node.value, path);

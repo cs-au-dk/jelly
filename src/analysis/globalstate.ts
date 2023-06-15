@@ -1,5 +1,5 @@
 import {Class, Function, Identifier, Node} from "@babel/types";
-import {FilePath, getOrSet, Location, sourceLocationToString} from "../misc/util";
+import {FilePath, getOrSet, Location, locationToString} from "../misc/util";
 import {ConstraintVar, NodeVar} from "./constraintvars";
 import {Token} from "./tokens";
 import {getPackageJsonInfo, PackageJsonInfo} from "../misc/packagejson";
@@ -273,7 +273,7 @@ export class GlobalState {
         const p = path.getFunctionParent()?.node;
         const caller = p ? this.functionInfos.get(p)! : moduleInfo;
         if (!caller)
-            assert.fail(`Function/module info not found at ${moduleInfo}:${sourceLocationToString(path.node.loc)}!?!`);
+            assert.fail(`Function/module info not found at ${moduleInfo}:${locationToString(path.node.loc)}!?!`);
         return caller;
     }
 

@@ -12,7 +12,7 @@ import {FragmentState} from "../analysis/fragmentstate";
 import {TypeScriptTypeInferrer} from "../typescript/typeinferrer";
 import {AnalysisDiagnostics} from "../typings/diagnostics";
 import logger, {writeStdOutIfActive} from "../misc/logger";
-import {Location, sourceLocationToStringWithFileAndEnd} from "../misc/util";
+import {Location, locationToStringWithFileAndEnd} from "../misc/util";
 import {TimeoutException} from "../misc/timer";
 import {DetectionPatternMatch, generateQuestion, PatternMatcher} from "./patternmatcher";
 
@@ -77,7 +77,7 @@ export function tapirPatternMatch(tapirPatterns: Array<PatternWrapper | Semantic
                 fragmentState.a.timeoutTimer.checkTimeout();
                 const ms = matcher.findDetectionPatternMatches(p); // the set of expressions that match tp and p
                 for (const m of ms) {
-                    logger.info(`Pattern #${tpId}: ${tpPattern}${tpVersion} matches ${sourceLocationToStringWithFileAndEnd(m.exp.loc)} (confidence: ${isHigh(m) ? "high" : "low"})`);
+                    logger.info(`Pattern #${tpId}: ${tpPattern}${tpVersion} matches ${locationToStringWithFileAndEnd(m.exp.loc)} (confidence: ${isHigh(m) ? "high" : "low"})`);
                     if (m.uncertainties && m.uncertainties.length > 0) {
                         for (const u of m.uncertainties)
                             logger.info(`Uncertainty: ${generateQuestion(u) ?? "Access path match uncertain"}`);
@@ -125,7 +125,7 @@ export function tapirPatternMatch(tapirPatterns: Array<PatternWrapper | Semantic
                                 continue forEachMatch;
                             }
                         }
-                        logger.warn(`Unexpected match for pattern #${tpId}${tpVersion} at ${sourceLocationToStringWithFileAndEnd(m.exp.loc)} (confidence: ${isHigh(m) ? "high" : "low"})`);
+                        logger.warn(`Unexpected match for pattern #${tpId}${tpVersion} at ${locationToStringWithFileAndEnd(m.exp.loc)} (confidence: ${isHigh(m) ? "high" : "low"})`);
                         unexpectedMatches++;
                     }
             } else

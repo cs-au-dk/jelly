@@ -24,7 +24,7 @@ import {
     mapSetAddAll,
     nodeToString,
     setAll,
-    sourceLocationToStringWithFileAndEnd
+    locationToStringWithFileAndEnd
 } from "../misc/util";
 import assert from "assert";
 import {
@@ -384,7 +384,7 @@ export default class Solver {
         const f = this.fragmentState;
         const vRep = f.getRepresentative(v);
         if (logger.isDebugEnabled())
-            logger.debug(`Adding universally quantified constraint #${TokenListener[key]} to ${vRep} at ${sourceLocationToStringWithFileAndEnd(n.loc)}`);
+            logger.debug(`Adding universally quantified constraint #${TokenListener[key]} to ${vRep} at ${locationToStringWithFileAndEnd(n.loc)}`);
         const m = mapGetMap(f.tokenListeners, vRep);
         const id = this.getListenerID(key, n);
         if (!m.has(id)) {
@@ -410,7 +410,7 @@ export default class Solver {
         const v1Rep = f.getRepresentative(v1);
         const v2Rep = f.getRepresentative(v2);
         if (logger.isDebugEnabled())
-            logger.debug(`Adding universally quantified pair constraint #${TokenListener[key]} to (${v1Rep}, ${v2Rep}) at ${sourceLocationToStringWithFileAndEnd(n.loc)}`);
+            logger.debug(`Adding universally quantified pair constraint #${TokenListener[key]} to (${v1Rep}, ${v2Rep}) at ${locationToStringWithFileAndEnd(n.loc)}`);
         const m1 = mapGetMap(f.pairListeners1, v1Rep);
         const id = this.getListenerID(key, n);
         if (!m1.has(id)) {
@@ -578,7 +578,7 @@ export default class Solver {
      */
     addForAllArrayEntriesConstraint(t: ArrayToken, key: TokenListener, n: Node, listener: (prop: string) => void) {
         if (logger.isDebugEnabled())
-            logger.debug(`Adding array entries constraint #${TokenListener[key]} to ${t} at ${sourceLocationToStringWithFileAndEnd(n.loc)}`);
+            logger.debug(`Adding array entries constraint #${TokenListener[key]} to ${t} at ${locationToStringWithFileAndEnd(n.loc)}`);
         const id = this.getListenerID(key, n);
         const m = this.runArrayEntriesListener(t, id, listener);
         if (m) {
@@ -636,7 +636,7 @@ export default class Solver {
      */
     addForAllObjectPropertiesConstraint(t: ObjectPropertyVarObj, key: TokenListener, n: Node, listener: (prop: string) => void) {
         if (logger.isDebugEnabled())
-            logger.debug(`Adding object properties constraint #${TokenListener[key]} to ${t} at ${sourceLocationToStringWithFileAndEnd(n.loc)}`);
+            logger.debug(`Adding object properties constraint #${TokenListener[key]} to ${t} at ${locationToStringWithFileAndEnd(n.loc)}`);
         const id = this.getListenerID(key, n);
         const m = this.runObjectPropertiesListener(t, id, listener);
         if (m) {

@@ -29,7 +29,7 @@ import {
     mapGetSet,
     nodeToString,
     SourceLocationsToJSON,
-    sourceLocationToStringWithFileAndEnd,
+    locationToStringWithFileAndEnd,
     Ternary
 } from "../misc/util";
 import {
@@ -396,7 +396,7 @@ export class PatternMatcher {
             for (const level of confidenceLevels)
                 for (const [e, aps] of res[level])
                     for (const ap of aps)
-                        logger.debug(`Pattern ${p} matched access path ${ap} at ${sourceLocationToStringWithFileAndEnd(e.loc)} (confidence: ${level})`);
+                        logger.debug(`Pattern ${p} matched access path ${ap} at ${locationToStringWithFileAndEnd(e.loc)} (confidence: ${level})`);
         return res;
     }
 
@@ -617,7 +617,7 @@ function getPropertyReadObject(exp: Node): Node | undefined {
         return undefined;
     if (isObjectProperty(exp)) // example: const { foo } = require("bar")
         return undefined;
-    assert.fail(`Unexpected node type ${exp.type} at ${sourceLocationToStringWithFileAndEnd(exp.loc)}`);
+    assert.fail(`Unexpected node type ${exp.type} at ${locationToStringWithFileAndEnd(exp.loc)}`);
 }
 
 export function convertPatternMatchesToJSON(patterns: Array<DetectionPattern | undefined>, matcher: PatternMatcher): PatternMatchesJSON {

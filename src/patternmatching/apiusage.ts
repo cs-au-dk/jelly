@@ -1,5 +1,5 @@
 import logger from "../misc/logger";
-import {mapGetSet, sourceLocationToStringWithFileAndEnd, Location} from "../misc/util";
+import {mapGetSet, locationToStringWithFileAndEnd, Location} from "../misc/util";
 import {
     AbbreviatedPathPattern,
     AccessPathPattern,
@@ -84,7 +84,7 @@ export function getAPIUsage(f: FragmentState): [AccessPathPatternToNodes, NodeTo
         const aps = mapGetSet(reached[t], p);
         if (!aps.has(n)) {
             if (logger.isDebugEnabled())
-                logger.debug(`Found ${t} ${p} at ${sourceLocationToStringWithFileAndEnd(n.loc)}`);
+                logger.debug(`Found ${t} ${p} at ${locationToStringWithFileAndEnd(n.loc)}`);
             aps.add(n);
             function isReadAtCall(): boolean {
                 if (t === "read") {
@@ -98,7 +98,7 @@ export function getAPIUsage(f: FragmentState): [AccessPathPatternToNodes, NodeTo
             }
             if (isReadAtCall()) { // if read occurs at call function expression, exclude in output
                 if (logger.isDebugEnabled())
-                    logger.debug(`Read-call ${ap} at ${sourceLocationToStringWithFileAndEnd(n.loc)}`);
+                    logger.debug(`Read-call ${ap} at ${locationToStringWithFileAndEnd(n.loc)}`);
             } else {
                 mapGetSet(res1[t], p).add(n);
                 mapGetSet(res2[t], n).add(p);
@@ -149,7 +149,7 @@ export function reportAPIUsage(r1: AccessPathPatternToNodes, r2: NodeToAccessPat
         for (const [p, ns] of m) {
             logger.info(`${t} ${p}:`);
             for (const n of ns)
-                logger.info(`  ${sourceLocationToStringWithFileAndEnd(n.loc)}`);
+                logger.info(`  ${locationToStringWithFileAndEnd(n.loc)}`);
             numAccessPathPatternsAtNodes += ns.size;
         }
         numAccessPathPatterns += m.size;
@@ -157,7 +157,7 @@ export function reportAPIUsage(r1: AccessPathPatternToNodes, r2: NodeToAccessPat
     // logger.info("API usage, nodes -> access path patterns:"); // TODO: remove this part, also in getAPIUsage?
     // for (const [t, m] of Object.entries(r2))
     //     for (const [n, ps] of m) {
-    //         logger.info(`${sourceLocationToStringWithFileAndEnd(n.loc)}:`);
+    //         logger.info(`${locationToStringWithFileAndEnd(n.loc)}:`);
     //         for (const p of ps)
     //             logger.info(`  ${t} ${p}`);
     //     }

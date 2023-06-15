@@ -8,7 +8,7 @@ import {
     LocationJSON,
     mapArrayAdd,
     SourceLocationsToJSON,
-    sourceLocationToStringWithFileAndEnd
+    locationToStringWithFileAndEnd
 } from "../misc/util";
 import {dirname, resolve} from "path";
 import Timer from "../misc/timer";
@@ -88,7 +88,7 @@ export class TypeScriptTypeInferrer {
         try {
             return this.checker.getTypeAtLocation(node);
         } catch (e) {
-            logger.error(`TypeScript internal error while querying type at ${typeof loc === "string" ? loc : sourceLocationToStringWithFileAndEnd(loc)}: ${e}`);
+            logger.error(`TypeScript internal error while querying type at ${typeof loc === "string" ? loc : locationToStringWithFileAndEnd(loc)}: ${e}`);
             return undefined;
         }
     }
@@ -115,10 +115,10 @@ export class TypeScriptTypeInferrer {
                 posLineChar.character !== loc.start.column ||
                 endLineChar.line + 1 !== loc.end.line ||
                 endLineChar.character !== loc.end.column)
-                logger.verbose(`TypeScript AST node misaligned: ${file.fileName}:${posLineChar.line + 1}:${posLineChar.character + 1}:${endLineChar.line + 1}:${endLineChar.character + 1}, expected ${sourceLocationToStringWithFileAndEnd(loc)}`); // FIXME: no longer relevant?
+                logger.verbose(`TypeScript AST node misaligned: ${file.fileName}:${posLineChar.line + 1}:${posLineChar.character + 1}:${endLineChar.line + 1}:${endLineChar.character + 1}, expected ${locationToStringWithFileAndEnd(loc)}`); // FIXME: no longer relevant?
             const type = this.getTypeAtTSNode(node, loc);
             if (logger.isDebugEnabled())
-                logger.debug(`TypeScript type at ${sourceLocationToStringWithFileAndEnd(loc)}: ${type ? this.checker.typeToString(type) : "???"}`);
+                logger.debug(`TypeScript type at ${locationToStringWithFileAndEnd(loc)}: ${type ? this.checker.typeToString(type) : "???"}`);
             return type;
         } catch {
             return undefined;

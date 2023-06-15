@@ -6,8 +6,8 @@ import {ModuleInfo} from "../analysis/infos";
  * Source location with extra information.
  * 'module' is set if the location belongs to a specific module, and undefined for globals.
  * 'native' is set if the location comes from a native model.
- * 'nodeIndex' is set by AST preprocessing at nodes with missing source location (see sourceLocationToString).
- * 'unbound' set to true if this is a location for an artificially declared unbound identifier.
+ * 'nodeIndex' is set by AST preprocessing at nodes with missing source location (see locationToString).
+ * 'unbound' is set to true if this is a location for an artificially declared unbound identifier.
  */
 export type Location = SourceLocation & {module?: ModuleInfo, native?: string, nodeIndex?: number, unbound?: boolean};
 
@@ -52,15 +52,15 @@ export function ternaryToString(t: Ternary): string {
  */
 export function nodeToString(n: Node): string {
     if (isIdentifier(n))
-        return `'${n.name}'[${sourceLocationToStringWithFile(n.loc, true)}]`;
+        return `'${n.name}'[${locationToStringWithFile(n.loc, true)}]`;
     else
-        return `[${sourceLocationToStringWithFileAndEnd(n.loc, true)}]`;
+        return `[${locationToStringWithFileAndEnd(n.loc, true)}]`;
 }
 
 /**
  * Returns a string representation of the given source location.
  */
-export function sourceLocationToString(loc: Location | null | undefined, withFilename: boolean = false, withEnd: boolean = false, useModuleName?: boolean) {
+export function locationToString(loc: Location | null | undefined, withFilename: boolean = false, withEnd: boolean = false, useModuleName?: boolean) {
     if (!loc)
         return "?";
     const file =
@@ -79,21 +79,21 @@ export function sourceLocationToString(loc: Location | null | undefined, withFil
 /**
  * Returns a string representation of the given source location, including filename.
  */
-export function sourceLocationToStringWithFile(loc: Location | null | undefined, useModuleName?: boolean) {
-    return sourceLocationToString(loc, true, false, useModuleName);
+export function locationToStringWithFile(loc: Location | null | undefined, useModuleName?: boolean) {
+    return locationToString(loc, true, false, useModuleName);
 }
 
 /**
  * Returns a string representation of the given source location, including filename and end position.
  */
-export function sourceLocationToStringWithFileAndEnd(loc: Location | null | undefined, useModuleName?: boolean) {
-    return sourceLocationToString(loc, true, true, useModuleName);
+export function locationToStringWithFileAndEnd(loc: Location | null | undefined, useModuleName?: boolean) {
+    return locationToString(loc, true, true, useModuleName);
 }
 
 /**
  * Checks whether the given file and line belong to the source location range.
  */
-export function sourceLocationContains(loc: Location | null | undefined, file: string, line: number): boolean {
+export function locationContains(loc: Location | null | undefined, file: string, line: number): boolean {
     return Boolean(loc && loc.start && loc.end && "module" in loc && loc.module && loc.module.getPath() === file && loc.start.line <= line && line <= loc.end.line);
 }
 

@@ -1,5 +1,5 @@
 import {Function, Node} from "@babel/types";
-import {sourceLocationToStringWithFileAndEnd} from "../misc/util";
+import {locationToStringWithFileAndEnd} from "../misc/util";
 import assert from "assert";
 import {ModuleInfo, PackageInfo} from "./infos";
 import {AccessPath} from "./accesspaths";
@@ -29,7 +29,7 @@ export class FunctionToken extends Token {
     }
 
     toString() {
-        return `Function[${sourceLocationToStringWithFileAndEnd(this.fun.loc, true)}]`;
+        return `Function[${locationToStringWithFileAndEnd(this.fun.loc, true)}]`;
     }
 }
 
@@ -67,7 +67,7 @@ export class AllocationSiteToken extends Token {
     }
 
     toString() {
-        return `${this.kind}[${sourceLocationToStringWithFileAndEnd(this.allocSite.loc, true)}]`;
+        return `${this.kind}[${locationToStringWithFileAndEnd(this.allocSite.loc, true)}]`;
     }
 }
 

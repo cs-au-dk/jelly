@@ -8,7 +8,7 @@ import {
     isImport,
     isStringLiteral
 } from "@babel/types";
-import {FilePath, sourceLocationToStringWithFile} from "../misc/util";
+import {FilePath, locationToStringWithFile} from "../misc/util";
 import traverse, {NodePath} from "@babel/traverse";
 import logger from "../misc/logger";
 import {options} from "../options";
@@ -31,9 +31,9 @@ export function findModules(ast: File, file: FilePath, f: FragmentState, moduleI
             } catch {
                 if (options.ignoreUnresolved || options.ignoreDependencies) {
                     if (logger.isVerboseEnabled())
-                        logger.verbose(`Ignoring unresolved module '${str}' at ${sourceLocationToStringWithFile(path.node.loc)}`);
+                        logger.verbose(`Ignoring unresolved module '${str}' at ${locationToStringWithFile(path.node.loc)}`);
                 } else// TODO: special warning if the require/import is placed in a try-block, an if statement, or a switch case?
-                    f.warn(`Unable to resolve module '${str}' at ${sourceLocationToStringWithFile(path.node.loc)}`);
+                    f.warn(`Unable to resolve module '${str}' at ${locationToStringWithFile(path.node.loc)}`);
             }
     }
 
@@ -49,7 +49,7 @@ export function findModules(ast: File, file: FilePath, f: FragmentState, moduleI
                 if (isStringLiteral(arg))
                     requireModule(arg.value, path);
                 else
-                    f.error(`Unhandled 'require' at ${sourceLocationToStringWithFile(path.node.loc)}`);
+                    f.error(`Unhandled 'require' at ${locationToStringWithFile(path.node.loc)}`);
             }
         },
 
