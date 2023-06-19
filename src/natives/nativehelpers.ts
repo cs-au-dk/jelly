@@ -402,8 +402,8 @@ export function invokeCallback(kind: CallbackKind, p: NativeFunctionParams, arg:
             const baseVar = vp.expVar(bp.base, p.path);
             const funVar = vp.expVar(funarg, p.path);
             const caller = a.getEnclosingFunctionOrModule(p.path, p.moduleInfo);
+            f.registerCall(p.path.node, p.moduleInfo, {native: true});
             p.solver.addForAllPairsConstraint(baseVar, funVar, key, p.path.node, (bt: AllocationSiteToken, ft: FunctionToken | AccessPathToken) => { // TODO: ignoring native functions etc.
-                f.registerCall(p.path.node, p.moduleInfo, {native: true});
                 type Param = Function["params"][0] | undefined;
                 let param1: Param, param2: Param, param3: Param, param4: Param;
                 if (ft instanceof FunctionToken) {
@@ -562,6 +562,99 @@ export function invokeCallback(kind: CallbackKind, p: NativeFunctionParams, arg:
             });
         }
     }
+}
+
+/**
+ * Models 'call' or 'apply'.
+ */
+export function invokeCallApply(kind: "Function.prototype.call" | "Function.prototype.apply", p: NativeFunctionParams) {
+    const args = p.path.node.arguments;
+    const basearg = args[0];
+    const bp = getBaseAndProperty(p.path);
+    if (bp) {
+        const f = p.solver.fragmentState;
+        const vp = p.solver.fragmentState.varProducer;
+        const a = p.solver.globalState;
+        const funVar = vp.expVar(bp.base, p.path);
+        const caller = a.getEnclosingFunctionOrModule(p.path, p.moduleInfo);
+        f.registerCall(p.path.node, p.moduleInfo, {native: true});
+        p.solver.addForAllConstraint(funVar, TokenListener.NATIVE_INVOKE_CALL_APPLY, p.path.node, (ft: Token) => {
+            if (ft instanceof FunctionToken) {
+                f.registerCallEdge(p.path.node, caller, a.functionInfos.get(ft.fun)!, {native: true}); // TODO: call graph edges for promise-related calls?
+                if (isExpression(basearg)) { // TODO: SpreadElement? non-MemberExpression?
+                    // base value
+                    const baseVar = vp.expVar(basearg, p.path);
+                    p.solver.addSubsetConstraint(baseVar, vp.thisVar(ft.fun)); // TODO: only bind 'this' if the callback is a proper function (not a lambda?)
+                }
+                // TODO: also model conversion for basearg to objects, see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/call
+                // arguments
+                switch (kind) {
+                    case "Function.prototype.call":
+                        for (let i = 1; i < args.length; i++) {
+                            const arg = args[i];
+                            const param = ft.fun.params[i - 1];
+                            if (isExpression(arg) && isIdentifier(param)) { // TODO: SpreadElement, non-Identifier parameters?
+                                const argVar = vp.expVar(arg, p.path);
+                                const paramVar = vp.nodeVar(param);
+                                p.solver.addSubsetConstraint(argVar, paramVar);
+                            }
+                        }
+                        break;
+                    case "Function.prototype.apply":
+                        if (args.length >= 2 && isExpression(args[1])) { // TODO: SpreadElement
+                            const argVar = vp.expVar(args[1], p.path);
+                            p.solver.addForAllConstraint(argVar, TokenListener.NATIVE_INVOKE_CALL_APPLY2, p.path.node, (t: Token) => {
+                                if (t instanceof ArrayToken) {
+                                    p.solver.addForAllArrayEntriesConstraint(t, TokenListener.NATIVE_INVOKE_CALL_APPLY3, p.path.node, (prop: string) => {
+                                        const param = parseInt(prop);
+                                        if (param >= 0 && param < ft.fun.params.length) {
+                                            const paramVar = vp.nodeVar(ft.fun.params[param]);
+                                            p.solver.addSubsetConstraint(vp.objPropVar(t, prop), paramVar);
+                                        }
+                                    });
+                                    // TODO: p.solver.addSubsetConstraint(vp.arrayValueVar(t), ...);
+                                }
+                            });
+                        }
+                        break;
+                }
+                // TODO: also model callee 'arguments'
+                // return value
+                const retVar = vp.returnVar(ft.fun);
+                p.solver.addSubsetConstraint(retVar, vp.expVar(p.path.node, p.path));
+            } else if (ft instanceof NativeObjectToken && ft.invoke)
+                warnNativeUsed(`${kind} with native function`, p); // TODO: call/apply to native function
+        });
+    }
+}
+
+/**
+ * Models 'bind'.
+ */
+export function functionBind(p: NativeFunctionParams) {
+    const args = p.path.node.arguments;
+    const basearg = args[0];
+    const bp = getBaseAndProperty(p.path);
+    if (bp) {
+        const vp = p.solver.fragmentState.varProducer;
+        const funVar = vp.expVar(bp.base, p.path);
+        p.solver.addForAllConstraint(funVar, TokenListener.NATIVE_INVOKE_BIND, p.path.node, (ft: Token) => {
+            if (ft instanceof FunctionToken) { // TODO: ignoring native functions etc.
+                if (isExpression(basearg)) { // TODO:SpreadElement? non-MemberExpression?
+                    // base value
+                    const baseVar = vp.expVar(basearg, p.path);
+                    p.solver.addSubsetConstraint(baseVar, vp.thisVar(ft.fun)); // TODO: only bind 'this' if the callback is a proper function (not a lambda?)
+                }
+                // TODO: also model conversion for basearg to objects, see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/bind
+            }
+        });
+        // return value
+        p.solver.addSubsetConstraint(vp.expVar(bp.base, p.path), vp.expVar(p.path.node, p.path));
+    }
+    if (!args.every(arg => isExpression(arg)))
+        warnNativeUsed("Function.prototype.bind", p, "with SpreadElement"); // TODO: SpreadElement
+    if (args.length > 1)
+        warnNativeUsed("Function.prototype.bind", p, "with multiple arguments"); // TODO: bind partial arguments
 }
 
 /**

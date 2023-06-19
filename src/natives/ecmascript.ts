@@ -10,6 +10,8 @@ import {
     assignParameterToThisArrayValue,
     assignParameterToThisProperty,
     callPromiseExecutor,
+    functionBind,
+    invokeCallApply,
     invokeCallback,
     newArray,
     newObject,
@@ -32,7 +34,6 @@ import {
 import {PackageObjectToken} from "../analysis/tokens";
 import {isExpression, isNewExpression} from "@babel/types";
 import {NativeFunctionParams, NativeModel, NativeModelParams} from "./nativebuilder";
-import {getBaseAndProperty} from "../misc/asthelpers";
 import {TokenListener} from "../analysis/listeners";
 
 export const OBJECT_PROTOTYPE = "Object.prototype";
@@ -670,29 +671,19 @@ export const ecmascriptModels: NativeModel = {
                 {
                     name: "apply",
                     invoke: (p: NativeFunctionParams) => {
-                        warnNativeUsed("Function.prototype.apply", p); // TODO
+                        invokeCallApply("Function.prototype.apply", p);
                     }
                 },
                 {
                     name: "bind",
                     invoke: (p: NativeFunctionParams) => {
-                        const bp = getBaseAndProperty(p.path);
-                        if (bp) {
-                            const vp = p.solver.fragmentState.varProducer;
-                            p.solver.addSubsetConstraint(vp.expVar(bp.base, p.path), vp.expVar(p.path.node, p.path)); // TODO: move to nativehelpers
-                        }
-                        if (!p.path.node.arguments.every(arg => isExpression(arg)))
-                            warnNativeUsed("Function.prototype.bind", p, "with SpreadElement"); // TODO: SpreadElement
-                        else if (p.path.node.arguments.length === 1)
-                            warnNativeUsed("Function.prototype.bind", p, "with one argument"); // TODO: bind 'this'
-                        else if (p.path.node.arguments.length > 1)
-                            warnNativeUsed("Function.prototype.bind", p, "with multiple arguments"); // TODO: bind 'this' and partial arguments
+                        functionBind(p);
                     }
                 },
                 {
                     name: "call",
                     invoke: (p: NativeFunctionParams) => {
-                        warnNativeUsed("Function.prototype.call", p); // TODO
+                        invokeCallApply("Function.prototype.call", p);
                     }
                 },
                 {

@@ -304,14 +304,14 @@ test("tests/micro/low", async () => {
 test("tests/micro/fun", async () => {
     await runTest("tests/micro", "fun.js", {
         soundness: "tests/micro/fun.json",
-        functionInfos: 4,
+        functionInfos: 15,
         moduleInfos: 1,
-        numberOfFunctionToFunctionEdges: 1,
-        oneCalleeCalls: 1,
-        funFound: 1,
-        funTotal: 3,
-        callFound: 1,
-        callTotal: 3
+        numberOfFunctionToFunctionEdges: 21,
+        oneCalleeCalls: 10,
+        funFound: 13,
+        funTotal: 13,
+        callFound: 13,
+        callTotal: 13
     });
 });
 
