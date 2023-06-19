@@ -9,7 +9,7 @@ import {UnknownAccessPath} from "./accesspaths";
 
 /**
  * Finds the ObjectTokens that may be accessed from outside the module via exporting to or importing from other modules.
- * Also adds UnknownAccessPath at parameters of escaping functions.
+ * Also adds UnknownAccessPath at parameters of escaping functions and properties of escaping objects.
  * Note: objects that are assigned to 'exports' (or to properties of such objects) are not considered escaping
  * (unless also returned by an escaping function or passed as argument to an external function).
  */
@@ -23,11 +23,11 @@ export function findEscapingObjects(m: ModuleInfo, solver: Solver): Set<ObjectTo
 
     /**
      * Adds the tokens of the given constraint variable to the worklist if not already visited.
-     * Note: PackageObjectTokens and AccessPathTokens are ignored.
+     * Note: PackageObjectTokens, AccessPathTokens and (most) NativeObjectTokens are ignored.
      */
     function addToWorklist(v: ConstraintVar) {
         for (const t of f.getTokens(v))
-            if ((t instanceof AllocationSiteToken || t instanceof FunctionToken || t instanceof NativeObjectToken) && !visited.has(t)) {
+            if ((t instanceof AllocationSiteToken || t instanceof FunctionToken || (t instanceof NativeObjectToken && t.name === "exports")) && !visited.has(t)) {
                 worklist.push(t);
                 visited.add(t);
             }
