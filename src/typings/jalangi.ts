@@ -36,6 +36,8 @@ export interface Jalangi {
 
   analysis?: JalangiAnalysis;
 
+  addAnalysis(analysis: JalangiAnalysis, filter?: (source: SourceObject) => boolean): void;
+
   smemory: {
 
     getShadowObject(
@@ -237,8 +239,6 @@ export interface JalangiAnalysis {
       isDirect: boolean
   ): { result: any } | void;
 
-  endExpression?(iid: IID): void;
-
   endExecution?(): void;
 
   runInstrumentedFunctionBody?(
@@ -318,6 +318,8 @@ export interface JalangiAnalysis {
       iid : IID,
       type: String
   ): void;
+
+  endExpression?(iid: IID): void;
 
   startStatement?(
       iid : IID,

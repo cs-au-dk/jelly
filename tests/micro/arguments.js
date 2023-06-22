@@ -1,3 +1,4 @@
+// Move f1 to 2nd line to make it discernible from synthetic module function
 function f1(x) {
     console.log("0");
     if (!x)

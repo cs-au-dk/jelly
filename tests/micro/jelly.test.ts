@@ -304,14 +304,14 @@ test("tests/micro/low", async () => {
 test("tests/micro/fun", async () => {
     await runTest("tests/micro", "fun.js", {
         soundness: "tests/micro/fun.json",
-        functionInfos: 15,
+        functionInfos: 16,
         moduleInfos: 1,
-        numberOfFunctionToFunctionEdges: 21,
-        oneCalleeCalls: 10,
-        funFound: 13,
-        funTotal: 13,
-        callFound: 13,
-        callTotal: 13
+        numberOfFunctionToFunctionEdges: 23,
+        oneCalleeCalls: 11,
+        funFound: 14,
+        funTotal: 14,
+        callFound: 15,
+        callTotal: 15
     });
 });
 
@@ -397,10 +397,15 @@ test("tests/micro/rxjs", async () => {
 
 test("tests/micro/import1", async () => {
     await runTest("tests/micro", "import1.mjs", {
+        soundness: "tests/micro/import1.json",
         functionInfos: 5,
         moduleInfos: 3,
         numberOfFunctionToFunctionEdges: 5,
-        oneCalleeCalls: 5
+        oneCalleeCalls: 5,
+        funFound: 5,
+        funTotal: 5,
+        callFound: 5,
+        callTotal: 5
     });
 });
 
@@ -448,6 +453,25 @@ test("tests/micro/import11", async () => {
         functionInfos: 0,
         moduleInfos: 1,
         matches: {total: 2}
+    });
+});
+
+test("tests/micro/dyn-import", async () => {
+    await runTest("tests/micro", "dyn-import.mjs", {
+        soundness: "tests/micro/dyn-import.json",
+        funTotal: 2,
+        funFound: 2,
+        callTotal: 2,
+        callFound: 2,
+    });
+});
+
+test("tests/micro/import-default", async () => {
+    await runTest("tests/micro/import-default", "a.ts", {
+        functionInfos: 1,
+        moduleInfos: 2,
+        numberOfFunctionToFunctionEdges: 1,
+        oneCalleeCalls: 1
     });
 });
 
@@ -652,5 +676,15 @@ test("tests/micro/peerdep", async () => {
     await runTest("tests/micro/peerdep", "peerdep.js",  {
         patterns: ["tests/micro/peerdep/peerdep-patterns.json"],
         matches: {total: 0, low: 0} // TODO: should report 1 match
+    });
+});
+
+test("tests/micro/call-expressions", async () => {
+    await runTest("tests/micro", "call-expressions.js", {
+        soundness: "tests/micro/call-expressions.json",
+        funFound: 10,
+        funTotal: 10,
+        callFound: 35,
+        callTotal: 35,
     });
 });

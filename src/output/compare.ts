@@ -2,6 +2,7 @@ import {readFileSync} from "fs";
 import {CallGraph} from "../typings/callgraph";
 import {addAll, mapGetSet, percent} from "../misc/util";
 import logger from "../misc/logger";
+import {LocationJSON} from "../misc/util";
 import assert from "assert";
 
 function compareStringArrays(as1: Array<string> | undefined, as2: Array<string> | undefined, file1: string, file2: string, kind: string): Set<string> {
@@ -15,12 +16,15 @@ function compareStringArrays(as1: Array<string> | undefined, as2: Array<string> 
     return s;
 }
 
-function loc(str: string, cg: CallGraph, kind: "Function" | "Call"): {str: string, file: string} {
-    const c1 = str.indexOf(":");
-    const c2 = str.indexOf(":", c1 + 1);
-    const c3 = str.indexOf(":", c2 + 1);
-    const file = cg.files[Number(str.substring(0, c1))];
-    const rest = str.substring(c1 + 1, kind === "Function" ? c3 : undefined); // stripping end locations for functions (workaround like in soundnesstester)
+// loc returns a canonical representation of a LocationJSON string that is suitable for matching
+// between call graphs collected from dynamic and static analysis
+function loc(str: LocationJSON, cg: CallGraph, kind: "Function" | "Call"): {str: string, file: string} {
+    const match = /^(?<fileIndex>\d+):(?<start>\d+:\d+):(?<end>\d+:\d+)$/.exec(str);
+    assert.ok(match);
+    const { fileIndex, start, end } = match.groups!;
+    const file = cg.files[Number(fileIndex)];
+    // stripping start locations for calls and end locations for functions (workaround like in soundnesstester)
+    const rest = kind === "Call"? end : start;
     return {str: `${file}:${rest}`, file};
 }
 

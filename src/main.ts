@@ -163,11 +163,13 @@ async function main() {
             }
         }
         logger.info("Generating dynamic call graph");
-        let cmd, args, cwd;
+        let cmd, args, cwd, env = {};
         if (options.npmTest) {
             cmd = "npm";
             args = ["test", ...program.args];
             cwd = path.resolve(options.npmTest)
+            // react-dom/test-utils' act method misbehaves in production environments
+            env = { NODE_ENV: "test" };
         } else {
             if (program.args.length === 0) {
                 logger.info("File missing, aborting");
@@ -183,6 +185,7 @@ async function main() {
             cwd,
             env: {
                 ...process.env,
+                ...env,
                 JELLY_OUT: dyn,
                 GRAAL_HOME: graalHome ? path.resolve(graalHome) : undefined,
                 PATH: `${__dirname}/../bin${path.delimiter}${process.env.PATH}`

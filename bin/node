@@ -2,26 +2,60 @@
 
 export JELLY_BIN=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 export JELLY_OUT=${JELLY_OUT:-'/tmp/jelly.json'}
-DYNJS=$( dirname $JELLY_BIN )/lib/dynamic/dyn.js
+DYNJS=$( dirname "$JELLY_BIN" )/lib/dynamic/dyn.js
 
 if [[ -z "${GRAAL_HOME}" ]]; then
   echo "Error: Environment variable GRAAL_HOME not set, aborting"
-  exit -1
+  exit 255
 fi
 
 if [[ ! -x $GRAAL_HOME/bin/node ]]; then
   echo "Error: $GRAAL_HOME/bin/node executable not found, aborting"
-  exit -1
+  exit 255
 fi
 
 if [[ ! -f $GRAAL_HOME/tools/nodeprof/jalangi.js ]]; then
   echo "Error: $GRAAL_HOME/tools/nodeprof/jalangi.js not found, aborting"
-  exit -1
+  exit 255
 fi
 
 if [[ ! -f $DYNJS ]]; then
   echo "Error: $DYNJS not found, aborting"
-  exit -1
+  exit 255
 fi
 
-PATH=$GRAAL_HOME/bin:$PATH exec node --jvm --experimental-options --nodeprof $GRAAL_HOME/tools/nodeprof/jalangi.js --analysis $DYNJS $@
+NODE_OPTS=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -use_strict|--use_strict)
+      # jalangi.js violates strict mode, so let's avoid that
+      shift
+      ;;
+
+    -r|--require)
+      NODE_OPTS+=("$1" "$2")
+      shift 2
+      ;;
+
+    -e|--eval|--eval=*)
+      # We can't trace anything, bail on nodeprof
+      exec "$GRAAL_HOME/bin/node" "${NODE_OPTS[@]}" "$@"
+      ;;
+
+    -*)
+      # Assume that all parameters that start with a dash are node options
+      NODE_OPTS+=("$1")
+      shift
+      ;;
+
+    *)
+      break
+      ;;
+  esac
+done
+
+exec "$GRAAL_HOME/bin/node" \
+  "${NODE_OPTS[@]}" \
+  --jvm --experimental-options \
+  --nodeprof "$GRAAL_HOME/tools/nodeprof/jalangi.js" --analysis "$DYNJS" \
+  "$@"

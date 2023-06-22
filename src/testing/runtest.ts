@@ -1,3 +1,6 @@
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import {options} from "../options";
 import {tapirLoadPatterns, tapirPatternMatch} from "../patternmatching/tapirpatterns";
 import {analyzeFiles} from "../analysis/analyzer";
@@ -7,6 +10,8 @@ import {AnalysisStateReporter} from "../output/analysisstatereporter";
 import Solver from "../analysis/solver";
 import {getAPIUsage} from "../patternmatching/apiusage";
 import {FragmentState} from "../analysis/fragmentstate";
+import logger from "../misc/logger";
+import {compareCallGraphs} from "../output/compare";
 
 export async function runTest(basedir: string,
                               app: string | Array<string>,
@@ -37,12 +42,35 @@ export async function runTest(basedir: string,
         options.trackedModules ??= ['**'];
     }
 
+    if (options.soundness)
+        // ensure that calls are registered
+        options.callgraphJson = "truthy";
+
+    const files = Array.isArray(app) ? app : [app]
     const solver = new Solver();
-    await analyzeFiles(Array.isArray(app) ? app : [app], solver);
+    await analyzeFiles(files, solver);
 
     let funFound, funTotal, callFound, callTotal;
-    if (args.soundness)
+    if (args.soundness) {
         [funFound, funTotal, callFound, callTotal] = testSoundness(args.soundness, solver.fragmentState);
+
+        // test that the output of compareCallGraphs agrees with the soundness tester
+        const output: string[] = [];
+        const spy = jest.spyOn(logger, "info").mockImplementation((line) => output.push(line as unknown as string) as any);
+        const tmpdir = await fs.mkdtemp(path.join(os.tmpdir(), "jelly-runTest-cgcompare-"));
+        try {
+            const cgpath = path.join(tmpdir, "callgraph.json")
+            new AnalysisStateReporter(solver.fragmentState).saveCallGraph(cgpath, files);
+            compareCallGraphs(args.soundness, cgpath)
+        } finally {
+            spy.mockRestore();
+            await fs.rm(tmpdir, { recursive: true });
+        }
+
+        const [_, funRecall, __, callRecall] = [...output.join("\n").matchAll(/: (\d+\/\d+) \(/g)].map((match) => match[1]);
+        expect(funRecall).toBe(`${funFound}/${funTotal}`);
+        expect(callRecall).toBe(`${callFound}/${callTotal}`);
+    }
 
     if (args.functionInfos !== undefined)
         expect(solver.globalState.functionInfos.size).toBe(args.functionInfos);

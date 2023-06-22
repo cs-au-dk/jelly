@@ -21,4 +21,4 @@ function baz3(a) {
 }
 var q3 = baz3(() => { console.log("5"); });
 q3();
-
+(baz3(() => { console.log("5"); })());

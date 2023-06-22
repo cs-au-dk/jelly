@@ -17,7 +17,7 @@ test("tests/helloworld/app", async () => {
         oneCalleeCalls: 906,
         funFound: 181,
         funTotal: 200,
-        callFound: 244,
+        callFound: 247,
         callTotal: 267
     });
 }, 20000);

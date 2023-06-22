@@ -40,64 +40,85 @@ export function testSoundness(jsonfile: string, f: FragmentState): [number, numb
     const dyn = JSON.parse(readFileSync(jsonfile, "utf8")) as CallGraph;
 
     // collect dynamic files and check that they have been analyzed
-    const dynamicFiles = new Map<number, string>();
     const cwd = process.cwd();
-    for (const file of dyn.files) {
+    const dynamicFiles = dyn.files.map((file) => {
         const p = path.resolve(options.basedir, file);
-
-        if (f.a.moduleInfosByPath.has(p)) {
-            // logger.debug(`Found file ${file}`);
-            dynamicFiles.set(dynamicFiles.size, p);
-        } else { // try to resolve the file relative to the current working directory
-            const p2 = path.resolve(cwd, file); // TODO: use basedir instead of cwd in dyn.ts for entries and files
-            if (f.a.moduleInfosByPath.has(p2))
-                dynamicFiles.set(dynamicFiles.size, p2);
-            else
-                logger.warn(`File ${file} not found in static call graph`);
+        let m = f.a.moduleInfosByPath.get(p);
+        if (m === undefined)
+            m = f.a.moduleInfosByPath.get(path.resolve(cwd, file)); // try to resolve the file relative to the current working directory
+        if (m === undefined) {
+            logger.warn(`File ${file} not found in static call graph`);
+            return file;
         }
-    }
+        return m.getPath();
+    });
 
     // finds the representative for the given source location
     function findRepresentativeLocation(loc: string): string {
         const c = loc.indexOf(":");
-        const file = dynamicFiles.get(Number(loc.substring(0, c)))!;
+        const file = dynamicFiles[Number(loc.substring(0, c))];
         const rest = loc.substring(c + 1);
-        const m = f.a.moduleInfosByPath.get(file);
-        return `${m ? m.getPath() : file}:${rest}`;
+        return `${file}:${rest}`;
     }
+
+    function stripEnd(loc: string): string {
+        return loc.replace(/(:\d+:\d+):\d+:\d+$/, "$1");
+    }
+
+    // staticShortFunctions maps "<file>:<startLine>:<startColumn>" to functions
+    // TODO: Collisions can happen between the synthetic module function and a function
+    // defined at the beginning of the file.
+    const staticShortFunctions = new Map([...staticFunctions.entries()].map(([sloc, fun]) => [stripEnd(sloc), fun]));
 
     // collect dynamic functions and check that they have been analyzed
     const dynamicFunctionLocs = new Map<number, string>();
     const dynamicFunctions = new Map<number, FunctionInfo | ModuleInfo>();
     const ignoredFunctions = new Set<string>();
     for (const [,n] of f.artificialFunctions)
-        ignoredFunctions.add(locationToStringWithFile(n.loc) + ":");
+        ignoredFunctions.add(locationToStringWithFile(n.loc));
     const comp = ([, loc1]: [string, string], [, loc2]: [string, string]) => loc1 < loc2 ? -1 : loc1 > loc2 ? 1 : 0;
     for (const [f, loc] of Object.entries(dyn.functions).sort(comp)) {
         const reploc = findRepresentativeLocation(loc);
         dynamicFunctionLocs.set(Number(f), reploc);
-        const fun = staticFunctions.get(reploc);
+        const stripped = stripEnd(reploc);
+        // dyn.ts sometimes reports incorrect end locations, so we try to match
+        // while only considering start locations if matching the full location fails
+        const fun = staticFunctions.get(reploc) ?? staticShortFunctions.get(stripped);
         if (!fun) {
-            if (!ignoredFunctions.has(reploc.substring(0, reploc.lastIndexOf(":", reploc.lastIndexOf(":") - 1) + 1))) // dyn.ts sometimes reports incorrect end locations, so we only consider start locations
+            if (!ignoredFunctions.has(stripped))
                 logger.warn(`Function ${reploc} not found in static call graph`);
             else
                 logger.debug(`Function ${reploc} from dynamic call graph ignored`); // filtering away artificial call edges reported by dyn.ts
-        } else {
+        } else
             dynamicFunctions.set(Number(f), fun);
-            // logger.debug(`Found function ${loc}`);
-        }
+    }
+
+    // dyn.ts sometimes reports incorrect start source locations for call expressions
+    // with parenthesized base expressions (see tests/micro/call-expressions.js),
+    // since end locations are unique for call expressions we can solely rely on those for matching
+    function stripStart(loc: string): string {
+        return loc.replace(/:\d+:\d+(:\d+:\d+)$/, "$1");
+    }
+
+    // callStrLocations maps "<file>:<endLine>:<endColumn>" to the full location.
+    const callStrLocations = new Map<string, string>();
+    for (const n of f.callLocations) {
+        const loc = locationToStringWithFileAndEnd(n.loc);
+        callStrLocations.set(stripStart(loc), loc);
     }
 
     // collect dynamic calls and check whether they have been analyzed
-    const callStrLocations = new Set<string>();
-    for (const n of f.callLocations)
-        callStrLocations.add(locationToStringWithFileAndEnd(n.loc));
     const dynamicCallLocs = new Map<number, string>();
     for (const [f, loc] of Object.entries(dyn.calls).sort(comp)) {
-        const reploc = findRepresentativeLocation(loc);
-        dynamicCallLocs.set(Number(f), reploc);
-        if (!callStrLocations.has(reploc))
+        let reploc = findRepresentativeLocation(loc);
+        // attempt to correct dynamically collected source start location with statically collected info
+        const actualLoc = callStrLocations.get(stripStart(reploc));
+        if (actualLoc === undefined)
             logger.warn(`Call ${reploc} not found in static call graph`);
+        else
+            reploc = actualLoc;
+
+        dynamicCallLocs.set(Number(f), reploc);
     }
 
     const warnings: Array<string> = [];

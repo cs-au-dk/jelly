@@ -8,7 +8,7 @@ const TEST_PACKAGES = ["yarn", "mocha", "chai", "nyc", "sinon", "should", "@babe
 /**
  * Commands that do not need instrumentation, for example because the actual work is known to happen in child processes.
  */
-const IGNORED_COMMANDS = ["npm", "npm-cli.js", "eslint", "grunt", "tsc", "tsd", "prettier", "rimraf", "xo"]; // TODO: other commands where instrumentation can be skipped?
+const IGNORED_COMMANDS = ["npm", "npm-cli.js", "eslint", "grunt", "rollup", "tsc", "tsd", "prettier", "rimraf", "xo"]; // TODO: other commands where instrumentation can be skipped?
 
 // override 'node' executable by overwriting process.execPath and prepending $JELLY_BIN to $PATH
 const jellybin = process.env.JELLY_BIN;
@@ -50,14 +50,22 @@ if (!outfile) {
     process.exit(-1);
 }
 
-console.log(`jelly: Running instrumented program: node ${process.argv.slice(4).join(" ")} (process ${process.pid})`);
-
 import {IID, Jalangi, SourceObject} from "../typings/jalangi";
 import fs from "fs";
 import path from "path";
 
+try {
+    // attempt to detect if we're running the jest entry point
+    // if so, insert jest parameter that disables the use of worker processes for tests
+    if(cmd.indexOf("jest") != -1 && /\/node_modules\/jest(-cli)?\/bin\/jest\.js$/.test(fs.realpathSync(cmd)))
+        process.argv.splice(5, 0, "--runInBand");
+} catch(e) {}
+
+console.log(`jelly: Running instrumented program: node ${process.argv.slice(4).join(" ")} (process ${process.pid})`);
+
 declare const J$: Jalangi;
 
+const cwd = process.cwd();  // capture before application can change directory
 const fileIds = new Map<string, number>();
 const files: Array<string> = [];
 const fun2fun = new Map<IID, Set<IID>>();
@@ -106,7 +114,7 @@ function so2loc(s: SourceObject): string {
 /**
  * NodeProf instrumentation callbacks.
  */
-J$.analysis = { // TODO: super calls not detected (see tests/micro/classes.js)
+J$.addAnalysis({ // TODO: super calls not detected (see tests/micro/classes.js)
 
     /**
      * Before function or constructor call.
@@ -164,6 +172,7 @@ J$.analysis = { // TODO: super calls not detected (see tests/micro/classes.js)
      */
     functionExit: function(_iid: IID, _returnVal, _wrappedExceptionVal) {
         funLocStack.pop();
+        inAppStack.pop();
         lastCallLoc = null;
     },
 
@@ -290,7 +299,9 @@ J$.analysis = { // TODO: super calls not detected (see tests/micro/classes.js)
     // binary(iid: IID, op: string, left: any, right: any, result: any, isOpAssign: boolean, isSwitchCaseComparison: boolean, isComputed: boolean): { result: any } | void {
     //     // TODO?
     // }
-};
+}, // Exclude internal sources except actual files incorrectly marked as internal.
+   // The incorrect marking has been observed for ECMAScript modules.
+   (source: SourceObject) => !source.internal || source.name.startsWith("file://"));
 
 /**
  * Program exit, write call graph to JSON file.
@@ -303,12 +314,14 @@ process.on('exit', function() {
     }
     // console.log(`jelly: Writing ${outfile}`);
     const fd = fs.openSync(outfile, "w");
-    fs.writeSync(fd, `{\n "entries": [${JSON.stringify(path.relative(process.cwd(), process.argv[1]))}],\n`);
+    fs.writeSync(fd, `{\n "entries": [${JSON.stringify(path.relative(cwd, process.argv[1]))}],\n`);
     fs.writeSync(fd, ` "time": "${new Date().toUTCString()}",\n`);
     fs.writeSync(fd, ` "files": [`);
     let first = true;
     for (const file of files) {
-        fs.writeSync(fd, `${first ? "" : ","}\n  ${JSON.stringify(file)}`);
+        // relativize absolute paths with file:// prefix
+        const fp = file.startsWith("file://")? path.relative(cwd, file.substring("file://".length)) : file;
+        fs.writeSync(fd, `${first ? "" : ","}\n  ${JSON.stringify(fp)}`);
         first = false;
     }
     fs.writeSync(fd, `\n ],\n "functions": {`);
