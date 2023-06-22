@@ -522,6 +522,10 @@ export class Operations {
                         if (t instanceof NativeObjectToken) // TODO: || t instanceof PackageObjectToken ?
                             f.registerEscapingToExternal(src, path.node);
 
+                        // if writing to module.exports, also write to %exports.default
+                        if (t instanceof NativeObjectToken && t.name === "module" && prop === "exports")
+                           this.solver.addSubsetConstraint(src, vp.objPropVar(this.moduleSpecialNatives.get("exports")!, "default"));
+
                     } else if (lVar && t instanceof AccessPathToken) {
 
                         // constraint: ...: ⟦E2⟧ ⊆ ⟦k.p⟧ where k is the current PackageObjectToken
