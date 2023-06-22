@@ -6,10 +6,12 @@ import {
     isAssignmentPattern,
     isExportDeclaration,
     isExpression,
+    isFunctionExpression,
     isIdentifier,
     isImport,
     isLVal,
     isMemberExpression,
+    isNewExpression,
     isObjectPattern,
     isParenthesizedExpression,
     isRestElement,
@@ -142,9 +144,16 @@ export class Operations {
         const f = this.solver.fragmentState;
         const vp = f.varProducer;
         const caller = this.a.getEnclosingFunctionOrModule(path, this.moduleInfo);
-        let pars: NodePath = path; // (workaround to match dyn.ts which has wrong source location for calls in parenthesized expressions)
-        while (isParenthesizedExpression(pars.parentPath!.node))
-            pars = pars.parentPath!;
+        const par = path.parentPath!;
+        // (workaround to match dyn.ts which has wrong source location for calls in parenthesized expressions)
+        // maybe use the parent if the call is parenthesized AND
+        // (the call is a 'new' expression OR (the callee is not parenthesized AND not a function literal))
+        // the condition is based on the source locations that are reported in
+        // tests/micro/call-expressions.js by the dynamic analysis
+        const pars: NodePath = isParenthesizedExpression(par.node) &&
+            (isNewExpression(path.node) ||
+             (!isParenthesizedExpression(path.node.callee) && !isFunctionExpression(path.node.callee)))?
+             par : path;
         f.registerCall(pars.node, this.moduleInfo);
 
         // collect special information for pattern matcher
