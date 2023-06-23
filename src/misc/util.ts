@@ -100,7 +100,7 @@ export function locationContains(loc: Location | null | undefined, file: string,
 /**
  * Checks whether the first source location is within the second source location.
  */
-export function sourceLocationIn(loc1: SourceLocation, loc2: SourceLocation | undefined | null): boolean {
+export function locationIn(loc1: SourceLocation, loc2: SourceLocation | undefined | null): boolean {
     if (!loc2)
         return false;
     let start = loc2.start.line < loc1.start.line ||
@@ -214,6 +214,54 @@ export function deleteMapSetAll<K, V>(m: Map<K, Set<V>>, k: K, vs: Set<V>) {
         if (s.size === 0)
             m.delete(k);
     }
+}
+
+export function addMapHybridSet<K, V>(k: K, v: V, to: Map<K, V | Set<V>>): boolean {
+    const s = to.get(k);
+    let added = false;
+    if (s) {
+        if (s instanceof Set) {
+            if (!s.has(v)) {
+                s.add(v);
+                added = true;
+            }
+        } else if (s !== v) {
+            to.set(k, new Set<V>([s, v]));
+            added = true;
+        }
+    } else {
+        to.set(k, v);
+        added = true;
+    }
+    return added;
+}
+
+export function addAllMapHybridSet<K, V>(from: Map<K, V | Set<V>>, to: Map<K, V | Set<V>>) {
+    for (const [k, v] of from)
+        if (v instanceof Set)
+            for (const t of v)
+                addMapHybridSet(k, t, to);
+        else
+            addMapHybridSet(k, v, to);
+}
+
+export function getMapHybridSetSize<K, V>(m: Map<K, V | Set<V>>): number {
+    let c = 0;
+    for (const v of m.values())
+        if (v instanceof Set)
+            c += v.size;
+        else
+            c++;
+    return c;
+}
+
+export function forEachMapHybridSet<K, V>(m: Map<K, V | Set<V>>, f: (k: K, v: V) => void) {
+    for (const [k, v] of m)
+        if (v instanceof Set)
+            for (const t of v)
+                f(k, t);
+        else
+            f(k, v);
 }
 
 /**

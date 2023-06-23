@@ -198,7 +198,7 @@ export function returnShuffledInplace(p: NativeFunctionParams) {
  * Warns about use of a native function.
  */
 export function warnNativeUsed(name: string, p: NativeFunctionParams, extra?: string) {
-    p.solver.fragmentState.warnUnsupported(p.path.node, `Call to '${name}'${extra ? ` ${extra}` : ""}`, true);
+    p.solver.fragmentState.warnUnsupported(p.path.node, `Call to '${name}'${extra ? ` ${extra}` : ""}`);
 }
 
 /**
@@ -532,7 +532,7 @@ export function invokeCallback(kind: CallbackKind, p: NativeFunctionParams, arg:
                         if (ft instanceof FunctionToken)
                             p.solver.addForAllConstraint(vp.returnVar(ft.fun), key, p.path.node, (t: Token) => {
                                 if (t instanceof AllocationSiteToken && t.kind === "Promise") {
-                                    // callback return value is a promise, transfer its values to the new promise
+                                    // when callback return value is a promise, transfer its values to the new promise
                                     if (kind !== "Promise.prototype.finally$onFinally")
                                         p.solver.addSubsetConstraint(vp.objPropVar(t, PROMISE_FULFILLED_VALUES), vp.objPropVar(thenPromise, PROMISE_FULFILLED_VALUES));
                                     p.solver.addSubsetConstraint(vp.objPropVar(t, PROMISE_REJECTED_VALUES), vp.objPropVar(thenPromise, PROMISE_REJECTED_VALUES));

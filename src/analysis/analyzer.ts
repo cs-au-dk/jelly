@@ -3,7 +3,7 @@ import {resolve} from "path";
 import logger, {writeStdOutIfActive} from "../misc/logger";
 import Solver, {AbortedException} from "./solver";
 import Timer, {TimeoutException} from "../misc/timer";
-import {addAll, mapMapSize, percent} from "../misc/util";
+import {addAll, getMapHybridSetSize, mapMapSize, percent} from "../misc/util";
 import {visit} from "./astvisitor";
 import {ModuleInfo, PackageInfo} from "./infos";
 import {options, resolveBaseDir} from "../options";
@@ -237,6 +237,10 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
             }
         }
 
+        const f = solver.fragmentState;
+        f.reportNonemptyUnhandledDynamicPropertyWrites();
+        f.reportNonemptyUnhandledDynamicPropertyReads();
+
     } catch (ex) {
         solver.updateDiagnostics();
         if (ex instanceof TimeoutException) {
@@ -248,8 +252,8 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
     }
     solver.diagnostics.time = timer.elapsed();
     solver.diagnostics.cpuTime = timer.elapsedCPU();
-    solver.diagnostics.errors = solver.fragmentState.errors;
-    solver.diagnostics.warnings = solver.fragmentState.warnings;
+    solver.diagnostics.errors = getMapHybridSetSize(solver.fragmentState.errors) + a.filesWithParseErrors.length;
+    solver.diagnostics.warnings = getMapHybridSetSize(solver.fragmentState.warnings) + getMapHybridSetSize(solver.fragmentState.warningsUnsupported);
 
     if (solver.diagnostics.aborted)
         logger.warn("Received abort signal, analysis aborted");
@@ -269,10 +273,6 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
         d.nativeOrExternalCalls = r.getZeroButNativeOrExternalCalleeCalls();
         d.functionsWithZeroCallers = r.getZeroCallerFunctions().size;
         if (logger.isInfoEnabled()) {
-            if (options.warningsUnsupported && !solver.diagnostics.aborted && !solver.diagnostics.timeout) {
-                r.reportNonemptyUnhandledDynamicPropertyWrites();
-                r.reportNonemptyUnhandledDynamicPropertyReads();
-            }
             logger.info(`Analyzed packages: ${solver.diagnostics.packages}, modules: ${solver.diagnostics.modules}, functions: ${a.functionInfos.size}, code size: ${Math.ceil(solver.diagnostics.codeSize / 1024)}KB`);
             logger.info(`Call edges function->function: ${f.numberOfFunctionToFunctionEdges}, call->function: ${f.numberOfCallToFunctionEdges}`);
             const n = d.totalCallSites - d.callsWithNoCallee - d.nativeOnlyCalls - d.externalOnlyCalls - d.nativeOrExternalCalls;
@@ -280,7 +280,7 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
                 ` (excluding ${d.callsWithNoCallee} zero-callee, ${d.nativeOnlyCalls} native-only, ${d.externalOnlyCalls} external-only and ${d.nativeOrExternalCalls} native-or-external-only)`)
             logger.info(`Functions with zero callers: ${r.getZeroCallerFunctions().size}/${a.functionInfos.size}`);
             logger.info(`Analysis time: ${solver.diagnostics.time}ms, memory usage: ${solver.diagnostics.maxMemoryUsage}MB${!options.gc ? " (without --gc)" : ""}`);
-            logger.info(`Analysis errors: ${f.errors}, warnings: ${f.warnings}${f.warnings > 0 && !options.warningsUnsupported ? " (show all with --warnings-unsupported)" : ""}`);
+            logger.info(`Analysis errors: ${solver.diagnostics.errors}, warnings: ${solver.diagnostics.warnings}${getMapHybridSetSize(f.warningsUnsupported) > 0 && !options.warningsUnsupported ? " (show all with --warnings-unsupported)" : ""}`);
             if (options.diagnostics) {
                 logger.info(`Iterations: ${solver.diagnostics.iterations}, listener notification rounds: ${solver.listenerNotificationRounds}`);
                 if (options.maxRounds !== undefined)

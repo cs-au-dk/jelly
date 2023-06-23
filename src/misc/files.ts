@@ -2,9 +2,9 @@ import {closeSync, existsSync, lstatSync, openSync, readdirSync, readFileSync, r
 import {basename, relative, resolve, sep} from "path";
 import {options} from "../options";
 import micromatch from "micromatch";
-import {FilePath, Location, locationToStringWithFile, locationToStringWithFileAndEnd} from "./util";
+import {FilePath, Location, locationToStringWithFileAndEnd} from "./util";
 import logger from "./logger";
-import {SourceLocation} from "@babel/types";
+import {Node} from "@babel/types";
 import {findPackageJson} from "./packagejson";
 import {tsResolveModuleName} from "../typescript/moduleresolver";
 import stringify from "stringify2stream";
@@ -81,7 +81,7 @@ function isShebang(path: string): boolean { // TODO: doesn't work with hacks lik
  * @return resolved file path if successful, undefined if file type not analyzable
  * @throws exception if the module is not found
  */
-export function requireResolve(str: string, file: FilePath, loc: SourceLocation | null | undefined, f: FragmentState): FilePath | undefined {
+export function requireResolve(str: string, file: FilePath, node: Node, f: FragmentState): FilePath | undefined {
     if (str.endsWith(".json")) {
         logger.debug(`Skipping JSON file '${str}'`); // TODO: analyze JSON files?
         return undefined;
@@ -92,7 +92,7 @@ export function requireResolve(str: string, file: FilePath, loc: SourceLocation 
         logger.verbose(`Ignoring module '${str}' with special extension`);
         return undefined;
     } else if (str[0] === "/") {
-        f.warn(`Ignoring absolute module path '${str}'`);
+        f.error(`Ignoring absolute module path '${str}'`, node);
         return undefined;
     }
     let filepath;
@@ -109,7 +109,7 @@ export function requireResolve(str: string, file: FilePath, loc: SourceLocation 
         for (const p of f.a.packageInfos.values())
             if (p.name === str)
                 if (filepath) {
-                    f.warn(`Multiple packages named ${str} found, skipping module load`);
+                    f.error(`Multiple packages named ${str} found, skipping module load`, node);
                     throw e;
                 } else {
                     filepath = resolve(p.dir, p.main || "index.js"); // https://nodejs.org/dist/latest-v8.x/docs/api/modules.html#modules_all_together
@@ -126,7 +126,7 @@ export function requireResolve(str: string, file: FilePath, loc: SourceLocation 
     }
     if (!filepath.endsWith(".js") && !filepath.endsWith(".jsx") && !filepath.endsWith(".es") && !filepath.endsWith(".mjs") &&
         !filepath.endsWith(".cjs") && !filepath.endsWith(".ts") && !filepath.endsWith(".tsx")) {
-        f.warn(`Module '${filepath}' at ${locationToStringWithFile(loc)} has unrecognized extension, skipping it`);
+        f.warn(`Module '${filepath}' has unrecognized extension, skipping it`, node);
         return undefined;
     }
     if (logger.isDebugEnabled())

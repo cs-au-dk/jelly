@@ -1,20 +1,14 @@
 import {ConstraintVar, IntermediateVar, NodeVar, ObjectPropertyVar, ObjectPropertyVarObj} from "./constraintvars";
 import logger, {isTTY, writeStdOut} from "../misc/logger";
-import {
-    AccessPathToken,
-    AllocationSiteToken,
-    ArrayToken,
-    FunctionToken,
-    ObjectToken,
-    PackageObjectToken,
-    Token
-} from "./tokens";
+import {AccessPathToken, AllocationSiteToken, ArrayToken, FunctionToken, ObjectToken, PackageObjectToken, Token} from "./tokens";
 import {GlobalState} from "./globalstate";
 import {PackageInfo} from "./infos";
 import {
     addAll,
+    addAllMapHybridSet,
     isArrayIndex,
     Location,
+    locationToStringWithFileAndEnd,
     mapArrayPushAll,
     mapGetArray,
     mapGetMap,
@@ -23,19 +17,10 @@ import {
     mapMapSetAll,
     mapSetAddAll,
     nodeToString,
-    setAll,
-    locationToStringWithFileAndEnd
+    setAll
 } from "../misc/util";
 import assert from "assert";
-import {
-    AccessPath,
-    CallResultAccessPath,
-    ComponentAccessPath,
-    IgnoredAccessPath,
-    ModuleAccessPath,
-    PropertyAccessPath,
-    UnknownAccessPath
-} from "./accesspaths";
+import {AccessPath, CallResultAccessPath, ComponentAccessPath, IgnoredAccessPath, ModuleAccessPath, PropertyAccessPath, UnknownAccessPath} from "./accesspaths";
 import {isAssignmentExpression, Node} from "@babel/types";
 import {FragmentState, ListenerID} from "./fragmentstate";
 import {TokenListener} from "./listeners";
@@ -1161,9 +1146,9 @@ export default class Solver {
         mapSetAddAll(s.maybeEscapingToExternal, f.maybeEscapingToExternal);
         setAll(s.unhandledDynamicPropertyWrites, f.unhandledDynamicPropertyWrites);
         addAll(s.unhandledDynamicPropertyReads, f.unhandledDynamicPropertyReads);
-        f.errors += s.errors;
-        f.warnings += s.errors;
-        addAll(s.nodesWithWarning, f.nodesWithWarning);
+        addAllMapHybridSet(s.errors, f.errors);
+        addAllMapHybridSet(s.warnings, f.warnings);
+        addAllMapHybridSet(s.warningsUnsupported, f.warningsUnsupported);
         mapSetAddAll(s.moduleAccessPaths, f.moduleAccessPaths);
         mapMapMapSetAll(s.propertyReadAccessPaths, f.propertyReadAccessPaths);
         mapMapMapSetAll(s.propertyWriteAccessPaths, f.propertyWriteAccessPaths);

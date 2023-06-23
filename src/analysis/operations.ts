@@ -144,16 +144,13 @@ export class Operations {
         const f = this.solver.fragmentState;
         const vp = f.varProducer;
         const caller = this.a.getEnclosingFunctionOrModule(path, this.moduleInfo);
-        const par = path.parentPath!;
-        // (workaround to match dyn.ts which has wrong source location for calls in parenthesized expressions)
-        // maybe use the parent if the call is parenthesized AND
-        // (the call is a 'new' expression OR (the callee is not parenthesized AND not a function literal))
-        // the condition is based on the source locations that are reported in
-        // tests/micro/call-expressions.js by the dynamic analysis
-        const pars: NodePath = isParenthesizedExpression(par.node) &&
+
+        // workaround to match dyn.ts which has wrong source location for calls in certain parenthesized expressions
+        const pars: NodePath = isParenthesizedExpression(path.parentPath.node) &&
             (isNewExpression(path.node) ||
-             (!isParenthesizedExpression(path.node.callee) && !isFunctionExpression(path.node.callee)))?
-             par : path;
+             (!isParenthesizedExpression(path.node.callee) && !isFunctionExpression(path.node.callee))) ?
+            path.parentPath : path;
+
         f.registerCall(pars.node, this.moduleInfo);
 
         // collect special information for pattern matcher
@@ -167,7 +164,7 @@ export class Operations {
             if (isStringLiteral(exp))
                 yield exp.value;
             else // TODO: currently supporting only string literals at 'require' and 'import'
-                f.warnUnsupported(path.node, "Unhandled 'require'", true);
+                f.warnUnsupported(path.node, "Unhandled 'require'");
         }
 
         // expression E0(E1,...,En) or new E0(E1,...,En)
@@ -203,7 +200,7 @@ export class Operations {
                         if (hasArguments)
                             this.solver.addSubsetConstraint(argVar, vp.objPropVar(argumentsToken!, String(i)));
                     } else if (arg)
-                        f.warnUnsupported(arg, "SpreadElement in arguments", true); // TODO: SpreadElement in arguments
+                        f.warnUnsupported(arg, "SpreadElement in arguments"); // TODO: SpreadElement in arguments
                 }
                 // constraint: ...: ⟦ret_t⟧ ⊆ ⟦(new) E0(E1,...,En)⟧
                 if (!isParentExpressionStatement(pars))
@@ -431,7 +428,7 @@ export class Operations {
             try {
 
                 // try to locate the module
-                const filepath = requireResolve(str, this.file, path.node.loc, f);
+                const filepath = requireResolve(str, this.file, path.node, f);
                 if (filepath) {
 
                     // register that the module is reached
@@ -453,7 +450,7 @@ export class Operations {
                     if (logger.isVerboseEnabled())
                         logger.verbose(`Ignoring unresolved module '${str}' at ${locationToStringWithFile(path.node.loc)}`);
                 } else // TODO: special warning if the require/import is placed in a try-block, an if statement, or a switch case?
-                    f.warn(`Unable to resolve module '${str}' at ${locationToStringWithFile(path.node.loc)}`); // TODO: may report duplicate error messages
+                    f.warn(`Unable to resolve module '${str}'`, path.node);
 
                 // couldn't find module file (probably hasn't been installed), use a DummyModuleInfo if absolute module name
                 if (!"./#".includes(str[0]))

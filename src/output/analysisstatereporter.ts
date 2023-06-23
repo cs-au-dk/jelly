@@ -236,36 +236,6 @@ export class AnalysisStateReporter {
     }
 
     /**
-     * Reports warnings about unhandled dynamic property write operations with nonempty token sets.
-     * The source code and the tokens are included in the output if loglevel is verbose or higher.
-     */
-    reportNonemptyUnhandledDynamicPropertyWrites() {
-        for (const [node, {src, source}] of this.f.unhandledDynamicPropertyWrites.entries()) {
-            const [size, ts] = this.f.getTokensSize(this.f.getRepresentative(src));
-            if (size > 0) {
-                let funs = 0;
-                for (const t of ts)
-                    if (t instanceof FunctionToken)
-                        funs++;
-                this.f.warn(`Nonempty dynamic property write (${funs} function${funs === 1 ? "" : "s"}) at ${locationToStringWithFile(node.loc)}`); // TODO: may report duplicate warnings
-                if (logger.isVerboseEnabled() && source !== undefined) {
-                    logger.warn(source);
-                    for (const t of ts)
-                        logger.warn(`  ${t}`);
-                }
-            }
-        }
-    }
-
-    /**
-     * Reports warnings about unhandled dynamic property read operations.
-     */
-    reportNonemptyUnhandledDynamicPropertyReads() {
-        for (const node of this.f.unhandledDynamicPropertyReads)
-            this.f.warn(`Dynamic property read at ${locationToStringWithFile(node.loc)}`); // TODO: may report duplicate warnings
-    }
-
-    /**
      * Returns the call sites that have zero callees,
      * excluding call sites to known native functions or external functions.
      */

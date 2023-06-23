@@ -23,7 +23,7 @@ export function testSoundness(jsonfile: string, f: FragmentState): [number, numb
             staticFunctions.set(`${m.getPath()}:${m.node.loc.start.line}:${m.node.loc.start.column + 1}:${m.node.loc.end.line}:${m.node.loc.end.column + 1}`, m);
     for (const g of f.a.functionInfos.values())
         if (!g.node?.loc || "nodeIndex" in g.node.loc)
-            f.warn(`Source location missing for function ${g.name || "<anonymous>"} in ${g.moduleInfo.getPath()}`);
+            logger.warn(`Warning: Source location missing for function ${g.name || "<anonymous>"} in ${g.moduleInfo.getPath()}`);
         else
             staticFunctions.set(`${g.moduleInfo.getPath()}:${g.node.loc.start.line}:${g.node.loc.start.column + 1}:${g.node.loc.end.line}:${g.node.loc.end.column + 1}`, g);
 

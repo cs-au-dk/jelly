@@ -21,7 +21,7 @@ import {
     OptionalCallExpression
 } from "@babel/types";
 import assert from "assert";
-import {mapGetSet, locationToStringWithFile, locationToStringWithFileAndEnd} from "../misc/util";
+import {mapGetSet, locationToStringWithFile, locationToStringWithFileAndEnd, addMapHybridSet} from "../misc/util";
 import {AccessPath, CallResultAccessPath, ComponentAccessPath, ModuleAccessPath, PropertyAccessPath} from "./accesspaths";
 import {options} from "../options";
 import logger from "../misc/logger";
@@ -229,19 +229,19 @@ export class FragmentState {
     readonly unhandledDynamicPropertyReads: Set<Node> = new Set;
 
     /**
-     * Number of errors. (For statistics only.)
+     * Error messages.
      */
-    errors: number = 0;
+    errors: Map<Node | undefined, string | Set<string>> = new Map;
 
     /**
-     * Number of warnings. (For statistics only.)
+     * Warning messages (excluding those about unsupported features).
      */
-    warnings: number = 0;
+    warnings: Map<Node | undefined, string | Set<string>> = new Map;
 
     /**
-     * AST nodes where a warning has been emitted.
+     * Warning messages about unsupported features.
      */
-    readonly nodesWithWarning: Set<Node> = new Set;
+    warningsUnsupported: Map<Node, string | Set<string>> = new Map;
 
     /**
      * 'require' expressions and import/export declarations/expressions where ModuleAccessPaths are created.
@@ -447,34 +447,59 @@ export class FragmentState {
 
     /**
      * Emits an error message.
+     * Avoids duplicates.
      */
-    error(msg: string) {
-        logger.error(`Error: ${msg}`);
-        this.errors++;
+    error(msg: string, node?: Node) {
+        if (addMapHybridSet(node, msg, this.errors))
+            logger.error(`Error: ${msg}${node ? ` at ${locationToStringWithFile(node.loc)}` : ""}`);
     }
 
     /**
-     * Emits a warning message.
+     * Emits a warning message. (See also warnUnsupported.)
+     * Avoids duplicates.
      */
-    warn(msg: string) {
-        logger.warn(`Warning: ${msg}`);
-        this.warnings++;
+    warn(msg: string, node?: Node) {
+        if (addMapHybridSet(node, msg, this.warnings))
+            logger.warn(`Warning: ${msg}${node ? ` at ${locationToStringWithFile(node.loc)}` : ""}`);
     }
 
     /**
      * Emits a warning message about an unsupported language feature or library function.
-     * If avoidDuplicates is set, at most one warning is generated per node.
+     * Avoids duplicates.
      */
-    warnUnsupported(node: Node, msg: string = node.type, avoidDuplicates: boolean = false) {
-        if (avoidDuplicates) {
-            if (this.nodesWithWarning.has(node))
-                return;
-            this.nodesWithWarning.add(node);
+    warnUnsupported(node: Node, msg: string = node.type) {
+        if (addMapHybridSet(node, msg, this.warningsUnsupported) && options.warningsUnsupported)
+            logger.warn(`Warning: ${msg} at ${locationToStringWithFile(node.loc)}`);
+    }
+
+    /**
+     * Reports warnings about unhandled dynamic property write operations with nonempty token sets.
+     * The source code and the tokens are included in the output if loglevel is verbose or higher.
+     */
+    reportNonemptyUnhandledDynamicPropertyWrites() {
+        for (const [node, {src, source}] of this.unhandledDynamicPropertyWrites.entries()) {
+            const [size, ts] = this.getTokensSize(this.getRepresentative(src));
+            if (size > 0) {
+                let funs = 0;
+                for (const t of ts)
+                    if (t instanceof FunctionToken)
+                        funs++;
+                this.warnUnsupported(node, `Nonempty dynamic property write (${funs} function${funs === 1 ? "" : "s"})`);
+                if (logger.isVerboseEnabled() && source !== undefined) {
+                    logger.warn(source);
+                    for (const t of ts)
+                        logger.warn(`  ${t}`);
+                }
+            }
         }
-        if (options.warningsUnsupported)
-            this.warn(`${msg} at ${locationToStringWithFile(node.loc)}`);
-        else
-            this.warnings++;
+    }
+
+    /**
+     * Reports warnings about unhandled dynamic property read operations.
+     */
+    reportNonemptyUnhandledDynamicPropertyReads() {
+        for (const node of this.unhandledDynamicPropertyReads)
+            this.warnUnsupported(node, "Dynamic property read");
     }
 
     /**

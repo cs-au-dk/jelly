@@ -25,7 +25,7 @@ export function findModules(ast: File, file: FilePath, f: FragmentState, moduleI
     function requireModule(str: string, path: NodePath) { // see requireModule in operations.ts
         if (!(builtinModules.has(str) || (str.startsWith("node:") && builtinModules.has(str.substring(5)))))
             try {
-                const filepath = requireResolve(str, file, path.node.loc, f);
+                const filepath = requireResolve(str, file, path.node, f);
                 if (filepath)
                     f.a.reachedFile(filepath, moduleInfo);
             } catch {
@@ -33,7 +33,7 @@ export function findModules(ast: File, file: FilePath, f: FragmentState, moduleI
                     if (logger.isVerboseEnabled())
                         logger.verbose(`Ignoring unresolved module '${str}' at ${locationToStringWithFile(path.node.loc)}`);
                 } else// TODO: special warning if the require/import is placed in a try-block, an if statement, or a switch case?
-                    f.warn(`Unable to resolve module '${str}' at ${locationToStringWithFile(path.node.loc)}`);
+                    f.warn(`Unable to resolve module '${str}'`, path.node);
             }
     }
 
@@ -49,7 +49,7 @@ export function findModules(ast: File, file: FilePath, f: FragmentState, moduleI
                 if (isStringLiteral(arg))
                     requireModule(arg.value, path);
                 else
-                    f.error(`Unhandled 'require' at ${locationToStringWithFile(path.node.loc)}`);
+                    f.warnUnsupported(path.node, "Unhandled 'require'");
             }
         },
 

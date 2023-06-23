@@ -35,7 +35,7 @@ import {
     ThisVar
 } from "./constraintvars";
 import {ArrayToken, ObjectToken, PackageObjectToken} from "./tokens";
-import {FilePath, Location, locationToStringWithFile} from "../misc/util";
+import {FilePath, Location} from "../misc/util";
 import {PackageInfo} from "./infos";
 import {GlobalState} from "./globalstate";
 import {getClass} from "../misc/asthelpers";
@@ -76,7 +76,7 @@ export class ConstraintVarProducer {
         else if (isSuper(exp)) {
             const cl = getClass(path);
             if (!cl) {
-                this.f.warnUnsupported(exp, `Ignoring super in object expression at ${locationToStringWithFile(exp.loc)}`, true); // TODO: object expressions may have prototypes, e.g. __proto__
+                this.f.warnUnsupported(exp, "Ignoring super in object expression"); // TODO: object expressions may have prototypes, e.g. __proto__
                 return undefined;
             }
             return this.extendsVar(cl);
