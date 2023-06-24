@@ -52,6 +52,7 @@ import {
     isPattern,
     isRestElement,
     isSpreadElement,
+    isVariableDeclaration,
     JSXElement,
     JSXMemberExpression,
     LogicalExpression,
@@ -688,7 +689,7 @@ export function visit(ast: File, op: Operations) {
             // read iterator using path.node for the temporary result
             op.readIteratorValue(op.expVar(path.node.right, path), vp.nodeVar(path.node), path.node);
             // assign the temporary result to the l-value
-            const lval = isLVal(path.node.left) ? path.node.left : path.node.left.declarations.length === 1 ? path.node.left.declarations[0]?.id : undefined;
+            const lval = isVariableDeclaration(path.node.left) ? path.node.left.declarations.length === 1 ? path.node.left.declarations[0]?.id : undefined : path.node.left;
             assert(lval, "Unexpected number of declarations at for-of");
             op.assign(vp.nodeVar(path.node), lval, path);
             // note: 'for await' is handled trivially because the same abstract object is used for the AsyncGenerator and the iterator objects
