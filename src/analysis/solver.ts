@@ -40,6 +40,10 @@ export default class Solver {
 
     fragmentState: FragmentState = new FragmentState(this.globalState);
 
+    get varProducer() {
+        return this.fragmentState.varProducer;
+    }
+
     unprocessedTokens: Map<ConstraintVar, Array<Token>> = new Map;
 
     unprocessedSubsetEdges: Map<ConstraintVar, Set<ConstraintVar>> = new Map;

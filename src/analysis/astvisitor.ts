@@ -115,9 +115,9 @@ export const IDENTIFIER_KIND = Symbol();
 
 export function visit(ast: File, op: Operations) {
     const solver = op.solver;
-    const f = solver.fragmentState;
     const a = solver.globalState;
-    const vp = f.varProducer;
+    const f = solver.fragmentState; // (don't use in callbacks)
+    const vp = f.varProducer; // (don't use in callbacks)
 
     // traverse the AST and extend the analysis result with information about the current module
     if (logger.isVerboseEnabled())
@@ -226,7 +226,7 @@ export function visit(ast: File, op: Operations) {
 
             // process destructuring for parameters and register identifier parameters
             for (const param of fun.params) {
-                const paramVar = op.solver.fragmentState.varProducer.nodeVar(param);
+                const paramVar = op.solver.varProducer.nodeVar(param);
                 if (isIdentifier(param))
                     f.registerFunctionParameter(paramVar, path.node);
                 else
@@ -589,9 +589,9 @@ export function visit(ast: File, op: Operations) {
                         if (isImportSpecifier(imp) || isImportDefaultSpecifier(imp)) {
                             const prop = getImportName(imp);
                             if (t instanceof AllocationSiteToken || t instanceof FunctionToken || t instanceof NativeObjectToken || t instanceof PackageObjectToken)
-                                solver.addSubsetConstraint(vp.objPropVar(t, prop), vp.nodeVar(imp.local));
+                                solver.addSubsetConstraint(solver.varProducer.objPropVar(t, prop), solver.varProducer.nodeVar(imp.local));
                             else if (t instanceof AccessPathToken) // TODO: treat as object along with other tokens above?
-                                solver.addAccessPath(a.canonicalizeAccessPath(new PropertyAccessPath(vp.nodeVar(path.node), prop)), vp.nodeVar(imp.local), t.ap); // TODO: describe this constraint...
+                                solver.addAccessPath(a.canonicalizeAccessPath(new PropertyAccessPath(solver.varProducer.nodeVar(path.node), prop)), solver.varProducer.nodeVar(imp.local), t.ap); // TODO: describe this constraint...
                         }
                 });
             }
@@ -678,7 +678,7 @@ export function visit(ast: File, op: Operations) {
                     if (m instanceof ModuleInfo) {
                         const t = a.canonicalizeToken(new NativeObjectToken("exports", m));
                         solver.addForAllObjectPropertiesConstraint(t, TokenListener.EXPORT_BASE, path.node, (prop: string) => { // TODO: only exporting explicitly defined properties, not unknown computed
-                            solver.addSubsetConstraint(vp.objPropVar(t, prop), vp.objPropVar(op.exportsObjectToken, prop));
+                            solver.addSubsetConstraint(solver.varProducer.objPropVar(t, prop), solver.varProducer.objPropVar(op.exportsObjectToken, prop));
                         });
                     }
                     break;
@@ -737,7 +737,7 @@ export function visit(ast: File, op: Operations) {
             if (componentVar)
                 solver.addForAllConstraint(componentVar, TokenListener.JSX_ELEMENT, path.node, (t: Token) => {
                     if (t instanceof AccessPathToken)
-                        solver.addAccessPath(a.canonicalizeAccessPath(new ComponentAccessPath(componentVar)), vp.nodeVar(path.node), t.ap);
+                        solver.addAccessPath(a.canonicalizeAccessPath(new ComponentAccessPath(componentVar)), solver.varProducer.nodeVar(path.node), t.ap);
                 });
         }
     });

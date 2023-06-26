@@ -113,15 +113,14 @@ export class Operations {
      * Also adds @Unknown and a subset constraint for globalThis.E if the given expression E is an implicitly declared global variable.
      */
     expVar(exp: Expression | JSXIdentifier | JSXMemberExpression | JSXNamespacedName, path: NodePath): ConstraintVar | undefined {
-        const vp = this.solver.fragmentState.varProducer;
-        const v = vp.expVar(exp, path);
+        const v = this.solver.varProducer.expVar(exp, path);
 
         // if the expression is a variable that has not been declared normally... (unbound set by preprocessAst)
         if (v instanceof NodeVar && isIdentifier(v.node) && (v.node.loc as Location).unbound) {
 
             // the variable may be a property of globalThis
             // constraint: globalThis.X ∈ ⟦X⟧
-            this.solver.addSubsetConstraint(vp.objPropVar(this.globalSpecialNatives.get("globalThis")!, v.node.name), v);
+            this.solver.addSubsetConstraint(this.solver.varProducer.objPropVar(this.globalSpecialNatives.get("globalThis")!, v.node.name), v);
 
             // the variable may be declared explicitly by unknown code
             // constraint: @Unknown ∈ ⟦X⟧
@@ -141,8 +140,7 @@ export class Operations {
      */
     callFunction(calleeVar: ConstraintVar | undefined, baseVar: ConstraintVar | undefined, args: CallExpression["arguments"],
                  resultVar: ConstraintVar | undefined, isNew: boolean, path: NodePath<CallExpression | OptionalCallExpression | NewExpression>) {
-        const f = this.solver.fragmentState;
-        const vp = f.varProducer;
+        const f = this.solver.fragmentState; // (don't use in callbacks)
         const caller = this.a.getEnclosingFunctionOrModule(path, this.moduleInfo);
 
         // workaround to match dyn.ts which has wrong source location for calls in certain parenthesized expressions
@@ -170,8 +168,8 @@ export class Operations {
         // expression E0(E1,...,En) or new E0(E1,...,En)
         // constraint: ∀ functions t ∈ ⟦E0⟧: ...
         this.solver.addForAllConstraint(calleeVar, TokenListener.CALL_FUNCTION_CALLEE, path.node, (t: Token) => {
-            const f = this.solver.fragmentState;
-            const vp = f.varProducer;
+            const f = this.solver.fragmentState; // (don't use in callbacks)
+            const vp = f.varProducer; // (don't use in callbacks)
             if (t instanceof FunctionToken) {
                 f.registerCallEdge(pars.node, caller, this.a.functionInfos.get(t.fun)!);
                 if (t.moduleInfo !== this.moduleInfo)
@@ -245,14 +243,12 @@ export class Operations {
                     if (isExpression(arg)) {
                         const argVar = this.expVar(arg, path);
                         this.solver.addForAllConstraint(argVar, TokenListener.CALL_FUNCTION_EXTERNAL, arg, (at: Token) => {
-                            const f = this.solver.fragmentState;
-                            const vp = f.varProducer;
                             if (at instanceof FunctionToken) {
                                 // constraint: assign UnknownAccessPath to arguments to function arguments for external functions, also add (artificial) call edge
-                                f.registerCallEdge(pars.node, caller, this.a.functionInfos.get(at.fun)!, {external: true});
+                                this.solver.fragmentState.registerCallEdge(pars.node, caller, this.a.functionInfos.get(at.fun)!, {external: true});
                                 for (let j = 0; j < at.fun.params.length; j++)
                                     if (isIdentifier(at.fun.params[j])) // TODO: non-identifier parameters?
-                                        this.solver.addAccessPath(UnknownAccessPath.instance, vp.nodeVar(at.fun.params[j]));
+                                        this.solver.addAccessPath(UnknownAccessPath.instance, this.solver.varProducer.nodeVar(at.fun.params[j]));
                             }
                         });
                         f.registerEscapingToExternal(argVar, arg);
@@ -275,12 +271,10 @@ export class Operations {
 
         // constraint: if E0 is a member expression E.m: ∀ t ∈ ⟦E⟧, functions f ∈ ⟦E0⟧: if f uses 'this'...
         this.solver.addForAllConstraint(calleeVar, TokenListener.CALL_FUNCTION_BASE_CALLEE, path.node, (ft: Token) => {
-            const f = this.solver.fragmentState;
-            const vp = f.varProducer;
-            if (ft instanceof FunctionToken && f.functionsWithThis.has(ft.fun))
+            if (ft instanceof FunctionToken && this.solver.fragmentState.functionsWithThis.has(ft.fun))
 
                 // constraint: ... ⟦E⟧ ⊆ ⟦this_f⟧
-                this.solver.addSubsetConstraint(baseVar, vp.thisVar(ft.fun)); // TODO: introduce special subset edge that only propagates FunctionToken and AllocationSiteToken?
+                this.solver.addSubsetConstraint(baseVar, this.solver.varProducer.thisVar(ft.fun)); // TODO: introduce special subset edge that only propagates FunctionToken and AllocationSiteToken?
         });
 
         // 'import' expression
@@ -290,7 +284,7 @@ export class Operations {
                 this.requireModule(str, v, path);
             const promise = this.newPromiseToken(path.node);
             this.solver.addTokenConstraint(promise, this.expVar(path.node, path));
-            this.solver.addSubsetConstraint(v, vp.objPropVar(promise, PROMISE_FULFILLED_VALUES));
+            this.solver.addSubsetConstraint(v, this.solver.varProducer.objPropVar(promise, PROMISE_FULFILLED_VALUES));
         }
     }
 
@@ -309,15 +303,13 @@ export class Operations {
         if (prop !== undefined) {
 
             const readFromGetter = (t: Token) => {
-                const f = this.solver.fragmentState;
-                const vp = f.varProducer;
                 if (t instanceof FunctionToken && t.fun.params.length === 0) {
                     if (dst)
-                        this.solver.addSubsetConstraint(vp.returnVar(t.fun), dst);
-                    if (base && f.functionsWithThis.has(t.fun))
-                        this.solver.addSubsetConstraint(base, vp.thisVar(t.fun));
-                    f.registerCall(node, this.moduleInfo, {accessor: true});
-                    f.registerCallEdge(node, enclosing, this.a.functionInfos.get(t.fun)!, {accessor: true});
+                        this.solver.addSubsetConstraint(this.solver.varProducer.returnVar(t.fun), dst);
+                    if (base && this.solver.fragmentState.functionsWithThis.has(t.fun))
+                        this.solver.addSubsetConstraint(base, this.solver.varProducer.thisVar(t.fun));
+                    this.solver.fragmentState.registerCall(node, this.moduleInfo, {accessor: true});
+                    this.solver.fragmentState.registerCallEdge(node, enclosing, this.a.functionInfos.get(t.fun)!, {accessor: true});
                 }
             }
 
@@ -326,38 +318,35 @@ export class Operations {
 
                 // constraint: ... ∀ ancestors t2 of t: ...
                 this.solver.addForAllAncestorsConstraint(t, node, (t2: Token) => {
-                    const vp = this.solver.fragmentState.varProducer;
-
                     if (t2 instanceof AllocationSiteToken || t2 instanceof FunctionToken || t2 instanceof NativeObjectToken || t2 instanceof PackageObjectToken) {
 
                         // constraint: ... ⟦t2.p⟧ ⊆ ⟦E.p⟧
                         if (dst)
-                            this.solver.addSubsetConstraint(vp.objPropVar(t2, prop), dst); // TODO: exclude AccessPathTokens?
+                            this.solver.addSubsetConstraint(this.solver.varProducer.objPropVar(t2, prop), dst); // TODO: exclude AccessPathTokens?
 
                         // constraint: ... ∀ functions t3 ∈ ⟦(get)t2.p⟧: ⟦ret_t3⟧ ⊆ ⟦E.p⟧
-                        this.solver.addForAllConstraint(vp.objPropVar(t2, prop, "get"), TokenListener.READ_PROPERTY_GETTER, node, readFromGetter);
+                        this.solver.addForAllConstraint(this.solver.varProducer.objPropVar(t2, prop, "get"), TokenListener.READ_PROPERTY_GETTER, node, readFromGetter);
 
                         if (t2 instanceof PackageObjectToken) {
                             // TODO: also reading from neighbor packages if t2 is a PackageObjectToken...
                             this.solver.addForAllPackageNeighborsConstraint(t2.packageInfo, node, (neighbor: PackageInfo) => {
-                                const vp = this.solver.fragmentState.varProducer;
                                 if (dst)
-                                    this.solver.addSubsetConstraint(vp.packagePropVar(neighbor, prop), dst); // TODO: exclude AccessPathTokens?
-                                this.solver.addForAllConstraint(vp.packagePropVar(neighbor, prop, "get"), TokenListener.READ_PROPERTY_GETTER2, node, readFromGetter);
+                                    this.solver.addSubsetConstraint(this.solver.varProducer.packagePropVar(neighbor, prop), dst); // TODO: exclude AccessPathTokens?
+                                this.solver.addForAllConstraint(this.solver.varProducer.packagePropVar(neighbor, prop, "get"), TokenListener.READ_PROPERTY_GETTER2, node, readFromGetter);
                             });
 
                         } else if (t2 instanceof ArrayToken) {
                             if (isArrayIndex(prop)) {
 
                                 // constraint: ... ⟦t2.*⟧ ⊆ ⟦E.p⟧
-                                this.solver.addSubsetConstraint(vp.arrayValueVar(t2), dst);
+                                this.solver.addSubsetConstraint(this.solver.varProducer.arrayValueVar(t2), dst);
                             }
                         }
 
                     } else if (base && t2 instanceof AccessPathToken) {
 
                         // constraint: ... if t2 is access path, @E.p ∈ ⟦E.p⟧
-                        this.solver.addAccessPath(this.a.canonicalizeAccessPath(new PropertyAccessPath(base, prop)), vp.nodeVar(node), t2.ap);
+                        this.solver.addAccessPath(this.a.canonicalizeAccessPath(new PropertyAccessPath(base, prop)), this.solver.varProducer.nodeVar(node), t2.ap);
                     }
                 });
 
@@ -371,30 +360,26 @@ export class Operations {
 
         } else { // TODO: handle dynamic property reads?
 
-            const f = this.solver.fragmentState;
-            f.registerEscapingFromModule(base); // unknown properties of the base object may escape
+            this.solver.fragmentState.registerEscapingFromModule(base); // unknown properties of the base object may escape
             this.solver.addAccessPath(UnknownAccessPath.instance, dst);
 
             // constraint: ∀ arrays t ∈ ⟦E⟧: ...
             if (dst)
                 this.solver.addForAllConstraint(base, TokenListener.READ_PROPERTY_BASE_DYNAMIC, node, (t: Token) => {
-                    const f = this.solver.fragmentState;
-                    const vp = f.varProducer;
                     if (t instanceof ArrayToken) {
 
                         // constraint: ... ⟦t.*⟧ ⊆ ⟦E[i]⟧
-                        this.solver.addSubsetConstraint(vp.arrayValueVar(t), dst);
+                        this.solver.addSubsetConstraint(this.solver.varProducer.arrayValueVar(t), dst);
 
                         // constraint: ...: ⟦t.p⟧ ⊆ ⟦E[i]⟧ where p is a property of t
                         this.solver.addForAllArrayEntriesConstraint(t, TokenListener.READ_PROPERTY_BASE_DYNAMIC_ARRAY, node, (prop: string) => {
-                            const vp = this.solver.fragmentState.varProducer;
-                            this.solver.addSubsetConstraint(vp.objPropVar(t, prop), dst);
+                            this.solver.addSubsetConstraint(this.solver.varProducer.objPropVar(t, prop), dst);
                         });
                         // TODO: ignoring reads from prototype chain
 
                     } else { // TODO: assuming dynamic reads from arrays only read array indices
                         if (logger.isInfoEnabled())
-                            f.registerUnhandledDynamicPropertyRead(node);
+                            this.solver.fragmentState.registerUnhandledDynamicPropertyRead(node);
                     }
                 });
 
@@ -411,8 +396,7 @@ export class Operations {
      * Returns the module info object, or undefined if not available.
      */
     requireModule(str: string, resultVar: ConstraintVar | undefined, path: NodePath): ModuleInfo | DummyModuleInfo | undefined { // see requireModule in modulefinder.ts
-        const f = this.solver.fragmentState;
-        const vp = f.varProducer;
+        const f = this.solver.fragmentState; // (don't use in callbacks)
         const reexport = isExportDeclaration(path.node);
         let m: ModuleInfo | DummyModuleInfo | undefined;
         if (builtinModules.has(str) || (str.startsWith("node:") && builtinModules.has(str.substring(5)))) {
@@ -442,7 +426,7 @@ export class Operations {
 
                     if (!reexport) {
                         // constraint: ⟦module_m.exports⟧ ⊆ ⟦require(...)⟧ where m denotes the module being loaded
-                        this.solver.addSubsetConstraint(vp.objPropVar(this.a.canonicalizeToken(new NativeObjectToken("module", m)), "exports"), resultVar);
+                        this.solver.addSubsetConstraint(this.solver.varProducer.objPropVar(this.a.canonicalizeToken(new NativeObjectToken("module", m)), "exports"), resultVar);
                     }
                 }
             } catch {
@@ -481,8 +465,7 @@ export class Operations {
      * Models an assignment from a constraint variable to an l-value.
      */
     assign(src: ConstraintVar | undefined, dst: LVal | ParenthesizedExpression, path: NodePath) {
-        const f = this.solver.fragmentState;
-        const vp = f.varProducer;
+        const vp = this.solver.varProducer; // (don't use in callbacks)
         while (isParenthesizedExpression(dst))
             dst = dst.expression as LVal | ParenthesizedExpression; // for parenthesized expressions, use the inner expression (the definition of LVal in @babel/types misses ParenthesizedExpression)
         if (isIdentifier(dst)) {
@@ -500,54 +483,49 @@ export class Operations {
                 // E1.p = E2
 
                 const writeToSetter = (t: Token) => {
-                    const f = this.solver.fragmentState;
-                    const vp = f.varProducer;
                     if (t instanceof FunctionToken && t.fun.params.length === 1) {
-                        this.solver.addSubsetConstraint(src, vp.nodeVar(t.fun.params[0]));
-                        if (f.functionsWithThis.has(t.fun))
-                            this.solver.addSubsetConstraint(lVar, vp.thisVar(t.fun));
-                        f.registerCall(path.node, this.moduleInfo, {accessor: true});
-                        f.registerCallEdge(path.node, this.a.getEnclosingFunctionOrModule(path, this.moduleInfo), this.a.functionInfos.get(t.fun)!, {accessor: true});
+                        this.solver.addSubsetConstraint(src, this.solver.varProducer.nodeVar(t.fun.params[0]));
+                        if (this.solver.fragmentState.functionsWithThis.has(t.fun))
+                            this.solver.addSubsetConstraint(lVar, this.solver.varProducer.thisVar(t.fun));
+                        this.solver.fragmentState.registerCall(path.node, this.moduleInfo, {accessor: true});
+                        this.solver.fragmentState.registerCallEdge(path.node, this.a.getEnclosingFunctionOrModule(path, this.moduleInfo), this.a.functionInfos.get(t.fun)!, {accessor: true});
                     }
                 }
 
                 // constraint: ∀ objects t ∈ ⟦E1⟧: ...
                 this.solver.addForAllConstraint(lVar, TokenListener.ASSIGN_MEMBER_BASE, path.node, (t: Token) => {
-                    const vp = this.solver.fragmentState.varProducer;
                     if (t instanceof AllocationSiteToken || t instanceof FunctionToken || t instanceof NativeObjectToken || t instanceof PackageObjectToken) {
 
                         // FIXME: special treatment of writes to "prototype" and "__proto__"
 
                         // constraint: ...: ⟦E2⟧ ⊆ ⟦t.p⟧
-                        this.solver.addSubsetConstraint(src, vp.objPropVar(t, prop));
+                        this.solver.addSubsetConstraint(src, this.solver.varProducer.objPropVar(t, prop));
 
                         // constraint: ...: ∀ functions t2 ∈ ⟦(set)t.p⟧: ⟦E2⟧ ⊆ ⟦x⟧ where x is the parameter of t2
-                        this.solver.addForAllConstraint(vp.objPropVar(t, prop, "set"), TokenListener.ASSIGN_SETTER, path.node, writeToSetter);
+                        this.solver.addForAllConstraint(this.solver.varProducer.objPropVar(t, prop, "set"), TokenListener.ASSIGN_SETTER, path.node, writeToSetter);
 
                         // values written to native object escape
                         if (t instanceof NativeObjectToken) // TODO: || t instanceof PackageObjectToken ?
-                            f.registerEscapingToExternal(src, path.node);
+                            this.solver.fragmentState.registerEscapingToExternal(src, path.node);
 
                         // if writing to module.exports, also write to %exports.default
                         if (t instanceof NativeObjectToken && t.name === "module" && prop === "exports")
-                           this.solver.addSubsetConstraint(src, vp.objPropVar(this.moduleSpecialNatives.get("exports")!, "default"));
+                           this.solver.addSubsetConstraint(src, this.solver.varProducer.objPropVar(this.moduleSpecialNatives.get("exports")!, "default"));
 
                     } else if (lVar && t instanceof AccessPathToken) {
 
                         // constraint: ...: ⟦E2⟧ ⊆ ⟦k.p⟧ where k is the current PackageObjectToken
-                        this.solver.addSubsetConstraint(src, vp.packagePropVar(this.packageInfo, prop));
+                        this.solver.addSubsetConstraint(src, this.solver.varProducer.packagePropVar(this.packageInfo, prop));
 
                         // collect property write operation @E1.p
-                        this.solver.addAccessPath(this.a.canonicalizeAccessPath(new PropertyAccessPath(lVar, prop)), vp.nodeVar(path.node), t.ap);
+                        this.solver.addAccessPath(this.a.canonicalizeAccessPath(new PropertyAccessPath(lVar, prop)), this.solver.varProducer.nodeVar(path.node), t.ap);
 
                         // values written to external objects escape
-                        f.registerEscapingToExternal(src, path.node);
+                        this.solver.fragmentState.registerEscapingToExternal(src, path.node);
 
                         // TODO: the following apparently has no effect on call graph or pattern matching...
                         // // constraint: assign UnknownAccessPath to arguments to function values for external functions
                         // this.solver.addForAllConstraint2(eVar, TokenListener.ASSIGN_..., path.node, (at: Token) => {
-                        //     const f = this.solver.fragmentState;
-                        //     const vp = f.varProducer;
                         //     if (at instanceof FunctionToken) {
                         //         for (let j = 0; j < at.fun.params.length; j++)
                         //             if (isIdentifier(at.fun.params[j])) // TODO: non-identifier parameters?
@@ -564,22 +542,20 @@ export class Operations {
 
                 // E1[...] = E2
                 this.solver.collectDynamicPropertyWrite(lVar);
-                f.registerEscapingFromModule(src);
+                this.solver.fragmentState.registerEscapingFromModule(src);
 
                 // constraint: ∀ arrays t ∈ ⟦E1⟧: ...
                 this.solver.addForAllConstraint(lVar, TokenListener.ASSIGN_DYNAMIC_BASE, path.node, (t: Token) => {
-                    const f = this.solver.fragmentState;
-                    const vp = f.varProducer;
                     if (t instanceof ArrayToken) {
 
                         // constraint: ...: ⟦E2⟧ ⊆ ⟦t.*⟧
-                        this.solver.addSubsetConstraint(src, vp.arrayValueVar(t));
+                        this.solver.addSubsetConstraint(src, this.solver.varProducer.arrayValueVar(t));
 
                         // TODO: write to array setters also?
 
                     } else {
                         if (logger.isInfoEnabled() && src)
-                            f.registerUnhandledDynamicPropertyWrite(path.node, src, options.warningsUnsupported && logger.isVerboseEnabled() ? path.getSource() : undefined);
+                            this.solver.fragmentState.registerUnhandledDynamicPropertyWrite(path.node, src, options.warningsUnsupported && logger.isVerboseEnabled() ? path.getSource() : undefined);
                     }
                 });
                 // TODO: computed property assignments (with known prefix/suffix)
@@ -600,9 +576,8 @@ export class Operations {
                     this.solver.addForAllConstraint(src, TokenListener.ASSIGN_OBJECT_PATTERN_REST, p, (t2: Token) => {
                         if (t2 instanceof AllocationSiteToken || t2 instanceof FunctionToken || t2 instanceof NativeObjectToken || t2 instanceof PackageObjectToken) {
                             this.solver.addForAllObjectPropertiesConstraint(t2, TokenListener.ASSIGN_OBJECT_PATTERN_REST_PROPERTIES, p, (prop: string) => { // TODO: only copying explicit properties, not unknown computed
-                                const vp = this.solver.fragmentState.varProducer;
                                 if (!matched.has(prop))
-                                    this.solver.addSubsetConstraint(vp.objPropVar(t2, prop), vp.objPropVar(t, prop));
+                                    this.solver.addSubsetConstraint(this.solver.varProducer.objPropVar(t2, prop), this.solver.varProducer.objPropVar(t, prop));
                                 // TODO: PropertyAccessPaths for rest elements in destructuring assignments for objects?
                             });
                         }
@@ -629,15 +604,13 @@ export class Operations {
                         // read the remaining array elements of src into a fresh array at p
                         const t = this.newArrayToken(p);
                         this.solver.addForAllConstraint(src, TokenListener.ASSIGN_ARRAY_PATTERN_REST, p, (t2: Token) => {
-                            const vp = this.solver.fragmentState.varProducer;
                             if (t2 instanceof ArrayToken) {
                                 this.solver.addForAllArrayEntriesConstraint(t2, TokenListener.ASSIGN_ARRAY_PATTERN_REST_ARRAY, p, (prop: string) => {
-                                    const vp = this.solver.fragmentState.varProducer;
                                     const newprop = parseInt(prop) - i;
                                     if (newprop >= 0)
-                                        this.solver.addSubsetConstraint(vp.objPropVar(t2, prop), vp.objPropVar(t, String(newprop)));
+                                        this.solver.addSubsetConstraint(this.solver.varProducer.objPropVar(t2, prop), this.solver.varProducer.objPropVar(t, String(newprop)));
                                 });
-                                this.solver.addSubsetConstraint(vp.arrayValueVar(t2), vp.arrayValueVar(t));
+                                this.solver.addSubsetConstraint(this.solver.varProducer.arrayValueVar(t2), this.solver.varProducer.arrayValueVar(t));
                             } // TODO: PropertyAccessPaths for rest elements in destructuring assignments for arrays?
                         });
                         this.solver.addTokenConstraint(t, vp.nodeVar(p));
@@ -665,14 +638,13 @@ export class Operations {
      */
     readIteratorValue(src: ConstraintVar | undefined, dst: ConstraintVar, node: Node) {
         this.solver.addForAllConstraint(src, TokenListener.READ_ITERATOR_VALUE, node, (t: Token) => {
-            const vp = this.solver.fragmentState.varProducer;
+            const vp = this.solver.varProducer;
             if (t instanceof AllocationSiteToken)
                 switch (t.kind) {
                     case "Array":
                         this.solver.addSubsetConstraint(vp.arrayValueVar(t), dst);
                         this.solver.addForAllArrayEntriesConstraint(t, TokenListener.READ_ITERATOR_VALUE_ARRAY, node, (prop: string) => {
-                            const vp = this.solver.fragmentState.varProducer;
-                            this.solver.addSubsetConstraint(vp.objPropVar(t, prop), dst);
+                            this.solver.addSubsetConstraint(this.solver.varProducer.objPropVar(t, prop), dst);
                         });
                         break;
                     case "Set":
@@ -698,9 +670,8 @@ export class Operations {
      */
     newObjectToken(n: Node): ObjectToken | PackageObjectToken {
         if (options.alloc) {
-            const f = this.solver.fragmentState;
             const t = this.a.canonicalizeToken(new ObjectToken(n, this.packageInfo));
-            if (!(f.widened && f.widened.has(t))) {
+            if (!(this.solver.fragmentState.widened && this.solver.fragmentState.widened.has(t))) {
                 this.solver.addInherits(t, this.globalSpecialNatives.get(OBJECT_PROTOTYPE)!);
                 return t;
             }
@@ -760,9 +731,8 @@ export class Operations {
         if (!arg || !res)
             return;
         this.solver.addForAllConstraint(arg, TokenListener.AWAIT, node, (t: Token) => {
-            const vp = this.solver.fragmentState.varProducer;
             if (t instanceof AllocationSiteToken && t.kind === "Promise")
-                this.solver.addSubsetConstraint(vp.objPropVar(t, PROMISE_FULFILLED_VALUES), res);
+                this.solver.addSubsetConstraint(this.solver.varProducer.objPropVar(t, PROMISE_FULFILLED_VALUES), res);
             else
                 this.solver.addTokenConstraint(t, res);
         });

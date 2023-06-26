@@ -15,7 +15,7 @@ export const nodejsModels: NativeModel = {
     name: "nodejs",
     init: (p: NativeModelParams) => {
         // module.exports = exports
-        p.solver.addTokenConstraint(p.moduleSpecialNatives.get("exports")!, p.solver.fragmentState.varProducer.objPropVar(p.moduleSpecialNatives.get("module")!, "exports"));
+        p.solver.addTokenConstraint(p.moduleSpecialNatives.get("exports")!, p.solver.varProducer.objPropVar(p.moduleSpecialNatives.get("module")!, "exports"));
     },
     params: [
         {

@@ -15,7 +15,7 @@ import {UnknownAccessPath} from "./accesspaths";
  */
 export function findEscapingObjects(m: ModuleInfo, solver: Solver): Set<ObjectToken> {
     const a = solver.globalState;
-    const f = solver.fragmentState;
+    const f = solver.fragmentState; // (don't use in callbacks)
     const worklist: Array<Token> = [];
     const visited = new Set<Token>();
     const escaping = new Set<ObjectToken>();
