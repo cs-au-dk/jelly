@@ -148,10 +148,7 @@ export default class Solver {
             if (logger.isVerboseEnabled())
                 assert(!f.redirections.has(toRep));
             f.vars.add(toRep);
-            this.tokenAdded(toRep, t,
-                f.tokenListeners.get(toRep),
-                f.pairListeners1.get(toRep),
-                f.pairListeners2.get(toRep));
+            this.tokenAdded(toRep, t);
             // collect statistics
             this.updateTokenStats(toRep);
             // add object property and array entry if applicable
@@ -172,19 +169,12 @@ export default class Solver {
     private addTokens(ts: Iterable<Token>, toRep: ConstraintVar, propagate: boolean = true) {
         const f = this.fragmentState;
         f.vars.add(toRep);
-        let ws: Array<Token> | undefined = undefined;
-        let tr: Map<ListenerID, (t: Token) => void> | undefined = undefined;
-        let tr1: Map<ListenerID, [ConstraintVar, (t1: AllocationSiteToken, t2: FunctionToken | AccessPathToken) => void]> | undefined = undefined;
-        let tr2: Map<ListenerID, [ConstraintVar, (t1: AllocationSiteToken, t2: FunctionToken | AccessPathToken) => void]> | undefined = undefined;
         let any = false;
+        let ws: Array<Token> | undefined = undefined;
         for (const t of f.addTokens(ts, toRep)) {
             any = true;
             if (propagate)
-                ws = this.tokenAdded(toRep, t,
-                    tr ??= f.tokenListeners.get(toRep),
-                    tr1 ??= f.pairListeners1.get(toRep),
-                    tr2 ??= f.pairListeners2.get(toRep),
-                    ws);
+                ws = this.tokenAdded(toRep, t, ws);
         }
         // add object property and array entry if applicable
         if (any && toRep instanceof ObjectPropertyVar) {
@@ -198,7 +188,7 @@ export default class Solver {
 
     /**
      * Replaces all tokens according to the given map.
-     * Also triggers token listeners.
+     * Also triggers token listeners for newly added tokens.
      */
     replaceTokens(m: Map<ObjectToken, PackageObjectToken>) {
         const f = this.fragmentState;
@@ -206,19 +196,13 @@ export default class Solver {
             const r = new Set<Token>();
             let any = false;
             let ws: Array<Token> | undefined = undefined;
-            let tr: Map<ListenerID, (t: Token) => void> | undefined = undefined;
-            let tr1: Map<ListenerID, [ConstraintVar, (t1: AllocationSiteToken, t2: FunctionToken | AccessPathToken) => void]> | undefined = undefined;
-            let tr2: Map<ListenerID, [ConstraintVar, (t1: AllocationSiteToken, t2: FunctionToken | AccessPathToken) => void]> | undefined = undefined;
             for (const t of ts) {
                 const q = t instanceof ObjectToken && m.get(t);
                 if (q) {
+                    if (!(Array.isArray(ts) ? ts.includes(q) : ts.has(q)) && !r.has(q))
+                        ws = this.tokenAdded(v, q, ws);
                     r.add(q);
                     any = true;
-                    ws = this.tokenAdded(v, q,
-                        tr ??= f.tokenListeners.get(v),
-                        tr1 ??= f.pairListeners1.get(v),
-                        tr2 ??= f.pairListeners2.get(v),
-                        ws);
                 } else
                     r.add(t);
             }
@@ -229,33 +213,14 @@ export default class Solver {
         }
     }
 
-    private tokenAdded(toRep: ConstraintVar, t: Token,
-                       tr: Map<ListenerID, (t: Token) => void> | undefined,
-                       tr1: Map<ListenerID, [ConstraintVar, (t1: AllocationSiteToken, t2: FunctionToken | AccessPathToken) => void]> | undefined,
-                       tr2: Map<ListenerID, [ConstraintVar, (t1: AllocationSiteToken, t2: FunctionToken | AccessPathToken) => void]> | undefined,
-                       ws?: Array<Token>): Array<Token> | undefined {
+    private tokenAdded(toRep: ConstraintVar, t: Token, ws?: Array<Token>): Array<Token> | undefined {
         if (logger.isDebugEnabled())
             logger.debug(`Added token ${t} to ${toRep}`);
-        const f = this.fragmentState;
         // add to worklist
         (ws ??= mapGetArray(this.unprocessedTokens, toRep)).push(t);
         this.unprocessedTokensSize++;
         if (this.unprocessedTokensSize % 100 === 0)
             this.printDiagnostics();
-        // notify listeners
-        if (tr)
-            for (const [id, listener] of tr)
-                this.callListener(id, listener, t);
-        if (t instanceof AllocationSiteToken && tr1)
-            for (const [id, [v2, listener]] of tr1)
-                for (const t2 of f.getTokens(f.getRepresentative(v2)))
-                    if (t2 instanceof FunctionToken || t2 instanceof AccessPathToken)
-                        this.callPairListener(id, listener, t, t2);
-        if ((t instanceof FunctionToken || t instanceof AccessPathToken) && tr2)
-            for (const [id, [v1, listener]] of tr2)
-                for (const t1 of f.getTokens(f.getRepresentative(v1)))
-                    if (t1 instanceof AllocationSiteToken)
-                        this.callPairListener(id, listener, t1, t);
         return ws;
     }
 
@@ -865,6 +830,28 @@ export default class Solver {
                     this.addTokens(ts, to);
                 this.incrementFixpointIterations();
             }
+            // notify listeners
+            const tr = f.tokenListeners.get(v);
+            if (tr)
+                for (const t of ts)
+                    for (const [id, listener] of tr)
+                        this.callListener(id, listener, t);
+            const tr1 = f.pairListeners1.get(v);
+            if (tr1)
+                for (const t of ts)
+                    if (t instanceof AllocationSiteToken)
+                        for (const [id, [v2, listener]] of tr1)
+                            for (const t2 of f.getTokens(f.getRepresentative(v2)))
+                                if (t2 instanceof FunctionToken || t2 instanceof AccessPathToken)
+                                    this.callPairListener(id, listener, t, t2);
+            let tr2 = f.pairListeners2.get(v);
+            if (tr2)
+                for (const t of ts)
+                    if ((t instanceof FunctionToken || t instanceof AccessPathToken))
+                        for (const [id, [v1, listener]] of tr2)
+                            for (const t1 of f.getTokens(f.getRepresentative(v1)))
+                                if (t1 instanceof AllocationSiteToken)
+                                    this.callPairListener(id, listener, t1, t);
         }
     }
 

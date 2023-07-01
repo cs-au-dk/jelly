@@ -595,7 +595,7 @@ export class FragmentState {
     /**
      * Returns all constraint variables with their tokens and number of tokens.
      */
-    *getAllVarsAndTokens(): Iterable<[ConstraintVar, Iterable<Token>, number]> {
+    *getAllVarsAndTokens(): Iterable<[ConstraintVar, Set<Token> | Array<Token>, number]> {
         for (const [v, ts] of this.tokens)
             if (ts instanceof Token)
                 yield [v, [ts], 1];
