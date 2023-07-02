@@ -586,9 +586,9 @@ export function invokeCallApply(kind: "Function.prototype.call" | "Function.prot
                     case "Function.prototype.apply":
                         if (args.length >= 2 && isExpression(args[1])) { // TODO: SpreadElement
                             const argVar = vp.expVar(args[1], p.path);
-                            p.solver.addForAllConstraint(argVar, TokenListener.NATIVE_INVOKE_CALL_APPLY2, p.path.node, (t: Token) => {
+                            p.solver.addForAllConstraint(argVar, TokenListener.NATIVE_INVOKE_CALL_APPLY2, ft.fun, (t: Token) => {
                                 if (t instanceof ArrayToken) {
-                                    p.solver.addForAllArrayEntriesConstraint(t, TokenListener.NATIVE_INVOKE_CALL_APPLY3, p.path.node, (prop: string) => {
+                                    p.solver.addForAllArrayEntriesConstraint(t, TokenListener.NATIVE_INVOKE_CALL_APPLY3, ft.fun, (prop: string) => {
                                         const param = parseInt(prop);
                                         if (param >= 0 && param < ft.fun.params.length) {
                                             const paramVar = p.solver.varProducer.nodeVar(ft.fun.params[param]);

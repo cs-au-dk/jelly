@@ -11,7 +11,7 @@
 
 
 - ECMAScript standard library
-  - Function.prototype.{apply,call,bind}
+  - Function.prototype.{apply,call,bind} (partly modeled...)
   - Object.{defineProperty, defineProperties, ...}
   - Promise
     - thenables (https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise#thenables)
