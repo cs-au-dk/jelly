@@ -48,7 +48,7 @@ export default class Solver {
 
     unprocessedSubsetEdges: Map<ConstraintVar, Set<ConstraintVar>> = new Map;
 
-    restoredSubsetEdges: Map<ConstraintVar, Set<ConstraintVar>> = new Map;
+    restored: Set<ConstraintVar> = new Set;
 
     // TODO: move some of this into AnalysisDiagnostics?
     // for diagnostics only
@@ -903,7 +903,7 @@ export default class Solver {
         f.a.timeoutTimer.checkTimeout();
         await this.checkAbort();
         let round = 0;
-        while (this.unprocessedTokens.size > 0 || this.unprocessedSubsetEdges.size > 0 || this.restoredSubsetEdges.size > 0 || f.postponedListenerCalls.length > 0) {
+        while (this.unprocessedTokens.size > 0 || this.unprocessedSubsetEdges.size > 0 || this.restored.size > 0 || f.postponedListenerCalls.length > 0) {
             round++;
             this.fixpointRound = round;
             if (logger.isVerboseEnabled())
@@ -915,15 +915,15 @@ export default class Solver {
                 this.unprocessedTokens.clear();
                 this.unprocessedSubsetEdgesSize = 0;
                 this.unprocessedSubsetEdges.clear();
-                this.restoredSubsetEdges.clear();
+                this.restored.clear();
                 f.postponedListenerCalls.length = 0;
                 break;
             }
-            if (this.unprocessedTokens.size > 0 || this.unprocessedSubsetEdges.size > 0 || this.restoredSubsetEdges.size > 0) {
+            if (this.unprocessedTokens.size > 0 || this.unprocessedSubsetEdges.size > 0 || this.restored.size > 0) {
                 if (options.cycleElimination) {
                     // find vars that are end points of new or restored subset edges
                     const nodes = new Set<ConstraintVar>();
-                    for (const v of [...this.unprocessedSubsetEdges.keys(), ...this.restoredSubsetEdges.keys()])
+                    for (const v of [...this.unprocessedSubsetEdges.keys(), ...this.restored])
                         nodes.add(f.getRepresentative(v));
                     if (nodes.size > 0) {
                         // find strongly connected components
@@ -949,7 +949,7 @@ export default class Solver {
                         }
                         this.totalPropagationTime += timer2.elapsedCPU();
                         this.unprocessedSubsetEdges.clear();
-                        this.restoredSubsetEdges.clear();
+                        this.restored.clear();
                     }
                     // process remaining tokens outside the sub-graph reachable via the new edges
                     const timer3 = new Timer();
@@ -965,7 +965,7 @@ export default class Solver {
                             await this.checkAbort(true);
                         }
                     this.unprocessedSubsetEdges.clear();
-                    this.restoredSubsetEdges.clear();
+                    this.restored.clear();
                     for (const v of this.unprocessedTokens.keys()) {
                         this.processTokens(v);
                         await this.checkAbort(true);
@@ -973,8 +973,8 @@ export default class Solver {
                     this.totalPropagationTime += timer.elapsedCPU();
                 }
             }
-            if (this.unprocessedTokens.size !== 0 || this.unprocessedTokensSize !== 0 || this.unprocessedSubsetEdges.size !== 0 || this.restoredSubsetEdges.size !== 0 || this.unprocessedSubsetEdgesSize !== 0)
-                assert.fail(`worklist non-empty: unprocessedTokens.size: ${this.unprocessedTokens.size}, unprocessedTokensSize: ${this.unprocessedTokensSize}, unprocessedSubsetEdges.size: ${this.unprocessedSubsetEdges.size}, restoredSubsetEdges.size: ${this.restoredSubsetEdges.size}, unprocessedSubsetEdgesSize: ${this.unprocessedSubsetEdgesSize}`);
+            if (this.unprocessedTokens.size !== 0 || this.unprocessedTokensSize !== 0 || this.unprocessedSubsetEdges.size !== 0 || this.restored.size !== 0 || this.unprocessedSubsetEdgesSize !== 0)
+                assert.fail(`worklist non-empty: unprocessedTokens.size: ${this.unprocessedTokens.size}, unprocessedTokensSize: ${this.unprocessedTokensSize}, unprocessedSubsetEdges.size: ${this.unprocessedSubsetEdges.size}, restored.size: ${this.restored.size}, unprocessedSubsetEdgesSize: ${this.unprocessedSubsetEdgesSize}`);
             // process all enqueued listener calls (excluding those created during the processing)
             if (logger.isVerboseEnabled())
                 logger.verbose(`Processing listener calls: ${f.postponedListenerCalls.length}`);
@@ -998,8 +998,6 @@ export default class Solver {
             assert.fail(`unprocessedTokensSize non-zero after propagate: ${this.unprocessedTokensSize}`);
         if (this.unprocessedSubsetEdgesSize !== 0)
             assert.fail(`unprocessedSubsetEdgesSize non-zero after propagate: ${this.unprocessedSubsetEdgesSize}`);
-        if (f.postponedListenerCalls.length > 0)
-            assert.fail(`postponedListenerCalls non-empty after propagate: ${f.postponedListenerCalls.length}`);
     }
 
     async checkAbort(throttle: boolean = false) {
@@ -1109,7 +1107,7 @@ export default class Solver {
                         if (fvs.size > this.largestSubsetEdgeOutDegree)
                             this.largestSubsetEdgeOutDegree = fvs.size;
                         mapGetSet(f.reverseSubsetEdges, v2Rep).add(vRep);
-                        mapGetSet(this.restoredSubsetEdges, vRep).add(v2Rep); // triggers cycle elimination
+                        this.restored.add(v2Rep); // triggers cycle elimination
                     }
                 }
             }
