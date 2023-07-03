@@ -4,10 +4,10 @@ import {getOrSet} from "./util";
 /**
  * Nuutila and Soisalon-Soininen's strongly connected components algorithm.
  * @param nodes nodes that must be visited (not necessarily all nodes in the graph!)
- * @param succ successors for each node
+ * @param succ successors for each node (undefined represents empty)
  * @returns [SCC representatives in reverse topological order, map from all visited nodes to their representatives]
  */
-export function nuutila<NodeType>(nodes: Iterable<NodeType>, succ: (n: NodeType) => Iterable<NodeType>): [Array<NodeType>, Map<NodeType, NodeType>] {
+export function nuutila<NodeType>(nodes: Iterable<NodeType>, succ: (n: NodeType) => Iterable<NodeType> | undefined): [Array<NodeType>, Map<NodeType, NodeType>] {
     const d: Map<NodeType, number> = new Map; // visit order
     const r: Map<NodeType, NodeType> = new Map; // map from nodes to their representatives
     const c: Set<NodeType> = new Set; // nodes in known components
@@ -22,21 +22,23 @@ export function nuutila<NodeType>(nodes: Iterable<NodeType>, succ: (n: NodeType)
     function visit(v: NodeType) {
         d.set(v, i++);
         r.set(v, v);
-        for (const w of succ(v)) {
-            if (!d.has(w))
-                visit(w); // TODO: implement without recursion?
-            if (!c.has(w)) {
-                const rv = r.get(v);
-                assert(rv);
-                const rw = r.get(w);
-                assert(rw);
-                const drv = d.get(rv);
-                assert(drv);
-                const drw = d.get(rw);
-                assert(drw);
-                r.set(v, drv < drw ? rv : rw);
+        const ws = succ(v);
+        if (ws)
+            for (const w of ws) {
+                if (!d.has(w))
+                    visit(w); // TODO: implement without recursion?
+                if (!c.has(w)) {
+                    const rv = r.get(v);
+                    assert(rv);
+                    const rw = r.get(w);
+                    assert(rw);
+                    const drv = d.get(rv);
+                    assert(drv);
+                    const drw = d.get(rw);
+                    assert(drw);
+                    r.set(v, drv < drw ? rv : rw);
+                }
             }
-        }
         if (r.get(v) === v) {
             c.add(v);
             while (s.length > 0) {

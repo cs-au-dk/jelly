@@ -928,7 +928,7 @@ export default class Solver {
                     if (nodes.size > 0) {
                         // find strongly connected components
                         const timer1 = new Timer();
-                        const [reps, repmap] = nuutila(nodes, (v: ConstraintVar) => f.subsetEdges.get(v) || []);
+                        const [reps, repmap] = nuutila(nodes, (v: ConstraintVar) => f.subsetEdges.get(v));
                         if (logger.isVerboseEnabled())
                             logger.verbose(`Cycle detection nodes: ${f.vars.size}, roots: ${nodes.size}, components: ${reps.length}`);
                         // cycle elimination
@@ -1037,8 +1037,7 @@ export default class Solver {
                 this.addSubsetEdge(fRep, repRep);
                 this.redirect(fRep, repRep);
             }
-        // add constraint variables and processed listeners
-        addAll(s.vars, f.vars);
+        // add processed listeners
         mapSetAddAll(s.ancestorListenersProcessed, f.ancestorListenersProcessed);
         mapSetAddAll(s.listenersProcessed, f.listenersProcessed);
         for (const [id, m] of s.pairListenersProcessed)
@@ -1055,9 +1054,10 @@ export default class Solver {
         for (const [k, m] of s.packageNeighborListeners)
             for (const [n, listener] of m)
                 this.runPackageNeighborsListener(k, n, listener);
-        // add new tokens, token listeners, and subset edges
+        // add new constraint variables, tokens, token listeners, and subset edges
         for (const v of s.vars) {
             const vRep = f.getRepresentative(v);
+            f.vars.add(vRep);
             const ntr = s.tokenListeners.get(v);
             const ntr1 = s.pairListeners1.get(v);
             const ntr2 = s.pairListeners2.get(v);
