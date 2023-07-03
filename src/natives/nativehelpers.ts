@@ -866,7 +866,7 @@ export function returnPromiseIterator(kind: "all" | "allSettled" | "any" | "race
                             p.solver.addSubsetConstraint(vp.objPropVar(t, PROMISE_FULFILLED_VALUES), vp.arrayValueVar(array!));
                             p.solver.addSubsetConstraint(vp.objPropVar(t, PROMISE_REJECTED_VALUES), vp.objPropVar(promise, PROMISE_REJECTED_VALUES));
                         } else
-                            p.solver.addToken(t, vp.arrayValueVar(array!));
+                            p.solver.addTokenConstraint(t, vp.arrayValueVar(array!));
                         break;
                     case "allSettled":
                         if (t instanceof AllocationSiteToken && t.kind === "Promise") {
@@ -874,7 +874,7 @@ export function returnPromiseIterator(kind: "all" | "allSettled" | "any" | "race
                             p.solver.addSubsetConstraint(vp.objPropVar(t, PROMISE_FULFILLED_VALUES), vp.objPropVar(allSettledObjects!, "value"));
                             p.solver.addSubsetConstraint(vp.objPropVar(t, PROMISE_REJECTED_VALUES), vp.objPropVar(allSettledObjects!, "reason"));
                         } else
-                            p.solver.addToken(t, vp.objPropVar(allSettledObjects!, "value"));
+                            p.solver.addTokenConstraint(t, vp.objPropVar(allSettledObjects!, "value"));
                         break;
                     case "any":
                         if (t instanceof AllocationSiteToken && t.kind === "Promise") {
@@ -882,7 +882,7 @@ export function returnPromiseIterator(kind: "all" | "allSettled" | "any" | "race
                             p.solver.addSubsetConstraint(vp.objPropVar(t, PROMISE_FULFILLED_VALUES), vp.objPropVar(promise, PROMISE_FULFILLED_VALUES));
                             // TODO: assign rejected values to an AggregateError object and assign that object to the rejected value of the new promise
                         } else
-                            p.solver.addToken(t, vp.objPropVar(promise, PROMISE_FULFILLED_VALUES));
+                            p.solver.addTokenConstraint(t, vp.objPropVar(promise, PROMISE_FULFILLED_VALUES));
                         break;
                     case "race":
                         if (t instanceof AllocationSiteToken && t.kind === "Promise") {
@@ -890,7 +890,7 @@ export function returnPromiseIterator(kind: "all" | "allSettled" | "any" | "race
                             p.solver.addSubsetConstraint(vp.objPropVar(t, PROMISE_FULFILLED_VALUES), vp.objPropVar(promise, PROMISE_FULFILLED_VALUES));
                             p.solver.addSubsetConstraint(vp.objPropVar(t, PROMISE_REJECTED_VALUES), vp.objPropVar(promise, PROMISE_REJECTED_VALUES));
                         } else
-                            p.solver.addToken(t, vp.objPropVar(promise, PROMISE_FULFILLED_VALUES));
+                            p.solver.addTokenConstraint(t, vp.objPropVar(promise, PROMISE_FULFILLED_VALUES));
                         break;
                 }
             });

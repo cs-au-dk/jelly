@@ -145,6 +145,8 @@ export default class Solver {
     addToken(t: Token, toRep: ConstraintVar): boolean {
         const f = this.fragmentState;
         if (f.addToken(t, toRep)) {
+            if (logger.isVerboseEnabled())
+                assert(!f.redirections.has(toRep));
             f.vars.add(toRep);
             this.tokenAdded(toRep, t,
                 f.tokenListeners.get(toRep),
@@ -167,7 +169,7 @@ export default class Solver {
      * Adds a set of tokens if not already present.
      * By default also adds to worklist and notifies listeners.
      */
-    addTokens(ts: Iterable<Token>, toRep: ConstraintVar, propagate: boolean = true) {
+    private addTokens(ts: Iterable<Token>, toRep: ConstraintVar, propagate: boolean = true) {
         const f = this.fragmentState;
         f.vars.add(toRep);
         let ws: Array<Token> | undefined = undefined;
@@ -343,6 +345,8 @@ export default class Solver {
                 if (s.size > this.largestSubsetEdgeOutDegree)
                     this.largestSubsetEdgeOutDegree = s.size;
                 mapGetSet(f.reverseSubsetEdges, toRep).add(fromRep);
+                if (logger.isVerboseEnabled())
+                    assert(!f.redirections.has(fromRep) && !f.redirections.has(toRep))
                 f.vars.add(fromRep);
                 f.vars.add(toRep);
                 if (propagate) {
