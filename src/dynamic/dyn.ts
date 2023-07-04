@@ -17,6 +17,9 @@ const IGNORED_COMMANDS = [
     // TODO: other commands where instrumentation can be skipped?
 ];
 
+// only write messages to stdout if it is a TTY
+const log = process.stdout.isTTY? console.log.bind(console) : () => {};
+
 // override 'node' executable by overwriting process.execPath and prepending $JELLY_BIN to $PATH
 const jellybin = process.env.JELLY_BIN;
 const node = `${jellybin}/node`;
@@ -37,7 +40,7 @@ for (const fun of ["spawn", "spawnSync"]) {
                         NODE: node,
                         npm_node_execpath: node
                     }};
-        // console.log("jelly:", fun, arguments[0], arguments[1].join(" ")/*, opts*/); // XXX
+        // log("jelly:", fun, arguments[0], arguments[1].join(" ")/*, opts*/); // XXX
         return real.call(this, arguments[0], arguments[1], opts);
     };
 }
@@ -46,7 +49,7 @@ for (const fun of ["spawn", "spawnSync"]) {
 const cmd = process.argv[4];
 for (const s of IGNORED_COMMANDS)
     if (cmd.endsWith(`/${s}`)) {
-        console.log(`jelly: Skipping instrumentation of ${cmd}`);
+        log(`jelly: Skipping instrumentation of ${cmd}`);
         // @ts-ignore
         return;
     }
@@ -68,7 +71,7 @@ try {
         process.argv.splice(5, 0, "--runInBand");
 } catch(e) {}
 
-console.log(`jelly: Running instrumented program: node ${process.argv.slice(4).join(" ")} (process ${process.pid})`);
+log(`jelly: Running instrumented program: node ${process.argv.slice(4).join(" ")} (process ${process.pid})`);
 
 declare const J$: Jalangi;
 
@@ -316,10 +319,10 @@ J$.addAnalysis({ // TODO: super calls not detected (see tests/micro/classes.js)
  */
 process.on('exit', function() {
     if (files.length === 0) {
-        console.log(`jelly: No relevant files detected for process ${process.pid}, skipping file write`);
+        log(`jelly: No relevant files detected for process ${process.pid}, skipping file write`);
         return;
     }
-    // console.log(`jelly: Writing ${outfile}`);
+    // log(`jelly: Writing ${outfile}`);
     const fd = fs.openSync(outfile, "w");
     fs.writeSync(fd, `{\n "entries": [${JSON.stringify(path.relative(cwd, process.argv[1]))}],\n`);
     fs.writeSync(fd, ` "time": "${new Date().toUTCString()}",\n`);
