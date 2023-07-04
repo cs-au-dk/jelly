@@ -8,7 +8,14 @@ const TEST_PACKAGES = ["yarn", "mocha", "chai", "nyc", "sinon", "should", "@babe
 /**
  * Commands that do not need instrumentation, for example because the actual work is known to happen in child processes.
  */
-const IGNORED_COMMANDS = ["npm", "npm-cli.js", "eslint", "grunt", "rollup", "tsc", "tsd", "prettier", "rimraf", "xo"]; // TODO: other commands where instrumentation can be skipped?
+const IGNORED_COMMANDS = [
+    "npm", "npm-cli.js",
+    "grunt", "rollup", "browserify", "terser",
+    "rimraf",
+    "eslint", "jslint", "prettier", "xo", "standard",
+    "tsc", "tsd",
+    // TODO: other commands where instrumentation can be skipped?
+];
 
 // override 'node' executable by overwriting process.execPath and prepending $JELLY_BIN to $PATH
 const jellybin = process.env.JELLY_BIN;
