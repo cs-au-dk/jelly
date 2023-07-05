@@ -127,7 +127,7 @@ export function widenObjects(m: ModuleInfo, widened: Set<ObjectToken>, solver: S
 
     // update the tokens
    [solver.unprocessedTokens, solver.unprocessedTokensSize] = widenTokenMapArrayValues(solver.unprocessedTokens);
-    assert(solver.unprocessedSubsetEdges.size === 0 && solver.unprocessedSubsetEdgesSize === 0);
+    assert(solver.nodesWithNewEdges.size === 0);
     solver.replaceTokens(tokenMap);
     f.inherits = widenTokenMapSetKeysValues(f.inherits);
     f.reverseInherits = widenTokenMapSetKeysValues(f.reverseInherits);
