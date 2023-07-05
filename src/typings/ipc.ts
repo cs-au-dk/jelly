@@ -1,6 +1,6 @@
 import {options} from "../options";
 import {AnalysisDiagnostics} from "./diagnostics";
-import {AccessPathPatternStringToNodes} from "../patternmatching/apiusage";
+import {AccessPathPatternToLocations} from "../patternmatching/apiusage";
 import {PatternMatchesJSON} from "../patternmatching/patternmatcher";
 import {SemanticPatch} from "./tapir";
 import {CallGraph} from "./callgraph";
@@ -136,7 +136,7 @@ export interface ApiUsageRequest extends Request {
 }
 
 export interface ApiUsageResponse extends SuccessResponse {
-    body: AccessPathPatternStringToNodes;
+    body: AccessPathPatternToLocations;
 }
 
 /**
