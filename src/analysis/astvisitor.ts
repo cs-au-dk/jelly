@@ -530,7 +530,7 @@ export function visit(ast: File, op: Operations) {
                         // constraint: ⟦E⟧ ⊆ ⟦t.i⟧ for each array element E with index i
                         const prop = String(index);
                         solver.addSubsetConstraint(op.expVar(e, path), vp.objPropVar(t, prop));
-                    } else if (e)
+                    } else if (isSpreadElement(e))
                         f.warnUnsupported(e, "SpreadElement in ArrayExpression"); // TODO: SpreadElement in ArrayExpression
             }
         },

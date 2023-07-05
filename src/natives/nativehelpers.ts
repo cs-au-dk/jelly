@@ -414,10 +414,12 @@ export function invokeCallback(kind: CallbackKind, p: NativeFunctionParams, arg:
                     case "Array.prototype.map":
                     case "Array.prototype.some":
                         // write array elements to param1
-                        p.solver.addSubsetConstraint(vp.arrayValueVar(bt), vp.nodeVar(param1));
-                        p.solver.addForAllArrayEntriesConstraint(bt, TokenListener.NATIVE_19, p.path.node, (prop: string) => {
-                            p.solver.addSubsetConstraint(vp.objPropVar(bt, prop), p.solver.varProducer.nodeVar(param1));
-                        });
+                        if (param1) {
+                            p.solver.addSubsetConstraint(vp.arrayValueVar(bt), vp.nodeVar(param1));
+                            p.solver.addForAllArrayEntriesConstraint(bt, TokenListener.NATIVE_19, param1, (prop: string) => {
+                                p.solver.addSubsetConstraint(vp.objPropVar(bt, prop), p.solver.varProducer.nodeVar(param1));
+                            });
+                        }
                         switch (kind) {
                             case "Array.prototype.map":
                                 // return new array with elements from the callback return values
@@ -437,10 +439,12 @@ export function invokeCallback(kind: CallbackKind, p: NativeFunctionParams, arg:
                     case "Array.prototype.reduce":
                     case "Array.prototype.reduceRight":
                         // write array elements to param2
-                        p.solver.addSubsetConstraint(vp.arrayValueVar(bt), vp.nodeVar(param2));
-                        p.solver.addForAllArrayEntriesConstraint(bt, TokenListener.NATIVE_20, p.path.node, (prop: string) => {
-                            p.solver.addSubsetConstraint(p.solver.varProducer.objPropVar(bt, prop), p.solver.varProducer.nodeVar(param2));
-                        });
+                        if (param2) {
+                            p.solver.addSubsetConstraint(vp.arrayValueVar(bt), vp.nodeVar(param2));
+                            p.solver.addForAllArrayEntriesConstraint(bt, TokenListener.NATIVE_20, param2, (prop: string) => {
+                                p.solver.addSubsetConstraint(p.solver.varProducer.objPropVar(bt, prop), p.solver.varProducer.nodeVar(param2));
+                            });
+                        }
                         p.solver.addSubsetConstraint(baseVar, vp.nodeVar(param4));
                         // bind initialValue to previousValue
                         if (args.length > 1 && isExpression(args[1])) { // TODO: SpreadElement
@@ -459,12 +463,13 @@ export function invokeCallback(kind: CallbackKind, p: NativeFunctionParams, arg:
                         const btVar = vp.arrayValueVar(bt);
                         p.solver.addSubsetConstraint(btVar, vp.nodeVar(param1));
                         p.solver.addSubsetConstraint(btVar, vp.nodeVar(param2));
-                        p.solver.addForAllArrayEntriesConstraint(bt, TokenListener.NATIVE_21, p.path.node, (prop: string) => {
-                            const btPropVar = vp.objPropVar(bt, prop)
-                            p.solver.addSubsetConstraint(btPropVar, p.solver.varProducer.nodeVar(param1));
-                            p.solver.addSubsetConstraint(btPropVar, p.solver.varProducer.nodeVar(param2));
-                            p.solver.addSubsetConstraint(btPropVar, btVar);
-                        });
+                        if (param1)
+                            p.solver.addForAllArrayEntriesConstraint(bt, TokenListener.NATIVE_21, param1, (prop: string) => {
+                                const btPropVar = vp.objPropVar(bt, prop)
+                                p.solver.addSubsetConstraint(btPropVar, p.solver.varProducer.nodeVar(param1));
+                                p.solver.addSubsetConstraint(btPropVar, p.solver.varProducer.nodeVar(param2));
+                                p.solver.addSubsetConstraint(btPropVar, btVar);
+                            });
                         p.solver.addSubsetConstraint(baseVar, vp.nodeVar(p.path.node));
                         break;
                     case "Map.prototype.forEach":

@@ -15,6 +15,7 @@ import {
     isObjectPattern,
     isParenthesizedExpression,
     isRestElement,
+    isSpreadElement,
     isStringLiteral,
     JSXIdentifier,
     JSXMemberExpression,
@@ -165,6 +166,8 @@ export class Operations {
                 f.warnUnsupported(path.node, "Unhandled 'require'");
         }
 
+        const argVars = args.map(arg => isExpression(arg) ? this.expVar(arg, path) : undefined);
+
         // expression E0(E1,...,En) or new E0(E1,...,En)
         // constraint: ∀ functions t ∈ ⟦E0⟧: ...
         this.solver.addForAllConstraint(calleeVar, TokenListener.CALL_FUNCTION_CALLEE, path.node, (t: Token) => {
@@ -176,20 +179,19 @@ export class Operations {
                     f.registerEscapingFromModuleArguments(args, path);
                 const hasArguments = f.functionsWithArguments.has(t.fun);
                 const argumentsToken = hasArguments ? this.a.canonicalizeToken(new ArrayToken(t.fun.body, this.packageInfo)) : undefined;
-                for (let i = 0; i < args.length; i++) {
-                    const arg = args[i];
+                for (let i = 0; i < argVars.length; i++) {
+                    const argVar = argVars[i];
                     // constraint: ...: ⟦Ei⟧ ⊆ ⟦Xi⟧ for each argument/parameter i (Xi may be a pattern)
-                    if (isExpression(arg)) {
-                        const argVar = this.expVar(arg, path);
+                    if (argVar) {
                         if (i < t.fun.params.length) {
                             const param = t.fun.params[i];
                             if (isRestElement(param)) {
                                 // read the remaining arguments into a fresh array
-                                const rest = args.slice(i);
+                                const rest = argVars.slice(i);
                                 const t = this.newArrayToken(param);
-                                for (const [i, arg] of rest.entries())
-                                    if (isExpression(arg)) // TODO: SpreadElement in arguments (warning emitted below)
-                                        this.solver.addSubsetConstraint(this.expVar(arg, path), vp.objPropVar(t, String(i)));
+                                for (const [i, argVar] of rest.entries())
+                                    if (argVar) // TODO: SpreadElement in arguments (warning emitted below)
+                                        this.solver.addSubsetConstraint(argVar, vp.objPropVar(t, String(i)));
                                 this.solver.addTokenConstraint(t, vp.nodeVar(param));
                             } else
                                 this.solver.addSubsetConstraint(argVar, vp.nodeVar(param));
@@ -197,8 +199,8 @@ export class Operations {
                         // constraint ...: ⟦Ei⟧ ⊆ ⟦t_arguments[i]⟧ for each argument i if the function uses 'arguments'
                         if (hasArguments)
                             this.solver.addSubsetConstraint(argVar, vp.objPropVar(argumentsToken!, String(i)));
-                    } else if (arg)
-                        f.warnUnsupported(arg, "SpreadElement in arguments"); // TODO: SpreadElement in arguments
+                    } else if (isSpreadElement(args[i]))
+                        f.warnUnsupported(args[i], "SpreadElement in arguments"); // TODO: SpreadElement in arguments
                 }
                 // constraint: ...: ⟦ret_t⟧ ⊆ ⟦(new) E0(E1,...,En)⟧
                 if (!isParentExpressionStatement(pars))
@@ -238,11 +240,10 @@ export class Operations {
                 // constraint: add CallResultAccessPath
                 this.solver.addAccessPath(this.a.canonicalizeAccessPath(new CallResultAccessPath(calleeVar)), resultVar, t.ap);
 
-                for (let i = 0; i < args.length; i++) {
-                    const arg = args[i];
-                    if (isExpression(arg)) {
-                        const argVar = this.expVar(arg, path);
-                        this.solver.addForAllConstraint(argVar, TokenListener.CALL_FUNCTION_EXTERNAL, arg, (at: Token) => {
+                for (let i = 0; i < argVars.length; i++) {
+                    const argVar = argVars[i];
+                    if (argVar) {
+                        this.solver.addForAllConstraint(argVar, TokenListener.CALL_FUNCTION_EXTERNAL, args[i], (at: Token) => {
                             if (at instanceof FunctionToken) {
                                 // constraint: assign UnknownAccessPath to arguments to function arguments for external functions, also add (artificial) call edge
                                 this.solver.fragmentState.registerCallEdge(pars.node, caller, this.a.functionInfos.get(at.fun)!, {external: true});
@@ -251,9 +252,9 @@ export class Operations {
                                         this.solver.addAccessPath(UnknownAccessPath.instance, this.solver.varProducer.nodeVar(at.fun.params[j]));
                             }
                         });
-                        f.registerEscapingToExternal(argVar, arg);
-                    } else
-                        f.warnUnsupported(arg, "SpreadElement in arguments to external function"); // TODO: SpreadElement in arguments to external function
+                        f.registerEscapingToExternal(argVar, args[i]);
+                    } else if (isSpreadElement(args[i]))
+                        f.warnUnsupported(args[i], "SpreadElement in arguments to external function"); // TODO: SpreadElement in arguments to external function
                 }
                 // TODO: also add arguments (and everything reachable from them) to escaping?
                 // TODO: also add UnknownAccessPath to properties of object arguments for external functions? (see also TODO at AssignmentExpression)
