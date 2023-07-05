@@ -73,7 +73,7 @@ export function isParentExpressionStatement(path: NodePath): boolean { // TODO: 
     let p: NodePath | null = path;
     do {
         p = p.parentPath;
-    } while (p && isParenthesizedExpression(p));
+    } while (p && isParenthesizedExpression(p.node));
     return p !== null && isExpressionStatement(p.node);
 }
 
