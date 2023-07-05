@@ -58,4 +58,5 @@ exec "$GRAAL_HOME/bin/node" \
   "${NODE_OPTS[@]}" \
   --jvm --experimental-options \
   --nodeprof "$GRAAL_HOME/tools/nodeprof/jalangi.js" --analysis "$DYNJS" \
+  --exec-path "$JELLY_BIN/node" \
   "$@"

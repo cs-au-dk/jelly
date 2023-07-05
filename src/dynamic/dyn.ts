@@ -3,14 +3,17 @@
 /**
  * Packages that are typically used for tests only and should be excluded in the collected call graphs.
  */
-const TEST_PACKAGES = ["yarn", "mocha", "chai", "nyc", "sinon", "should", "@babel", "jest"]; // TODO: other test packages?
+const TEST_PACKAGES = [
+    "ava", "yarn", "mocha", "chai", "nyc",
+    "sinon", "should", "@babel", "jest", "tape",
+]; // TODO: other test packages?
 
 /**
  * Commands that do not need instrumentation, for example because the actual work is known to happen in child processes.
  */
 const IGNORED_COMMANDS = [
     "npm", "npm-cli.js",
-    "grunt", "rollup", "browserify", "terser",
+    "grunt", "rollup", "browserify", "webpack", "terser",
     "rimraf",
     "eslint", "jslint", "prettier", "xo", "standard",
     "tsc", "tsd",
@@ -22,12 +25,11 @@ const log = process.stdout.isTTY? console.log.bind(console) : () => {};
 
 // override 'node' executable by overwriting process.execPath and prepending $JELLY_BIN to $PATH
 const jellybin = process.env.JELLY_BIN;
-const node = `${jellybin}/node`;
 if (!jellybin) {
     console.error('Error: Environment variable JELLY_BIN not set, aborting');
     process.exit(-1);
 }
-process.execPath = node;
+const node = `${jellybin}/node`;
 const child_process = require('child_process');
 for (const fun of ["spawn", "spawnSync"]) {
     const real = child_process[fun];
@@ -46,7 +48,7 @@ for (const fun of ["spawn", "spawnSync"]) {
 }
 
 // skip instrumentation of selected commands where actual work is known to happen in child processes
-const cmd = process.argv[4];
+const cmd = process.argv[6];
 for (const s of IGNORED_COMMANDS)
     if (cmd.endsWith(`/${s}`)) {
         log(`jelly: Skipping instrumentation of ${cmd}`);
@@ -68,10 +70,10 @@ try {
     // attempt to detect if we're running the jest entry point
     // if so, insert jest parameter that disables the use of worker processes for tests
     if(cmd.indexOf("jest") != -1 && /\/node_modules\/jest(-cli)?\/bin\/jest\.js$/.test(fs.realpathSync(cmd)))
-        process.argv.splice(5, 0, "--runInBand");
+        process.argv.splice(7, 0, "--runInBand");
 } catch(e) {}
 
-log(`jelly: Running instrumented program: node ${process.argv.slice(4).join(" ")} (process ${process.pid})`);
+log(`jelly: Running instrumented program: node ${process.argv.slice(6).join(" ")} (process ${process.pid})`);
 
 enum FunType {
     App,
