@@ -1,0 +1,1 @@
+{"entries":["default-parameter.js"],"files":["default-parameter.js"],"functions":["0:1:1:8:1","0:2:1:4:2","0:2:16:2:50","0:6:1:6:24"],"calls":["0:7:1:7:4","0:6:16:6:19","0:3:5:3:8"],"fun2fun":[[0,1],[0,3],[1,2]],"call2fun":[[1,1],[2,2],[0,3]],"ignore":[]}

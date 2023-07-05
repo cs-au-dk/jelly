@@ -289,7 +289,11 @@ export interface JalangiAnalysis {
 
   builtinExit?(
       name: string,
-      returnVal: any
+      f: Function,
+      dis: any,
+      args: any,
+      returnVal: any,
+      exceptionVal: any
   ): { returnVal: any } | void;
 
   asyncFunctionEnter?(

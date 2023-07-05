@@ -14,8 +14,8 @@ test("tests/micro/classes", async () => {
         moduleInfos: 1,
         numberOfFunctionToFunctionEdges: 34,
         oneCalleeCalls: 32,
-        funFound: 32,
-        funTotal: 33,
+        funFound: 30,
+        funTotal: 30,
         callFound: 36,
         callTotal: 36
     });
@@ -28,8 +28,8 @@ test("tests/micro/accessors", async () => {
         moduleInfos: 1,
         numberOfFunctionToFunctionEdges: 3,
         oneCalleeCalls: 3,
-        funFound: 3,
-        funTotal: 3,
+        funFound: 1,
+        funTotal: 1,
         callFound: 1,
         callTotal: 1
     });
@@ -51,10 +51,10 @@ test("tests/micro/eval", async () => {
         moduleInfos: 2,
         numberOfFunctionToFunctionEdges: 0,
         oneCalleeCalls: 0,
-        funFound: 1,
-        funTotal: 1,
-        callFound: 1,
-        callTotal: 1
+        funFound: 0,
+        funTotal: 0,
+        callFound: 0,
+        callTotal: 0
     });
 });
 
@@ -65,10 +65,10 @@ test("tests/micro/client1", async () => {
         moduleInfos: 2,
         numberOfFunctionToFunctionEdges: 3,
         oneCalleeCalls: 3,
-        funFound: 4,
-        funTotal: 4,
-        callFound: 4,
-        callTotal: 4
+        funFound: 3,
+        funTotal: 3,
+        callFound: 3,
+        callTotal: 3
     });
 });
 
@@ -225,10 +225,10 @@ test("tests/micro/generators", async () => {
         moduleInfos: 1,
         numberOfFunctionToFunctionEdges: 26,
         oneCalleeCalls: 14,
-        funFound: 15,
-        funTotal: 15,
-        callFound: 15,
-        callTotal: 15
+        funFound: 24,
+        funTotal: 24,
+        callFound: 24,
+        callTotal: 24
     });
 });
 
@@ -301,6 +301,27 @@ test("tests/micro/low", async () => {
     })
 });
 
+test("tests/micro/Function.prototype.bind", async () => {
+    await runTest("tests/micro", "Function.prototype.bind.js", {
+        soundness: "tests/micro/Function.prototype.bind.json",
+        funFound: 1,
+        funTotal: 1,
+        callFound: 1,
+        callTotal: 1,
+    });
+});
+
+test("tests/micro/Function.prototype.call", async () => {
+    await runTest("tests/micro", "Function.prototype.call.js", {
+        soundness: "tests/micro/Function.prototype.call.json",
+        // dynamic analysis does not capture calls through call/apply
+        funFound: 0,
+        funTotal: 0,
+        callFound: 0,
+        callTotal: 0,
+    });
+});
+
 test("tests/micro/fun", async () => {
     await runTest("tests/micro", "fun.js", {
         soundness: "tests/micro/fun.json",
@@ -364,10 +385,10 @@ test("tests/micro/rest", async () => {
         moduleInfos: 1,
         numberOfFunctionToFunctionEdges: 21,
         oneCalleeCalls: 18,
-        funFound: 17,
-        funTotal: 19,
-        callFound: 21,
-        callTotal: 23
+        funFound: 18,
+        funTotal: 20,
+        callFound: 22,
+        callTotal: 24
     });
 });
 
@@ -638,10 +659,10 @@ test("tests/micro/asyncawait", async () => {
         moduleInfos: 1,
         numberOfFunctionToFunctionEdges: 19,
         oneCalleeCalls: 10,
-        funFound: 9,
-        funTotal: 9,
-        callFound: 9,
-        callTotal: 9
+        funFound: 14,
+        funTotal: 14,
+        callFound: 14,
+        callTotal: 15
     });
 });
 
@@ -686,5 +707,32 @@ test("tests/micro/call-expressions", async () => {
         funTotal: 10,
         callFound: 35,
         callTotal: 35,
+    });
+});
+
+test("tests/micro/default-parameter", async () => {
+    await runTest("tests/micro", "default-parameter.js", {
+        soundness: "tests/micro/default-parameter.json",
+        functionInfos: 3,
+        // TODO: make static and dynamic analysis agree on source function in fun2fun edges in default parameter initialization
+        // in dynamic analysis the source is the caller of the function with a default parameter
+        // difficult to change due to order of observed events in dynamic analysis
+        // in static analysis the source is the function with a default parameter
+        // impossible to change without context sensitivity
+        funFound: 2,
+        funTotal: 3,
+        callFound: 3,
+        callTotal: 3,
+    });
+});
+
+test("tests/micro/throw", async () => {
+    await runTest("tests/micro", "throw.js", {
+        soundness: "tests/micro/throw.json",
+        functionInfos: 2,
+        funFound: 2,
+        funTotal: 2,
+        callFound: 2,
+        callTotal: 2,
     });
 });

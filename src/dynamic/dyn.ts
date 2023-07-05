@@ -73,36 +73,51 @@ try {
 
 log(`jelly: Running instrumented program: node ${process.argv.slice(4).join(" ")} (process ${process.pid})`);
 
+enum FunType {
+    App,
+    Lib,
+    Test,
+}
+
+interface FunInfo {
+    type: FunType,
+    eval: boolean,
+    calls?: Set<IID>,
+    loc: SourceObject,
+}
+
 declare const J$: Jalangi;
 
 const cwd = process.cwd();  // capture before application can change directory
 const fileIds = new Map<string, number>();
 const files: Array<string> = [];
-const fun2fun = new Map<IID, Set<IID>>();
 const call2fun = new Map<IID, Set<IID>>();
-const functionLocations = new Map<IID, string>();
 const callLocations = new Map<IID, string>();
 const funLocStack = Array<IID>(); // top-most is source location of callee function
-const inAppStack = Array<boolean>(); // top-most is true if in app code
-let lastCallLoc: IID | null = null; // source location of most recent call site
+// top-most is true if in app code
+// i.e. whether the top-most non-library function is not a test function
+const inAppStack = Array<boolean>();
 let enterScriptLocation: SourceObject | undefined = undefined; // if not undefined, next functionEnter enters a module
+// maps returned functions from Function.prototype.bind(...) to the bound function
+const binds = new WeakMap<Function, Function>();
+// stores a list of pending callers for functions that haven't been entered yet
+const pendingCalls = new WeakMap<Function, [FunInfo, IID][]>();
+const funIids = new WeakMap<Function, IID>();
+const iidToInfo = new Map<IID, FunInfo>();
 
 // TODO: add edges for implicit calls? calls to/from built-ins? to/from Node.js std.lib? calls to/from eval/Function? async/await?
 /**
  * Adds a call edge.
  */
-function addCallEdge(call: IID | null, callerFun: IID, calleeFun: IID) {
-    let fs = fun2fun.get(callerFun);
-    if (!fs) {
-        fs = new Set;
-        fun2fun.set(callerFun, fs);
-    }
-    fs.add(calleeFun);
+function addCallEdge(call: IID | null, callerFun: FunInfo, calleeFun: IID) {
+    (callerFun.calls ??= new Set()).add(calleeFun);
+
     if (call) { // excluding call->function edges for implicit calls
         let cs = call2fun.get(call);
         if (!cs) {
             cs = new Set;
             call2fun.set(call, cs);
+            callLocations.set(call, so2loc(J$.iidToSourceObject(call)));
         }
         cs.add(calleeFun);
     }
@@ -129,61 +144,95 @@ J$.addAnalysis({ // TODO: super calls not detected (see tests/micro/classes.js)
     /**
      * Before function or constructor call.
      */
-    invokeFunPre: function(iid: IID, _f: Function, _base: Object, _args: any[], _isConstructor: boolean, _isMethod: boolean, _functionIid: IID, _functionSid: IID) {
-        lastCallLoc = iid;
+    invokeFunPre: function(iid: IID, f: Function, _base: Object, _args: any[], _isConstructor: boolean, _isMethod: boolean, _functionIid: IID, _functionSid: IID) {
+        // console.log(`invokeFunPre ${f.name} from ${iid && J$.iidToLocation(iid)}`);
+
+        const callerInApp = inAppStack.length > 0 && inAppStack[inAppStack.length - 1];
+        if (callerInApp && typeof f === "function") {
+            const callerIid = funLocStack[funLocStack.length - 1]!
+            const callerInfo = iidToInfo.get(callerIid)!;
+            if (!callerInfo.eval) {
+                // resolve bound functions
+                let bound: Function | undefined;
+                while((bound = binds.get(f)) !== undefined)
+                    f = bound;
+
+                const calleeIid = funIids.get(f);
+                if (calleeIid === undefined) {
+                    // we have not entered the function yet - register pending call
+                    let m = pendingCalls.get(f);
+                    if (m === undefined)
+                        pendingCalls.set(f, m = []);
+
+                    m.push([callerInfo, iid]);
+                } else {
+                    // every iid in funIids must map to something in iidToInfo
+                    const calleeInfo = iidToInfo.get(calleeIid)!;
+                    if (calleeInfo.type !== FunType.Test && !calleeInfo.eval)
+                        addCallEdge(iid, callerInfo, calleeIid);
+                }
+            }
+        }
     },
 
     /**
      * Entering function.
      */
-    functionEnter: function(iid: IID, _func: Function, _receiver: object, _args: any[]) {
-        const so = J$.iidToSourceObject(iid);
-        const calleeEval = "eval" in so;
+    functionEnter: function(iid: IID, func: Function, _receiver: object, _args: any[]) {
+        // console.log(`Entered ${func.name} ${J$.iidToLocation(iid)}`);
+        funIids.set(func, iid);
+
+        let info = iidToInfo.get(iid);
+        if (info === undefined) {
+            const so = J$.iidToSourceObject(iid);
+
+            info = {
+                type: TEST_PACKAGES.some((w) => so.name.includes(`node_modules/${w}/`))?
+                    FunType.Test :
+                    so.name.startsWith("/") || so.name.includes("node_modules/")?
+                    FunType.Lib : FunType.App,
+                eval: "eval" in so,
+                loc: enterScriptLocation ?? so,
+            };
+
+            iidToInfo.set(iid, info);
+        }
+
         // determine whether the caller and/or the callee are in app code or in test packages
         let callerInApp, calleeInApp;
         if (inAppStack.length === 0) { // called from top-level
-            calleeInApp = !so.name.includes("node_modules/") && !so.name.startsWith("/") && !calleeEval;
+            calleeInApp = info.type === FunType.App && !info.eval;
             callerInApp = false;
         } else {
-            callerInApp = inAppStack.length > 0 && inAppStack[inAppStack.length - 1];
-            if (callerInApp) {// called from app code
-                calleeInApp = !so.name.startsWith("/");
-                if (calleeInApp)
-                    for (const w of TEST_PACKAGES)
-                        if (so.name.includes(`node_modules/${w}/`)) {
-                            calleeInApp = false;
-                            break;
-                        }
-            } else // called from test package
-                calleeInApp = !so.name.includes("node_modules/")
+            callerInApp = inAppStack[inAppStack.length - 1];
+            if (callerInApp) // called from app code
+                calleeInApp = info.type !== FunType.Test;
+            else // called from test package
+                calleeInApp = info.type === FunType.App;
         }
         inAppStack.push(calleeInApp);
-        // register call edge and call location if caller and callee are both in app code and it's an explicit call
-        if (callerInApp && calleeInApp && funLocStack.length > 0 && lastCallLoc && !calleeEval) {
-            const cso = J$.iidToSourceObject(lastCallLoc);
-            const callerEval = "eval" in cso;
-            if (!callerEval) {
-                addCallEdge(lastCallLoc, funLocStack[funLocStack.length - 1], iid);
-                if (!callLocations.has(lastCallLoc))
-                    callLocations.set(lastCallLoc, so2loc(cso));
-            }
+
+        const pCalls = pendingCalls.get(func);
+        if (pCalls !== undefined) {
+            pendingCalls.delete(func);
+
+            if (calleeInApp && !info.eval)
+                for (const [caller, callIid] of pCalls) // register pending call edges
+                    addCallEdge(callIid, caller, iid);
         }
-        // register function location if callee is in app code
-        if (calleeInApp && !calleeEval && !functionLocations.has(iid))
-            functionLocations.set(iid, so2loc(enterScriptLocation ?? so));
+
         // push function location and reset enterScriptLocation
         funLocStack.push(iid);
         enterScriptLocation = undefined;
-        lastCallLoc = null;
     },
 
     /**
      * Exiting function.
      */
     functionExit: function(_iid: IID, _returnVal, _wrappedExceptionVal) {
+        // console.log(`Exited ${_iid && J$.iidToLocation(_iid)}`);
         funLocStack.pop();
         inAppStack.pop();
-        lastCallLoc = null;
     },
 
     /**
@@ -213,10 +262,9 @@ J$.addAnalysis({ // TODO: super calls not detected (see tests/micro/classes.js)
     /**
      * Before call to 'eval'.
      */
-    evalPre(iid: IID, str: string) {
-        lastCallLoc = null;
-        // TODO: record extra information about eval/Function calls? see --callgraph-native-calls
-    },
+    // evalPre(iid: IID, str: string) {
+    //     // TODO: record extra information about eval/Function calls? see --callgraph-native-calls
+    // },
 
     // evalPost(iid: IID, str: string) {
     //     // TODO?
@@ -225,10 +273,9 @@ J$.addAnalysis({ // TODO: super calls not detected (see tests/micro/classes.js)
     /**
      * Before call to 'Function'.
      */
-    evalFunctionPre(iid: IID, func: Function, receiver: Object, args: any) {
-        lastCallLoc = null;
-        // TODO?
-    },
+    // evalFunctionPre(iid: IID, func: Function, receiver: Object, args: any) {
+    //     // TODO?
+    // },
 
     // evalFunctionPost(iid: IID, func: Function, receiver: Object, args: any, ret: any) {
     //     // TODO?
@@ -238,13 +285,17 @@ J$.addAnalysis({ // TODO: super calls not detected (see tests/micro/classes.js)
      * Before call to built-in function.
      */
     builtinEnter(name: string, f: Function, dis: any, args: any) {
-        lastCallLoc = null;
+        // (J$ as any).nativeLog(`BuiltinEnter ${name} ${dis} ${typeof dis}`);
+        pendingCalls.delete(f); // remove pending calls
+        // TODO: Populate funIids and iidToInfo with something to prevent pending calls?
         // TODO: record extra information about calls to built-ins? see --callgraph-native-calls and --callgraph-require-calls
     },
 
-    // builtinExit(name: string, returnVal: any) {
-    //     // TODO?
-    // },
+    builtinExit(name: string, f: Function, dis: any, args: any, returnVal: any, exceptionVal: any) {
+        // (J$ as any).nativeLog(`BuiltinExit ${name} ${returnVal} ${typeof returnVal} ${dis} ${typeof dis}`);
+        if (name === "Function.prototype.bind" && typeof returnVal === "function")
+            binds.set(returnVal, dis); // record information about binds
+    },
     //
     // asyncFunctionEnter(iid: IID) {
     //     // TODO: record extra information about async calls? see --callgraph-native-calls
@@ -265,10 +316,9 @@ J$.addAnalysis({ // TODO: super calls not detected (see tests/micro/classes.js)
     /**
      * Before property read operation (which may trigger implicit call).
      */
-    getFieldPre(iid: IID, base: any, offset: any, isComputed: boolean, isOpAssign: boolean, isMethodCall: boolean): { base: any; offset: any; skip: boolean } | void {
-        lastCallLoc = null;
-        // TODO: detect implicit calls to getters? see --callgraph-implicit-calls
-    },
+    // getFieldPre(iid: IID, base: any, offset: any, isComputed: boolean, isOpAssign: boolean, isMethodCall: boolean): { base: any; offset: any; skip: boolean } | void {
+    //     // TODO: detect implicit calls to getters? see --callgraph-implicit-calls
+    // },
 
     // getField(iid: IID, base: any, offset: any, val: any, isComputed: boolean, isOpAssign: boolean, isMethodCall: boolean): { result: any } | void {
     //     // TODO?
@@ -277,10 +327,9 @@ J$.addAnalysis({ // TODO: super calls not detected (see tests/micro/classes.js)
     /**
      * Before property write operation (which may trigger implicit call).
      */
-    putFieldPre(iid: IID, base: any, offset: any, val: any, isComputed: boolean, isOpAssign: boolean): { base: any; offset: any; val: any; skip: boolean } | void {
-        lastCallLoc = null;
-        // TODO: detect implicit calls to setters? see --callgraph-implicit-calls
-    },
+    // putFieldPre(iid: IID, base: any, offset: any, val: any, isComputed: boolean, isOpAssign: boolean): { base: any; offset: any; val: any; skip: boolean } | void {
+    //     // TODO: detect implicit calls to setters? see --callgraph-implicit-calls
+    // },
 
     // putField(iid: IID, base: any, offset: any, val: any, isComputed: boolean, isOpAssign: boolean): { result: any } | void {
     //     // TODO?
@@ -289,10 +338,9 @@ J$.addAnalysis({ // TODO: super calls not detected (see tests/micro/classes.js)
     /**
      * Before unary operator (which may trigger implicit call).
      */
-    unaryPre(iid: IID, op: string, left: any): { op: string; left: any; skip: boolean } | void {
-        lastCallLoc = null;
-        // TODO: detect implicit calls to valueOf? see --callgraph-implicit-calls
-    },
+    // unaryPre(iid: IID, op: string, left: any): { op: string; left: any; skip: boolean } | void {
+    //     // TODO: detect implicit calls to valueOf? see --callgraph-implicit-calls
+    // },
 
     // unary(iid: IID, op: string, left: any, result: any): { result: any } | void {
     //     // TODO?
@@ -301,10 +349,9 @@ J$.addAnalysis({ // TODO: super calls not detected (see tests/micro/classes.js)
     /**
      * Before binary operator (which may trigger implicit call).
      */
-    binaryPre(iid: IID, op: string, left: any, right: any, isOpAssign: boolean, isSwitchCaseComparison: boolean, isComputed: boolean): { op: string; left: any; right: any; skip: boolean } | void {
-        lastCallLoc = null;
-        // TODO: detect implicit calls to valueOf/toString? see --callgraph-implicit-calls
-    },
+    // binaryPre(iid: IID, op: string, left: any, right: any, isOpAssign: boolean, isSwitchCaseComparison: boolean, isComputed: boolean): { op: string; left: any; right: any; skip: boolean } | void {
+    //     // TODO: detect implicit calls to valueOf/toString? see --callgraph-implicit-calls
+    // },
 
     // binary(iid: IID, op: string, left: any, right: any, result: any, isOpAssign: boolean, isSwitchCaseComparison: boolean, isComputed: boolean): { result: any } | void {
     //     // TODO?
@@ -322,25 +369,34 @@ process.on('exit', function() {
         log(`jelly: No relevant files detected for process ${process.pid}, skipping file write`);
         return;
     }
+
     // log(`jelly: Writing ${outfile}`);
+
+    // the function locations that are required are for those functions
+    // that have calls or are called
+    const requiredFunctions = new Set([...iidToInfo.entries()]
+                                      .flatMap(([i, f]) => f.calls === undefined? [] :
+                                               [i].concat([...f.calls])));
+
     const fd = fs.openSync(outfile, "w");
     fs.writeSync(fd, `{\n "entries": [${JSON.stringify(path.relative(cwd, process.argv[1]))}],\n`);
     fs.writeSync(fd, ` "time": "${new Date().toUTCString()}",\n`);
-    fs.writeSync(fd, ` "files": [`);
+    fs.writeSync(fd, ` "functions": {`);
     let first = true;
+    for (const [iid, info] of iidToInfo) if (requiredFunctions.has(iid)) {
+        fs.writeSync(fd, `${first ? "" : ","}\n  "${iid}": ${JSON.stringify(so2loc(info.loc))}`);
+        first = false;
+    }
+    fs.writeSync(fd, `\n },\n "files": [`);
+    // files go after functions as so2loc populates files
+    first = true;
     for (const file of files) {
         // relativize absolute paths with file:// prefix
         const fp = file.startsWith("file://")? path.relative(cwd, file.substring("file://".length)) : file;
         fs.writeSync(fd, `${first ? "" : ","}\n  ${JSON.stringify(fp)}`);
         first = false;
     }
-    fs.writeSync(fd, `\n ],\n "functions": {`);
-    first = true;
-    for (const [iid, loc] of functionLocations) {
-        fs.writeSync(fd, `${first ? "" : ","}\n  "${iid}": ${JSON.stringify(loc)}`);
-        first = false;
-    }
-    fs.writeSync(fd, `\n },\n "calls": {`);
+    fs.writeSync(fd, `\n ],\n "calls": {`);
     first = true;
     for (const [iid, loc] of callLocations) {
         fs.writeSync(fd, `${first ? "" : ","}\n  "${iid}": ${JSON.stringify(loc)}`);
@@ -348,8 +404,8 @@ process.on('exit', function() {
     }
     fs.writeSync(fd, `\n },\n "fun2fun": [`);
     first = true;
-    for (const [callerFun, callees] of fun2fun)
-        for (const callee of callees) {
+    for (const [callerFun, info] of iidToInfo)
+        for (const callee of info.calls ?? []) {
             fs.writeSync(fd, `${first ? "\n  " : ", "}[${callerFun}, ${callee}]`);
             first = false;
         }
