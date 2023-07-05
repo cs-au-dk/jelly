@@ -1,5 +1,5 @@
 import {closeSync, existsSync, lstatSync, openSync, readdirSync, readFileSync, readSync, writeSync} from "fs";
-import {basename, relative, resolve, sep} from "path";
+import {basename, relative, resolve} from "path";
 import {options} from "../options";
 import micromatch from "micromatch";
 import {FilePath, Location, locationToStringWithFileAndEnd} from "./util";
@@ -14,7 +14,7 @@ import {FragmentState} from "../analysis/fragmentstate";
  * Expands the given list of file paths.
  * Each given file path is resolved relative to the current working directory.
  * Directories are traversed recursively (except node_modules, .git, and .yarn,
- * and also excluding out, build, dist, generated and sub-directories that contain package.json unless inside a node_modules directory within basedir),
+ * and also excluding out, build, dist, generated and sub-directories that contain package.json unless inside a node_modules directory),
  * and all .js, .es, .mjs, .cjs, .ts, .tsx and Node.js shebang files are included
  * (except .d.ts and paths matching options.exclude and also excluding .min.js, .bundle.js unless inside a node_modules directory within basedir).
  * Symlinks are ignored.
@@ -40,7 +40,7 @@ export function expand(paths: Array<string> | string): Array<string> {
 
 function* expandRec(path: string, sub: boolean): Generator<string> {
     const stat = lstatSync(path);
-    const inNodeModules = relative(options.basedir, path).split(sep).includes("node_modules");
+    const inNodeModules = path.includes("node_modules");
     if (stat.isDirectory()) {
         const base = basename(path);
         if (!sub ||
