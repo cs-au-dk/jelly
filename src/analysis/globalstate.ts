@@ -236,7 +236,9 @@ export class GlobalState {
 
                 // record that module has been reached
                 this.reachedFiles.add(tofile);
-                if (from && options.ignoreDependencies)
+                if (from && (options.ignoreDependencies ||
+                    (!moduleInfo.packageInfo.isEntry && ((options.includePackages && !options.includePackages.includes(moduleInfo.packageInfo.name))
+                        || (options.excludePackages && options.excludePackages.includes(moduleInfo.packageInfo.name))))))
                     logger.info(`Ignoring module ${moduleInfo}`);
                 else
                     this.pendingFiles.push(tofile);

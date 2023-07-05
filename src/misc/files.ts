@@ -27,8 +27,8 @@ export function expand(paths: Array<string> | string): Array<string> {
     for (const path of paths)
         for (const e of expandRec(resolve(path), false))
             res.push(e); // TODO: complain if e starts with "."? (happens if path is outside basedir)
-    if (options.exclude) {
-        const excl = new Set(micromatch(res, options.exclude));
+    if (options.excludeEntries) {
+        const excl = new Set(micromatch(res, options.excludeEntries));
         const eres = [];
         for (const r of res)
             if (!excl.has(r))

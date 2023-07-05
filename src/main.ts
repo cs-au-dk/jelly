@@ -46,10 +46,13 @@ program
     .option("-s, --soundness <file>", "compare with dynamic call graph")
     .option("-n, --graal-home <directory>", "home of graal-nodejs (default: $GRAAL_HOME)")
     .option("-d, --dynamic <file>", "generate call graph dynamically, no static analysis")
-    .option("-e, --exclude <glob...>", "files to exclude when specifying entry directories")
     .option("-p, --patterns <file...>", "files containing API usage patterns to detect")
     .option("-v, --vulnerabilities <file>", "report vulnerability matches")
     // .option("-g, --callgraph-graphviz <file>", "save call graph as Graphviz dot file") // TODO: graphviz output disabled for now
+    .option("--include-packages <package...>", "include only dependencies in this list")
+    .option("--exclude-packages <package...>", "exclude dependencies in this list")
+    .option("--ignore-dependencies", "don't include dependencies in analysis")
+    .option("--ignore-unresolved", "don't report errors about unresolved modules")
     .option("--npm-test <dir>", "run 'npm test' instead of 'node' (use with -d)")
     // .option("--graphviz-packages <package...>", "packages to include in Graphviz dot file (use with -g)")
     // .option("--graphviz-elide-functions", "elide functions (use with -g)")
@@ -64,8 +67,6 @@ program
     .option("--no-cycle-elimination", "disable cycle elimination")
     .option("--no-natives", "disable nonessential models of native libraries")
     .option("--skip-graal-test", "skip graal-nodejs test (use with -d)")
-    .option("--ignore-dependencies", "don't include dependencies in analysis")
-    .option("--ignore-unresolved", "don't report errors about unresolved modules")
     .option("--no-print-progress", "don't print analysis progress information")
     .option("--no-tty", "don't print solver progress for TTY")
     .option("--warnings-unsupported", "print warnings about unsupported features")
@@ -76,6 +77,7 @@ program
     .option("--find-access-paths <location>", "find access paths for source location (file:line)")
     .option("--higher-order-functions", "report higher-order functions")
     .option("--zeros", "report calls with zero callees and functions with zero callers")
+    .option("--exclude-entries <glob...>", "files to exclude when specifying entry directories")
     .option("--tracked-modules <glob...>", "modules to track usage of (default: empty unless using -p, -v or --api-usage)")
     .option("--external-matches", "enable pattern matches from external code (default: false unless using -v)")
     .option("--no-callgraph-implicit", "omit implicit calls in call graph") // TODO: not yet including implicit valueOf/toString calls
@@ -92,8 +94,9 @@ program
     .usage("[options] [files]")
     .addHelpText("after",
         "\nAll modules reachable by require/import from the given files are included in the analysis\n" +
-        "(except when using --ignore-dependencies). If specifying directories instead\n" +
-        "of files, the files in the directories and their subdirectories are used as entry points.\n" +
+        "(except when using --ignore-dependencies, --include-packages or --exclude-packages).\n" +
+        "If specifying directories instead of files, the files in the directories and their\n" +
+        "subdirectories are used as entry points.\n" +
         "The special argument -- indicates end of options, typically after multi-argument options.\n" +
         `Memory limit is ${getMemoryLimit()}MB.${PKG ? "" : " Change with, for example: NODE_OPTIONS=--max-old-space-size=4096"}`)
     .action(main)

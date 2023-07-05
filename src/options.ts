@@ -37,7 +37,7 @@ export const options: {
     skipGraalTest: boolean,
     ignoreDependencies: boolean,
     ignoreUnresolved: boolean,
-    exclude: Array<string> | undefined,
+    excludeEntries: Array<string> | undefined,
     patterns: Array<string> | undefined,
     natives: boolean,
     warningsUnsupported: boolean,
@@ -62,7 +62,9 @@ export const options: {
     zeros: boolean,
     variableKinds: boolean,
     vulnerabilities: string | undefined,
-    externalMatches: boolean
+    externalMatches: boolean,
+    includePackages: Array<string> | undefined,
+    excludePackages: Array<string> | undefined
 } = {
     callgraphHtml: undefined,
     dataflowHtml: undefined,
@@ -92,7 +94,7 @@ export const options: {
     skipGraalTest: false,
     ignoreDependencies: false,
     ignoreUnresolved: false,
-    exclude: undefined,
+    excludeEntries: undefined,
     patterns: undefined,
     natives: true,
     warningsUnsupported: false,
@@ -117,7 +119,9 @@ export const options: {
     zeros: false,
     variableKinds: false,
     vulnerabilities: undefined,
-    externalMatches: false
+    externalMatches: false,
+    includePackages: undefined,
+    excludePackages: undefined
 };
 
 export function setOptions(opts: OptionValues & Partial<typeof options>) {
