@@ -233,8 +233,8 @@ export default class Solver {
     addAccessPath(ap: AccessPath, to: ConstraintVar | undefined, subap?: AccessPath) { // TODO: store access paths separately from other tokens?
         if (!to)
             return;
-        const abstractProp = ap instanceof PropertyAccessPath && ap.prop !== "default" && patternProperties && !patternProperties.has(ap.prop);
-        const ap2 = subap instanceof IgnoredAccessPath || (subap instanceof UnknownAccessPath && abstractProp) ? subap :
+        const abstractProp = ap instanceof PropertyAccessPath && !(subap instanceof ModuleAccessPath && ap.prop === "default") && patternProperties && !patternProperties.has(ap.prop);
+        const ap2 = subap instanceof IgnoredAccessPath || (subap instanceof UnknownAccessPath && (ap instanceof CallResultAccessPath || ap instanceof ComponentAccessPath || abstractProp)) ? subap :
             abstractProp ? this.globalState.canonicalizeAccessPath(new PropertyAccessPath((ap as PropertyAccessPath).base, "?")) : ap; // abstracting irrelevant access paths
         if (logger.isDebugEnabled())
             logger.debug(`Adding access path ${ap2}${ap2 !== ap ? ` (${ap})` : ""} at ${to}${subap ? ` (sub-expression access path: ${subap})` : ""}`);
