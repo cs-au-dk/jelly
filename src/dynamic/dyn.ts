@@ -5,7 +5,7 @@
  */
 const TEST_PACKAGES = [
     "ava", "yarn", "mocha", "chai", "nyc",
-    "sinon", "should", "@babel", "jest", "tape",
+    "sinon", "should", "@babel", "jest", "tap", "tape",
 ]; // TODO: other test packages?
 
 /**
@@ -15,7 +15,7 @@ const IGNORED_COMMANDS = [
     "npm", "npm-cli.js",
     "grunt", "rollup", "browserify", "webpack", "terser",
     "rimraf",
-    "eslint", "jslint", "prettier", "xo", "standard",
+    "eslint", "tslint", "jslint", "prettier", "xo", "standard",
     "tsc", "tsd",
     // TODO: other commands where instrumentation can be skipped?
 ];
