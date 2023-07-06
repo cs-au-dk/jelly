@@ -13,10 +13,12 @@ import {
     isMemberExpression,
     isNewExpression,
     isObjectPattern,
+    isOptionalMemberExpression,
     isParenthesizedExpression,
     isRestElement,
     isSpreadElement,
     isStringLiteral,
+    isTSParameterProperty,
     JSXIdentifier,
     JSXMemberExpression,
     JSXNamespacedName,
@@ -476,7 +478,7 @@ export class Operations {
             const lVar = vp.identVar(dst, path);
             this.solver.addSubsetConstraint(src, lVar);
 
-        } else if (isMemberExpression(dst)) {
+        } else if (isMemberExpression(dst) || isOptionalMemberExpression(dst)) {
             const lVar = this.expVar(dst.object, path);
             const prop = getProperty(dst);
             if (prop !== undefined) {
@@ -623,7 +625,9 @@ export class Operations {
                         // assign the temporary result at p to the locations represented by p
                         this.assign(vp.nodeVar(p), p, path);
                     }
-        } else {
+        } else if (isTSParameterProperty(dst))
+            this.assign(src, dst.parameter, path);
+        else {
             if (!isRestElement(dst))
                 assert.fail(`Unexpected LVal type ${dst.type} at ${locationToStringWithFile(dst.loc)}`);
             // assign the array generated at callFunction to the sub-l-value

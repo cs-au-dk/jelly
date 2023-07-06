@@ -16,7 +16,6 @@ import {
     isObjectProperty,
     isOptionalMemberExpression,
     isTSExternalModuleReference,
-    isVariableDeclarator,
     Node,
     Program,
     TSExportAssignment,
@@ -138,8 +137,7 @@ export function preprocessAst(ast: File, file: string, module: ModuleInfo, globa
                 !(isClassProperty(path.parent) && path.parent.key === n) &&
                 !(isClassMethod(path.parent) && path.parent.key === n) &&
                 !isImportSpecifier(path.parent) &&
-                !isJSXAttribute(path.parent) &&
-                !(isVariableDeclarator(path.parent) && path.parent.id === n)) {
+                !isJSXAttribute(path.parent)) {
                 const ps = path.scope.getProgramParent();
                 if (!ps.getBinding(n.name)?.identifier) {
                     const d = identifier(n.name);

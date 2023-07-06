@@ -278,7 +278,7 @@ export class PatternMatcher {
                 const esc = this.escapingToExternal.get(ap);
                 if (esc)
                     for (const n of esc)
-                        if (!write || (isAssignmentExpression(n) && isMemberExpression(n.left)))
+                        if (!write || (isAssignmentExpression(n) && (isMemberExpression(n.left) || isOptionalMemberExpression(n.left))))
                             mapGetSet(res!.low, n).add(ap);
             }
 
@@ -489,7 +489,7 @@ export class PatternMatcher {
             const sub = this.findAccessPathPatternMatches(d.ap);
             for (const level of confidenceLevels)
                 for (const exp of sub[level].keys())
-                    if (!isMemberExpression(exp) && !isIdentifier(exp)) // excluding E.default expressions and identifiers
+                    if (!(isMemberExpression(exp) || isOptionalMemberExpression(exp)) && !isIdentifier(exp)) // excluding E.default expressions and identifiers
                         if (!d.onlyDefault || isDefaultImport(exp))
                             res.push({exp, uncertainties: level === "low" ? ["accessPath" as const] : undefined});
         } else if (d instanceof ReadDetectionPattern) {
@@ -535,7 +535,7 @@ export class PatternMatcher {
                     const uncertainties: Array<Uncertainty> = [];
                     if (level === "low")
                         uncertainties.push("accessPath");
-                    if (isAssignmentExpression(exp) && isMemberExpression(exp.left)) {
+                    if (isAssignmentExpression(exp) && (isMemberExpression(exp.left) || isOptionalMemberExpression(exp.left))) {
                         if (d.valueFilter)
                             switch (expressionMatchesType(exp.right, undefined, d.valueFilter, this.typer)) {
                                 case Ternary.False:

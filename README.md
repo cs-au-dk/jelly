@@ -160,7 +160,7 @@ jelly --npm-test tests/mochatest -d cg.json
 Another approach is to add `$JELLY_HOME/lib/bin/node` to `PATH` and set `JELLY_OUT`, for example to run Mocha directly:
 ```bash
 cd tests/mochatest
-PATH=$JELLY_HOME/lib/bin:$PATH JELLY_OUT=cg.json node_modules/.bin/mocha
+PATH=$JELLY_HOME/bin:$PATH JELLY_OUT=cg.json node_modules/.bin/mocha
 ```
 where `JELLY_HOME` is the home directory of Jelly.
 This results in a file `cg.json-<PID>` for each instrumented file that is executed.
