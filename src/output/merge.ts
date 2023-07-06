@@ -15,8 +15,11 @@ export function merge(callgraphs: Array<CallGraph>): CallGraph {
     ignore: []
   }
 
-  for (const cg of callgraphs) {
+  type Edge = [number, number];
+  const fun2fun = new Map<string, Edge>();
+  const call2fun = new Map<string, Edge>();
 
+  for (const cg of callgraphs) {
     if (cg.entries)
       for (const entry of cg.entries)
         if (result.entries?.indexOf(entry) == -1)
@@ -37,12 +40,22 @@ export function merge(callgraphs: Array<CallGraph>): CallGraph {
       }
     }
 
+    const translate = (loc: string) => {
+      const i = loc.indexOf(":");
+      assert.notEqual(i, -1);
+      const originalFileId = parseInt(loc.substring(0, i));
+      const newFileId = fileMap.get(originalFileId);
+      assert.notEqual(newFileId, undefined);
+      return String(newFileId) + loc.substring(i);
+    };
+
     const functionsMap = new Map<number, number>();
     if (cg.functions) {
       for (let originalIdStr of Object.keys(cg.functions)) {
-        let originalId = parseInt(originalIdStr);
-        const fn = cg.functions[originalId];
+        const originalId = parseInt(originalIdStr);
+        let fn = cg.functions[originalId];
         assert.ok(fn);
+        fn = translate(fn);
         let resultId = (result.functions as Array<string>).indexOf(fn);
         if (resultId === -1) {
           resultId = (result.functions as Array<string>).length;
@@ -56,8 +69,8 @@ export function merge(callgraphs: Array<CallGraph>): CallGraph {
     const callsMap = new Map<number, number>();
     if (cg.calls) {
       for (let originalIdStr of Object.keys(cg.calls)) {
-        let originalId = parseInt(originalIdStr);
-        const call = cg.calls[originalId];
+        const originalId = parseInt(originalIdStr);
+        const call = translate(cg.calls[originalId]);
         let resultId = (result.calls as Array<string>).indexOf(call);
         if (resultId == -1) {
           resultId = (result.calls as Array<string>).length;
@@ -70,22 +83,25 @@ export function merge(callgraphs: Array<CallGraph>): CallGraph {
     if (cg.fun2fun)
       for (let [u, v] of cg.fun2fun)
         if (functionsMap.has(u) && functionsMap.has(v)) {
-          const [w, x] = [functionsMap.get(u)!, functionsMap.get(v)!];
-          result.fun2fun.push([w, x]);
+          const e: Edge = [functionsMap.get(u)!, functionsMap.get(v)!];
+          fun2fun.set(e.join(","), e);
         }
 
     if (cg.call2fun)
       for (let [u, v] of cg.call2fun)
         if (callsMap.has(u) && functionsMap.has(v)) {
-          const [w, x] = [callsMap.get(u)!, functionsMap.get(v)!];
-          result.call2fun.push([w, x]);
+          const e: Edge = [callsMap.get(u)!, functionsMap.get(v)!];
+          call2fun.set(e.join(","), e);
         }
 
     if (cg.ignore)
-      for (const ignoreLoc of cg.ignore)
+      for (const ignoreLoc of cg.ignore.map(translate))
         if (result.ignore?.indexOf(ignoreLoc) == -1)
           result.ignore.push(ignoreLoc);
   }
+
+  result.fun2fun = [...fun2fun.values()];
+  result.call2fun = [...call2fun.values()];
 
   return result;
 }
