@@ -1,6 +1,7 @@
 import {options} from "../options";
 import assert from "assert";
 import * as v8 from "v8";
+import logger from "./logger";
 
 /**
  * Triggers garbage collection if option --gc is enabled and returns the current size of heap used in MB.
@@ -10,7 +11,10 @@ export function getMemoryUsage(): number {
         assert(typeof gc === "function");
         gc();
     }
-    return Math.ceil(process.memoryUsage().heapUsed / 1048576);
+    const res = Math.ceil(process.memoryUsage().heapUsed / 1048576);
+    if (options.gc && logger.isInfoEnabled())
+        logger.info(`Memory usage: ${res}MB`);
+    return res;
 }
 
 /**
