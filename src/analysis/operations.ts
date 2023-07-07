@@ -478,6 +478,13 @@ export class Operations {
             const lVar = vp.identVar(dst, path);
             this.solver.addSubsetConstraint(src, lVar);
 
+            // if the variable has not been declared normally... (unbound set by preprocessAst)
+            if (lVar instanceof NodeVar && (lVar.node.loc as Location).unbound) {
+
+                // constraint: ⟦E⟧ ⊆ ⟦globalThis.X⟧
+                this.solver.addSubsetConstraint(src, this.solver.varProducer.objPropVar(this.globalSpecialNatives.get("globalThis")!, dst.name));
+            }
+
         } else if (isMemberExpression(dst) || isOptionalMemberExpression(dst)) {
             const lVar = this.expVar(dst.object, path);
             const prop = getProperty(dst);

@@ -736,3 +736,9 @@ test("tests/micro/throw", async () => {
         callTotal: 2,
     });
 });
+
+test("tests/micro/undecl", async () => {
+    await runTest("tests/micro", "undecl1.js", {
+        numberOfFunctionToFunctionEdges: 1
+    });
+});
