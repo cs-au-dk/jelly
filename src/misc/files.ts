@@ -1,5 +1,5 @@
 import {closeSync, existsSync, lstatSync, openSync, readdirSync, readFileSync, readSync, writeSync} from "fs";
-import {basename, relative, resolve} from "path";
+import {basename, dirname, relative, resolve} from "path";
 import {options} from "../options";
 import micromatch from "micromatch";
 import {FilePath, Location, locationToStringWithFileAndEnd} from "./util";
@@ -136,8 +136,9 @@ export function requireResolve(str: string, file: FilePath, node: Node, f: Fragm
 
 /**
  * Attempts to auto-detect basedir if not set explicitly.
- * If not set explicitly and a single path is given, basedir is set to the nearest enclosing directory
- * of paths[0] that contains a package.json file.
+ * If not set explicitly and a single path is given, basedir is set to
+ * the parent of the nearest enclosing directory of paths[0] that
+ * contains a package.json file.
  * @param paths paths to entry files or directories
  * @return true if successful, false if failed
  */
@@ -161,7 +162,7 @@ export function autoDetectBaseDir(paths: Array<string>): boolean {
         logger.info("Can't auto-detect basedir, package.json not found (use option -b), aborting");
         return false;
     }
-    options.basedir = resolve(process.cwd(), t.dir);
+    options.basedir = dirname(resolve(process.cwd(), t.dir));
     logger.verbose(`Basedir auto-detected: ${options.basedir}`);
     return true;
 }
