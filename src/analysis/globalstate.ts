@@ -135,11 +135,6 @@ export class GlobalState {
      */
     globalSpecialNatives: SpecialNativeObjects | undefined;
 
-    constructor() {
-        this.canonicalizeAccessPath(IgnoredAccessPath.instance);
-        this.canonicalizeAccessPath(UnknownAccessPath.instance);
-    }
-
     /**
      * Returns the canonical representative of the given constraint variable (possibly the given one).
      */
@@ -164,6 +159,8 @@ export class GlobalState {
      */
     canonicalizeAccessPath<T extends AccessPath>(t: T): T {
         this.numberOfCanonicalizeAccessPathCalls++;
+        if (t === IgnoredAccessPath.instance || t === UnknownAccessPath.instance)
+            return t;
         return getOrSet(this.canonicalAccessPaths, t.toString(), () => t) as T;
     }
 

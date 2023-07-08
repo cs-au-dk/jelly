@@ -240,7 +240,7 @@ export class Operations {
                 f.registerEscapingFromModuleArguments(args, path);
 
                 // constraint: add CallResultAccessPath
-                this.solver.addAccessPath(this.a.canonicalizeAccessPath(new CallResultAccessPath(calleeVar)), resultVar, t.ap);
+                this.solver.addAccessPath(new CallResultAccessPath(calleeVar), resultVar, t.ap);
 
                 for (let i = 0; i < argVars.length; i++) {
                     const argVar = argVars[i];
@@ -349,7 +349,7 @@ export class Operations {
                     } else if (base && t2 instanceof AccessPathToken) {
 
                         // constraint: ... if t2 is access path, @E.p ∈ ⟦E.p⟧
-                        this.solver.addAccessPath(this.a.canonicalizeAccessPath(new PropertyAccessPath(base, prop)), this.solver.varProducer.nodeVar(node), t2.ap);
+                        this.solver.addAccessPath(new PropertyAccessPath(base, prop), this.solver.varProducer.nodeVar(node), t2.ap);
                     }
                 });
 
@@ -452,10 +452,7 @@ export class Operations {
                     const s = normalizeModuleName(str);
                     const tracked = options.trackedModules && options.trackedModules.find(e =>
                         micromatch.isMatch(m!.getOfficialName(), e) || micromatch.isMatch(s, e))
-                    this.solver.addAccessPath(tracked ?
-                            this.a.canonicalizeAccessPath(new ModuleAccessPath(m, s)) :
-                            IgnoredAccessPath.instance,
-                        resultVar);
+                    this.solver.addAccessPath(tracked ? new ModuleAccessPath(m, s) : IgnoredAccessPath.instance, resultVar);
                 }
 
                 f.registerRequireCall(path.node, this.a.getEnclosingFunctionOrModule(path, this.moduleInfo), m);
@@ -528,7 +525,7 @@ export class Operations {
                         this.solver.addSubsetConstraint(src, this.solver.varProducer.packagePropVar(this.packageInfo, prop));
 
                         // collect property write operation @E1.p
-                        this.solver.addAccessPath(this.a.canonicalizeAccessPath(new PropertyAccessPath(lVar, prop)), this.solver.varProducer.nodeVar(path.node), t.ap);
+                        this.solver.addAccessPath(new PropertyAccessPath(lVar, prop), this.solver.varProducer.nodeVar(path.node), t.ap);
 
                         // values written to external objects escape
                         this.solver.fragmentState.registerEscapingToExternal(src, path.node);

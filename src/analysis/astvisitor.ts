@@ -591,7 +591,7 @@ export function visit(ast: File, op: Operations) {
                             if (t instanceof AllocationSiteToken || t instanceof FunctionToken || t instanceof NativeObjectToken || t instanceof PackageObjectToken)
                                 solver.addSubsetConstraint(solver.varProducer.objPropVar(t, prop), solver.varProducer.nodeVar(imp.local));
                             else if (t instanceof AccessPathToken) // TODO: treat as object along with other tokens above?
-                                solver.addAccessPath(a.canonicalizeAccessPath(new PropertyAccessPath(solver.varProducer.nodeVar(path.node), prop)), solver.varProducer.nodeVar(imp.local), t.ap); // TODO: describe this constraint...
+                                solver.addAccessPath(new PropertyAccessPath(solver.varProducer.nodeVar(path.node), prop), solver.varProducer.nodeVar(imp.local), t.ap); // TODO: describe this constraint...
                         }
                 });
             }
@@ -737,7 +737,7 @@ export function visit(ast: File, op: Operations) {
             if (componentVar)
                 solver.addForAllConstraint(componentVar, TokenListener.JSX_ELEMENT, path.node, (t: Token) => {
                     if (t instanceof AccessPathToken)
-                        solver.addAccessPath(a.canonicalizeAccessPath(new ComponentAccessPath(componentVar)), solver.varProducer.nodeVar(path.node), t.ap);
+                        solver.addAccessPath(new ComponentAccessPath(componentVar), solver.varProducer.nodeVar(path.node), t.ap);
                 });
         }
     });
