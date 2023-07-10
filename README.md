@@ -50,6 +50,7 @@ Directories are expanded (using heuristics to skip certain files and directories
 All files reachable from entry files are analyzed, except
 if option `--ignore-dependencies` is used, in which case only entry files are analyzed,
 and only files within the base directory (auto-detected or specified using option `--basedir` or `-b`) are included.
+Specific packages can also be selected using `--include-packages` or `--exclude-packages`.
 
 As an example, generate a call graph for the `winston` package and all its dependencies, both in JSON format and for HTML visualization:
 ```bash
