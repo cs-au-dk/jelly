@@ -19,8 +19,9 @@ function compareStringArrays(as1: Array<string> | undefined, as2: Array<string> 
 // loc returns a canonical representation of a LocationJSON string that is suitable for matching
 // between call graphs collected from dynamic and static analysis
 function loc(str: LocationJSON, cg: CallGraph, kind: "Function" | "Call"): {str: string, file: string} {
-    const match = /^(?<fileIndex>\d+):(?<start>\d+:\d+):(?<end>\d+:\d+)$/.exec(str);
-    assert.ok(match);
+    const match = /^(?<fileIndex>\d+):(?<start>(?:\d+:\d+|\?:\?)):(?<end>(?:\d+:\d+|\?:\?))$/.exec(str);
+    // TODO: warn on missing start/end?
+    assert.ok(match, `${kind} location ${str} does not match expected format`);
     const { fileIndex, start, end } = match.groups!;
     const file = cg.files[Number(fileIndex)];
     // stripping start locations for calls and end locations for functions (workaround like in soundnesstester)
