@@ -805,6 +805,7 @@ export default class Solver {
                     }
                     f.pairListeners2.delete(v);
                 }
+                assert(!this.unprocessedTokens.has(v));
                 f.vars.delete(v);
                 f.vars.add(rep);
             }
@@ -1060,7 +1061,7 @@ export default class Solver {
                 const fvs = mapGetSet(f.subsetEdges, vRep);
                 for (const v2 of svs) {
                     const v2Rep = f.getRepresentative(v2);
-                    if (!fvs.has(v2Rep)) {
+                    if (!fvs.has(v2Rep) && vRep !== v2Rep) {
                         fvs.add(v2Rep);
                         f.numberOfSubsetEdges++;
                         if (fvs.size > this.largestSubsetEdgeOutDegree)
