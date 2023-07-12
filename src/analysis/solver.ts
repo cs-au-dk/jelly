@@ -110,10 +110,7 @@ export default class Solver {
         d.functions = a.functionInfos.size;
         d.functionToFunctionEdges = f.numberOfFunctionToFunctionEdges;
         d.uniqueTokens = f.a.canonicalTokens.size;
-        const usage = getMemoryUsage();
-        if (logger.isVerboseEnabled())
-            logger.verbose(`Memory usage: ${usage}MB`);
-        d.maxMemoryUsage = Math.max(d.maxMemoryUsage, usage);
+        d.maxMemoryUsage = Math.max(d.maxMemoryUsage, getMemoryUsage());
     }
 
     /**

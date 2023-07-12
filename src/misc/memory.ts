@@ -12,7 +12,7 @@ export function getMemoryUsage(): number {
         gc();
     }
     const res = Math.ceil(process.memoryUsage().heapUsed / 1048576);
-    if (options.gc && logger.isInfoEnabled())
+    if ((options.gc && logger.isInfoEnabled()) || logger.isVerboseEnabled())
         logger.info(`Memory usage: ${res}MB`);
     return res;
 }
