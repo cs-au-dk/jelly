@@ -49,6 +49,7 @@ export function parseAndDesugar(str: string, file: string, f: FragmentState): Fi
 
     // apply Babel transformations
     let res;
+    const p = Error.prepareStackTrace;
     try {
         res = transformFromAstSync(originalAst, str, {
             plugins: [
@@ -64,6 +65,8 @@ export function parseAndDesugar(str: string, file: string, f: FragmentState): Fi
     } catch (e) {
         f.error(`Babel transformation failed for ${file}${e instanceof Error ? `: ${e.message}` : ""}`);
         return null;
+    } finally {
+        Error.prepareStackTrace = p; // Babel replaces prepareStackTrace, --enable-source-maps needs the original
     }
     if (!res) {
         f.error(`Babel transformation failed silently for ${file}`);
