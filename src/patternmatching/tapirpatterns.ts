@@ -8,13 +8,12 @@ import {
     removeObsoletePatterns
 } from "./patternloader";
 import {setDefaultTrackedModules, setPatternProperties} from "../options";
-import {FragmentState} from "../analysis/fragmentstate";
 import {TypeScriptTypeInferrer} from "../typescript/typeinferrer";
-import {AnalysisDiagnostics} from "../typings/diagnostics";
 import logger, {writeStdOutIfActive} from "../misc/logger";
 import {Location, locationToStringWithFileAndEnd} from "../misc/util";
 import {TimeoutException} from "../misc/timer";
 import {DetectionPatternMatch, generateQuestion, PatternMatcher} from "./patternmatcher";
+import Solver from "../analysis/solver";
 
 /**
  * Loads patterns from TAPIR pattern files.
@@ -32,13 +31,12 @@ export function tapirLoadPatterns(patternFiles: Array<string>): [Array<PatternWr
  * Performs pattern matching on the given analysis state.
  * @param tapirPatterns TAPIR patterns
  * @param patterns parsed patterns (or 'undefined', in case of parse errors)
- * @param fragmentState analysis state
+ * @param solver analysis solver
  * @param typer TypeScript type inferrer
  * @param expected expected matches (optional)
- * @param diagnostics analysis diagnostics (optional), for setting aborted in case of timeout
  * @return number of matches and misses of different categories
  */
-export function tapirPatternMatch(tapirPatterns: Array<PatternWrapper | SemanticPatch>, patterns: Array<DetectionPattern | undefined>, fragmentState: FragmentState, typer?: TypeScriptTypeInferrer, expected?: (PatchType | Match)[], diagnostics?: AnalysisDiagnostics): {
+export function tapirPatternMatch(tapirPatterns: Array<PatternWrapper | SemanticPatch>, patterns: Array<DetectionPattern | undefined>, solver: Solver, typer?: TypeScriptTypeInferrer, expected?: (PatchType | Match)[]): {
     matches: number,
     matchesLow: number,
     expectedMatches: number,
@@ -54,7 +52,7 @@ export function tapirPatternMatch(tapirPatterns: Array<PatternWrapper | Semantic
     missesFileNotAnalyzed: number
 } {
     writeStdOutIfActive("Pattern matching...");
-    const matcher = new PatternMatcher(fragmentState, typer);
+    const matcher = new PatternMatcher(solver.fragmentState, typer);
     let matches = 0, matchesLow = 0, expectedMatches = 0, unexpectedMatches = 0,
         expectedLow = 0, expectedHigh = 0, unexpectedLow = 0, unexpectedHigh = 0,
         matchesTapirFalsePositives = 0, missesTapirFalsePositives = 0,
@@ -74,7 +72,7 @@ export function tapirPatternMatch(tapirPatterns: Array<PatternWrapper | Semantic
             const tpVersion = "version" in tp ? ` (version ${tp.version})` : "";
             const p = patterns[i];
             if (p) {
-                fragmentState.a.timeoutTimer.checkTimeout();
+                solver.globalState.timeoutTimer.checkTimeout();
                 const ms = matcher.findDetectionPatternMatches(p); // the set of expressions that match tp and p
                 for (const m of ms) {
                     logger.info(`Pattern #${tpId}: ${tpPattern}${tpVersion} matches ${locationToStringWithFileAndEnd(m.exp.loc)} (confidence: ${isHigh(m) ? "high" : "low"})`);
@@ -134,26 +132,26 @@ export function tapirPatternMatch(tapirPatterns: Array<PatternWrapper | Semantic
     } catch (ex) {
         if (ex instanceof TimeoutException) {
             logger.error("Time limit reached, pattern matching aborted");
-            if (diagnostics)
-                diagnostics.timeout = true;
+            if (solver.diagnostics)
+                solver.diagnostics.timeout = true;
         } else
             throw ex;
     }
-    if (fragmentState.a.filesAnalyzed.length === 0)
+    if (solver.globalState.filesAnalyzed.length === 0)
         logger.warn("Zero files analyzed");
     if (expected)
         for (const q of expectedRemaining) {
             const tapirFalsePositive = isTapirFalsePositive(q);
             const id = "classification" in q ? q.classification : q.semanticPatchId;
             const version = "semanticPatchVersion" in q ? ` (version ${q.semanticPatchVersion})` : "";
-            const fileAnalyzed = fragmentState.a.filesAnalyzed.find(f => f.endsWith(q.file)) !== undefined;
+            const fileAnalyzed = solver.globalState.filesAnalyzed.find(f => f.endsWith(q.file)) !== undefined;
             logger.warn(`Missed match for pattern #${id}${version} at ${q.file}:${"lineNumber" in q ? q.lineNumber : q.loc}` +
                 (tapirFalsePositive ? " (TAPIR false positive)" : "") +
                 ("highConfidence" in q ? ` (${q.highConfidence ? "high" : "low"} confidence)` : "") +
                 (fileAnalyzed ? "" : " (file not analyzed)"));
             if (tapirFalsePositive)
                 missesTapirFalsePositives++;
-            if (fragmentState.a.filesWithParseErrors.find(f => f.endsWith(q.file)))
+            if (solver.globalState.filesWithParseErrors.find(f => f.endsWith(q.file)))
                 missesParseErrors++;
             if (!fileAnalyzed)
                 missesFileNotAnalyzed++;

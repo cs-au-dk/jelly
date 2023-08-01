@@ -90,7 +90,7 @@ export async function runTest(basedir: string,
         expect(callTotal).toBe(args.callTotal);
     if (args.matches) {
         assert(tapirPatterns !== undefined && detectionPatterns !== undefined);
-        const {matches, matchesLow} = tapirPatternMatch(tapirPatterns, detectionPatterns, solver.fragmentState);
+        const {matches, matchesLow} = tapirPatternMatch(tapirPatterns, detectionPatterns, solver);
         expect(matches).toBe(args.matches.total);
         if (args.matches.low !== undefined)
             expect(matchesLow).toBe(args.matches.low);

@@ -326,7 +326,7 @@ async function main() {
                 testSoundness(options.soundness, f);
 
             if (tapirPatterns && patterns)
-                tapirPatternMatch(tapirPatterns, patterns, f, typer, undefined, solver.diagnostics);
+                tapirPatternMatch(tapirPatterns, patterns, solver, typer, undefined);
 
             if (options.apiUsage) {
                 const [r1, r2] = getAPIUsage(f);
