@@ -1,4 +1,4 @@
-import fs from "fs";
+import fs, {statSync} from "fs";
 import {resolve} from "path";
 import logger, {writeStdOutIfActive} from "../misc/logger";
 import Solver, {AbortedException} from "./solver";
@@ -60,7 +60,6 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
 
                 const str = fs.readFileSync(file, "utf8"); // TODO: OK to assume utf8? (ECMAScript says utf16??)
                 writeStdOutIfActive(`Parsing ${file} (${Math.ceil(str.length / 1024)}KB)...`);
-                solver.diagnostics.codeSize += str.length;
                 const ast = parseAndDesugar(str, file, solver.fragmentState);
                 if (!ast) {
                     a.filesWithParseErrors.push(file);
@@ -68,6 +67,7 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
                 }
                 moduleInfo.node = ast.program;
                 a.filesAnalyzed.push(file);
+                solver.diagnostics.codeSize += statSync(file).size;
 
                 if (options.modulesOnly) {
 
