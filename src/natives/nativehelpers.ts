@@ -54,7 +54,7 @@ export function assignParameterToThisProperty(param: number, prop: string, p: Na
 function assignExpressionToArrayValue(from: Expression, t: ArrayToken, p: NativeFunctionParams) {
     const argVar = p.solver.varProducer.expVar(from, p.path);
     p.solver.addSubsetConstraint(argVar, p.solver.varProducer.arrayValueVar(t));
-    p.solver.addForAllArrayEntriesConstraint(t, TokenListener.NATIVE_13, p.path.node, (prop: string) =>
+    p.solver.addForAllArrayEntriesConstraint(t, TokenListener.NATIVE_13, from, (prop: string) =>
         p.solver.addSubsetConstraint(argVar, p.solver.varProducer.objPropVar(t, prop)));
 }
 
@@ -452,7 +452,7 @@ export function invokeCallback(kind: CallbackKind, p: NativeFunctionParams, arg:
                         break;
                     case "Array.prototype.sort":
                         // write array elements to param1 and param2 and to the array
-                        if (ft instanceof FunctionToken) {
+                        if (bt instanceof ArrayToken && ft instanceof FunctionToken) { // TODO: currently limited support for generic array methods
                             const btVar = vp.arrayValueVar(bt);
                             p.solver.addSubsetConstraint(btVar, vp.nodeVar(param1));
                             p.solver.addSubsetConstraint(btVar, vp.nodeVar(param2));
