@@ -460,16 +460,19 @@ export function invokeCallback(kind: CallbackKind, p: NativeFunctionParams, arg:
                         break;
                     case "Array.prototype.sort":
                         // write array elements to param1 and param2 and to the array
-                        const btVar = vp.arrayValueVar(bt);
-                        p.solver.addSubsetConstraint(btVar, vp.nodeVar(param1));
-                        p.solver.addSubsetConstraint(btVar, vp.nodeVar(param2));
-                        if (param1)
-                            p.solver.addForAllArrayEntriesConstraint(bt, TokenListener.NATIVE_21, param1, (prop: string) => {
+                        if (ft instanceof FunctionToken) {
+                            const btVar = vp.arrayValueVar(bt);
+                            p.solver.addSubsetConstraint(btVar, vp.nodeVar(param1));
+                            p.solver.addSubsetConstraint(btVar, vp.nodeVar(param2));
+                            p.solver.addForAllArrayEntriesConstraint(bt, TokenListener.NATIVE_21, ft.fun, (prop: string) => {
                                 const btPropVar = vp.objPropVar(bt, prop)
-                                p.solver.addSubsetConstraint(btPropVar, p.solver.varProducer.nodeVar(param1));
-                                p.solver.addSubsetConstraint(btPropVar, p.solver.varProducer.nodeVar(param2));
+                                if (param1)
+                                    p.solver.addSubsetConstraint(btPropVar, p.solver.varProducer.nodeVar(param1));
+                                if (param1)
+                                    p.solver.addSubsetConstraint(btPropVar, p.solver.varProducer.nodeVar(param2));
                                 p.solver.addSubsetConstraint(btPropVar, btVar);
                             });
+                        }
                         p.solver.addSubsetConstraint(baseVar, vp.nodeVar(p.path.node));
                         break;
                     case "Map.prototype.forEach":
