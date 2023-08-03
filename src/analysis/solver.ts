@@ -50,6 +50,8 @@ export default class Solver {
 
     restored: Set<ConstraintVar> = new Set;
 
+    readonly listeners: Map<ListenerID, [TokenListener, Node]> = new Map;
+
     // TODO: move some of this into AnalysisDiagnostics?
     // for diagnostics only
     unprocessedTokensSize: number = 0;
@@ -326,12 +328,20 @@ export default class Solver {
     }
 
     /**
-     * Provides a unique ID for the given key and node.
+     * Provides a unique'ish ID for the given key and node.
      */
     private getListenerID(key: TokenListener, n: Node): ListenerID {
-        let id = (n as any)[JELLY_NODE_ID];
-        assert(id !== undefined);
-        return ((id << 10) + key) ^ ((n.loc && (n.loc as Location).module?.hash) ?? 0); // TODO: hash collision possible
+        const nid = (n as any)[JELLY_NODE_ID];
+        assert(nid !== undefined);
+        const id = (BigInt(nid) << 32n) + (BigInt(key) << 16n) + BigInt((n.loc && (n.loc as Location).module?.hash) ?? 0); // TODO: hash collision possible
+        const x = this.listeners.get(id);
+        if (x) {
+            const [xk, xn] = x;
+            if (xk !== key || xn !== n)
+                logger.error("Error: Hash collision in getListenerID");
+        } else
+            this.listeners.set(id, [key, n]);
+        return id;
     }
 
     /**
@@ -551,7 +561,7 @@ export default class Solver {
      * Runs array entry listener on all existing entries if new.
      * Returns listener map if new.
      */
-    private runArrayEntriesListener(t: ArrayToken, id: number, listener: (prop: string) => void): Map<ListenerID, (prop: string) => void> | false {
+    private runArrayEntriesListener(t: ArrayToken, id: ListenerID, listener: (prop: string) => void): Map<ListenerID, (prop: string) => void> | false {
         const f = this.fragmentState;
         const m = mapGetMap(f.arrayEntriesListeners, t);
         if (!m.has(id)) {
@@ -609,7 +619,7 @@ export default class Solver {
      * Runs object property listener on all existing properties if new.
      * Returns listener map if new.
      */
-    private runObjectPropertiesListener(t: ObjectPropertyVarObj, id: number, listener: (prop: string) => void): Map<ListenerID, (prop: string) => void> | false {
+    private runObjectPropertiesListener(t: ObjectPropertyVarObj, id: ListenerID, listener: (prop: string) => void): Map<ListenerID, (prop: string) => void> | false {
         const f = this.fragmentState;
         const m = mapGetMap(f.objectPropertiesListeners, t);
         if (!m.has(id)) {

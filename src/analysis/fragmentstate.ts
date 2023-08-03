@@ -29,7 +29,7 @@ import {NodePath} from "@babel/traverse";
 import {GlobalState} from "./globalstate";
 import {ConstraintVarProducer} from "./constraintvarproducer";
 
-export type ListenerID = number;
+export type ListenerID = bigint;
 
 /**
  * Analysis state for a fragment (a module or a package with dependencies, depending on the analysis phase).
