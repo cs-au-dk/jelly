@@ -677,9 +677,8 @@ export function visit(ast: File, op: Operations) {
                     const m = op.requireModule(path.node.source.value, vp.nodeVar(path.node), path);
                     if (m instanceof ModuleInfo) {
                         const t = a.canonicalizeToken(new NativeObjectToken("exports", m));
-                        solver.addForAllObjectPropertiesConstraint(t, TokenListener.EXPORT_BASE, path.node, (prop: string) => { // TODO: only exporting explicitly defined properties, not unknown computed
-                            solver.addSubsetConstraint(solver.varProducer.objPropVar(t, prop), solver.varProducer.objPropVar(op.exportsObjectToken, prop));
-                        });
+                        solver.addForAllObjectPropertiesConstraint(t, TokenListener.EXPORT_BASE, path.node, (prop: string) => // TODO: only exporting explicitly defined properties, not unknown computed
+                            solver.addSubsetConstraint(solver.varProducer.objPropVar(t, prop), solver.varProducer.objPropVar(op.exportsObjectToken, prop)));
                     }
                     break;
             }

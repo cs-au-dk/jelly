@@ -375,9 +375,8 @@ export class Operations {
                         this.solver.addSubsetConstraint(this.solver.varProducer.arrayValueVar(t), dst);
 
                         // constraint: ...: ⟦t.p⟧ ⊆ ⟦E[i]⟧ where p is a property of t
-                        this.solver.addForAllArrayEntriesConstraint(t, TokenListener.READ_PROPERTY_BASE_DYNAMIC_ARRAY, node, (prop: string) => {
-                            this.solver.addSubsetConstraint(this.solver.varProducer.objPropVar(t, prop), dst);
-                        });
+                        this.solver.addForAllArrayEntriesConstraint(t, TokenListener.READ_PROPERTY_BASE_DYNAMIC_ARRAY, node, (prop: string) =>
+                            this.solver.addSubsetConstraint(this.solver.varProducer.objPropVar(t, prop), dst));
                         // TODO: ignoring reads from prototype chain
 
                     } else { // TODO: assuming dynamic reads from arrays only read array indices
@@ -652,9 +651,8 @@ export class Operations {
                 switch (t.kind) {
                     case "Array":
                         this.solver.addSubsetConstraint(vp.arrayValueVar(t), dst);
-                        this.solver.addForAllArrayEntriesConstraint(t, TokenListener.READ_ITERATOR_VALUE_ARRAY, node, (prop: string) => {
-                            this.solver.addSubsetConstraint(this.solver.varProducer.objPropVar(t, prop), dst);
-                        });
+                        this.solver.addForAllArrayEntriesConstraint(t, TokenListener.READ_ITERATOR_VALUE_ARRAY, node, (prop: string) =>
+                            this.solver.addSubsetConstraint(this.solver.varProducer.objPropVar(t, prop), dst));
                         break;
                     case "Set":
                         this.solver.addSubsetConstraint(vp.objPropVar(t, SET_VALUES), dst);
