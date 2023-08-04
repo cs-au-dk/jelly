@@ -57,8 +57,6 @@ export default class Solver {
     unprocessedTokensSize: number = 0;
     fixpointRound: number = 0;
     listenerNotificationRounds: number = 0;
-    largestTokenSetSize: number = 0;
-    largestSubsetEdgeOutDegree: number = 0;
     lastPrintDiagnosticsTime: number = 0;
     tokenListenerNotifications: number = 0;
     pairListenerNotifications: number = 0;
@@ -147,8 +145,6 @@ export default class Solver {
                 assert(!f.redirections.has(toRep));
             f.vars.add(toRep);
             this.tokenAdded(toRep, t);
-            // collect statistics
-            this.updateTokenStats(toRep);
             // add object property and array entry if applicable
             if (toRep instanceof ObjectPropertyVar) {
                 this.addObjectProperty(toRep.obj, toRep.prop);
@@ -180,8 +176,6 @@ export default class Solver {
             if (toRep.obj instanceof ArrayToken)
                 this.addArrayEntry(toRep.obj, toRep.prop, propagate);
         }
-        // collect statistics
-        this.updateTokenStats(toRep);
     }
 
     /**
@@ -204,10 +198,8 @@ export default class Solver {
                 } else
                     r.add(t);
             }
-            if (any) {
+            if (any)
                 f.replaceTokens(v, r, size);
-                this.updateTokenStats(v);
-            }
         }
     }
 
@@ -258,15 +250,6 @@ export default class Solver {
     }
 
     /**
-     * Collects statistics after tokens have been added.
-     */
-    private updateTokenStats(toRep: ConstraintVar) {
-        const [size] = this.fragmentState.getTokensSize(toRep);
-        if (size > this.largestTokenSetSize)
-            this.largestTokenSetSize = size;
-    }
-
-    /**
      * Reports diagnostics periodically (only if print progress is enabled, stdout is tty, and log level is "info").
      */
     private printDiagnostics() {
@@ -305,8 +288,6 @@ export default class Solver {
                 // add the edge
                 s.add(toRep);
                 f.numberOfSubsetEdges++;
-                if (s.size > this.largestSubsetEdgeOutDegree)
-                    this.largestSubsetEdgeOutDegree = s.size;
                 mapGetSet(f.reverseSubsetEdges, toRep).add(fromRep);
                 if (logger.isVerboseEnabled())
                     assert(!f.redirections.has(fromRep) && !f.redirections.has(toRep))
@@ -1071,8 +1052,6 @@ export default class Solver {
                     if (!fvs.has(v2Rep) && vRep !== v2Rep) {
                         fvs.add(v2Rep);
                         f.numberOfSubsetEdges++;
-                        if (fvs.size > this.largestSubsetEdgeOutDegree)
-                            this.largestSubsetEdgeOutDegree = fvs.size;
                         mapGetSet(f.reverseSubsetEdges, v2Rep).add(vRep);
                         this.restored.add(v2Rep); // triggers cycle elimination
                     }
