@@ -103,5 +103,9 @@ export function merge(callgraphs: Array<CallGraph>): CallGraph {
   result.fun2fun = [...fun2fun.values()];
   result.call2fun = [...call2fun.values()];
 
+  const firstTime = callgraphs[0]?.time;
+  if (firstTime !== undefined)
+    result.time = firstTime;
+
   return result;
 }

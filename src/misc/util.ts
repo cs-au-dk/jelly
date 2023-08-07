@@ -313,4 +313,27 @@ export class SourceLocationsToJSON {
         // @ts-ignore
         return `${this.getFileIndex(loc.module ? loc.module.getPath() : loc.filename)}:${loc.start.line}:${loc.start.column + 1}:${loc.end.line}:${loc.end.column + 1}`;
     }
+
+    parseLocationJSON(loc: LocationJSON): { loc?: SourceLocation, fileIndex: number, file: string } {
+        const [_, _fileIndex, startLine, startCol, endLine, endCol] = /^(\d+):(\d+|\?):(\d+|\?):(\d+|\?):(\d+|\?)/.exec(loc)!;
+        const fileIndex = Number(_fileIndex);
+        assert(fileIndex < this.files.length);
+
+        if (startLine === "?") {
+            assert(startCol === "?" && endLine === "?" && endCol === "?");
+            return {
+                fileIndex,
+                file: this.files[fileIndex],
+            };
+        }
+
+        return {
+            loc: {
+                start: { line: Number(startLine), column: Number(startCol)-1 },
+                end: { line: Number(endLine), column: Number(endCol)-1 },
+            },
+            fileIndex,
+            file: this.files[fileIndex],
+        };
+    }
 }

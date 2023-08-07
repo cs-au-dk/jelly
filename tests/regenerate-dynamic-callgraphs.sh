@@ -14,7 +14,9 @@ if ! [ -f /.dockerenv ]; then
   exec docker run --rm -it $OPTS -v "$TESTS":/workspace -w /workspace --entrypoint bash jelly:latest "./regenerate-dynamic-callgraphs.sh"
 fi
 
-cd "$TESTS/micro" || exit 1
+set -euo pipefail
+
+cd "$TESTS/micro"
 
 for f in *.*js; do
 	JSON="${f%.*}.json"
@@ -23,8 +25,31 @@ for f in *.*js; do
 	fi
 done
 
-cd ../mochatest || exit 1
+cd "$TESTS/mochatest"
 
 jelly --skip-graal-test --dynamic "test.json" --npm-test .
 
-# TODO: Can we regenerate the CG for the express helloworld example too, which is a server application?
+cd "$TESTS/helloworld"
+
+# Run server in background
+jelly --skip-graal-test --dynamic app.json app.js &
+PID=$!
+
+# Wait for server to come up and send two requests
+node --no-warnings --eval "(async () => {
+  while(true) {
+    try {
+      await fetch('http://localhost:3000/does-not-exit');
+      console.log('Server is running');
+      break;
+    } catch(e) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  }
+
+  const response = await fetch('http://localhost:3000');
+  console.log(await response.text());
+})()"
+
+wait $PID
+

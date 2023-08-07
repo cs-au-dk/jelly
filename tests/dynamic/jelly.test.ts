@@ -61,6 +61,7 @@ describe("tests/dynamic", () => {
     test("simple", () => {
       const cgA: CallGraph = {
         entries: [],
+        time: "foobar",
         files: ["a.js"],
         functions: ["0:1:1:2:1"],
         calls: ["0:1:5:1:10"],
@@ -81,6 +82,7 @@ describe("tests/dynamic", () => {
 
       expect(merge([cgA, cgB])).toStrictEqual({
         entries: [],
+        time: "foobar",
         files: ["a.js", "b.js"],
         functions: ["0:1:1:2:1", "1:1:1:2:1"],
         calls: ["0:1:5:1:10", "1:1:5:1:10"],

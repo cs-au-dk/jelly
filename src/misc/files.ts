@@ -53,6 +53,8 @@ function* expandRec(path: string, sub: boolean): Generator<string> {
                     return (lstatSync(f1).isDirectory() ? 1 : 0) - (lstatSync(f2).isDirectory() ? 1 : 0) || f1.localeCompare(f2);
                 }))
                     yield* expandRec(file, true);
+            else
+                logger.debug(`Skipping directory ${path}`);
         } else
             logger.debug(`Skipping directory ${path}`);
     } else if (stat.isFile() && !path.endsWith(".d.ts") &&

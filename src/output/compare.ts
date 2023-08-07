@@ -1,9 +1,10 @@
 import {readFileSync} from "fs";
 import {CallGraph} from "../typings/callgraph";
-import {addAll, mapGetSet, percent} from "../misc/util";
+import {SourceLocationsToJSON, addAll, mapArrayAdd, mapGetSet, percent} from "../misc/util";
 import logger from "../misc/logger";
 import {LocationJSON} from "../misc/util";
 import assert from "assert";
+import {SourceLocation} from "@babel/types";
 
 function compareStringArrays(as1: Array<string> | undefined, as2: Array<string> | undefined, file1: string, file2: string, kind: string): Set<string> {
     const s = new Set<string>();
@@ -19,14 +20,15 @@ function compareStringArrays(as1: Array<string> | undefined, as2: Array<string> 
 // loc returns a canonical representation of a LocationJSON string that is suitable for matching
 // between call graphs collected from dynamic and static analysis
 function loc(str: LocationJSON, cg: CallGraph, kind: "Function" | "Call"): {str: string, file: string} {
-    const match = /^(?<fileIndex>\d+):(?<start>(?:\d+:\d+|\?:\?)):(?<end>(?:\d+:\d+|\?:\?))$/.exec(str);
-    // TODO: warn on missing start/end?
-    assert.ok(match, `${kind} location ${str} does not match expected format`);
-    const { fileIndex, start, end } = match.groups!;
-    const file = cg.files[Number(fileIndex)];
-    // stripping start locations for calls and end locations for functions (workaround like in soundnesstester)
-    const rest = kind === "Call"? end : start;
-    return {str: `${file}:${rest}`, file};
+    const parsed = new SourceLocationsToJSON(cg.files).parseLocationJSON(str);
+    let rest;
+    if (!parsed.loc) rest = "?:?";
+    else {
+        // stripping start locations for calls and end locations for functions (workaround like in soundnesstester)
+        const pos = kind === "Call"? parsed.loc.end : parsed.loc.start;
+        rest = `${pos.line}:${pos.column+1}`;
+    }
+    return {str: `${parsed.file}:${rest}`, file: parsed.file};
 }
 
 function compareLocationObjects(o1: {[index: number]: string}, o2: {[index: number]: string}, file1: string, file2: string, cg1: CallGraph, cg2: CallGraph, file2files: Set<string>, kind: "Function" | "Call", ignores: Set<string>) {
@@ -133,6 +135,73 @@ function getIgnores(cg: CallGraph): Set<string> {
     return s;
 }
 
+
+/**
+  * Returns the number of functions in cg1 that are reachable in cg2.
+  * Reachability in cg2 is computed from all application modules that are present in cg1.
+  */
+function computeReachableFunctions(file2: string, cg1: CallGraph, cg2: CallGraph): [number, number] {
+    const parser = new SourceLocationsToJSON(cg2.files);
+    // find the module entry function for each file by looking for functions
+    // that begin at position 1:1 and span the longest
+    const fileToModuleIndex: Array<{ index: number, loc: SourceLocation } | undefined> = new Array(cg2.files.length);
+    const replocToIndex = new Map<string, number>();
+    for (const [i, floc] of Object.entries(cg2.functions)) {
+        replocToIndex.set(loc(floc, cg2, "Function").str, Number(i));
+
+        const parsed = parser.parseLocationJSON(floc);
+        if (parsed.loc && parsed.loc.start.line === 1 && parsed.loc.start.column === 0) {
+            const prev = fileToModuleIndex[parsed.fileIndex]?.loc;
+            if (prev === undefined || parsed.loc.end.line > prev.end.line ||
+                (parsed.loc.end.line === prev.end.line && parsed.loc.end.column >= prev.end.column))
+                fileToModuleIndex[parsed.fileIndex] = { index: Number(i), loc: parsed.loc };
+        }
+    }
+
+    const Q: Array<number> = [];
+    // treat all application modules as CG roots
+    for (const [i, file] of cg2.files.entries())
+        if (!/\bnode_modules\//.test(file)) {
+            const mi = fileToModuleIndex[i];
+            assert(mi);
+            Q.push(mi.index);
+        }
+
+    // compute transitive closure from entries
+    const funEdges = new Map<number, Array<number>>();
+    for (const [a, b] of cg2.fun2fun) mapArrayAdd(a, b, funEdges);
+
+    const SCGreach = new Set(Q);
+    while (Q.length) {
+        const i = Q.pop()!;
+
+        for (const ni of funEdges.get(i) ?? [])
+            if (!SCGreach.has(ni)) {
+                SCGreach.add(ni);
+                Q.push(ni);
+            }
+    }
+
+    if (logger.isDebugEnabled()) {
+        logger.debug("Statically reachable functions:");
+        for (const i of SCGreach)
+            logger.debug(`\t${loc(cg2.functions[i], cg2, "Function").str}`);
+    }
+
+    let dcgReach = 0, comReach = 0;
+    for (const floc of Object.values(cg1.functions)) {
+        const reploc = loc(floc, cg1, "Function").str;
+        dcgReach++;
+
+        if (SCGreach.has(replocToIndex.get(reploc)!))
+            comReach++;
+        else
+            logger.info(`Function ${reploc} (${floc}) is unreachable in ${file2}`);
+    }
+
+    return [dcgReach, comReach];
+}
+
 /**
  * Compares two call graphs, reports missing files, function and edges and precision/recall.
  * @param file1 "actual" call graph
@@ -152,14 +221,18 @@ export function compareCallGraphs(file1: string, file2: string) {
     compareLocationObjects(cg2.functions, cg1.functions, file2, file1, cg2, cg1, file1files,  "Function", ignores1);
     compareLocationObjects(cg1.calls, cg2.calls, file1, file2, cg1, cg2, file2files, "Call", ignores2);
     compareLocationObjects(cg2.calls, cg1.calls, file2, file1, cg2, cg1, file1files, "Call", ignores1);
+    // measure precision/recall in terms of individual call edges
     const [foundFun1, totalFun1] = compareEdges(cg1.fun2fun, cg2.fun2fun, file1, file2, cg1, cg2, file2files, "Function", "functions", ignores2);
     const [foundFun2, totalFun2] = compareEdges(cg2.fun2fun, cg1.fun2fun, file2, file1, cg2, cg1, file1files, "Function", "functions", ignores1);
     const [foundCall1, totalCall1] = compareEdges(cg1.call2fun, cg2.call2fun, file1, file2, cg1, cg2, file2files, "Call", "calls", ignores2);
     const [foundCall2, totalCall2] = compareEdges(cg2.call2fun, cg1.call2fun, file2, file1, cg2, cg1, file1files, "Call", "calls", ignores1);
+    // measure recall in terms of reachable functions
+    const [dcgReach, comReach] = computeReachableFunctions(file2, cg1, cg2);
     logger.info(`Function->function edges in ${file2} that are also in ${file1}: ${foundFun2}/${totalFun2} (${percent(foundFun2 / totalFun2)})`);
     logger.info(`Function->function edges in ${file1} that are also in ${file2}: ${foundFun1}/${totalFun1} (${percent(foundFun1 / totalFun1)})`);
     logger.info(`Call->function edges in ${file2} that are also in ${file1}: ${foundCall2}/${totalCall2} (${percent(foundCall2 / totalCall2)})`);
     logger.info(`Call->function edges in ${file1} that are also in ${file2}: ${foundCall1}/${totalCall1} (${percent(foundCall1 / totalCall1)})`);
     const {precision, recall} = compareCallSiteEdges(cg1, cg2, ignores1, ignores2);
     logger.info(`Per-call average precision: ${percent(precision)}, recall: ${percent(recall)}`);
+    logger.info(`Functions in ${file1} that are reachable in ${file2}: ${comReach}/${dcgReach}${dcgReach > 0? ` (${percent(comReach / dcgReach)})` : ""}`)
 }

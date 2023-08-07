@@ -27,6 +27,8 @@ export async function runTest(basedir: string,
                                   funTotal?: number,
                                   callFound?: number,
                                   callTotal?: number,
+                                  reachableFound?: number,
+                                  reachableTotal?: number,
                                   apiUsageAccessPathPatternsAtNodes?: number
                               }) {
     options.basedir = basedir;
@@ -50,9 +52,9 @@ export async function runTest(basedir: string,
     const solver = new Solver();
     await analyzeFiles(files, solver);
 
-    let funFound, funTotal, callFound, callTotal;
+    let soundness;
     if (args.soundness) {
-        [funFound, funTotal, callFound, callTotal] = testSoundness(args.soundness, solver.fragmentState);
+        soundness = testSoundness(args.soundness, solver.fragmentState);
 
         // test that the output of compareCallGraphs agrees with the soundness tester
         const output: string[] = [];
@@ -67,9 +69,10 @@ export async function runTest(basedir: string,
             await fs.rm(tmpdir, { recursive: true });
         }
 
-        const [_, funRecall, __, callRecall] = [...output.join("\n").matchAll(/: (\d+\/\d+) \(/g)].map((match) => match[1]);
-        expect(funRecall).toBe(`${funFound}/${funTotal}`);
-        expect(callRecall).toBe(`${callFound}/${callTotal}`);
+        const [_, funRecall, __, callRecall, reachRecall] = [...output.join("\n").matchAll(/: (\d+\/\d+) \(/g)].map((match) => match[1]);
+        expect(funRecall).toBe(`${soundness.fun2funFound}/${soundness.fun2funTotal}`);
+        expect(callRecall).toBe(`${soundness.call2funFound}/${soundness.call2funTotal}`);
+        expect(reachRecall).toBe(`${soundness.reachableFound}/${soundness.reachableTotal}`);
     }
 
     if (args.functionInfos !== undefined)
@@ -81,13 +84,17 @@ export async function runTest(basedir: string,
     if (args.oneCalleeCalls !== undefined)
         expect(new AnalysisStateReporter(solver.fragmentState).getOneCalleeCalls()).toBe(args.oneCalleeCalls);
     if (args.funFound !== undefined)
-        expect(funFound).toBe(args.funFound);
+        expect(soundness?.fun2funFound).toBe(args.funFound);
     if (args.funTotal !== undefined)
-        expect(funTotal).toBe(args.funTotal);
+        expect(soundness?.fun2funTotal).toBe(args.funTotal);
     if (args.callFound !== undefined)
-        expect(callFound).toBe(args.callFound);
+        expect(soundness?.call2funFound).toBe(args.callFound);
     if (args.callTotal !== undefined)
-        expect(callTotal).toBe(args.callTotal);
+        expect(soundness?.call2funTotal).toBe(args.callTotal);
+    if (args.reachableFound !== undefined)
+        expect(soundness?.reachableFound).toBe(args.reachableFound);
+    if (args.reachableTotal !== undefined)
+        expect(soundness?.reachableTotal).toBe(args.reachableTotal);
     if (args.matches) {
         assert(tapirPatterns !== undefined && detectionPatterns !== undefined);
         const {matches, matchesLow} = tapirPatternMatch(tapirPatterns, detectionPatterns, solver);

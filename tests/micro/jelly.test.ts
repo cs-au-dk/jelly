@@ -17,7 +17,9 @@ test("tests/micro/classes", async () => {
         funFound: 30,
         funTotal: 30,
         callFound: 36,
-        callTotal: 36
+        callTotal: 36,
+        reachableFound: 25,
+        reachableTotal: 35
     });
 });
 
@@ -31,7 +33,9 @@ test("tests/micro/accessors", async () => {
         funFound: 1,
         funTotal: 1,
         callFound: 1,
-        callTotal: 1
+        callTotal: 1,
+        reachableFound: 4,
+        reachableTotal: 4
     });
 });
 
@@ -54,7 +58,9 @@ test("tests/micro/eval", async () => {
         funFound: 0,
         funTotal: 0,
         callFound: 0,
-        callTotal: 0
+        callTotal: 0,
+        reachableFound: 2,
+        reachableTotal: 3
     });
 });
 
@@ -68,7 +74,9 @@ test("tests/micro/client1", async () => {
         funFound: 3,
         funTotal: 3,
         callFound: 3,
-        callTotal: 3
+        callTotal: 3,
+        reachableFound: 5,
+        reachableTotal: 5
     });
 });
 
@@ -92,7 +100,9 @@ test("tests/micro/client2", async () => {
         funFound: 2,
         funTotal: 2,
         callFound: 2,
-        callTotal: 2
+        callTotal: 2,
+        reachableFound: 4,
+        reachableTotal: 4,
     });
 });
 
@@ -106,7 +116,9 @@ test("tests/micro/client3", async () => {
         funFound: 1,
         funTotal: 1,
         callFound: 1,
-        callTotal: 1
+        callTotal: 1,
+        reachableFound: 3,
+        reachableTotal: 3,
     });
 });
 
@@ -120,7 +132,9 @@ test("tests/micro/client4", async () => {
         funFound: 3,
         funTotal: 3,
         callFound: 4,
-        callTotal: 4
+        callTotal: 4,
+        reachableFound: 6,
+        reachableTotal: 6
     });
 });
 
@@ -134,7 +148,9 @@ test("tests/micro/client5", async () => {
         funFound: 3,
         funTotal: 3,
         callFound: 4,
-        callTotal: 4
+        callTotal: 4,
+        reachableFound: 6,
+        reachableTotal: 6
     });
 });
 
@@ -148,7 +164,9 @@ test("tests/micro/client6", async () => {
         funFound: 0,
         funTotal: 0,
         callFound: 0,
-        callTotal: 0
+        callTotal: 0,
+        reachableFound: 2,
+        reachableTotal: 2
     });
 });
 
@@ -172,7 +190,9 @@ test("tests/micro/arrays", async () => {
         funFound: 3,
         funTotal: 3,
         callFound: 3,
-        callTotal: 3
+        callTotal: 3,
+        reachableFound: 4,
+        reachableTotal: 4
     });
 });
 
@@ -186,7 +206,9 @@ test("tests/micro/arrays2", async () => {
         funFound: 5,
         funTotal: 5,
         callFound: 6,
-        callTotal: 6
+        callTotal: 6,
+        reachableFound: 7,
+        reachableTotal: 7
     });
 });
 
@@ -200,7 +222,9 @@ test("tests/micro/iterators", async () => {
         funFound: 22,
         funTotal: 22,
         callFound: 43,
-        callTotal: 43
+        callTotal: 43,
+        reachableFound: 23,
+        reachableTotal: 23
     });
 });
 
@@ -214,7 +238,9 @@ test("tests/micro/more1", async () => {
         funFound: 14,
         funTotal: 20,
         callFound: 20,
-        callTotal: 29
+        callTotal: 29,
+        reachableFound: 16,
+        reachableTotal: 20
     });
 });
 
@@ -228,7 +254,9 @@ test("tests/micro/generators", async () => {
         funFound: 24,
         funTotal: 24,
         callFound: 24,
-        callTotal: 24
+        callTotal: 24,
+        reachableFound: 24,
+        reachableTotal: 25
     });
 });
 
@@ -242,7 +270,9 @@ test("tests/micro/arguments", async () => {
         funFound: 7,
         funTotal: 8,
         callFound: 6,
-        callTotal: 8
+        callTotal: 8,
+        reachableFound: 8,
+        reachableTotal: 8
     });
 });
 
@@ -256,7 +286,9 @@ test("tests/micro/destructuring", async () => {
         funFound: 7,
         funTotal: 9,
         callFound: 10,
-        callTotal: 12
+        callTotal: 12,
+        reachableFound: 9,
+        reachableTotal: 11
     });
 });
 
@@ -287,7 +319,9 @@ test("tests/micro/oneshot", async () => {
         funFound: 1,
         funTotal: 1,
         callFound: 1,
-        callTotal: 1
+        callTotal: 1,
+        reachableFound: 2,
+        reachableTotal: 2
     });
 });
 
@@ -308,6 +342,8 @@ test("tests/micro/Function.prototype.bind", async () => {
         funTotal: 1,
         callFound: 1,
         callTotal: 1,
+        reachableFound: 2,
+        reachableTotal: 2
     });
 });
 
@@ -319,6 +355,8 @@ test("tests/micro/Function.prototype.call", async () => {
         funTotal: 0,
         callFound: 0,
         callTotal: 0,
+        reachableFound: 2,
+        reachableTotal: 2,
     });
 });
 
@@ -332,7 +370,9 @@ test("tests/micro/fun", async () => {
         funFound: 14,
         funTotal: 14,
         callFound: 15,
-        callTotal: 15
+        callTotal: 15,
+        reachableFound: 17,
+        reachableTotal: 17
     });
 });
 
@@ -346,7 +386,9 @@ test("tests/micro/obj", async () => {
         funFound: 1,
         funTotal: 1,
         callFound: 1,
-        callTotal: 1
+        callTotal: 1,
+        reachableFound: 2,
+        reachableTotal: 2
     });
 });
 
@@ -360,7 +402,9 @@ test("tests/micro/mix", async () => {
         funFound: 3,
         funTotal: 3,
         callFound: 3,
-        callTotal: 3
+        callTotal: 3,
+        reachableFound: 4,
+        reachableTotal: 4
     });
 });
 
@@ -374,7 +418,9 @@ test("tests/micro/templateliterals", async () => {
         funFound: 4,
         funTotal: 4,
         callFound: 3,
-        callTotal: 4
+        callTotal: 4,
+        reachableFound: 5,
+        reachableTotal: 5
     });
 });
 
@@ -388,7 +434,9 @@ test("tests/micro/rest", async () => {
         funFound: 18,
         funTotal: 20,
         callFound: 22,
-        callTotal: 24
+        callTotal: 24,
+        reachableFound: 19,
+        reachableTotal: 20
     });
 });
 
@@ -402,7 +450,9 @@ test("tests/micro/rest2", async () => {
         funFound: 2,
         funTotal: 2,
         callFound: 2,
-        callTotal: 2
+        callTotal: 2,
+        reachableFound: 3,
+        reachableTotal: 3
     });
 });
 
@@ -426,7 +476,9 @@ test("tests/micro/import1", async () => {
         funFound: 5,
         funTotal: 5,
         callFound: 5,
-        callTotal: 5
+        callTotal: 5,
+        reachableFound: 8,
+        reachableTotal: 8
     });
 });
 
@@ -484,6 +536,8 @@ test("tests/micro/dyn-import", async () => {
         funFound: 2,
         callTotal: 2,
         callFound: 2,
+        reachableFound: 4,
+        reachableTotal: 4
     });
 });
 
@@ -521,7 +575,9 @@ test("tests/micro/prototypes2", async () => {
         functionInfos: 1,
         moduleInfos: 1,
         numberOfFunctionToFunctionEdges: 1,
-        oneCalleeCalls: 1
+        oneCalleeCalls: 1,
+        reachableFound: 2,
+        reachableTotal: 3
     });
 });
 
@@ -621,19 +677,25 @@ test("tests/micro/match12", async () => {
     });
 });
 
-test("tests/micro/promises", async () => {
-    options.callgraphNative = false;
-    await runTest("tests/micro", "promises.js", {
-        soundness: "tests/micro/promises.json",
-        functionInfos: 40,
-        moduleInfos: 1,
-        numberOfFunctionToFunctionEdges: 25,
-        oneCalleeCalls: 14,
-        funFound: 24,
-        funTotal: 28,
-        callFound: 24,
-        callTotal: 28
-    });
+
+describe("tests/micro/promises", () => {
+    test.each([false, true])(
+        "callgraphNative=%p", async (callgraphNative: boolean) => {
+            options.callgraphNative = callgraphNative;
+            await runTest("tests/micro", "promises.js", {
+                soundness: "tests/micro/promises.json",
+                functionInfos: 40,
+                moduleInfos: 1,
+                numberOfFunctionToFunctionEdges: callgraphNative? 51 : 25,
+                oneCalleeCalls: callgraphNative? 20 : 14,
+                funFound: 24,
+                funTotal: 28,
+                callFound: 24,
+                callTotal: 28,
+                reachableFound: callgraphNative? 29 : 1,
+                reachableTotal: 33
+            });
+        })
 });
 
 test("tests/micro/promiseall", async () => {
@@ -647,7 +709,9 @@ test("tests/micro/promiseall", async () => {
         funFound: 1,
         funTotal: 1,
         callFound: 1,
-        callTotal: 1
+        callTotal: 1,
+        reachableFound: 1,
+        reachableTotal: 4
     });
 });
 
@@ -662,7 +726,9 @@ test("tests/micro/asyncawait", async () => {
         funFound: 14,
         funTotal: 14,
         callFound: 14,
-        callTotal: 15
+        callTotal: 15,
+        reachableFound: 11,
+        reachableTotal: 20
     });
 });
 
@@ -707,6 +773,8 @@ test("tests/micro/call-expressions", async () => {
         funTotal: 10,
         callFound: 35,
         callTotal: 35,
+        reachableFound: 11,
+        reachableTotal: 11,
     });
 });
 
@@ -723,6 +791,8 @@ test("tests/micro/default-parameter", async () => {
         funTotal: 3,
         callFound: 3,
         callTotal: 3,
+        reachableFound: 4,
+        reachableTotal: 4
     });
 });
 
@@ -734,11 +804,27 @@ test("tests/micro/throw", async () => {
         funTotal: 2,
         callFound: 2,
         callTotal: 2,
+        reachableFound: 3,
+        reachableTotal: 3,
     });
 });
 
 test("tests/micro/undecl", async () => {
     await runTest("tests/micro", "undecl1.js", {
         numberOfFunctionToFunctionEdges: 1
+    });
+});
+
+test("tests/micro/for-in", async () => {
+    await runTest("tests/micro", "for-in.js", {
+        soundness: "tests/micro/for-in.json",
+        moduleInfos: 1,
+        functionInfos: 2,
+        funFound: 0,
+        funTotal: 2,
+        callFound: 0,
+        callTotal: 2,
+        reachableFound: 1,
+        reachableTotal: 3,
     });
 });

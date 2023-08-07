@@ -9,13 +9,21 @@ import {FragmentState} from "../analysis/fragmentstate";
 
 /**
  * Performs soundness testing of the analysis result using the given dynamic call graph.
- * @return [number of dynamic function->function call edges matched,
- *          total number of dynamic function->function call edges,
- *          number of dynamic call->function call edges matched,
- *          total number of dynamic call->function call edges]
  */
-export function testSoundness(jsonfile: string, f: FragmentState): [number, number, number, number] {
-
+export function testSoundness(jsonfile: string, f: FragmentState): {
+    // number of dynamic function->function call edges matched
+    fun2funFound: number,
+    // total number of dynamic function->function call edges
+    fun2funTotal: number,
+    // number of dynamic call->function call edges matched
+    call2funFound: number,
+    // total number of dynamic call->function call edges
+    call2funTotal: number,
+    // number of dynamic functions that are statically reachable
+    reachableFound: number,
+    // total number of dynamic functions
+    reachableTotal: number,
+} {
     // collect all static functions including module top-level functions (excluding aliases)
     const staticFunctions = new Map<string, FunctionInfo | ModuleInfo>();
     for (const m of f.a.moduleInfos.values())
@@ -181,10 +189,47 @@ export function testSoundness(jsonfile: string, f: FragmentState): [number, numb
     }
     const total2 = found2 + missed2;
 
+    // compute reachable functions
+    const Q: Array<FunctionInfo | ModuleInfo> = [];
+    // treat all application modules as CG roots
+    for (const [file, m] of f.a.moduleInfosByPath)
+        if (!/\bnode_modules\//.test(file))
+            Q.push(m);
+
+    // compute transitive closure from entries
+    const SCGreach = new Set(Q);
+    while (Q.length) {
+        const i = Q.pop()!;
+
+        for (const ni of [...f.functionToFunction.get(i) ?? [], ...f.requireGraph.get(i) ?? []])
+            if (!SCGreach.has(ni)) {
+                SCGreach.add(ni);
+                Q.push(ni);
+            }
+    }
+
+    const dcgReach = dynamicFunctionLocs.size;
+    let comReach = 0;
+    for (const [fi, reploc] of dynamicFunctionLocs.entries()) {
+        const f = dynamicFunctions.get(fi);
+        if (f !== undefined && SCGreach.has(f))
+            comReach++;
+        else {
+            const typ = f === undefined? "Function/module" :
+                f instanceof ModuleInfo? "Module" : "Function";
+            warnings.push(`${typ} ${reploc} is unreachable in static call graph`);
+        }
+    }
+
     // report and return results
     for (const m of warnings.sort())
         logger.warn(m);
     logger.info(`Dynamic function->function call edges matched: ${found1}/${total1}${total1 > 0 ? ` (recall: ${percent(found1 / total1)})` : ""}`);
     logger.info(`Dynamic call->function call edges matched: ${found2}/${total2}${total2 > 0 ? ` (recall: ${percent(found2 / total2)})` : ""}`);
-    return [found1, total1, found2, total2];
+    logger.info(`Dynamic functions reachable in static call graph: ${comReach}/${dcgReach}${dcgReach > 0? ` (recall: ${percent(comReach / dcgReach)})` : ""}`)
+    return {
+        fun2funFound: found1, fun2funTotal: total1,
+        call2funFound: found2, call2funTotal: total2,
+        reachableFound: comReach, reachableTotal: dcgReach,
+    };
 }

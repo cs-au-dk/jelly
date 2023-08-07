@@ -18,6 +18,8 @@ test("tests/mochatest", async () => {
         funFound: 3,
         funTotal: 3,
         callFound: 3,
-        callTotal: 3
+        callTotal: 3,
+        reachableFound: 2,
+        reachableTotal: 7
     });
 });

@@ -1,1 +1,1 @@
-{"entries":["promiseall.js"],"files":["promiseall.js"],"functions":["0:5:36:5:44","0:1:1:3:2"],"calls":["0:5:41:5:44"],"fun2fun":[[0,1]],"call2fun":[[0,1]],"ignore":[]}
+{"entries":["promiseall.js"],"files":["promiseall.js"],"functions":["0:1:1:7:1","0:6:21:6:45","0:6:36:6:44","0:2:1:4:2"],"calls":["0:6:41:6:44"],"fun2fun":[[2,3]],"call2fun":[[0,3]],"ignore":[]}
