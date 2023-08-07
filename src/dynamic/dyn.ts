@@ -1,15 +1,6 @@
 /*! DO NOT INSTRUMENT */
 
 /**
- * Packages that are typically used for tests only and should be excluded in the collected call graphs.
- */
-const TEST_PACKAGES = [
-    "ava", "yarn", "karma", "mocha", "nyc", "jasmine", "jest", "tap", "tape", "@babel",
-    "chai", "should", "supertest",
-    "sinon", "nock",
-]; // TODO: other test packages?
-
-/**
  * Commands that do not need instrumentation, for example because the actual work is known to happen in child processes.
  */
 const IGNORED_COMMANDS = [
@@ -66,6 +57,7 @@ if (!outfile) {
 
 import {IID, Jalangi, SourceObject} from "../typings/jalangi";
 import {mapArrayAdd} from "../misc/util";
+import {isPathInTestPackage} from "./sources";
 import fs from "fs";
 import path from "path";
 
@@ -179,9 +171,10 @@ const pathToFunType: (path: string) => FunType = (() => {
         if (typ !== undefined)
             return typ;
 
-        typ = path.startsWith("/") || path.includes("node_modules/")?
-            (TEST_PACKAGES.some((w) => path.includes(`node_modules/${w}/`))?
-             FunType.Test : FunType.Lib) : FunType.App;
+        typ = path === "<builtin>"? FunType.Lib :
+            path.startsWith("/") || path.includes("node_modules/")?
+            (isPathInTestPackage(path)? FunType.Test : FunType.Lib)
+            : FunType.App;
         cache.set(path, typ);
         return typ;
     };
