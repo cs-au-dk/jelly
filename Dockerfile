@@ -1,7 +1,7 @@
-FROM ubuntu:20.04 as builder
+FROM ubuntu:20.04 as node-builder
 WORKDIR /tools
 
-# install Node
+# install Node & update NPM
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     wget \
@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     apt-get autoremove -y && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
-ARG NODE_VERSION=18.12.1
+ARG NODE_VERSION=18.17.0
 ARG NODE_PACKAGE=node-v${NODE_VERSION}-linux
 RUN arch="$(dpkg --print-architecture)"; \
         case "$arch" in \
@@ -19,7 +19,11 @@ RUN arch="$(dpkg --print-architecture)"; \
         esac; \
     \
     wget -c https://nodejs.org/dist/v$NODE_VERSION/$NODE_PACKAGE-$ARCH.tar.gz -O -| tar -xzC /tools/ && \
-    mv /tools/$NODE_PACKAGE-$ARCH /tools/node
+    mv /tools/$NODE_PACKAGE-$ARCH /tools/node && \
+    PATH="/tools/node/bin:$PATH" npm install -g "npm@>=9.8.0"
+
+FROM ubuntu:20.04 as nodeprof-builder
+WORKDIR /tools
 
 # install GraalVM JavaScript and NodeProf
 RUN apt-get update && apt-get install -y git gcc g++ make python3 python3-pip && pip3 install ninja_syntax
@@ -36,9 +40,9 @@ ENV GRAAL_HOME=/tools/graal/sdk/latest_graalvm_home
 
 FROM ubuntu:20.04
 RUN mkdir -p /usr/lib/jvm
-COPY --from=builder /tools/node /opt/node
-COPY --from=builder /tools/jdk /usr/lib/jvm/jdk
-COPY --from=builder /tools/graal/sdk/latest_graalvm_home /usr/lib/jvm/graalvm
+COPY --from=node-builder /tools/node /opt/node
+COPY --from=nodeprof-builder /tools/jdk /usr/lib/jvm/jdk
+COPY --from=nodeprof-builder /tools/graal/sdk/latest_graalvm_home /usr/lib/jvm/graalvm
 ENV NODE_PATH /opt/node/lib/node_modules
 ENV PATH /opt/node/bin:$PATH
 ENV JAVA_HOME=/usr/lib/jvm/jdk
