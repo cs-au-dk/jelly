@@ -163,8 +163,11 @@ function computeReachableFunctions(file2: string, cg1: CallGraph, cg2: CallGraph
     for (const [i, file] of cg2.files.entries())
         if (!/\bnode_modules\//.test(file)) {
             const mi = fileToModuleIndex[i];
-            assert(mi);
-            Q.push(mi.index);
+            if (mi !== undefined)
+                Q.push(mi.index);
+            else
+                // TODO: saveCallGraph shouldn't output files for modules with parse errors
+                logger.warn(`Unable to determine module function for ${file}`)
         }
 
     // compute transitive closure from entries
