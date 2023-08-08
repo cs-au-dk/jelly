@@ -529,6 +529,19 @@ test("tests/micro/import11", async () => {
     });
 });
 
+test("tests/micro/import12", async () => {
+    const files = ["import12.mjs"];
+    await runTest("tests/micro", files, {
+        soundness: "tests/micro/import12.json",
+        funFound: 1,
+        funTotal: 1,
+        callFound: 1,
+        callTotal: 1,
+        reachableFound: 2,
+        reachableTotal: 2,
+    });
+});
+
 test("tests/micro/dyn-import", async () => {
     await runTest("tests/micro", "dyn-import.mjs", {
         soundness: "tests/micro/dyn-import.json",

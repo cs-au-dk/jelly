@@ -2,12 +2,11 @@ import * as ts from "typescript";
 import {FilePath} from "../misc/util";
 
 const options = { // TODO: get options from tsconfig.json if available? (see typeinferrer.ts)
-    target: ts.ScriptTarget.ES5,
-    module: ts.ModuleKind.CommonJS,
+    module: ts.ModuleKind.NodeNext,
     allowJs: true,
     checkJs: true,
     noDtsResolution: true // if not enabled, .d.ts files take priority over .js files
-}; // TODO: set typeRoots to options.basedir?
+};
 
 const host = ts.createCompilerHost(options);
 
@@ -19,8 +18,9 @@ const host = ts.createCompilerHost(options);
  * @throws exception if the module is not found
  */
 export function tsResolveModuleName(str: string, file: FilePath): FilePath {
+    const resolutionMode = ts.getImpliedNodeFormatForFile(file as ts.Path, undefined, host, options);
     const t = str.endsWith(".ts") ? str.substring(0, str.length - 3) : str;
-    const filepath = ts.resolveModuleName(t, file, options, host).resolvedModule?.resolvedFileName;
+    const filepath = ts.resolveModuleName(t, file, options, host, undefined, undefined, resolutionMode).resolvedModule?.resolvedFileName;
     if (!filepath)
         throw new Error;
     return filepath;
