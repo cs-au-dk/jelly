@@ -340,8 +340,8 @@ test("tests/micro/Function.prototype.bind", async () => {
         soundness: "tests/micro/Function.prototype.bind.json",
         funFound: 1,
         funTotal: 1,
-        callFound: 1,
-        callTotal: 1,
+        callFound: 2,
+        callTotal: 2,
         reachableFound: 2,
         reachableTotal: 2
     });
@@ -350,11 +350,10 @@ test("tests/micro/Function.prototype.bind", async () => {
 test("tests/micro/Function.prototype.call", async () => {
     await runTest("tests/micro", "Function.prototype.call.js", {
         soundness: "tests/micro/Function.prototype.call.json",
-        // dynamic analysis does not capture calls through call/apply
-        funFound: 0,
-        funTotal: 0,
-        callFound: 0,
-        callTotal: 0,
+        funFound: 1,
+        funTotal: 1,
+        callFound: 1,
+        callTotal: 1,
         reachableFound: 2,
         reachableTotal: 2,
     });
@@ -367,10 +366,10 @@ test("tests/micro/fun", async () => {
         moduleInfos: 1,
         numberOfFunctionToFunctionEdges: 23,
         oneCalleeCalls: 11,
-        funFound: 14,
-        funTotal: 14,
-        callFound: 15,
-        callTotal: 15,
+        funFound: 18,
+        funTotal: 18,
+        callFound: 19,
+        callTotal: 19,
         reachableFound: 17,
         reachableTotal: 17
     });

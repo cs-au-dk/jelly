@@ -6,12 +6,10 @@ import {
     isAssignmentPattern,
     isExportDeclaration,
     isExpression,
-    isFunctionExpression,
     isIdentifier,
     isImport,
     isLVal,
     isMemberExpression,
-    isNewExpression,
     isObjectPattern,
     isOptionalMemberExpression,
     isParenthesizedExpression,
@@ -23,13 +21,12 @@ import {
     JSXMemberExpression,
     JSXNamespacedName,
     LVal,
-    NewExpression,
     Node,
-    OptionalCallExpression,
     ParenthesizedExpression
 } from "@babel/types";
 import {NodePath} from "@babel/traverse";
 import {
+    getAdjustedCallNodePath,
     getKey,
     getProperty,
     isInTryBlockOrBranch,
@@ -75,7 +72,7 @@ import {
     REGEXP_PROTOTYPE,
     SET_VALUES
 } from "../natives/ecmascript";
-import {SpecialNativeObjects} from "../natives/nativebuilder";
+import {CallNodePath, SpecialNativeObjects} from "../natives/nativebuilder";
 import {TokenListener} from "./listeners";
 import micromatch from "micromatch";
 import {callPromiseResolve} from "../natives/nativehelpers";
@@ -148,16 +145,11 @@ export class Operations {
      * @param path path of the call expression
      */
     callFunction(calleeVar: ConstraintVar | undefined, baseVar: ConstraintVar | undefined, args: CallExpression["arguments"],
-                 resultVar: ConstraintVar | undefined, isNew: boolean, path: NodePath<CallExpression | OptionalCallExpression | NewExpression>) {
+                 resultVar: ConstraintVar | undefined, isNew: boolean, path: CallNodePath) {
         const f = this.solver.fragmentState; // (don't use in callbacks)
         const caller = this.a.getEnclosingFunctionOrModule(path, this.moduleInfo);
 
-        // workaround to match dyn.ts which has wrong source location for calls in certain parenthesized expressions
-        const pars: NodePath = isParenthesizedExpression(path.parentPath.node) &&
-            (isNewExpression(path.node) ||
-             (!isParenthesizedExpression(path.node.callee) && !isFunctionExpression(path.node.callee))) ?
-            path.parentPath : path;
-
+        const pars = getAdjustedCallNodePath(path);
         f.registerCall(pars.node, this.moduleInfo);
 
         // collect special information for pattern matcher

@@ -128,7 +128,9 @@ export function mapGetSet<K, V>(m: Map<K, Set<V>>, k: K): Set<V> {
     return mt;
 }
 
-export function mapGetArray<K, V>(m: Map<K, Array<V>>, k: K): Array<V> {
+export function mapGetArray<K, V>(m: Map<K, Array<V>>, k: K): Array<V>
+export function mapGetArray<K extends object, V>(m: WeakMap<K, Array<V>>, k: K): Array<V>
+export function mapGetArray<K, V>(m: Map<K, Array<V>> | WeakMap<any, Array<V>>, k: K): Array<V> {
     let mt = m.get(k);
     if (!mt) {
         mt = [];
@@ -193,7 +195,9 @@ export function setAll<K, V>(from: Map<K, V>, to: Map<K, V>) {
         to.set(k, v);
 }
 
-export function mapArrayAdd<K, V>(k: K, v: V, m: Map<K, Array<V>>) {
+export function mapArrayAdd<K, V>(k: K, v: V, m: Map<K, Array<V>>): void
+export function mapArrayAdd<K extends object, V>(k: K, v: V, m: WeakMap<K, Array<V>>): void
+export function mapArrayAdd<K, V>(k: K, v: V, m: Map<K, Array<V>> | WeakMap<any, Array<V>>) {
     let a = m.get(k);
     if (!a) {
         a = [];

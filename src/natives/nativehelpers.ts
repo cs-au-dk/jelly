@@ -10,7 +10,7 @@ import {
     PackageObjectToken,
     Token
 } from "../analysis/tokens";
-import {getBaseAndProperty, isParentExpressionStatement} from "../misc/asthelpers";
+import {getAdjustedCallNodePath, getBaseAndProperty, isParentExpressionStatement} from "../misc/asthelpers";
 import {Node} from "@babel/core";
 import {
     ARRAY_PROTOTYPE,
@@ -379,13 +379,14 @@ export function invokeCallback(kind: CallbackKind, p: NativeFunctionParams, arg:
             const baseVar = p.solver.varProducer.expVar(bp.base, p.path);
             const funVar = p.solver.varProducer.expVar(funarg, p.path);
             const caller = a.getEnclosingFunctionOrModule(p.path, p.moduleInfo);
-            p.solver.fragmentState.registerCall(p.path.node, p.moduleInfo, {native: true});
+            const cpath = getAdjustedCallNodePath(p.path);
+            p.solver.fragmentState.registerCall(cpath.node, p.moduleInfo, {native: true});
             p.solver.addForAllPairsConstraint(baseVar, funVar, key, p.path.node, (bt: AllocationSiteToken, ft: FunctionToken | AccessPathToken) => { // TODO: ignoring native functions etc.
                 const vp = p.solver.varProducer; // (don't use in callbacks)
                 type Param = Function["params"][0] | undefined;
                 let param1: Param, param2: Param, param3: Param, param4: Param;
                 if (ft instanceof FunctionToken) {
-                    p.solver.fragmentState.registerCallEdge(p.path.node, caller, a.functionInfos.get(ft.fun)!, {native: true}); // TODO: call graph edges for promise-related calls?
+                    p.solver.fragmentState.registerCallEdge(cpath.node, caller, a.functionInfos.get(ft.fun)!, {native: true}); // TODO: call graph edges for promise-related calls?
                     param1 = ft.fun.params.length > 0 && isIdentifier(ft.fun.params[0]) ? ft.fun.params[0] : undefined; // TODO: non-Identifier parameters?
                     param2 = ft.fun.params.length > 1 && isIdentifier(ft.fun.params[1]) ? ft.fun.params[1] : undefined;
                     param3 = ft.fun.params.length > 2 && isIdentifier(ft.fun.params[2]) ? ft.fun.params[2] : undefined;
@@ -557,11 +558,12 @@ export function invokeCallApply(kind: "Function.prototype.call" | "Function.prot
         const a = p.solver.globalState;
         const funVar = p.solver.varProducer.expVar(bp.base, p.path);
         const caller = a.getEnclosingFunctionOrModule(p.path, p.moduleInfo);
-        p.solver.fragmentState.registerCall(p.path.node, p.moduleInfo, {native: true});
+        const cpath = getAdjustedCallNodePath(p.path);
+        p.solver.fragmentState.registerCall(cpath.node, p.moduleInfo, {native: true});
         p.solver.addForAllConstraint(funVar, TokenListener.NATIVE_INVOKE_CALL_APPLY, p.path.node, (ft: Token) => {
             const vp = p.solver.varProducer;
             if (ft instanceof FunctionToken) {
-                p.solver.fragmentState.registerCallEdge(p.path.node, caller, a.functionInfos.get(ft.fun)!, {native: true}); // TODO: call graph edges for promise-related calls?
+                p.solver.fragmentState.registerCallEdge(cpath.node, caller, a.functionInfos.get(ft.fun)!, {native: true}); // TODO: call graph edges for promise-related calls?
                 if (isExpression(basearg)) { // TODO: SpreadElement? non-MemberExpression?
                     // base value
                     const baseVar = vp.expVar(basearg, p.path);

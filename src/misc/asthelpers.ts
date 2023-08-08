@@ -14,10 +14,12 @@ import {
     isClassPrivateProperty,
     isExpression,
     isExpressionStatement,
+    isFunctionExpression,
     isIdentifier,
     isImportSpecifier,
     isJSXMemberExpression,
     isMemberExpression,
+    isNewExpression,
     isNumericLiteral,
     isOptionalMemberExpression,
     isParenthesizedExpression,
@@ -112,6 +114,18 @@ export function getImportName(imp: ImportSpecifier | ImportDefaultSpecifier): st
  */
 export function getClass(path: NodePath<any>): Class | undefined {
     return (path.find((p) => p.isClass()) as NodePath<Class>)?.node;
+}
+
+/**
+ * Returns an adjusted call node path that matches source locations reported
+ * for calls by the dynamic analysis, which has wrong source locations for calls
+ * in certain parenthesized expressions.
+ */
+export function getAdjustedCallNodePath(path: CallNodePath): NodePath {
+    return isParenthesizedExpression(path.parentPath.node) &&
+        (isNewExpression(path.node) ||
+         (!isParenthesizedExpression(path.node.callee) && !isFunctionExpression(path.node.callee))) ?
+         path.parentPath : path;
 }
 
 /**
