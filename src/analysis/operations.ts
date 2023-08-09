@@ -29,7 +29,13 @@ import {
     ParenthesizedExpression
 } from "@babel/types";
 import {NodePath} from "@babel/traverse";
-import {getKey, getProperty, isMaybeUsedAsPromise, isParentExpressionStatement} from "../misc/asthelpers";
+import {
+    getKey,
+    getProperty,
+    isInTryBlockOrBranch,
+    isMaybeUsedAsPromise,
+    isParentExpressionStatement
+} from "../misc/asthelpers";
 import {
     AccessPathToken,
     AllocationSiteToken,
@@ -435,8 +441,11 @@ export class Operations {
                 if (options.ignoreUnresolved || options.ignoreDependencies) {
                     if (logger.isVerboseEnabled())
                         logger.verbose(`Ignoring unresolved module '${str}' at ${locationToStringWithFile(path.node.loc)}`);
-                } else // TODO: special warning if the require/import is placed in a try-block, an if statement, or a switch case?
-                    f.warn(`Unable to resolve module '${str}'`, path.node);
+                } else
+                    if (isInTryBlockOrBranch(path))
+                        f.warn(`Unable to resolve conditionally loaded module '${str}'`, path.node);
+                    else
+                        f.error(`Unable to resolve module '${str}'`, path.node);
 
                 // couldn't find module file (probably hasn't been installed), use a DummyModuleInfo if absolute module name
                 if (!"./#".includes(str[0]))

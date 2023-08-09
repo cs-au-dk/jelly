@@ -129,3 +129,20 @@ export function isMaybeUsedAsPromise(path: NodePath<CallExpression | OptionalCal
             isIdentifier(path.parent.property) &&
             !['then', 'catch'].includes(path.parent.property.name));
 }
+
+/**
+ * Returns true if the given node occurs in a try block or branch.
+ */
+export function isInTryBlockOrBranch(path: NodePath): boolean {
+    let p: NodePath | null = path;
+    do {
+        p = p.parentPath;
+        if (p) {
+            if (p.isFunction())
+                return false;
+            if (p.isTryStatement() || p.isIfStatement() || p.isSwitchCase() || p.isConditionalExpression())
+                return true;
+        }
+    } while (p);
+    return false;
+}
