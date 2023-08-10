@@ -552,19 +552,20 @@ export class Operations {
                 this.solver.fragmentState.registerEscapingFromModule(src);
 
                 // constraint: ∀ arrays t ∈ ⟦E1⟧: ...
-                this.solver.addForAllConstraint(lVar, TokenListener.ASSIGN_DYNAMIC_BASE, path.node, (t: Token) => {
-                    if (t instanceof ArrayToken) {
+                if (src)
+                    this.solver.addForAllConstraint(lVar, TokenListener.ASSIGN_DYNAMIC_BASE, path.node, (t: Token) => {
+                        if (t instanceof ArrayToken) {
 
-                        // constraint: ...: ⟦E2⟧ ⊆ ⟦t.*⟧
-                        this.solver.addSubsetConstraint(src, this.solver.varProducer.arrayValueVar(t));
+                            // constraint: ...: ⟦E2⟧ ⊆ ⟦t.*⟧
+                            this.solver.addSubsetConstraint(src, this.solver.varProducer.arrayValueVar(t));
 
-                        // TODO: write to array setters also?
+                            // TODO: write to array setters also?
 
-                    } else {
-                        if (logger.isInfoEnabled() && src)
-                            this.solver.fragmentState.registerUnhandledDynamicPropertyWrite(path.node, src, options.warningsUnsupported && logger.isVerboseEnabled() ? path.getSource() : undefined);
-                    }
-                });
+                        } else {
+                            if (logger.isInfoEnabled())
+                                this.solver.fragmentState.registerUnhandledDynamicPropertyWrite(path.node, src, options.warningsUnsupported && logger.isVerboseEnabled() ? path.getSource() : undefined);
+                        }
+                    });
                 // TODO: computed property assignments (with known prefix/suffix)
 
                 // TODO: PropertyAccessPath for dynamic property writes?
