@@ -154,6 +154,10 @@ export function autoDetectBaseDir(paths: Array<string>): boolean {
     }
     if (paths.length === 0)
         return true;
+    if (paths.length > 1) {
+        logger.info("Can't auto-detect basedir (use option -b), aborting");
+        return false;
+    }
     if (!existsSync(paths[0])) {
         logger.info(`File or directory ${paths[0]} not found, aborting`);
         return false;
