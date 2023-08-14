@@ -13,6 +13,7 @@ import {NodePath} from "@babel/traverse";
 import {dirname, relative, resolve} from "path";
 import {options} from "../options";
 import logger from "../misc/logger";
+import {TSModuleResolver} from "../typescript/moduleresolver";
 
 /**
  * Global analysis state.
@@ -104,6 +105,11 @@ export class GlobalState {
      * Cache of PackageJsonInfos.
      */
     readonly packageJsonInfos = new Map<FilePath, PackageJsonInfo>();
+
+    /**
+     * TSModuleResolver instance which caches lookups of tsconfig.json files.
+     */
+     readonly tsModuleResolver = new TSModuleResolver();
 
     /**
      * Number of calls to canonicalizeVar.

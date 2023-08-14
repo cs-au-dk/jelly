@@ -1,12 +1,12 @@
 import {closeSync, existsSync, lstatSync, openSync, readdirSync, readFileSync, readSync, writeSync} from "fs";
-import {basename, dirname, relative, resolve} from "path";
+import {basename, dirname, extname, relative, resolve} from "path";
+import module from "module";
 import {options} from "../options";
 import micromatch from "micromatch";
 import {FilePath, Location, locationToStringWithFileAndEnd} from "./util";
 import logger from "./logger";
 import {Node} from "@babel/types";
 import {findPackageJson} from "./packagejson";
-import {tsResolveModuleName} from "../typescript/moduleresolver";
 import stringify from "stringify2stream";
 import {FragmentState} from "../analysis/fragmentstate";
 
@@ -99,7 +99,7 @@ export function requireResolve(str: string, file: FilePath, node: Node, f: Fragm
     }
     let filepath;
     try {
-        filepath = tsResolveModuleName(str, file);
+        filepath = f.a.tsModuleResolver.resolveModuleName(str, file);
         // TypeScript prioritizes .ts over .js, overrule if coming from a .js file
         if (file.endsWith(".js") && filepath.endsWith(".ts") && !str.endsWith(".ts")) {
             const p = filepath.substring(0, filepath.length - 3) + ".js";
@@ -107,17 +107,25 @@ export function requireResolve(str: string, file: FilePath, node: Node, f: Fragm
                 filepath = p;
         }
     } catch (e) {
-        // see if the string refers to a package that is among those analyzed (and not in node_modules)
-        for (const p of f.a.packageInfos.values())
-            if (p.name === str)
-                if (filepath) {
-                    f.error(`Multiple packages named ${str} found, skipping module load`, node);
-                    throw e;
-                } else {
-                    filepath = resolve(p.dir, p.main || "index.js"); // https://nodejs.org/dist/latest-v8.x/docs/api/modules.html#modules_all_together
-                    if (!existsSync(filepath))
-                        filepath = undefined;
-                }
+        logger.debug(`Could not resolve module '${str}' required from ${file} with TS compiler`);
+        try {
+            // try to resolve the module using require's logic
+            filepath = module.createRequire(file).resolve(str);
+        } catch {}
+
+        if (!filepath)
+            // see if the string refers to a package that is among those analyzed (and not in node_modules)
+            for (const p of f.a.packageInfos.values())
+                if (p.name === str)
+                    if (filepath) {
+                        f.error(`Multiple packages named ${str} found, skipping module load`, node);
+                        throw e;
+                    } else {
+                        filepath = resolve(p.dir, p.main || "index.js"); // https://nodejs.org/dist/latest-v8.x/docs/api/modules.html#modules_all_together
+                        if (!existsSync(filepath))
+                            filepath = undefined;
+                    }
+
         if (!filepath)
             throw e;
     }
@@ -126,8 +134,7 @@ export function requireResolve(str: string, file: FilePath, node: Node, f: Fragm
         logger.debug(msg);
         throw new Error(msg);
     }
-    if (!filepath.endsWith(".js") && !filepath.endsWith(".jsx") && !filepath.endsWith(".es") && !filepath.endsWith(".mjs") &&
-        !filepath.endsWith(".cjs") && !filepath.endsWith(".ts") && !filepath.endsWith(".tsx")) {
+    if (filepath.endsWith(".d.ts") || ![".js", ".jsx", ".es", ".mjs", ".cjs", ".ts", ".tsx"].includes(extname(filepath))) {
         f.warn(`Module '${filepath}' has unrecognized extension, skipping it`, node);
         return undefined;
     }
