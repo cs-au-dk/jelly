@@ -38,6 +38,9 @@ export interface Jalangi {
 
   addAnalysis(analysis: JalangiAnalysis, filter?: (source: SourceObject) => boolean): void;
 
+  enableAnalysis(): void;
+  disableAnalysis(): void;
+
   smemory: {
 
     getShadowObject(

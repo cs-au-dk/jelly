@@ -6,6 +6,7 @@ import { execFileSync } from "node:child_process";
 
 import { CallGraph } from "../../src/typings/callgraph";
 import { merge } from "../../src/output/merge";
+import { isSourceSimplyWrapped } from "../../src/dynamic/sources";
 
 describe("tests/dynamic", () => {
   describe("wrapper", () => {
@@ -18,7 +19,7 @@ describe("tests/dynamic", () => {
       await fs.writeFile(
         path.join(binPath, "node"),
         '#!/usr/bin/env bash\necho "$@"\n',
-        { mode: 0o777 }
+        { mode: 0o777 },
       );
 
       const nodeprofPath = path.join(tmpDir, "tools", "nodeprof");
@@ -31,7 +32,7 @@ describe("tests/dynamic", () => {
     });
 
     test.each(["help", "version", "v8-options", "experimental-modules"])(
-      "wrapper handles --%p",
+      "wrapper handles --%s",
       (parameter: string) => {
         const output = execFileSync("bin/node", [`--${parameter}`, "positional"], {
           encoding: "utf8",
@@ -94,16 +95,53 @@ describe("tests/dynamic", () => {
 
     test("deduplication", () => {
       const cgA: CallGraph = {
-          entries: [],
-          files: ["a.js"],
-          functions: ["0:1:1:2:1"],
-          calls: ["0:1:5:1:10"],
-          fun2fun: [[0, 0]],
-          call2fun: [[0, 0]],
-          ignore: [],
+        entries: [],
+        files: ["a.js"],
+        functions: ["0:1:1:2:1"],
+        calls: ["0:1:5:1:10"],
+        fun2fun: [[0, 0]],
+        call2fun: [[0, 0]],
+        ignore: [],
       };
 
       expect(merge([cgA, cgA])).toStrictEqual(cgA);
     });
+  });
+
+  describe("source-utils", () => {
+    function jestWrap(source: string): string {
+      const EVAL_RESULT_VARIABLE = "Object.<anonymous>";
+      const args = ["module", "exports", "require", "__dirname", "__filename"];
+
+      const wrapperStart = `({"${EVAL_RESULT_VARIABLE}":function(${args.join(",")}){`;
+      return `${wrapperStart + source}\n}});`;
+    }
+
+    function simpleWrap(source: string): string {
+      return `(function(){${source}\n})()`;
+    }
+
+    const s = `\
+const x = 10;
+console.log(x * x);
+`;
+
+    test.each([
+      [s, "", false],
+      ["", s, true],
+      [s, jestWrap(s), true],
+      [s, jestWrap("b"), false],
+      [jestWrap(s), s, false],
+      [s, jestWrap(s + "b"), true],
+      [s, simpleWrap(s), true],
+      [s, simpleWrap(s.replaceAll("x", "y")), false],
+      [s, `/* Top text */${s}/* Bottom text */`, true],
+      [s, `/* Top text */\n${s}`, false],
+    ])(
+      "isSourceSimplyWrapped-%#",
+      (diskSource: string, observedSource: string, expected: boolean) => {
+        expect(isSourceSimplyWrapped(diskSource, observedSource)).toBe(expected);
+      },
+    );
   });
 });

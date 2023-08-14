@@ -19,3 +19,18 @@ const testRegexp = new RegExp(`\\bnode_modules/(?:${TEST_PACKAGES.join('|')}|(?:
 export function isPathInTestPackage(path: string): boolean {
     return testRegexp.test(path);
 }
+
+/**
+ * Tests whether the difference between two source files is the addition of a
+ * "header" on the first line that shifts the first line of the disk source some
+ * columns to the right. Trailing characters after the disk source are allowed.
+ * This kind of difference will not impact source locations on subsequent lines.
+ */
+export function isSourceSimplyWrapped(diskSource: string, observedSource: string): boolean {
+    // TODO: if source map support is implemented, we can easily return a fake source map here
+    const i = observedSource.indexOf(diskSource);
+    if (i === -1) return false;
+
+    const newlinePos = observedSource.indexOf("\n");
+    return (newlinePos === -1 || i <= newlinePos);
+}

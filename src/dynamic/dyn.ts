@@ -57,7 +57,7 @@ if (!outfile) {
 
 import {IID, Jalangi, SourceObject} from "../typings/jalangi";
 import {mapArrayAdd} from "../misc/util";
-import {isPathInTestPackage} from "./sources";
+import {isPathInTestPackage, isSourceSimplyWrapped} from "./sources";
 import fs from "fs";
 import path from "path";
 
@@ -78,14 +78,15 @@ enum FunType {
 
 interface FunInfo {
     type: FunType,
-    // true if function is defined in an eval context
-    eval: boolean,
+    // ignored functions will not be present in the output and no calls to/from
+    // ignored functions are recorded. currently true for functions defined in an
+    // eval context and functions in files that have been transformed at run-time
+    ignored: boolean,
     // call edges to other functions
     calls?: Set<IID>,
     loc: SourceObject,
-    // true if the functions should be present in the output
-    // currently this is the case for functions entered in app-level code
-    output: boolean,
+    // whether the function has been entered from app-level code
+    observedAsApp: boolean,
 }
 
 declare const J$: Jalangi;
@@ -93,6 +94,7 @@ declare const J$: Jalangi;
 const cwd = process.cwd();  // capture before application can change directory
 const fileIds = new Map<string, number>();
 const files: Array<string> = [];
+const ignoredFiles = new Set<string>(["structured-stack", "evalmachine.<anonymous>"]);
 const call2fun = new Map<IID, Set<IID>>();
 const callLocations = new Map<IID, string>();
 const funLocStack = Array<IID>(); // top-most is source location of callee function
@@ -142,7 +144,7 @@ function registerCall(call: IID, callerInfo: FunInfo, callee: Function) {
     else {
         // every iid in funIids must map to something in iidToInfo
         const calleeInfo = iidToInfo.get(calleeIid)!;
-        if (calleeInfo.type !== FunType.Test && !calleeInfo.eval)
+        if (calleeInfo.type !== FunType.Test && !calleeInfo.ignored)
             addCallEdge(call, callerInfo, calleeIid);
     }
 }
@@ -195,7 +197,7 @@ J$.addAnalysis({ // TODO: super calls not detected (see tests/micro/classes.js)
         if (callerInApp && typeof f === "function") {
             const callerIid = funLocStack[funLocStack.length - 1]!
             const callerInfo = iidToInfo.get(callerIid)!;
-            if (!callerInfo.eval)
+            if (!callerInfo.ignored)
                 registerCall(iid, callerInfo, f);
         }
     },
@@ -213,9 +215,9 @@ J$.addAnalysis({ // TODO: super calls not detected (see tests/micro/classes.js)
 
             info = {
                 type: pathToFunType(so.name),
-                eval: "eval" in so,
+                ignored: ("eval" in so) || ignoredFiles.has(so.name),
                 loc: enterScriptLocation ?? so,
-                output: false,
+                observedAsApp: false,
             };
 
             iidToInfo.set(iid, info);
@@ -224,7 +226,7 @@ J$.addAnalysis({ // TODO: super calls not detected (see tests/micro/classes.js)
         // determine whether the caller and/or the callee are in app code or in test packages
         let calleeInApp;
         if (inAppStack.length === 0) // called from top-level
-            calleeInApp = info.type === FunType.App && !info.eval;
+            calleeInApp = info.type === FunType.App && !("eval" in info.loc);
         else {
             const callerInApp = inAppStack[inAppStack.length - 1];
             if (callerInApp) // called from app code
@@ -233,13 +235,13 @@ J$.addAnalysis({ // TODO: super calls not detected (see tests/micro/classes.js)
                 calleeInApp = info.type === FunType.App;
         }
         inAppStack.push(calleeInApp);
-        info.output ||= calleeInApp && !info.eval;
+        info.observedAsApp ||= calleeInApp;
 
         const pCalls = pendingCalls.get(func);
         if (pCalls !== undefined) {
             pendingCalls.delete(func);
 
-            if (calleeInApp && !info.eval)
+            if (calleeInApp && !info.ignored)
                 for (const [caller, callIid] of pCalls) // register pending call edges
                     addCallEdge(callIid, caller, iid);
         }
@@ -264,6 +266,25 @@ J$.addAnalysis({ // TODO: super calls not detected (see tests/micro/classes.js)
     newSource: function(sourceInfo: { name: string; internal: boolean, eval?: string }, source: string) {
         if ("eval" in sourceInfo)
             return; // eval/Function call, not actually a new source file
+
+        // check whether the source we observe matches the file on disk
+        try {
+            const fp = sourceInfo.name.startsWith("file://")? sourceInfo.name.substring("file://".length) : sourceInfo.name,
+                absfp = path.isAbsolute(fp)? fp : path.join(cwd, fp);
+            const diskSource = fs.readFileSync(absfp, "utf-8");
+            if (diskSource !== source && !isSourceSimplyWrapped(diskSource, source)) {
+                // if the source does not match, we will potentially run into
+                // issues with matching static and dynamic source locations
+                // to avoid such issues we don't output any information for this file
+                // TODO: Handle this more cleanly, perhaps by using embedded source maps
+                log(`jelly: the source for ${sourceInfo.name} does not match the on-disk content - ignoring`);
+                ignoredFiles.add(sourceInfo.name);
+            }
+        } catch (error: any) {
+            if (error.code !== "ENOENT")
+                throw error;
+        }
+
         // find correct end source location
         let endLine = 1, last = 0;
         for (let i = 0; i < source.length; i++) {
@@ -406,9 +427,9 @@ J$.addAnalysis({ // TODO: super calls not detected (see tests/micro/classes.js)
  * Program exit, write call graph to JSON file.
  * (Note, funLocStack is nonempty if exit happens because of process.exit.)
  */
-process.on('exit', function() {
+process.on('exit', () => {
     const outputFunctions = [];
-    for (const [iid, info] of iidToInfo) if (info.output)
+    for (const [iid, info] of iidToInfo) if (!info.ignored && info.observedAsApp)
         outputFunctions.push([iid, so2loc(info.loc)]);
 
     if (outputFunctions.length === 0) {

@@ -28,6 +28,7 @@ done
 cd "$TESTS/mochatest"
 
 jelly --skip-graal-test --dynamic "test.json" --npm-test .
+jelly --skip-graal-test --dynamic "test-with-hook.json" --npm-test . -- -- -r ./require-hook
 
 cd "$TESTS/helloworld"
 
