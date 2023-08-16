@@ -308,7 +308,7 @@ export class PatternMatcher {
                             if (ps)
                                 for (const prop of p.props)
                                     addMatches(level, ap, ps.get(prop), tmp, subvs);
-                           addEscapingToExternal(ap);
+                            addEscapingToExternal(ap);
                         }
                     transfer(level, sub, tmp, subvs);
                 }
@@ -424,7 +424,7 @@ export class PatternMatcher {
      */
     private filterMatches(n: Node, filter: Filter): [Ternary, Node] {
         if (!(isCallExpression(n) || isOptionalCallExpression(n) || isNewExpression(n)))
-            assert.fail(`Unexpected node type ${n.type}`);
+            return [Ternary.Maybe, n]; // relevant due to addEscapingToExternal
         if (filter instanceof NumArgsCallFilter) {
             let simple = true, exps = 0;
             for (const arg of n.arguments)
