@@ -137,10 +137,11 @@ function getIgnores(cg: CallGraph): Set<string> {
 
 
 /**
-  * Returns the number of functions in cg1 that are reachable in cg2.
+  * Returns the number of functions in cg1, the number of reachable functions
+  * in cg2, and the number of functions in cg1 that are reachable in cg2.
   * Reachability in cg2 is computed from all application modules that are present in cg1.
   */
-function computeReachableFunctions(file2: string, cg1: CallGraph, cg2: CallGraph): [number, number] {
+function computeReachableFunctions(file2: string, cg1: CallGraph, cg2: CallGraph): [number, number, number] {
     const parser = new SourceLocationsToJSON(cg2.files);
     // find the module entry function for each file by looking for functions
     // that begin at position 1:1 and span the longest
@@ -202,7 +203,7 @@ function computeReachableFunctions(file2: string, cg1: CallGraph, cg2: CallGraph
             logger.info(`Function ${reploc} (${floc}) is unreachable in ${file2}`);
     }
 
-    return [dcgReach, comReach];
+    return [dcgReach, SCGreach.size, comReach];
 }
 
 /**
@@ -230,12 +231,13 @@ export function compareCallGraphs(file1: string, file2: string) {
     const [foundCall1, totalCall1] = compareEdges(cg1.call2fun, cg2.call2fun, file1, file2, cg1, cg2, file2files, "Call", "calls", ignores2);
     const [foundCall2, totalCall2] = compareEdges(cg2.call2fun, cg1.call2fun, file2, file1, cg2, cg1, file1files, "Call", "calls", ignores1);
     // measure recall in terms of reachable functions
-    const [dcgReach, comReach] = computeReachableFunctions(file2, cg1, cg2);
+    const [dcgReach, scgReach, comReach] = computeReachableFunctions(file2, cg1, cg2);
     logger.info(`Function->function edges in ${file2} that are also in ${file1}: ${foundFun2}/${totalFun2} (${percent(foundFun2 / totalFun2)})`);
     logger.info(`Function->function edges in ${file1} that are also in ${file2}: ${foundFun1}/${totalFun1} (${percent(foundFun1 / totalFun1)})`);
     logger.info(`Call->function edges in ${file2} that are also in ${file1}: ${foundCall2}/${totalCall2} (${percent(foundCall2 / totalCall2)})`);
     logger.info(`Call->function edges in ${file1} that are also in ${file2}: ${foundCall1}/${totalCall1} (${percent(foundCall1 / totalCall1)})`);
     const {precision, recall} = compareCallSiteEdges(cg1, cg2, ignores1, ignores2);
     logger.info(`Per-call average precision: ${percent(precision)}, recall: ${percent(recall)}`);
+    logger.info(`Reachable functions in ${file2} that are also in ${file1}: ${comReach}/${scgReach}${scgReach > 0? ` (${percent(comReach / scgReach)})` : ""}`)
     logger.info(`Functions in ${file1} that are reachable in ${file2}: ${comReach}/${dcgReach}${dcgReach > 0? ` (${percent(comReach / dcgReach)})` : ""}`)
 }

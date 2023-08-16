@@ -69,7 +69,8 @@ export async function runTest(basedir: string,
             await fs.rm(tmpdir, { recursive: true });
         }
 
-        const [_, funRecall, __, callRecall, reachRecall] = [...output.join("\n").matchAll(/: (\d+\/\d+)(?: \(|$)/g)].map((match) => match[1]);
+        const [_, funRecall, __, callRecall, ___, reachRecall] =
+            [...output.join("\n").matchAll(/: (\d+\/\d+)(?: \(|$)/g)].map((match) => match[1]);
         expect(funRecall).toBe(`${soundness.fun2funFound}/${soundness.fun2funTotal}`);
         expect(callRecall).toBe(`${soundness.call2funFound}/${soundness.call2funTotal}`);
         expect(reachRecall).toBe(`${soundness.reachableFound}/${soundness.reachableTotal}`);
