@@ -114,6 +114,8 @@ export type PatternMatchJSON = {
     }>
 };
 
+export type ModuleFilter = (module: ModuleAccessPath['moduleInfo']) => boolean;
+
 export class PatternMatcher {
 
     private readonly fragmentState: FragmentState;
@@ -175,7 +177,7 @@ export class PatternMatcher {
     /**
      * Finds the AST nodes that match the given access path pattern, together with the associated access paths.
      */
-    private findAccessPathPatternMatches(p: AccessPathPattern, write?: boolean): AccessPathPatternMatches {
+    private findAccessPathPatternMatches(p: AccessPathPattern, moduleFilter?: ModuleFilter, write?: boolean): AccessPathPatternMatches {
         let cache = write ? this.writeExpressionCache : this.expressionCache;
         let res = cache.get(p);
         if (!res) {
@@ -283,7 +285,10 @@ export class PatternMatcher {
             }
 
             if (p instanceof ImportAccessPathPattern) {
-                for (const [ap, ns] of this.findGlobMatches(p.glob))
+                let globMatches = this.findGlobMatches(p.glob);
+                if (moduleFilter)
+                    globMatches = globMatches.filter(([ap, _ns]) => moduleFilter(ap.moduleInfo));
+                for (const [ap, ns] of globMatches)
                     for (const n of ns)
                         mapGetSet(high, n).add(ap);
                 // workaround to support TAPIR's treatment of default imports
@@ -298,7 +303,7 @@ export class PatternMatcher {
                         }
                     }
             } else if (p instanceof PropertyAccessPathPattern) {
-                const sub = this.findAccessPathPatternMatches(p.base);
+                const sub = this.findAccessPathPatternMatches(p.base, moduleFilter);
                 for (const level of confidenceLevels) {
                     const tmp = new Map<Node, Set<PropertyAccessPath>>(); // temporary result (before deciding demotions)
                     const subvs = new Map<Node, ConstraintVar>();
@@ -313,7 +318,7 @@ export class PatternMatcher {
                     transfer(level, sub, tmp, subvs);
                 }
             } else if (p instanceof CallResultAccessPathPattern) {
-                const sub = this.findAccessPathPatternMatches(p.fun);
+                const sub = this.findAccessPathPatternMatches(p.fun, moduleFilter);
                 for (const level of confidenceLevels) {
                     const tmp = new Map<Node, Set<CallResultAccessPath>>();
                     const subvs = new Map<Node, ConstraintVar>();
@@ -327,7 +332,7 @@ export class PatternMatcher {
             } else if (p instanceof DisjunctionAccessPathPattern) {
                 const subs = [];
                 for (const ap of p.aps)
-                    subs.push(this.findAccessPathPatternMatches(ap));
+                    subs.push(this.findAccessPathPatternMatches(ap, moduleFilter));
                 for (const sub of subs)
                     for (const level of confidenceLevels)
                         for (const [n, aps] of sub[level])
@@ -336,8 +341,8 @@ export class PatternMatcher {
                     for (const [n, aps] of sub.low)
                         deleteAll(aps.values(), mapGetSet(high, n))
             } else if (p instanceof ExclusionAccessPathPattern) {
-                const included = this.findAccessPathPatternMatches(p.include);
-                const excluded = this.findAccessPathPatternMatches(p.exclude);
+                const included = this.findAccessPathPatternMatches(p.include, moduleFilter);
+                const excluded = this.findAccessPathPatternMatches(p.exclude, moduleFilter);
                 // start with all the included matches
                 for (const level of confidenceLevels)
                     for (const [n, aps] of included[level])
@@ -353,7 +358,7 @@ export class PatternMatcher {
                         if (high.get(n)?.delete(ap))
                             mapGetSet(low, n).add(ap);
             } else if (p instanceof PotentiallyUnknownAccessPathPattern) {
-                const sub = this.findAccessPathPatternMatches(p.ap);
+                const sub = this.findAccessPathPatternMatches(p.ap, moduleFilter);
                 for (const level of confidenceLevels)
                     for (const [n, aps] of sub[level])
                         addAll(aps, mapGetSet(res[level], n));
@@ -361,7 +366,7 @@ export class PatternMatcher {
                     mapGetSet(low, n).add(UnknownAccessPath.instance);
             } else if (p instanceof WildcardAccessPathPattern) {
                 // add all expressions that can be reached from matches to p.ap in zero or more calls or property accesses
-                let sub = this.findAccessPathPatternMatches(p.ap);
+                let sub = this.findAccessPathPatternMatches(p.ap, moduleFilter);
                 // copy results from sub to res
                 for (const level of confidenceLevels)
                     for (const [n, bps] of sub[level])
@@ -482,18 +487,18 @@ export class PatternMatcher {
      * Finds the AST nodes that match the given detection pattern,
      * with descriptions of the causes of uncertainty for low-confidence matches.
      */
-    findDetectionPatternMatches(d: DetectionPattern): Array<DetectionPatternMatch> {
+    findDetectionPatternMatches(d: DetectionPattern, moduleFilter?: ModuleFilter): Array<DetectionPatternMatch> {
         this.findEscapingAccessPathsToExternal();
         const res: Array<DetectionPatternMatch> = [];
         if (d instanceof ImportDetectionPattern) {
-            const sub = this.findAccessPathPatternMatches(d.ap);
+            const sub = this.findAccessPathPatternMatches(d.ap, moduleFilter);
             for (const level of confidenceLevels)
                 for (const exp of sub[level].keys())
                     if (!(isMemberExpression(exp) || isOptionalMemberExpression(exp)) && !isIdentifier(exp)) // excluding E.default expressions and identifiers
                         if (!d.onlyDefault || isDefaultImport(exp))
                             res.push({exp, uncertainties: level === "low" ? ["accessPath" as const] : undefined});
         } else if (d instanceof ReadDetectionPattern) {
-            const sub = this.findAccessPathPatternMatches(d.ap);
+            const sub = this.findAccessPathPatternMatches(d.ap, moduleFilter);
             for (const level of confidenceLevels) {
                 for (const exp of sub[level].keys()) {
                     if (!d.notInvoked || !this.fragmentState.invokedExpressions.has(exp)) {
@@ -529,7 +534,7 @@ export class PatternMatcher {
                 }
             }
         } else if (d instanceof WriteDetectionPattern) {
-            const sub = this.findAccessPathPatternMatches(d.ap, true);
+            const sub = this.findAccessPathPatternMatches(d.ap, moduleFilter, true);
             for (const level of confidenceLevels)
                 for (const exp of sub[level].keys()) {
                     const uncertainties: Array<Uncertainty> = [];
@@ -558,7 +563,7 @@ export class PatternMatcher {
         } else if (d instanceof CallDetectionPattern) {
             // 'call' patterns match entire call expressions but refer only to the functions being called,
             // so we wrap the access path pattern in a CallResultAccessPathPattern
-            const sub = this.findAccessPathPatternMatches(new CallResultAccessPathPattern(d.ap));
+            const sub = this.findAccessPathPatternMatches(new CallResultAccessPathPattern(d.ap), moduleFilter);
             const f = this.fragmentState;
             for (const level of confidenceLevels)
                 matches: for (const exp of sub[level].keys()) {
