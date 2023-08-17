@@ -203,6 +203,18 @@ function computeReachableFunctions(file2: string, cg1: CallGraph, cg2: CallGraph
             logger.info(`Function ${reploc} (${floc}) is unreachable in ${file2}`);
     }
 
+    // report edges from the dynamic call graph where only the source is reachable
+    for (const [a, b] of cg1.fun2fun) {
+        const aloc = loc(cg1.functions[a], cg1, "Function").str;
+        const i = replocToIndex.get(aloc);
+        if (i === undefined || !SCGreach.has(i)) continue;
+
+        const bloc = loc(cg1.functions[b], cg1, "Function").str;
+        const j = replocToIndex.get(bloc);
+        if (j === undefined || !SCGreach.has(j))
+            logger.info(`Missed dynamic function/function edge ${aloc} -> ${bloc} could increase reachability recall`);
+    }
+
     return [dcgReach, SCGreach.size, comReach];
 }
 
