@@ -15,5 +15,5 @@ export interface Vulnerability {
 }
 
 export function getVulnerabilityId(v: Vulnerability): string {
-    return 'id' in v.osv ? v.osv.id : v.osv.url;
+    return "id" in v.osv ? v.osv.id : v.osv.url;
 }

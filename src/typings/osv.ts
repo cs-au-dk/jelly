@@ -21,7 +21,7 @@ export interface OpenSourceVulnerability {
 }
 
 /**
- * The type of the vulnerability as reported by npm audit
+ * The type of the vulnerability as reported by npm audit.
  */
 export type NpmAuditVulnerability = {
     cvss: {
@@ -49,7 +49,6 @@ export type AuditSeverityType =
     | 'HIGH'
     | 'critical'
     | 'CRITICAL';
-
 
 export interface Affected {
     database_specific?: { [key: string]: unknown };

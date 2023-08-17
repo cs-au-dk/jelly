@@ -1,4 +1,4 @@
-import {ModuleInfo} from "../analysis/infos";
+import {DummyModuleInfo, ModuleInfo} from "../analysis/infos";
 import {
     AccessPathPattern,
     CallDetectionPattern,
@@ -114,7 +114,7 @@ export type PatternMatchJSON = {
     }>
 };
 
-export type ModuleFilter = (module: ModuleAccessPath['moduleInfo']) => boolean;
+export type ModuleFilter = (module: ModuleInfo | DummyModuleInfo) => boolean;
 
 export class PatternMatcher {
 
