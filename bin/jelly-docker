@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 if [[ -z "$1" ]]; then
   echo "Error: Workspace root directory missing, aborting"
-  exit -1
+  exit 255
 fi
-docker run --rm --name jelly --network none -v $(readlink -f "$1"):/workspace -w /workspace --user $(id -u):$(id -g) jelly ${@:2}
+
+if docker info --format '{{join .SecurityOptions "\n"}}' | grep --silent "name=rootless"; then
+    OPTS=""
+else
+    OPTS="--user $(id -u):$(id -g) -e HOME=/tmp"
+fi
+
+exec docker run --rm --name jelly $OPTS --network none -v "$(readlink -f "$1")":/workspace -w /workspace jelly "${@:2}"
