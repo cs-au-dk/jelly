@@ -6,7 +6,7 @@ import {FragmentState} from "../analysis/fragmentstate";
 import {NativeObjectToken, Token} from "../analysis/tokens";
 import {isIdentifier} from "@babel/types";
 import {VulnerabilityResults} from "../patternmatching/vulnerabilitydetector";
-import {Vulnerability} from "../typings/vulnerabilities";
+import {getVulnerabilityId, Vulnerability} from "../typings/vulnerabilities";
 import {constraintVarToStringWithCode, funcToStringWithCode} from "./tostringwithcode";
 
 export interface VisualizerGraphs {
@@ -260,7 +260,7 @@ function getVisualizerCallGraph(f: FragmentState, vulnerabilities: Vulnerability
         vuls = [];
         for (const v of relevant) {
             const x: NonNullable<VisualizerGraphs["graphs"][number]["vulnerabilities"]>[number] = {
-                title: v.osv.id,
+                title: getVulnerabilityId(v),
                 package: {sources: [], targets: []},
                 module: {sources: [], targets: []},
                 function:  {sources: [], targets: []}
