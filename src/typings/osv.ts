@@ -20,6 +20,37 @@ export interface OpenSourceVulnerability {
     withdrawn?: Date;
 }
 
+/**
+ * The type of the vulnerability as reported by npm audit
+ */
+export type NpmAuditVulnerability = {
+    cvss: {
+        score: number;
+        vectorString: string | null;
+    };
+    cwe: string[];
+    dependency: string; // name of the affected package
+    name: string; // typically, also the name of the affected package
+    range: string;
+    severity: AuditSeverityType;
+    source: number; // might change over time
+    title: string;
+    url: string;
+};
+
+export type AuditSeverityType =
+    | 'info'
+    | 'INFO'
+    | 'low'
+    | 'LOW'
+    | 'moderate'
+    | 'MODERATE'
+    | 'high'
+    | 'HIGH'
+    | 'critical'
+    | 'CRITICAL';
+
+
 export interface Affected {
     database_specific?: { [key: string]: unknown };
     ecosystem_specific?: { [key: string]: unknown };
