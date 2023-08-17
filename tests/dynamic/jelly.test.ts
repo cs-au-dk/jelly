@@ -1,7 +1,7 @@
-import * as os from "node:os";
-import * as path from "node:path";
-import * as fs from "node:fs/promises";
-import * as process from "node:process";
+import os from "node:os";
+import path from "node:path";
+import fs from "node:fs/promises";
+import process from "node:process";
 import { execFileSync } from "node:child_process";
 
 import { CallGraph } from "../../src/typings/callgraph";
@@ -12,6 +12,14 @@ describe("tests/dynamic", () => {
   describe("wrapper", () => {
     let tmpDir: string;
     beforeAll(async () => {
+      const dynJS = path.resolve(__dirname, "..", "..", "lib", "dynamic", "dyn.js");
+      try { await fs.access(dynJS); }
+      catch {
+        console.log(`Creating empty ${dynJS}...`);
+        await fs.mkdir(path.dirname(dynJS), { recursive: true });
+        await fs.writeFile(dynJS, "");
+      }
+
       // Set up a mocked GRAAL_HOME that fools bin/node
       tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "jelly-test-dynamic-"));
       const binPath = path.join(tmpDir, "bin");
