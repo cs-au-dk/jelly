@@ -1,6 +1,8 @@
 import {isIdentifier, Node, SourceLocation} from "@babel/types";
 import assert from "assert";
 import {ModuleInfo} from "../analysis/infos";
+import {CallGraph} from "../typings/callgraph";
+import logger from "./logger";
 
 /**
  * Source location with extra information.
@@ -106,7 +108,7 @@ export function locationIn(loc1: SourceLocation, loc2: SourceLocation | undefine
     let start = loc2.start.line < loc1.start.line ||
         (loc2.start.line === loc1.start.line && loc2.start.column <= loc1.start.column);
     let end = loc1.end.line < loc2.end.line ||
-        (loc1.end.line === loc2.end.line && loc2.end.column <= loc1.end.column);
+        (loc1.end.line === loc2.end.line && loc1.end.column <= loc2.end.column);
     return start && end;
 }
 
@@ -340,4 +342,85 @@ export class SourceLocationsToJSON {
             file: this.files[fileIndex],
         };
     }
+}
+
+/*
+ * Computes a mapping from calls to the function they are contained in.
+ * The time complexity is linearithmic in the number of functions and calls.
+ */
+export function mapCallsToFunctions(cg: CallGraph): Map<number, number> {
+    const parser = new SourceLocationsToJSON(cg.files);
+    const ret = new Map();
+
+    type SourceLocationWithIndex = SourceLocation & { index: number };
+    const byFile: Array<{ functions: SourceLocationWithIndex[], calls: SourceLocationWithIndex[] }> =
+        Array.from(cg.files, () => ({ functions: [], calls: [] }));
+
+    // group functions and calls by file
+    for (const kind of ["functions", "calls"] as const)
+        for (const [i, loc] of Object.entries(cg[kind])) {
+            const parsed = parser.parseLocationJSON(loc);
+            if (!parsed.loc)
+                continue;
+
+            byFile[parsed.fileIndex][kind].push({...parsed.loc, index: Number(i)});
+        }
+
+    function compareLC(a: { line: number, column: number }, b: { line: number, column: number }): number {
+        return a.line !== b.line? a.line - b.line : a.column - b.column;
+    }
+
+    // orders source locations primarily in ascending order by start location
+    // ties are broken first by descending order of end locations and then index.
+    function compareSL(a: SourceLocationWithIndex, b: SourceLocationWithIndex): number {
+        return compareLC(a.start, b.start) || -compareLC(a.end, b.end) || a.index - b.index;
+    }
+
+    for (const [i, {functions, calls}] of byFile.entries()) {
+        functions.sort(compareSL);
+        calls.sort(compareSL);
+
+        // sweep over functions and calls simultaneously, maintaining a stack of functions
+        const stack = [];
+        let funIndex = 0;
+
+        for (const call of calls) {
+            // remove functions that ended before the call starts
+            while (stack.length && compareLC(stack[stack.length-1]!.end, call.start) <= 0)
+                stack.pop();
+
+            // add functions that started before the call (but didn't end yet)
+            while (funIndex < functions.length) {
+                const fun = functions[funIndex], cmp = compareLC(fun.start, call.start);
+                // require that the function starts strictly before the call, unless the function is
+                // the synthetic module function. requiring that calls are stricly before functions
+                // is required due to how functions sometimes have incorrect start positions in the
+                // dynamic analysis
+                if (cmp < 0 || (cmp === 0 && fun.start.line == 1 && fun.start.column === 0)) {
+                    funIndex++;
+
+                    if (compareLC(fun.end, call.start) > 0)
+                        stack.push(fun);
+                } else
+                    break;
+            }
+
+            assert(stack.length);
+            const fun = stack[stack.length-1];
+
+            if (!locationIn(call, fun)) {
+                // this should not happen!
+                // one case has been observed where the same file is loaded multiple times in the dynamic
+                // analysis with different contents, which results in a dynamic CG with functions that
+                // cannot be properly nested within eachother
+                const cs = parser.makeLocString({...call, filename: cg.files[i]}),
+                    fs = parser.makeLocString({...fun, filename: cg.files[i]});
+                logger.error(`Error: ${cs} should be in ${fs}`);
+            }
+
+            ret.set(call.index, fun.index);
+        }
+    }
+
+    return ret;
 }

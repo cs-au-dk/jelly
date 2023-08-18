@@ -1,16 +1,11 @@
-import fs from "node:fs/promises";
-import os from "node:os";
-import path from "node:path";
 import {options, setDefaultTrackedModules, setPatternProperties} from "../options";
 import {tapirLoadPatterns, tapirPatternMatch} from "../patternmatching/tapirpatterns";
 import {analyzeFiles} from "../analysis/analyzer";
 import assert from "assert";
-import {testSoundness} from "../dynamic/soundnesstester";
 import {AnalysisStateReporter} from "../output/analysisstatereporter";
 import Solver from "../analysis/solver";
 import {getAPIUsage} from "../patternmatching/apiusage";
 import {FragmentState} from "../analysis/fragmentstate";
-import logger from "../misc/logger";
 import {compareCallGraphs} from "../output/compare";
 import {VulnerabilityDetector} from "../patternmatching/vulnerabilitydetector";
 import {getGlobs, getProperties} from "../patternmatching/patternloader";
@@ -67,28 +62,12 @@ export async function runTest(basedir: string,
     await analyzeFiles(files, solver);
 
     let soundness;
-    if (args.soundness) {
-        soundness = testSoundness(args.soundness, solver.fragmentState);
-
-        // test that the output of compareCallGraphs agrees with the soundness tester
-        const output: string[] = [];
-        const spy = jest.spyOn(logger, "info").mockImplementation((line) => output.push(line as unknown as string) as any);
-        const tmpdir = await fs.mkdtemp(path.join(os.tmpdir(), "jelly-runTest-cgcompare-"));
-        try {
-            const cgpath = path.join(tmpdir, "callgraph.json")
-            new AnalysisStateReporter(solver.fragmentState).saveCallGraph(cgpath, files);
-            compareCallGraphs(args.soundness, cgpath)
-        } finally {
-            spy.mockRestore();
-            await fs.rm(tmpdir, { recursive: true });
-        }
-
-        const [_, funRecall, __, callRecall, ___, reachRecall] =
-            [...output.join("\n").matchAll(/: (\d+\/\d+)(?: \(|$)/g)].map((match) => match[1]);
-        expect(funRecall).toBe(`${soundness.fun2funFound}/${soundness.fun2funTotal}`);
-        expect(callRecall).toBe(`${soundness.call2funFound}/${soundness.call2funTotal}`);
-        expect(reachRecall).toBe(`${soundness.reachableFound}/${soundness.reachableTotal}`);
-    }
+    if (args.soundness)
+        soundness = compareCallGraphs(
+            args.soundness, "<computed>",
+            new AnalysisStateReporter(solver.fragmentState).callGraphToJSON(files),
+            /* compareBothWays */ false,
+        );
 
     if (args.functionInfos !== undefined)
         expect(solver.globalState.functionInfos.size).toBe(args.functionInfos);

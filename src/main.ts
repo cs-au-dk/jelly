@@ -4,7 +4,6 @@ import {analyzeFiles} from "./analysis/analyzer";
 import {closeSync, openSync, readdirSync, readFileSync, unlinkSync} from "fs";
 import {program} from "commander";
 import logger, {logToFile, setLogLevel} from "./misc/logger";
-import {testSoundness} from "./dynamic/soundnesstester";
 import {options, PKG, setDefaultTrackedModules, setOptions, setPatternProperties, VERSION} from "./options";
 import {spawnSync} from "child_process";
 import path from "path";
@@ -323,7 +322,7 @@ async function main() {
                 out.reportReachablePackagesAndModules();
 
             if (options.soundness)
-                testSoundness(options.soundness, f);
+                compareCallGraphs(options.soundness, "<computed>", out.callGraphToJSON(files), false);
 
             if (tapirPatterns && patterns)
                 tapirPatternMatch(tapirPatterns, patterns, solver, typer, undefined);

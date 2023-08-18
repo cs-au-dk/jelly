@@ -1,5 +1,5 @@
 import logger from "../misc/logger";
-import {deleteAll, getOrSet, LocationJSON, locationToStringWithFile, locationToStringWithFileAndEnd} from "../misc/util";
+import {deleteAll, FilePath, getOrSet, locationToStringWithFile, locationToStringWithFileAndEnd} from "../misc/util";
 import {GlobalState} from "../analysis/globalstate";
 import {FunctionToken, NativeObjectToken, Token} from "../analysis/tokens";
 import fs from "fs";
@@ -55,6 +55,11 @@ export class AnalysisStateReporter {
         logger.info(`Analysis tokens written to ${outfile}`);
     }
 
+
+    private makeLocStr(fileIndex: number, loc: SourceLocation | undefined | null): string {
+        return `${fileIndex}:${loc ? `${loc.start.line}:${loc.start.column + 1}:${loc.end.line}:${loc.end.column + 1}` : "?:?:?:?"}`;
+    }
+
     /**
      * Saves the call graph to a JSON file using the format defined in callgraph.d.ts.
      */
@@ -76,9 +81,6 @@ export class AnalysisStateReporter {
             first = false;
         }
         fs.writeSync(fd, `\n ],\n "functions": {`);
-        function makeLocStr(fileIndex: number, loc: SourceLocation | undefined | null): string {
-            return `${fileIndex}:${loc ? `${loc.start.line}:${loc.start.column + 1}:${loc.end.line}:${loc.end.column + 1}` : "?:?:?:?"}`;
-        }
         const functionIndices = new Map<FunctionInfo | ModuleInfo, number>();
         first = true;
         for (const fun of [...this.a.functionInfos.values(), ...this.a.moduleInfos.values()]) {
@@ -87,7 +89,7 @@ export class AnalysisStateReporter {
             const fileIndex = fileIndices.get(fun instanceof ModuleInfo ? fun : fun.moduleInfo);
             if (fileIndex === undefined)
                 assert.fail(`File index not found for ${fun}`);
-            fs.writeSync(fd, `${first ? "" : ","}\n  "${funIndex}": ${JSON.stringify(makeLocStr(fileIndex, fun.node?.loc))}`);
+            fs.writeSync(fd, `${first ? "" : ","}\n  "${funIndex}": ${JSON.stringify(this.makeLocStr(fileIndex, fun.node?.loc))}`);
             first = false;
         }
         fs.writeSync(fd, `\n },\n "calls": {`);
@@ -100,7 +102,7 @@ export class AnalysisStateReporter {
                 const fileIndex = fileIndices.get(m);
                 if (fileIndex === undefined)
                     assert.fail(`File index not found for ${m}`);
-                fs.writeSync(fd, `${first ? "" : ","}\n  "${callIndex}": ${JSON.stringify(makeLocStr(fileIndex, call.loc))}`);
+                fs.writeSync(fd, `${first ? "" : ","}\n  "${callIndex}": ${JSON.stringify(this.makeLocStr(fileIndex, call.loc))}`);
                 first = false;
             }
         fs.writeSync(fd, `\n },\n "fun2fun": [`);
@@ -137,7 +139,7 @@ export class AnalysisStateReporter {
             const fileIndex = fileIndices.get(m);
             if (fileIndex === undefined)
                 assert.fail(`File index not found for ${m}`);
-            fs.writeSync(fd, `${first ? "" : ","}\n  ${JSON.stringify(makeLocStr(fileIndex, n.loc))}`);
+            fs.writeSync(fd, `${first ? "" : ","}\n  ${JSON.stringify(this.makeLocStr(fileIndex, n.loc))}`);
             first = false;
         }
         fs.writeSync(fd, `${first ? "" : "\n "}]\n}\n`);
@@ -148,46 +150,38 @@ export class AnalysisStateReporter {
     /**
      * Creates a JSON representation of the call graph using the format defined in callgraph.d.ts.
      */
-    callGraphToJSON(files: Array<string>): CallGraph {
-        const cg: CallGraph & {entries: Array<string>, ignore: Array<LocationJSON>} = {
-            time: new Date().toUTCString(),
-            entries: [],
-            files: [],
-            functions: [],
-            calls: [],
-            fun2fun: [],
-            call2fun: [],
-            ignore: []
-        };
-        for (const file of files)
-            cg.entries.push(relative(options.basedir,resolve(options.basedir, file)));
+    callGraphToJSON(ifiles: Array<string>): CallGraph {
+        type Edges = Array<[number, number]>;
+        const files: Array<FilePath> = [],
+            functions: Array<string> = [],
+            calls: Array<string> = [],
+            fun2fun: Edges = [],
+            call2fun: Edges = [];
         const fileIndices = new Map<ModuleInfo, number>();
         for (const m of this.a.moduleInfos.values()) {
             fileIndices.set(m, fileIndices.size);
-            cg.files.push(relative(options.basedir, m.getPath()));
-        }
-        function makeLocStr(fileIndex: number, loc: SourceLocation | undefined | null): string {
-            return `${fileIndex}:${loc ? `${loc.start.line}:${loc.start.column + 1}:${loc.end.line}:${loc.end.column + 1}` : "?:?:?:?"}`;
+            files.push(relative(options.basedir, m.getPath()));
         }
         const functionIndices = new Map<FunctionInfo | ModuleInfo, number>();
         for (const fun of [...this.a.functionInfos.values(), ...this.a.moduleInfos.values()]) {
-            const funIndex = functionIndices.size;
+            const funIndex = functions.length;
             functionIndices.set(fun, funIndex);
             const fileIndex = fileIndices.get(fun instanceof ModuleInfo ? fun : fun.moduleInfo);
             if (fileIndex === undefined)
                 assert.fail(`File index not found for ${fun}`);
-            cg.functions[funIndex] = makeLocStr(fileIndex, fun.node?.loc);
+            functions.push(this.makeLocStr(fileIndex, fun.node?.loc));
         }
         const callIndices = new Map<Node, number>();
-        for (const [m, calls] of this.f.calls)
-            for (const call of calls) {
-                const callIndex = callIndices.size + functionIndices.size;
+        for (const [m, mcalls] of this.f.calls) {
+            const fileIndex = fileIndices.get(m);
+            if (fileIndex === undefined)
+                assert.fail(`File index not found for ${m}`);
+            for (const call of mcalls) {
+                const callIndex = calls.length;
                 callIndices.set(call, callIndex);
-                const fileIndex = fileIndices.get(m);
-                if (fileIndex === undefined)
-                    assert.fail(`File index not found for ${m}`);
-                cg.calls[callIndex] = makeLocStr(fileIndex, call.loc);
+                calls.push(this.makeLocStr(fileIndex, call.loc));
             }
+        }
         for (const [caller, callees] of [...this.f.functionToFunction, ...(options.callgraphRequire ? this.f.requireGraph : [])])
             for (const callee of callees) {
                 const callerIndex = functionIndices.get(caller);
@@ -196,7 +190,7 @@ export class AnalysisStateReporter {
                 const calleeIndex = functionIndices.get(callee);
                 if (calleeIndex === undefined)
                     assert.fail(`Function index not found for ${callee}`);
-                cg.fun2fun.push([callerIndex, calleeIndex]);
+                fun2fun.push([callerIndex, calleeIndex]);
             }
         for (const [call, callIndex] of callIndices) {
             const funs = this.f.callToFunction.get(call) || [];
@@ -207,16 +201,25 @@ export class AnalysisStateReporter {
                 const calleeIndex = functionIndices.get(callee);
                 if (calleeIndex === undefined)
                     assert.fail(`Function index not found for ${callee}`);
-                cg.fun2fun.push([callIndex, calleeIndex]);
+                call2fun.push([callIndex, calleeIndex]);
             }
         }
-        for (const [m, n] of this.f.artificialFunctions) {
-            const fileIndex = fileIndices.get(m);
-            if (fileIndex === undefined)
-                assert.fail(`File index not found for ${m}`);
-            cg.ignore.push(makeLocStr(fileIndex, n.loc));
-        }
-        return cg;
+
+        return {
+            time: new Date().toUTCString(),
+            entries: ifiles.map(file => relative(options.basedir, resolve(options.basedir, file))),
+            files,
+            functions,
+            calls,
+            fun2fun,
+            call2fun,
+            ignore: this.f.artificialFunctions.map(([m, n]) => {
+                const fileIndex = fileIndices.get(m);
+                if (fileIndex === undefined)
+                    assert.fail(`File index not found for ${m}`);
+                return this.makeLocStr(fileIndex, n.loc);
+            }),
+        };
     }
 
     /**

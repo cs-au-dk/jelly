@@ -335,7 +335,7 @@ export class FragmentState {
     registerCall(n: Node, m: ModuleInfo, {native, external, accessor}: {native?: boolean, external?: boolean, accessor?: boolean} = {}) {
         if (accessor && !options.callgraphImplicit)
             return;
-        if (options.callgraphJson)
+        if (options.callgraphJson || options.soundness)
             mapGetSet(this.calls, m).add(n);
         if (!this.callLocations.has(n) ||
             (native && !this.nativeCallLocations.has(n)) ||
