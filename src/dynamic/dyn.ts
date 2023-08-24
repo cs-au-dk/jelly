@@ -16,6 +16,13 @@ const IGNORED_COMMANDS = [
 // only write messages to stdout if it is a TTY
 const log = process.stdout.isTTY? console.log.bind(console) : () => {};
 
+// capture before application can change directory
+const cwd = process.cwd();
+// JELLY_BASEDIR is the path that files in the output should be relative to
+// propagating this value to child processes makes output paths consistent,
+// even when processes are spawned with different working directories
+const JELLY_BASEDIR = process.env.JELLY_BASEDIR || cwd;
+
 // override 'node' executable by overwriting process.execPath and prepending $JELLY_BIN to $PATH
 const jellybin = process.env.JELLY_BIN;
 if (!jellybin) {
@@ -23,7 +30,7 @@ if (!jellybin) {
     process.exit(-1);
 }
 const node = `${jellybin}/node`;
-const child_process = require('child_process');
+const child_process = require("child_process");
 for (const fun of ["spawn", "spawnSync"]) {
     const real = child_process[fun];
     child_process[fun] = function() {
@@ -33,7 +40,8 @@ for (const fun of ["spawn", "spawnSync"]) {
                     env: {...env,
                         PATH: `${jellybin}${env.PATH ? `:${env.PATH}` : ""}`,
                         NODE: node,
-                        npm_node_execpath: node
+                        npm_node_execpath: node,
+                        JELLY_BASEDIR,
                     }};
         // log("jelly:", fun, arguments[0], arguments[1].join(" ")/*, opts*/); // XXX
         return real.call(this, arguments[0], arguments[1], opts);
@@ -50,7 +58,7 @@ for (const s of IGNORED_COMMANDS)
     }
 
 const outfile = process.env.JELLY_OUT + "-" + process.pid;
-if (!outfile) {
+if (!("JELLY_OUT" in process.env)) {
     console.error('Error: Environment variable JELLY_OUT not set, aborting');
     process.exit(-1);
 }
@@ -64,7 +72,8 @@ import path from "path";
 try {
     // attempt to detect if we're running the jest entry point
     // if so, insert jest parameter that disables the use of worker processes for tests
-    if(cmd.indexOf("jest") != -1 && /\/node_modules\/jest(-cli)?\/bin\/jest\.js$/.test(fs.realpathSync(cmd)))
+    const jestDetector = /\/node_modules\/(?:jest(?:-cli)?\/bin\/jest\.js|jest-ci\/bin\.js)$/;
+    if (cmd.indexOf("jest") !== -1 && jestDetector.test(fs.realpathSync(cmd)))
         process.argv.splice(7, 0, "--runInBand");
 } catch(e) {}
 
@@ -91,7 +100,6 @@ interface FunInfo {
 
 declare const J$: Jalangi;
 
-const cwd = process.cwd();  // capture before application can change directory
 const fileIds = new Map<string, number>();
 const files: Array<string> = [];
 const ignoredFiles = new Set<string>(["structured-stack", "evalmachine.<anonymous>"]);
@@ -439,15 +447,19 @@ process.on('exit', () => {
 
     // log(`jelly: Writing ${outfile}`);
 
+    function formatPath(fp: string): string {
+        fp = fp.startsWith("file://")? fp.substring("file://".length) : path.resolve(cwd, fp);
+        // ensure that paths are relative to the base directory
+        return JSON.stringify(path.relative(JELLY_BASEDIR, fp));
+    }
+
     const fd = fs.openSync(outfile, "w");
-    fs.writeSync(fd, `{\n "entries": [${JSON.stringify(path.relative(cwd, process.argv[1]))}],\n`);
+    fs.writeSync(fd, `{\n "entries": [${formatPath(process.argv[1])}],\n`);
     fs.writeSync(fd, ` "time": "${new Date().toUTCString()}",\n`);
     fs.writeSync(fd, ` "files": [`);
     let first = true;
     for (const file of files) {
-        // relativize absolute paths with file:// prefix
-        const fp = file.startsWith("file://")? path.relative(cwd, file.substring("file://".length)) : file;
-        fs.writeSync(fd, `${first ? "" : ","}\n  ${JSON.stringify(fp)}`);
+        fs.writeSync(fd, `${first ? "" : ","}\n  ${formatPath(file)}`);
         first = false;
     }
     fs.writeSync(fd, `\n ],\n "functions": {`);

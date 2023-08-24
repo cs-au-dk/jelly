@@ -2,10 +2,10 @@
  * Packages that are typically used for tests only and should be excluded in the collected call graphs.
  */
 const TEST_PACKAGES = [
-    "ava", "yarn", "karma", "mocha", "jasmine", "tap", "tape", "@babel", "@jest",
+    "ava", "uvu", "yarn", "karma", "mocha", "jasmine", "tap", "tape", "@babel", "@jest",
     "nyc", "c8",
     "chai", "expect", "should", "supertest",
-    "sinon", "nock",
+    "@sinonjs", "sinon", "nock",
 ]; // TODO: other test packages?
 
 

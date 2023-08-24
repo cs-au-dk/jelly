@@ -1,0 +1,1 @@
+{"entries":["spawn-cwd.js","sub/index.js"],"files":["spawn-cwd.js","sub/index.js","lib3.js"],"functions":["0:1:1:7:1","1:1:1:2:1","2:1:1:4:1","2:1:22:3:2"],"calls":["1:1:1:1:28"],"fun2fun":[[1,3]],"call2fun":[[0,3]],"ignore":[],"time":"Thu, 24 Aug 2023 12:17:34 GMT"}
