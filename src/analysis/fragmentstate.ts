@@ -159,11 +159,6 @@ export class FragmentState {
     readonly artificialFunctions: Array<[ModuleInfo, Node]> = [];
 
     /**
-     * Call nodes for each module. (Only used with options.callgraphJson.)
-     */
-    readonly calls: Map<ModuleInfo, Set<Node>> = new Map;
-
-    /**
      * Source locations of all calls (including accessor calls).
      */
     readonly callLocations: Set<Node> = new Set;
@@ -335,8 +330,6 @@ export class FragmentState {
     registerCall(n: Node, m: ModuleInfo, {native, external, accessor}: {native?: boolean, external?: boolean, accessor?: boolean} = {}) {
         if (accessor && !options.callgraphImplicit)
             return;
-        if (options.callgraphJson || options.soundness)
-            mapGetSet(this.calls, m).add(n);
         if (!this.callLocations.has(n) ||
             (native && !this.nativeCallLocations.has(n)) ||
             (external && !this.externalCallLocations.has(n))) {

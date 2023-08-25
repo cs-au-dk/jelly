@@ -1,5 +1,5 @@
 import logger from "../misc/logger";
-import {deleteAll, FilePath, getOrSet, locationToStringWithFile, locationToStringWithFileAndEnd} from "../misc/util";
+import {deleteAll, FilePath, getOrSet, Location, locationToStringWithFile, locationToStringWithFileAndEnd} from "../misc/util";
 import {GlobalState} from "../analysis/globalstate";
 import {FunctionToken, NativeObjectToken, Token} from "../analysis/tokens";
 import fs from "fs";
@@ -95,16 +95,17 @@ export class AnalysisStateReporter {
         fs.writeSync(fd, `\n },\n "calls": {`);
         const callIndices = new Map<Node, number>();
         first = true;
-        for (const [m, calls] of this.f.calls)
-            for (const call of calls) {
-                const callIndex = callIndices.size + functionIndices.size;
-                callIndices.set(call, callIndex);
-                const fileIndex = fileIndices.get(m);
-                if (fileIndex === undefined)
-                    assert.fail(`File index not found for ${m}`);
-                fs.writeSync(fd, `${first ? "" : ","}\n  "${callIndex}": ${JSON.stringify(this.makeLocStr(fileIndex, call.loc))}`);
-                first = false;
-            }
+        for (const call of this.f.callLocations) {
+            const m = (call.loc as Location).module;
+            assert(m);
+            const callIndex = callIndices.size + functionIndices.size;
+            callIndices.set(call, callIndex);
+            const fileIndex = fileIndices.get(m);
+            if (fileIndex === undefined)
+                assert.fail(`File index not found for ${m}`);
+            fs.writeSync(fd, `${first ? "" : ","}\n  "${callIndex}": ${JSON.stringify(this.makeLocStr(fileIndex, call.loc))}`);
+            first = false;
+        }
         fs.writeSync(fd, `\n },\n "fun2fun": [`);
         first = true;
         for (const [caller, callees] of [...this.f.functionToFunction, ...(options.callgraphRequire ? this.f.requireGraph : [])])
@@ -172,15 +173,15 @@ export class AnalysisStateReporter {
             functions.push(this.makeLocStr(fileIndex, fun.node?.loc));
         }
         const callIndices = new Map<Node, number>();
-        for (const [m, mcalls] of this.f.calls) {
+        for (const call of this.f.callLocations) {
+            const m = (call.loc as Location).module;
+            assert(m);
             const fileIndex = fileIndices.get(m);
             if (fileIndex === undefined)
                 assert.fail(`File index not found for ${m}`);
-            for (const call of mcalls) {
-                const callIndex = calls.length;
-                callIndices.set(call, callIndex);
-                calls.push(this.makeLocStr(fileIndex, call.loc));
-            }
+            const callIndex = calls.length;
+            callIndices.set(call, callIndex);
+            calls.push(this.makeLocStr(fileIndex, call.loc));
         }
         for (const [caller, callees] of [...this.f.functionToFunction, ...(options.callgraphRequire ? this.f.requireGraph : [])])
             for (const callee of callees) {

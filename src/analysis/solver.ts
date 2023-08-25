@@ -1085,7 +1085,6 @@ export default class Solver {
         addAll(s.functionsWithArguments, f.functionsWithArguments);
         addAll(s.functionsWithThis, f.functionsWithThis);
         f.artificialFunctions.push(...s.artificialFunctions);
-        mapSetAddAll(s.calls, f.calls);
         addAll(s.callLocations, f.callLocations);
         addAll(s.nativeCallLocations, f.nativeCallLocations);
         addAll(s.externalCallLocations, f.externalCallLocations);

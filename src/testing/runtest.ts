@@ -44,10 +44,6 @@ export async function runTest(basedir: string,
         options.trackedModules ??= ['**'];
     }
 
-    if (options.soundness)
-        // ensure that calls are registered
-        options.callgraphJson = "truthy";
-
     const files = Array.isArray(app) ? app : [app]
     const solver = new Solver();
     let vulnerabilityDetector;
