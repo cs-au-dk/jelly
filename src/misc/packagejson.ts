@@ -1,5 +1,5 @@
 import {FilePath} from "./util";
-import {dirname, relative, resolve} from "path";
+import {dirname, relative, resolve, sep} from "path";
 import {existsSync, readFileSync} from "fs";
 import logger from "./logger";
 import {options} from "../options";
@@ -41,14 +41,32 @@ export interface PackageJsonInfo {
 export function findPackageJson(file: FilePath): {packageJson: FilePath, dir: FilePath} | undefined {
     let dir = file;
     while (true) {
-        const packageJson = resolve(dir, "package.json");
-        if (existsSync(packageJson))
-            return {packageJson, dir};
+        if (doesDirContainPackageJsonForNpmPackage(dir))
+            return {packageJson: resolve(dir, "package.json"), dir};
         const d = dirname(dir);
         if (d === dir || (options.basedir && !d.startsWith(dirname(options.basedir))))
             return undefined;
         dir = d;
     }
+}
+
+/**
+ * Checks whether dir has a package.json file and if dir is inside node_modules, it also checks
+ * that the name of the package.json file matches the directory name relative to node_modules.
+ * If dir is not inside node_modules, it is assumed that the package.json file is correct.
+ */
+function doesDirContainPackageJsonForNpmPackage(dir: FilePath): boolean {
+    const packageJson = resolve(dir, "package.json");
+    if (!existsSync(packageJson))
+        return false;
+    // if package exists, check if it is the correct one, i.e., that the name matches the directory name relative to node_modules
+    const nodeModulesDirString = `node_modules${sep}`;
+    const lastIndexOfNodeModules = dir.lastIndexOf(nodeModulesDirString);
+    if (lastIndexOfNodeModules === -1)
+        return true;
+    const lastNodeModulesPath = dir.substring(0, lastIndexOfNodeModules + nodeModulesDirString.length);
+    const expectedNameOfPackage = relative(lastNodeModulesPath, dir);
+    return getPackageJsonInfo(packageJson).name === expectedNameOfPackage;
 }
 
 /**
