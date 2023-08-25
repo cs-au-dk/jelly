@@ -840,3 +840,10 @@ test("tests/micro/for-in", async () => {
         reachableTotal: 3,
     });
 });
+
+test("tests/micro/wrong-package-json-found", async () => {
+    await runTest("tests/micro/wrong-package-json-found", "index.js", {
+        patterns: ["tests/micro/wrong-package-json-found/wrong-package-json-found-patterns.json"],
+        matches: {total: 1}
+    });
+});
