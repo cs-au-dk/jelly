@@ -66,7 +66,11 @@ function doesDirContainPackageJsonForNpmPackage(dir: FilePath): boolean {
         return true;
     const lastNodeModulesPath = dir.substring(0, lastIndexOfNodeModules + nodeModulesDirString.length);
     const expectedNameOfPackage = relative(lastNodeModulesPath, dir);
-    return getPackageJsonInfo(packageJson).name === expectedNameOfPackage;
+    return parsePackageJson(packageJson).name === expectedNameOfPackage;
+}
+
+function parsePackageJson(packageJson: FilePath) {
+    return JSON.parse(readFileSync(packageJson, {encoding: "utf8"}));
 }
 
 /**
@@ -78,7 +82,7 @@ export function getPackageJsonInfo(tofile: FilePath): PackageJsonInfo {
     let f;
     if (p) {
         try {
-            f = JSON.parse(readFileSync(p.packageJson, {encoding: "utf8"}));
+            f = parsePackageJson(p.packageJson);
         } catch {
             logger.warn(`Unable to parse ${p.packageJson}`);
         }

@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import {options} from "../options";
+import {options, setDefaultTrackedModules, setPatternProperties} from "../options";
 import {tapirLoadPatterns, tapirPatternMatch} from "../patternmatching/tapirpatterns";
 import {analyzeFiles} from "../analysis/analyzer";
 import assert from "assert";
@@ -12,6 +12,9 @@ import {getAPIUsage} from "../patternmatching/apiusage";
 import {FragmentState} from "../analysis/fragmentstate";
 import logger from "../misc/logger";
 import {compareCallGraphs} from "../output/compare";
+import {VulnerabilityDetector} from "../patternmatching/vulnerabilitydetector";
+import {getGlobs, getProperties} from "../patternmatching/patternloader";
+import {Vulnerability} from "../typings/vulnerabilities";
 
 export async function runTest(basedir: string,
                               app: string | Array<string>,
@@ -30,6 +33,8 @@ export async function runTest(basedir: string,
                                   reachableFound?: number,
                                   reachableTotal?: number,
                                   apiUsageAccessPathPatternsAtNodes?: number
+                                  vulnerabilities?: Vulnerability[],
+                                  vulnMatches?: number
                               }) {
     options.basedir = basedir;
     options.patterns = args.patterns;
@@ -50,6 +55,15 @@ export async function runTest(basedir: string,
 
     const files = Array.isArray(app) ? app : [app]
     const solver = new Solver();
+    let vulnerabilityDetector;
+    if (args.vulnerabilities) {
+        options.vulnerabilities = 'someFile'; // dummy value for the analysis to know that vulnerabilities is used
+        vulnerabilityDetector = new VulnerabilityDetector(args.vulnerabilities);
+        const qs = vulnerabilityDetector.getPatterns();
+        setDefaultTrackedModules(getGlobs(qs));
+        setPatternProperties(getProperties(qs));
+        solver.globalState.vulnerabilities = vulnerabilityDetector;
+    }
     await analyzeFiles(files, solver);
 
     let soundness;
@@ -110,6 +124,11 @@ export async function runTest(basedir: string,
             for (const ns of m.values())
                 numAccessPathPatternsAtNodes += ns.size;
         expect(numAccessPathPatternsAtNodes).toBe(args.apiUsageAccessPathPatternsAtNodes);
+    }
+    if (args.vulnMatches !== undefined) {
+        if (!vulnerabilityDetector) throw new Error("vulnMatches can only be checked if vulnerabilities has been given.");
+        const matches = vulnerabilityDetector.patternMatch(solver.fragmentState, undefined, solver.diagnostics)
+        expect(matches.size).toBe(args.vulnMatches);
     }
 }
 
