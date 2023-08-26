@@ -1,6 +1,7 @@
 import {options, resetOptions} from "../../src/options";
 import logger from "../../src/misc/logger";
 import {runTest} from "../../src/testing/runtest";
+import {Vulnerability} from "../../src/typings/vulnerabilities";
 
 beforeEach(() => {
     resetOptions();
@@ -842,8 +843,25 @@ test("tests/micro/for-in", async () => {
 });
 
 test("tests/micro/wrong-package-json-found", async () => {
+    const vulnerabilities: Vulnerability[] = [{
+        osv: {
+            cvss: {
+                score: 1,
+                vectorString: null
+            },
+            cwe: ['1'],
+            dependency: "terser",
+            name: "terser",
+            range: "<2.0.0",
+            severity: 'high',
+            source: 1,
+            title: "title",
+            url: 'url'
+        },
+        patterns: ["<terser>.minify"],
+    }];
     await runTest("tests/micro/wrong-package-json-found", "index.js", {
-        patterns: ["tests/micro/wrong-package-json-found/wrong-package-json-found-patterns.json"],
-        matches: {total: 1}
+        vulnerabilities,
+        vulnMatches: 1
     });
 });
