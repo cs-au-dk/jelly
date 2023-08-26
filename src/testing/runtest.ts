@@ -29,7 +29,7 @@ export async function runTest(basedir: string,
                                   reachableTotal?: number,
                                   apiUsageAccessPathPatternsAtNodes?: number
                                   vulnerabilities?: Vulnerability[],
-                                  vulnMatches?: number
+                                  vulnerabilitiesMatches?: number
                               }) {
     options.basedir = basedir;
     options.patterns = args.patterns;
@@ -100,10 +100,11 @@ export async function runTest(basedir: string,
                 numAccessPathPatternsAtNodes += ns.size;
         expect(numAccessPathPatternsAtNodes).toBe(args.apiUsageAccessPathPatternsAtNodes);
     }
-    if (args.vulnMatches !== undefined) {
-        if (!vulnerabilityDetector) throw new Error("vulnMatches can only be checked if vulnerabilities has been given.");
+    if (args.vulnerabilitiesMatches !== undefined) {
+        if (!vulnerabilityDetector)
+            throw new Error("vulnerabilitiesMatches can only be checked if vulnerabilities has been given.");
         const matches = vulnerabilityDetector.patternMatch(solver.fragmentState, undefined, solver.diagnostics)
-        expect(matches.size).toBe(args.vulnMatches);
+        expect(matches.size).toBe(args.vulnerabilitiesMatches);
     }
 }
 

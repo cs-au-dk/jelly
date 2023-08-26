@@ -336,9 +336,9 @@ test("tests/micro/low", async () => {
     })
 });
 
-test("tests/micro/Function.prototype.bind", async () => {
-    await runTest("tests/micro", "Function.prototype.bind.js", {
-        soundness: "tests/micro/Function.prototype.bind.json",
+test("tests/micro/bind", async () => {
+    await runTest("tests/micro", "bind.js", {
+        soundness: "tests/micro/bind.json",
         funFound: 1,
         funTotal: 1,
         callFound: 2,
@@ -348,9 +348,9 @@ test("tests/micro/Function.prototype.bind", async () => {
     });
 });
 
-test("tests/micro/Function.prototype.call", async () => {
-    await runTest("tests/micro", "Function.prototype.call.js", {
-        soundness: "tests/micro/Function.prototype.call.json",
+test("tests/micro/call", async () => {
+    await runTest("tests/micro", "call.js", {
+        soundness: "tests/micro/call.json",
         funFound: 1,
         funTotal: 1,
         callFound: 1,
@@ -842,7 +842,7 @@ test("tests/micro/for-in", async () => {
     });
 });
 
-test("tests/micro/wrong-package-json-found", async () => {
+test("tests/micro/packagejson", async () => {
     const vulnerabilities: Vulnerability[] = [{
         osv: {
             cvss: {
@@ -860,8 +860,8 @@ test("tests/micro/wrong-package-json-found", async () => {
         },
         patterns: ["<terser>.minify"],
     }];
-    await runTest("tests/micro/wrong-package-json-found", "index.js", {
+    await runTest("tests/micro/packagejson", "index.js", {
         vulnerabilities,
-        vulnMatches: 1
+        vulnerabilitiesMatches: 1
     });
 });

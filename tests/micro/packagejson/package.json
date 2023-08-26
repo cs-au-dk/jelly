@@ -1,0 +1,8 @@
+{
+  "name": "packagejson",
+  "version": "1.0.0",
+  "main": "index.js",
+  "dependencies": {
+    "terser": "^1.0.0"
+  }
+}
