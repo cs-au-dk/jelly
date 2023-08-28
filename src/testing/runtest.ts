@@ -62,7 +62,7 @@ export async function runTest(basedir: string,
         soundness = compareCallGraphs(
             args.soundness, "<computed>",
             new AnalysisStateReporter(solver.fragmentState).callGraphToJSON(files),
-            /* compareBothWays */ false,
+            false, true,
         );
 
     if (args.functionInfos !== undefined)

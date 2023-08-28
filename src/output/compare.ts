@@ -243,8 +243,13 @@ function computeReachableFunctions(file2: string, cg1: CallGraph, cg2: CallGraph
  * @param compareBothWays if true, reports missing objects in both directions, otherwise
  * only objects that are present in the "actual" call graph but missing in the "predicted"
  * call graph are reported
+ * @param compareReachability compare reachability as an additional call graph comparison metric
  */
-export function compareCallGraphs(file1: string, file2: string, cg2?: CallGraph, compareBothWays: boolean = true): {
+export function compareCallGraphs(
+    file1: string, file2: string, cg2?: CallGraph,
+    compareBothWays: boolean = true,
+    compareReachability: boolean = false,
+): {
     // number of actual function->function call edges matched
     fun2funFound: number,
     // total number of actual function->function call edges
@@ -282,7 +287,7 @@ export function compareCallGraphs(file1: string, file2: string, cg2?: CallGraph,
     const [foundCall2, totalCall2] = compareBothWays &&
         compareEdges(cg2.call2fun, cg1.call2fun, file2, file1, cg2, cg1, file1files!, "Call", "calls", ignores1) || [0, 0];
     // measure recall in terms of reachable functions
-    const [dcgReach, scgReach, comReach] = computeReachableFunctions(file2, cg1, cg2);
+    const [dcgReach, scgReach, comReach] = compareReachability && computeReachableFunctions(file2, cg1, cg2) || [0, 0, 0];
 
     const formatFraction = (num: number, den: number) => `${num}/${den}${den === 0? "" : ` (${percent(num / den)})`}`;
     if (compareBothWays)
@@ -293,9 +298,11 @@ export function compareCallGraphs(file1: string, file2: string, cg2?: CallGraph,
     logger.info(`Call->function edges in ${file1} that are also in ${file2}: ${formatFraction(foundCall1, totalCall1)}`);
     const {precision, recall} = compareCallSiteEdges(cg1, cg2, ignores1, ignores2);
     logger.info(`Per-call average precision: ${percent(precision)}, recall: ${percent(recall)}`);
-    if (compareBothWays)
-        logger.info(`Reachable functions in ${file2} that are also in ${file1}: ${formatFraction(comReach, scgReach)}`);
-    logger.info(`Functions in ${file1} that are reachable in ${file2}: ${formatFraction(comReach, dcgReach)}`);
+    if (compareReachability) {
+        if (compareBothWays)
+            logger.info(`Reachable functions in ${file2} that are also in ${file1}: ${formatFraction(comReach, scgReach)}`);
+        logger.info(`Functions in ${file1} that are reachable in ${file2}: ${formatFraction(comReach, dcgReach)}`);
+    }
 
     return {
         fun2funFound: foundFun1, fun2funTotal: totalFun1,
