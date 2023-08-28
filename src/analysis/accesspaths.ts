@@ -28,7 +28,7 @@ export class ModuleAccessPath extends AccessPath {
 
     constructor(moduleInfo: ModuleInfo | DummyModuleInfo, requireName: string) {
         const t = !"./#".includes(requireName[0]) && requireName !== moduleInfo.getOfficialName() ? requireName : undefined; // only use require name if not relative and different from official name
-        super(`<${moduleInfo.getOfficialName()}${t ? `(${t})` : ""}>`);
+        super(`<${moduleInfo.getOfficialName()}${moduleInfo instanceof ModuleInfo ? `@${moduleInfo.packageInfo.version}` : ''}${t ? `(${t})` : ""}>`);
         this.moduleInfo = moduleInfo;
         this.requireName = t;
     }
