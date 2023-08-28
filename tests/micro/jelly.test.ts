@@ -865,3 +865,27 @@ test("tests/micro/packagejson", async () => {
         vulnerabilitiesMatches: 1
     });
 });
+
+test("tests/micro/multiple-versions-of-package-only-one-vulnerable", async () => {
+    const vulnerabilities: Vulnerability[] = [{
+        osv: {
+            cvss: {
+                score: 1,
+                vectorString: null
+            },
+            cwe: ['1'],
+            dependency: "ansi-regex",
+            name: "ansi-regex",
+            range: ">=3.0.0",
+            severity: 'high',
+            source: 1,
+            title: "title",
+            url: 'url'
+        },
+        patterns: ["<ansi-regex>"],
+    }];
+    await runTest("tests/micro/multiple-versions-of-package-only-one-vulnerable", "index.js", {
+        vulnerabilities,
+        vulnerabilitiesMatches: 1
+    });
+});
