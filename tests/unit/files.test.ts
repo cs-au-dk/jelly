@@ -9,6 +9,7 @@ import {requireResolve} from "../../src/misc/files";
 import {options, resetOptions} from "../../src/options";
 import {FilePath} from "../../src/misc/util";
 import logger from "../../src/misc/logger";
+import {realpathSync} from "fs";
 
 describe("tests/unit/files/requireResolve", () => {
 	interface NestedDirectoryJSON {
@@ -443,6 +444,6 @@ describe("tests/unit/files/requireResolve", () => {
 
 		await f(basedir, vol);
 
-		return basedir;
+		return realpathSync(basedir);
 	}
 });
