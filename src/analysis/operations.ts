@@ -426,8 +426,8 @@ export class Operations {
             this.solver.addForAllConstraint(this.solver.varProducer.objPropVar(base, prop, "set"), TokenListener.ASSIGN_SETTER, node, writeToSetter);
 
         // values written to native object escape
-        if (base instanceof NativeObjectToken) // TODO: || base instanceof PackageObjectToken ?
-                this.solver.fragmentState.registerEscapingToExternal(src, escapeNode);
+        if (base instanceof NativeObjectToken && (base.moduleInfo || base.name === "globalThis")) // TODO: other natives? packageObjectTokens?
+            this.solver.fragmentState.registerEscapingToExternal(src, escapeNode);
 
         // if writing to module.exports, also write to %exports.default
         if (base instanceof NativeObjectToken && base.name === "module" && prop === "exports")
