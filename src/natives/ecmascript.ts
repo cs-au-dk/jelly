@@ -34,12 +34,12 @@ import {
     widenArgument,
     defineProperties
 } from "./nativehelpers";
-import {Token, PackageObjectToken, ObjectToken} from "../analysis/tokens";
+import {PackageObjectToken} from "../analysis/tokens";
 import {isExpression, isNewExpression, isStringLiteral} from "@babel/types";
 import {NativeFunctionParams, NativeModel, NativeModelParams} from "./nativebuilder";
 import {TokenListener} from "../analysis/listeners";
 import {options} from "../options";
-import {ObjectPropertyVarObj, isObjectProperyVarObj} from "../analysis/constraintvars";
+import {ObjectPropertyVarObj} from "../analysis/constraintvars";
 
 export const OBJECT_PROTOTYPE = "Object.prototype";
 export const ARRAY_PROTOTYPE = "Array.prototype";
@@ -1087,13 +1087,8 @@ export const ecmascriptModels: NativeModel = {
                                 return;
                             }
 
-                            obj = p.solver.globalState.canonicalizeToken(new ObjectToken(p.path.node, p.moduleInfo.packageInfo));
-
-                            // the returned object gets the object passed as 1st argument as prototype:
-                            p.solver.addForAllConstraint(p.op.expVar(args[0], p.path), TokenListener.NATIVE_OBJECT_CREATE, p.path.node, (t: Token) => {
-                                if (isObjectProperyVarObj(t))
-                                    p.solver.addInherits(obj, t);
-                            });
+                            // the returned object gets the object passed as 1st argument as prototype
+                            obj = newObject("Object", args[0], p);
                         } else
                             obj = p.op.packageObjectToken;
 
@@ -1108,11 +1103,7 @@ export const ecmascriptModels: NativeModel = {
                             // model the part of Object.create's logic that is similar to Object.defineProperties
                             const nodes = [p.path.node, args[0], args[1]];
                             const ivars = prepareDefineProperties("Object.create", args[1], nodes as any, p);
-                            if (ivars) {
-                                const enclosing = p.solver.globalState.getEnclosingFunctionOrModule(p.path, p.moduleInfo);
-                                for (const {prop, ac, ivar} of ivars)
-                                    p.op.writeProperty(ivar, obj, prop, p.path.node, enclosing, undefined, ac, false);
-                            }
+                            defineProperties(obj, TokenListener.NATIVE_OBJECT_CREATE, ivars, p);
                         }
                     }
                 },
@@ -1128,14 +1119,9 @@ export const ecmascriptModels: NativeModel = {
                             return;
                         }
 
-                        const obj = p.op.expVar(args[0], p.path);
-                        if (!obj)
-                            return;
-
                         const nodes = [p.path.node, args[0], args[1]];
                         const ivars = prepareDefineProperties("Object.defineProperties", args[1], nodes as any, p);
-                        if (ivars)
-                            defineProperties(obj, TokenListener.NATIVE_OBJECT_DEFINE_PROPERTIES, ivars, p);
+                        defineProperties(args[0], TokenListener.NATIVE_OBJECT_DEFINE_PROPERTIES, ivars, p);
                     }
                 },
                 {
@@ -1155,13 +1141,8 @@ export const ecmascriptModels: NativeModel = {
                             return;
                         }
 
-                        const obj = p.op.expVar(args[0], p.path);
-                        const descriptor = p.op.expVar(args[2], p.path);
-                        if (!obj || !descriptor)
-                            return;
-
-                        const ivars = prepareDefineProperty("Object.defineProperty", args[1].value, descriptor, args as any, p);
-                        defineProperties(obj, TokenListener.NATIVE_OBJECT_DEFINE_PROPERTY, ivars, p);
+                        const ivars = prepareDefineProperty("Object.defineProperty", args[1].value, args[2], args as any, p);
+                        defineProperties(args[0], TokenListener.NATIVE_OBJECT_DEFINE_PROPERTY, ivars, p);
                     }
                 },
                 {

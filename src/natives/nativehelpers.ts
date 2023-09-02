@@ -28,7 +28,7 @@ import {TokenListener} from "../analysis/listeners";
 import assert from "assert";
 import {NodePath} from "@babel/traverse";
 import {Operations} from "../analysis/operations";
-import {AccessorType, ConstraintVar, IntermediateVar, isObjectProperyVarObj} from "../analysis/constraintvars";
+import {AccessorType, IntermediateVar, ObjectPropertyVarObj, isObjectProperyVarObj} from "../analysis/constraintvars";
 import {locationToStringWithFile} from "../misc/util";
 
 /**
@@ -216,12 +216,18 @@ export function returnArgument(arg: Node, p: NativeFunctionParams) {
 /**
  * Creates a new AllocationSiteToken with the given kind and prototype.
  */
-export function newObject(kind: ObjectKind, proto: NativeObjectToken | PackageObjectToken, p: NativeFunctionParams): AllocationSiteToken {
+export function newObject(kind: ObjectKind, proto: NativeObjectToken | PackageObjectToken | Expression, p: NativeFunctionParams): AllocationSiteToken {
     const t = p.solver.globalState.canonicalizeToken(
         kind ==="Object" ? new ObjectToken(p.path.node, p.moduleInfo.packageInfo) :
             kind === "Array" ? new ArrayToken(p.path.node, p.moduleInfo.packageInfo) :
                 new AllocationSiteToken(kind, p.path.node, p.moduleInfo.packageInfo));
-    p.solver.addInherits(t, proto);
+    if (proto instanceof Token)
+        p.solver.addInherits(t, proto);
+    else
+        p.solver.addForAllConstraint(p.op.expVar(proto, p.path), TokenListener.NATIVE_25, p.path.node, (pt: Token) => {
+            if (isObjectProperyVarObj(pt))
+                p.solver.addInherits(t, pt);
+        });
     return t;
 }
 
@@ -904,16 +910,20 @@ type PreparedDefineProperty = {
  * that can be assigned (via subset edges) to properties of objects.
  * @param name the name of the native function that is modeled
  * @param prop the property name associated with the property descriptor
- * @param descriptor constraint variable for the property descriptor object
+ * @param descriptor expression for the property descriptor object
  * @param nodes 3 unique AST nodes to attach property reads to
  */
 export function prepareDefineProperty(
     name: "Object.defineProperty" | "Object.defineProperties" | "Object.create",
     prop: string,
-    descriptor: ConstraintVar,
+    descriptor: Expression,
     nodes: [Node, Node, Node],
     p: NativeFunctionParams,
 ): Array<PreparedDefineProperty> {
+    const dvar = p.op.expVar(descriptor, p.path);
+    if (!dvar)
+        return [];
+
     // FIXME: we want to read 3 properties from the descriptor object at the same AST node.
     // this is not possible as the (constraintvar, listenerID, AST node) tuple needs to be
     // unique for each readProperty operation.
@@ -921,7 +931,7 @@ export function prepareDefineProperty(
     const enclosing = p.solver.globalState.getEnclosingFunctionOrModule(p.path, p.moduleInfo);
     return (["value", "get", "set"] as const).map((descriptorProp, i) => {
         const ivar = p.solver.varProducer.intermediateVar(p.path.node, `${name} (${prop}.${descriptorProp})`);
-        p.op.readProperty(descriptor, descriptorProp, ivar, nodes[i], enclosing);
+        p.op.readProperty(dvar, descriptorProp, ivar, nodes[i], enclosing);
         return {prop, ac: descriptorProp === "value"? "normal" : descriptorProp, ivar};
     });
 }
@@ -939,7 +949,7 @@ export function prepareDefineProperties(
     props: Expression,
     nodes: [Node, Node, Node],
     p: NativeFunctionParams,
-): Array<PreparedDefineProperty> | undefined {
+): Array<PreparedDefineProperty> {
     // TODO: modeling this operation for non-literal expressions requires
     // either a new kind of pair constraint or a way to generate listener IDs
     // based on the property that is defined. currently we can have at most
@@ -947,7 +957,7 @@ export function prepareDefineProperties(
     // number of (unique) properties on objects flowing to the props expression
     if (!isObjectExpression(props)) {
         warnNativeUsed(name, p, "with non-object expression");
-        return undefined;
+        return [];
     }
 
     return props.properties.flatMap((oprop) => {
@@ -965,30 +975,37 @@ export function prepareDefineProperties(
         if (!isExpression(oprop.value))
             assert.fail(`Unexpected Property value type ${oprop.value?.type} at ${locationToStringWithFile(oprop.loc)}`);
 
-        const descriptor = p.op.expVar(oprop.value, p.path);
-        return !descriptor? [] :
-            prepareDefineProperty(name, key, descriptor, nodes, p);
+        return prepareDefineProperty(name, key, oprop.value, nodes, p);
     });
 }
 
 /*
  * Assigns values collected from property descriptors to the objects in the given constraint variable.
- * @param obj the variable that holds objects that properties should be written to
+ * @param obj the object token or the expression that holds objects that properties should be written to
  * @param key TokenListener to use for the constraint
  * @param ivars prepared values from property descriptors
  */
 export function defineProperties(
-    obj: ConstraintVar,
+    obj: Expression | ObjectPropertyVarObj,
     key: TokenListener,
     ivars: Array<PreparedDefineProperty>,
     p: NativeFunctionParams,
 ) {
-    const enclosing = p.solver.globalState.getEnclosingFunctionOrModule(p.path, p.moduleInfo);
-    p.solver.addForAllConstraint(obj, key, p.path.node, (t: Token) => {
-        if (!isObjectProperyVarObj(t))
-            return;
+    if (ivars.length === 0)
+        return;
 
+    const enclosing = p.solver.globalState.getEnclosingFunctionOrModule(p.path, p.moduleInfo);
+
+    function write(t: ObjectPropertyVarObj) {
         for (const {prop, ac, ivar} of ivars)
             p.op.writeProperty(ivar, t, prop, p.path.node, enclosing, undefined, ac, false);
-    });
+    }
+
+    if (obj instanceof Token)
+        write(obj);
+    else
+        p.solver.addForAllConstraint(p.op.expVar(obj, p.path), key, p.path.node, (t: Token) => {
+            if (isObjectProperyVarObj(t))
+                write(t);
+        });
 }
