@@ -6,6 +6,14 @@ export interface AnalysisDiagnostics {
 
     functions: number;
 
+    vars: number;
+
+    listeners: number;
+
+    tokens: number;
+
+    subsetEdges: number;
+
     functionToFunctionEdges: number;
 
     iterations: number;

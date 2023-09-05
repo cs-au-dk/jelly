@@ -75,6 +75,10 @@ export default class Solver {
         packages: 0,
         modules: 0,
         functions: 0,
+        vars: 0,
+        listeners: 0,
+        tokens: 0,
+        subsetEdges: 0,
         functionToFunctionEdges: 0,
         iterations: 0,
         uniqueTokens: 0,
@@ -108,6 +112,10 @@ export default class Solver {
         const f = this.fragmentState;
         const d = this.diagnostics;
         d.functions = a.functionInfos.size;
+        d.vars = f.getNumberOfVarsWithTokens();
+        d.listeners = this.listeners.size;
+        d.tokens = f.numberOfTokens;
+        d.subsetEdges = f.numberOfSubsetEdges;
         d.functionToFunctionEdges = f.numberOfFunctionToFunctionEdges;
         d.uniqueTokens = f.a.canonicalTokens.size;
         d.maxMemoryUsage = Math.max(d.maxMemoryUsage, getMemoryUsage());
