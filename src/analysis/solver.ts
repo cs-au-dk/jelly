@@ -15,6 +15,7 @@ import {
     mapGetSet,
     mapMapMapSetAll,
     mapMapSetAll,
+    mapMapSize,
     mapSetAddAll,
     nodeToString,
     setAll
@@ -113,7 +114,10 @@ export default class Solver {
         const d = this.diagnostics;
         d.functions = a.functionInfos.size;
         d.vars = f.getNumberOfVarsWithTokens();
-        d.listeners = this.listeners.size;
+        d.listeners = [
+            f.tokenListeners, f.pairListeners1, f.pairListeners2, f.packageNeighborListeners,
+            f.ancestorListeners, f.arrayEntriesListeners, f.objectPropertiesListeners,
+        ].reduce((acc, l: Map<Object, Map<Object, Object>>) => acc + mapMapSize(l), 0);
         d.tokens = f.numberOfTokens;
         d.subsetEdges = f.numberOfSubsetEdges;
         d.functionToFunctionEdges = f.numberOfFunctionToFunctionEdges;
