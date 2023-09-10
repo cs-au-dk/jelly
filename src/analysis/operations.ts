@@ -44,7 +44,7 @@ import {
     PackageObjectToken,
     Token
 } from "./tokens";
-import {AccessorType, ArgumentsVar, ConstraintVar, IntermediateVar, isObjectProperyVarObj, NodeVar, ObjectPropertyVarObj} from "./constraintvars";
+import {AccessorType, ConstraintVar, IntermediateVar, isObjectProperyVarObj, NodeVar, ObjectPropertyVarObj} from "./constraintvars";
 import {
     CallResultAccessPath,
     IgnoredAccessPath,
@@ -206,10 +206,8 @@ export class Operations {
                 if (!isParentExpressionStatement(pars))
                     this.solver.addSubsetConstraint(vp.returnVar(t.fun), resultVar);
                 // constraint: ...: t_arguments ∈ ⟦t_arguments⟧ if the function uses 'arguments'
-                if (hasArguments) {
-                    const argumentsVar = this.a.canonicalizeVar(new ArgumentsVar(t.fun));
-                    this.solver.addTokenConstraint(argumentsToken!, argumentsVar);
-                }
+                if (hasArguments)
+                    this.solver.addTokenConstraint(argumentsToken!, vp.argumentsVar(t.fun));
 
             } else if (t instanceof NativeObjectToken) {
                 f.registerCall(pars.node, this.moduleInfo, {native: true});
@@ -330,11 +328,12 @@ export class Operations {
 
                         if (t2 instanceof PackageObjectToken) {
                             // TODO: also reading from neighbor packages if t2 is a PackageObjectToken...
-                            this.solver.addForAllPackageNeighborsConstraint(t2.packageInfo, node, (neighbor: PackageInfo) => {
-                                if (dst)
-                                    this.solver.addSubsetConstraint(this.solver.varProducer.packagePropVar(neighbor, prop), dst); // TODO: exclude AccessPathTokens?
-                                this.solver.addForAllConstraint(this.solver.varProducer.packagePropVar(neighbor, prop, "get"), TokenListener.READ_PROPERTY_GETTER2, node, readFromGetter);
-                            });
+                            if (options.readNeighbors)
+                                this.solver.addForAllPackageNeighborsConstraint(t2.packageInfo, node, (neighbor: PackageInfo) => { // TODO: also use t2.kind
+                                    if (dst)
+                                        this.solver.addSubsetConstraint(this.solver.varProducer.packagePropVar(neighbor, prop), dst); // TODO: exclude AccessPathTokens?
+                                    this.solver.addForAllConstraint(this.solver.varProducer.packagePropVar(neighbor, prop, "get"), TokenListener.READ_PROPERTY_GETTER2, node, readFromGetter);
+                                });
 
                         } else if (t2 instanceof ArrayToken) {
                             if (isArrayIndex(prop)) {

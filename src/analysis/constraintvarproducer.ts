@@ -96,7 +96,7 @@ export class ConstraintVarProducer {
         } else {
             if (id.name === "arguments") {
                 const fun = this.f.registerArguments(path);
-                return fun ? this.a.canonicalizeVar(new ArgumentsVar(fun)) : this.nodeVar(id); // using the identifier itself as fallback if no enclosing function
+                return fun ? this.argumentsVar(fun) : this.nodeVar(id); // using the identifier itself as fallback if no enclosing function
             } else {
                 const ps = path.scope.getProgramParent();
                 d = ps.getBinding(id.name)?.identifier;
@@ -149,6 +149,13 @@ export class ConstraintVarProducer {
      */
     thisVar(fun: Function): ThisVar {
         return this.a.canonicalizeVar(new ThisVar(fun));
+    }
+
+    /**
+     * Finds the constraint variable representing 'arguments' for the given function.
+     */
+    argumentsVar(fun: Function): ArgumentsVar {
+        return this.a.canonicalizeVar(new ArgumentsVar(fun));
     }
 
     /**

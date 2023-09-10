@@ -62,7 +62,8 @@ program
     // .option("--bottom-up", "analyze bottom-up in package dependency structure") // TODO: bottom-up analysis disabled for now
     .option("--no-alloc", "disable light-weight allocation site abstraction")
     .option("--no-widening", "disable widening")
-    .option("--no-patch-dynamics", "disable patching of dynamic property accesses")
+    .option("--no-patch-dynamics", "disable dynamic property access heuristic")
+    .option("--no-read-neighbors", "disable package neighbor heuristic")
     .option("--no-cycle-elimination", "disable cycle elimination")
     .option("--no-natives", "disable nonessential models of native libraries")
     .option("--skip-graal-test", "skip graal-nodejs test (use with -d)")

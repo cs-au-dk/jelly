@@ -456,8 +456,10 @@ export default class Solver {
      * By default also notifies listeners.
      */
     addPackageNeighbor(k1: PackageInfo, k2: PackageInfo, propagate: boolean = true) {
-        this.addPackageNeighborPrivate(k1, k2, propagate);
-        this.addPackageNeighborPrivate(k2, k1, propagate);
+        if (options.readNeighbors) {
+            this.addPackageNeighborPrivate(k1, k2, propagate);
+            this.addPackageNeighborPrivate(k2, k1, propagate);
+        }
     }
 
     private addPackageNeighborPrivate(k: PackageInfo, neighbor: PackageInfo, propagate: boolean = true) {
@@ -684,7 +686,7 @@ export default class Solver {
      * @param base the constraint variable for the base expression
      * @param pck the current package object token
      */
-    collectPropertyRead(result: ConstraintVar | undefined, base: ConstraintVar | undefined, pck: PackageObjectToken, prop: string | undefined) {
+    collectPropertyRead(result: ConstraintVar | undefined, base: ConstraintVar | undefined, pck: PackageObjectToken, prop: string | undefined) { // TODO: rename to registerPropertyRead, move to FragmentState
         if (result && base)
             this.fragmentState.maybeEmptyPropertyReads.push({result, base, pck, prop});
     }
@@ -693,7 +695,7 @@ export default class Solver {
      * Collects dynamic property write operations.
      * @param base the constraint variable for the base expression
      */
-    collectDynamicPropertyWrite(base: ConstraintVar | undefined) {
+    collectDynamicPropertyWrite(base: ConstraintVar | undefined) { // TODO: rename to registerDynamicPropertyWrite, move to FragmentState
         if (base)
             this.fragmentState.dynamicPropertyWrites.add(base);
     }
@@ -1014,7 +1016,7 @@ export default class Solver {
     /**
      * Merges the given fragment state into the current fragment state.
      */
-    merge(s: FragmentState, propagate: boolean = true) { // TODO: reconsider use of 'propagate' flag
+    merge(s: FragmentState, propagate: boolean) { // TODO: reconsider use of 'propagate' flag
         const f = this.fragmentState;
         // merge redirections
         if (options.cycleElimination)

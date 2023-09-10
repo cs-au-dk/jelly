@@ -588,10 +588,11 @@ export function visit(ast: File, op: Operations) {
                     for (const imp of path.node.specifiers)
                         if (isImportSpecifier(imp) || isImportDefaultSpecifier(imp)) {
                             const prop = getImportName(imp);
+                            const dst = solver.varProducer.nodeVar(imp.local);
                             if (t instanceof AllocationSiteToken || t instanceof FunctionToken || t instanceof NativeObjectToken || t instanceof PackageObjectToken)
-                                solver.addSubsetConstraint(solver.varProducer.objPropVar(t, prop), solver.varProducer.nodeVar(imp.local));
+                                solver.addSubsetConstraint(solver.varProducer.objPropVar(t, prop), dst);
                             else if (t instanceof AccessPathToken) // TODO: treat as object along with other tokens above?
-                                solver.addAccessPath(new PropertyAccessPath(solver.varProducer.nodeVar(path.node), prop), solver.varProducer.nodeVar(imp.local), t.ap); // TODO: describe this constraint...
+                                solver.addAccessPath(new PropertyAccessPath(solver.varProducer.nodeVar(path.node), prop), dst, t.ap); // TODO: describe this constraint...
                         }
                 });
             }
