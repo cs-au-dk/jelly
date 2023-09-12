@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     apt-get autoremove -y && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
-ARG NODE_VERSION=18.17.0
+ARG NODE_VERSION=18.17.1
 ARG NODE_PACKAGE=node-v${NODE_VERSION}-linux
 RUN arch="$(dpkg --print-architecture)"; \
         case "$arch" in \
@@ -20,23 +20,26 @@ RUN arch="$(dpkg --print-architecture)"; \
     \
     wget -c https://nodejs.org/dist/v$NODE_VERSION/$NODE_PACKAGE-$ARCH.tar.gz -O -| tar -xzC /tools/ && \
     mv /tools/$NODE_PACKAGE-$ARCH /tools/node && \
-    PATH="/tools/node/bin:$PATH" npm install -g "npm@>=9.8.0"
+    PATH="/tools/node/bin:$PATH" npm install -g "npm@^9.8.0"
+    # GraalJS uses Node 16 which is not supported by npm v10
 
 FROM ubuntu:20.04 as nodeprof-builder
 WORKDIR /tools
 
 # install GraalVM JavaScript and NodeProf
 RUN apt-get update && apt-get install -y git gcc g++ make python3 python3-pip && pip3 install ninja_syntax
-RUN git clone --depth=1 --branch 6.0.4 https://github.com/graalvm/mx.git
-RUN /tools/mx/mx fetch-jdk --java-distribution labsjdk-ce-17
-RUN mv /root/.mx/jdks/labsjdk-ce-17-* /tools/jdk
+RUN git clone --depth=1 --branch 6.42.0 https://github.com/graalvm/mx.git
+RUN /tools/mx/mx fetch-jdk --java-distribution labsjdk-ce-17 --to /tools --alias jdk
 ENV JAVA_HOME=/tools/jdk
-RUN git clone --depth=1 https://github.com/Haiyang-Sun/nodeprof.js.git
+# set up a specific version of nodeprof.js
 WORKDIR /tools/nodeprof.js
+RUN git init && \
+    git remote add origin https://github.com/Haiyang-Sun/nodeprof.js.git && \
+    git fetch origin edc3be9ea55b4fa59bb26c74e7f0d29602556c56 && \
+    git reset --hard FETCH_HEAD
 RUN /tools/mx/mx sforceimports
 RUN /tools/mx/mx build
 RUN /tools/mx/mx --dy /compiler build
-ENV GRAAL_HOME=/tools/graal/sdk/latest_graalvm_home
 
 FROM ubuntu:20.04
 RUN mkdir -p /usr/lib/jvm
@@ -47,7 +50,7 @@ ENV NODE_PATH /opt/node/lib/node_modules
 ENV PATH /opt/node/bin:$PATH
 ENV JAVA_HOME=/usr/lib/jvm/jdk
 ENV GRAAL_HOME=/usr/lib/jvm/graalvm
-ENV NODE_OPTIONS --max-old-space-size=8000
+ENV NODE_OPTIONS --max-old-space-size=8192
 ENV NODE_ENV production
 
 # install Jelly files built locally
