@@ -62,8 +62,7 @@ export async function runTest(basedir: string,
         soundness = compareCallGraphs(
             args.soundness, "<computed>",
             new AnalysisStateReporter(solver.fragmentState).callGraphToJSON(files),
-            false, true,
-        );
+            false, true);
 
     if (args.functionInfos !== undefined)
         expect(solver.globalState.functionInfos.size).toBe(args.functionInfos);

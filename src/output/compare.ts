@@ -248,7 +248,7 @@ function computeReachableFunctions(file2: string, cg1: CallGraph, cg2: CallGraph
 export function compareCallGraphs(
     file1: string, file2: string, cg2?: CallGraph,
     compareBothWays: boolean = true,
-    compareReachability: boolean = false,
+    compareReachability: boolean = false
 ): {
     // number of actual function->function call edges matched
     fun2funFound: number,
