@@ -1058,9 +1058,11 @@ export const ecmascriptModels: NativeModel = {
         {
             name: "Object",
             invoke: (p: NativeFunctionParams) => {
-                if (p.path.node.arguments.length > 0)
-                    warnNativeUsed("Object", p, "with arguments"); // TODO
-                returnPackageObject(p);
+                // Object(...) can return primitive wrapper objects, but they are not relevant
+                returnToken(
+                    !options.alloc? p.op.packageObjectToken :
+                    newObject("Object", p.globalSpecialNatives.get(OBJECT_PROTOTYPE)!, p), p);
+                returnArgument(p.path.node.arguments[0], p);
             },
             staticMethods: [
                 {

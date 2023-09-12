@@ -434,6 +434,22 @@ test("tests/micro/obj", async () => {
     });
 });
 
+test("tests/micro/obj2", async () => {
+    await runTest("tests/micro", "obj2.js", {
+        soundness: "tests/micro/obj2.json",
+        functionInfos: 2,
+        moduleInfos: 1,
+        numberOfFunctionToFunctionEdges: 2,
+        oneCalleeCalls: 5,
+        funFound: 2,
+        funTotal: 2,
+        callFound: 5,
+        callTotal: 5,
+        reachableFound: 3,
+        reachableTotal: 3,
+    });
+});
+
 test("tests/micro/mix", async () => {
     await runTest("tests/micro", "mix.js", {
         soundness: "tests/micro/mix.json",
