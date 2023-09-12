@@ -298,7 +298,7 @@ export class Operations {
      * @param enclosing enclosing function/module of the AST node
      */
     readProperty(base: ConstraintVar | undefined, prop: string | undefined, dst: ConstraintVar | undefined, node: Node, enclosing: FunctionInfo | ModuleInfo) {
-        this.solver.collectPropertyRead(dst, base, this.packageObjectToken);
+        this.solver.collectPropertyRead(dst, base, this.packageObjectToken, prop);
 
         // expression E.p or E["p"] or E[i]
         if (prop !== undefined) {

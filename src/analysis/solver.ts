@@ -672,9 +672,9 @@ export default class Solver {
      * @param base the constraint variable for the base expression
      * @param pck the current package object token
      */
-    collectPropertyRead(result: ConstraintVar | undefined, base: ConstraintVar | undefined, pck: PackageObjectToken) {
+    collectPropertyRead(result: ConstraintVar | undefined, base: ConstraintVar | undefined, pck: PackageObjectToken, prop: string | undefined) {
         if (result && base)
-            this.fragmentState.maybeEmptyPropertyReads.push({result, base, pck});
+            this.fragmentState.maybeEmptyPropertyReads.push({result, base, pck, prop});
     }
 
     /**

@@ -285,7 +285,7 @@ export class FragmentState {
     /**
      * Property reads that may have empty result.
      */
-    maybeEmptyPropertyReads: Array<{result: ConstraintVar, base: ConstraintVar, pck: PackageObjectToken}> = [];
+    maybeEmptyPropertyReads: Array<{result: ConstraintVar, base: ConstraintVar, pck: PackageObjectToken, prop: string | undefined}> = [];
 
     /**
      * Dynamic property writes.

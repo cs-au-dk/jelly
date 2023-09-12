@@ -316,7 +316,7 @@ async function patchDynamics(solver: Solver) {
     let count = 0;
     const r: typeof f.maybeEmptyPropertyReads = [];
     for (const e of f.maybeEmptyPropertyReads) {
-        const {result, base, pck} = e;
+        const {result, base, pck/*, prop*/} = e;
         const bs = f.getTokens(f.getRepresentative(base));
         const [size] = f.getTokensSize(f.getRepresentative(result));
         if (size === 0) {
@@ -333,6 +333,21 @@ async function patchDynamics(solver: Solver) {
                 // constraint: ...: @Unknown ∈ ⟦E⟧ and k ∈ ⟦E.p⟧ (or ⟦E[..]⟧) where k is the package containing the property read operation
                 solver.addAccessPath(UnknownAccessPath.instance, base);
                 solver.addTokenConstraint(pck, result); // TODO: omit?
+
+                // TODO: enable extra patching for exports properties?
+                /*
+                // constraint: ...: ⟦%exports[m].p⟧ ⊆ ⟦E⟧ for each module m in the current package or a neighbor package
+                if (prop !== undefined)
+                    for (const p of [pck.packageInfo, ...f.packageNeighbors.get(pck.packageInfo) ?? []]) {
+                        for (const m of p.modules.values()) {
+                            const t = f.a.canonicalizeToken(new NativeObjectToken("exports", m));
+                            const v = f.getRepresentative(solver.varProducer.objPropVar(t, prop));
+                            if (f.vars.has(v))
+                                solver.addSubsetConstraint(v, result);
+                        }
+                    }
+                 */
+
                 count++;
             } else
                 r.push(e); // keep only the property reads that are still empty
