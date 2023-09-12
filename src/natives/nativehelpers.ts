@@ -437,7 +437,7 @@ export function invokeCallback(kind: CallbackKind, p: NativeFunctionParams, arg:
                         // TODO: array functions are generic (can be applied to any array-like object, including strings), can also be sub-classed
                         break;
                     case "Array.prototype.reduce":
-                    case "Array.prototype.reduceRight":
+                    case "Array.prototype.reduceRight": {
                         // write array elements to param2
                         if (param2) {
                             p.solver.addSubsetConstraint(vp.arrayValueVar(bt), vp.nodeVar(param2));
@@ -445,18 +445,29 @@ export function invokeCallback(kind: CallbackKind, p: NativeFunctionParams, arg:
                                 p.solver.addSubsetConstraint(p.solver.varProducer.objPropVar(bt, prop), p.solver.varProducer.nodeVar(param2)));
                         }
                         p.solver.addSubsetConstraint(baseVar, vp.nodeVar(param4));
-                        // bind initialValue to previousValue
+
+                        const resultVar = vp.expVar(p.path.node, p.path);
                         if (args.length > 1 && isExpression(args[1])) { // TODO: SpreadElement
-                            const thisArgVar = vp.expVar(args[1], p.path);
-                            p.solver.addSubsetConstraint(thisArgVar, vp.nodeVar(param1));
+                            // bind initialValue to previousValue and resultVar
+                            const arg1Var = vp.expVar(args[1], p.path);
+                            p.solver.addSubsetConstraint(arg1Var, vp.nodeVar(param1));
+                            p.solver.addSubsetConstraint(arg1Var, resultVar);
+                        } else if (args.length === 1) {
+                            // initialValue is bt[0]
+                            p.solver.addSubsetConstraint(vp.arrayValueVar(bt), vp.nodeVar(param1));
+                            p.solver.addSubsetConstraint(vp.objPropVar(bt, "0"), vp.nodeVar(param1));
+                            p.solver.addSubsetConstraint(vp.arrayValueVar(bt), resultVar);
+                            p.solver.addSubsetConstraint(vp.objPropVar(bt, "0"), resultVar);
                         }
+
                         // connect callback return value to previousValue and to result
                         if (ft instanceof FunctionToken) {
                             const retVar = vp.returnVar(ft.fun);
                             p.solver.addSubsetConstraint(retVar, vp.nodeVar(param1));
-                            p.solver.addSubsetConstraint(retVar, vp.expVar(p.path.node, p.path));
+                            p.solver.addSubsetConstraint(retVar, resultVar);
                         }
                         break;
+                    }
                     case "Array.prototype.sort":
                         // write array elements to param1 and param2 and to the array
                         if (bt instanceof ArrayToken && ft instanceof FunctionToken) { // TODO: currently limited support for generic array methods

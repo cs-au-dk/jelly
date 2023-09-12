@@ -57,13 +57,6 @@ export async function runTest(basedir: string,
     }
     await analyzeFiles(files, solver);
 
-    let soundness;
-    if (args.soundness)
-        soundness = compareCallGraphs(
-            args.soundness, "<computed>",
-            new AnalysisStateReporter(solver.fragmentState).callGraphToJSON(files),
-            false, true);
-
     if (args.functionInfos !== undefined)
         expect(solver.globalState.functionInfos.size).toBe(args.functionInfos);
     if (args.moduleInfos !== undefined)
@@ -72,18 +65,26 @@ export async function runTest(basedir: string,
         expect(solver.fragmentState.numberOfFunctionToFunctionEdges).toBe(args.numberOfFunctionToFunctionEdges);
     if (args.oneCalleeCalls !== undefined)
         expect(new AnalysisStateReporter(solver.fragmentState).getOneCalleeCalls()).toBe(args.oneCalleeCalls);
-    if (args.funFound !== undefined)
-        expect(soundness?.fun2funFound).toBe(args.funFound);
-    if (args.funTotal !== undefined)
-        expect(soundness?.fun2funTotal).toBe(args.funTotal);
-    if (args.callFound !== undefined)
-        expect(soundness?.call2funFound).toBe(args.callFound);
-    if (args.callTotal !== undefined)
-        expect(soundness?.call2funTotal).toBe(args.callTotal);
-    if (args.reachableFound !== undefined)
-        expect(soundness?.reachableFound).toBe(args.reachableFound);
-    if (args.reachableTotal !== undefined)
-        expect(soundness?.reachableTotal).toBe(args.reachableTotal);
+
+    if (args.soundness) {
+        const soundness = compareCallGraphs(
+            args.soundness, "<computed>",
+            new AnalysisStateReporter(solver.fragmentState).callGraphToJSON(files),
+            false, true);
+
+        if (args.funTotal !== undefined)
+            expect(soundness.fun2funTotal).toBe(args.funTotal);
+        if (args.callTotal !== undefined)
+            expect(soundness.call2funTotal).toBe(args.callTotal);
+        if (args.reachableTotal !== undefined)
+            expect(soundness.reachableTotal).toBe(args.reachableTotal);
+
+        // unless the args specify something else, assume that we want full soundness
+        expect(soundness.fun2funFound).toBe(args.funFound ?? soundness.fun2funTotal);
+        expect(soundness.call2funFound).toBe(args.callFound ?? soundness.call2funTotal);
+        expect(soundness.reachableFound).toBe(args.reachableFound ?? soundness.reachableTotal);
+    }
+
     if (args.matches) {
         assert(tapirPatterns !== undefined && detectionPatterns !== undefined);
         const {matches, matchesLow} = tapirPatternMatch(tapirPatterns, detectionPatterns, solver);

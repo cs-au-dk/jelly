@@ -245,6 +245,16 @@ test("tests/micro/arrays2", async () => {
     });
 });
 
+test("tests/micro/arrays3", async () => {
+    await runTest("tests/micro", "arrays3.js", {
+        soundness: "tests/micro/arrays3.json",
+        functionInfos: 6,
+        moduleInfos: 1,
+        numberOfFunctionToFunctionEdges: 6,
+        oneCalleeCalls: 6,
+    });
+});
+
 test("tests/micro/iterators", async () => {
     await runTest("tests/micro", "iterators.js", {
         soundness: "tests/micro/iterators.json",
