@@ -44,7 +44,7 @@ import {
     PackageObjectToken,
     Token
 } from "./tokens";
-import {ArgumentsVar, ConstraintVar, IntermediateVar, NodeVar} from "./constraintvars";
+import {AccessorType, ArgumentsVar, ConstraintVar, IntermediateVar, isObjectProperyVarObj, NodeVar, ObjectPropertyVarObj} from "./constraintvars";
 import {
     CallResultAccessPath,
     IgnoredAccessPath,
@@ -391,6 +391,50 @@ export class Operations {
     }
 
     /**
+     * Models writing a property to an object.
+     * @param src constraint variable representing the value to be written
+     * @param base token representing the object that is written to
+     * @param prop property name
+     * @param node AST node where the operation occurs (used for constraint keys etc.)
+     * @param enclosing enclosing function/module of the AST node
+     * @param escapeNode AST node for 'registerEscapingToExternal' (defaults to node)
+     * @param ac describes the type of property that is written to
+     * @param invokeSetters if true, models invocation of setters (i.e. the [[Set]] internal method is modeled instead of [[DefineOwnPropery]])
+     */
+    writeProperty(
+        src: ConstraintVar | undefined, base: ObjectPropertyVarObj, prop: string,
+        node: Node, enclosing: FunctionInfo | ModuleInfo, escapeNode: Node = node,
+        ac: AccessorType = "normal", invokeSetters: boolean = true,
+    ) {
+        const writeToSetter = (t: Token) => {
+            if (t instanceof FunctionToken && t.fun.params.length === 1) {
+                this.solver.addSubsetConstraint(src, this.solver.varProducer.nodeVar(t.fun.params[0]));
+                if (this.solver.fragmentState.functionsWithThis.has(t.fun))
+                    this.solver.addTokenConstraint(base, this.solver.varProducer.thisVar(t.fun));
+                this.solver.fragmentState.registerCall(node, this.moduleInfo, {accessor: true});
+                this.solver.fragmentState.registerCallEdge(node, enclosing, this.a.functionInfos.get(t.fun)!, {accessor: true});
+            }
+        }
+
+        // FIXME: special treatment of writes to "prototype" and "__proto__"
+
+        // constraint: ...: ⟦E2⟧ ⊆ ⟦base.p⟧
+        this.solver.addSubsetConstraint(src, this.solver.varProducer.objPropVar(base, prop, ac));
+
+        if (invokeSetters)
+            // constraint: ...: ∀ functions t2 ∈ ⟦(set)base.p⟧: ⟦E2⟧ ⊆ ⟦x⟧ where x is the parameter of t2
+            this.solver.addForAllConstraint(this.solver.varProducer.objPropVar(base, prop, "set"), TokenListener.ASSIGN_SETTER, node, writeToSetter);
+
+        // values written to native object escape
+        if (base instanceof NativeObjectToken) // TODO: || base instanceof PackageObjectToken ?
+                this.solver.fragmentState.registerEscapingToExternal(src, escapeNode);
+
+        // if writing to module.exports, also write to %exports.default
+        if (base instanceof NativeObjectToken && base.name === "module" && prop === "exports")
+            this.solver.addSubsetConstraint(src, this.solver.varProducer.objPropVar(this.moduleSpecialNatives.get("exports")!, "default", ac));
+    }
+
+    /**
      * Models 'require' and 'import'.
      * If path denotes an ExportDeclaration, no constraints are generated.
      * Returns the module info object, or undefined if not available.
@@ -486,41 +530,13 @@ export class Operations {
             const lVar = this.expVar(dst.object, path);
             const prop = getProperty(dst);
             if (prop !== undefined) {
-
-                // E1.p = E2
-
-                const writeToSetter = (t: Token) => {
-                    if (t instanceof FunctionToken && t.fun.params.length === 1) {
-                        this.solver.addSubsetConstraint(src, this.solver.varProducer.nodeVar(t.fun.params[0]));
-                        if (this.solver.fragmentState.functionsWithThis.has(t.fun))
-                            this.solver.addSubsetConstraint(lVar, this.solver.varProducer.thisVar(t.fun));
-                        this.solver.fragmentState.registerCall(path.node, this.moduleInfo, {accessor: true});
-                        this.solver.fragmentState.registerCallEdge(path.node, this.a.getEnclosingFunctionOrModule(path, this.moduleInfo), this.a.functionInfos.get(t.fun)!, {accessor: true});
-                    }
-                }
+                // E1.prop = E2
 
                 // constraint: ∀ objects t ∈ ⟦E1⟧: ...
                 this.solver.addForAllConstraint(lVar, TokenListener.ASSIGN_MEMBER_BASE, dst, (t: Token) => {
-                    if (t instanceof AllocationSiteToken || t instanceof FunctionToken || t instanceof NativeObjectToken || t instanceof PackageObjectToken) {
-
-                        // FIXME: special treatment of writes to "prototype" and "__proto__"
-
-                        // constraint: ...: ⟦E2⟧ ⊆ ⟦t.p⟧
-                        this.solver.addSubsetConstraint(src, this.solver.varProducer.objPropVar(t, prop));
-
-                        // constraint: ...: ∀ functions t2 ∈ ⟦(set)t.p⟧: ⟦E2⟧ ⊆ ⟦x⟧ where x is the parameter of t2
-                        this.solver.addForAllConstraint(this.solver.varProducer.objPropVar(t, prop, "set"), TokenListener.ASSIGN_SETTER, dst, writeToSetter);
-
-                        // values written to native object escape
-                        if (t instanceof NativeObjectToken) // TODO: || t instanceof PackageObjectToken ?
-                            this.solver.fragmentState.registerEscapingToExternal(src, path.node);
-
-                        // if writing to module.exports, also write to %exports.default
-                        if (t instanceof NativeObjectToken && t.name === "module" && prop === "exports")
-                           this.solver.addSubsetConstraint(src, this.solver.varProducer.objPropVar(this.moduleSpecialNatives.get("exports")!, "default"));
-
-                    } else if (lVar && t instanceof AccessPathToken) {
-
+                    if (isObjectProperyVarObj(t))
+                        this.writeProperty(src, t, prop, dst, this.a.getEnclosingFunctionOrModule(path, this.moduleInfo), path.node);
+                    else if (lVar && t instanceof AccessPathToken) {
                         // constraint: ...: ⟦E2⟧ ⊆ ⟦k.p⟧ where k is the current PackageObjectToken
                         this.solver.addSubsetConstraint(src, this.solver.varProducer.packagePropVar(this.packageInfo, prop));
 

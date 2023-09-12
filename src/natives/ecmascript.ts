@@ -10,6 +10,8 @@ import {
     assignParameterToThisArrayValue,
     assignParameterToThisProperty,
     callPromiseExecutor,
+    prepareDefineProperties,
+    prepareDefineProperty,
     functionBind,
     invokeCallApply,
     invokeCallback,
@@ -29,12 +31,15 @@ import {
     returnThisProperty,
     returnToken,
     warnNativeUsed,
-    widenArgument
+    widenArgument,
+    defineProperties
 } from "./nativehelpers";
-import {PackageObjectToken} from "../analysis/tokens";
-import {isExpression, isNewExpression} from "@babel/types";
+import {Token, PackageObjectToken, ObjectToken} from "../analysis/tokens";
+import {isExpression, isNewExpression, isStringLiteral} from "@babel/types";
 import {NativeFunctionParams, NativeModel, NativeModelParams} from "./nativebuilder";
 import {TokenListener} from "../analysis/listeners";
+import {options} from "../options";
+import {ObjectPropertyVarObj, isObjectProperyVarObj} from "../analysis/constraintvars";
 
 export const OBJECT_PROTOTYPE = "Object.prototype";
 export const ARRAY_PROTOTYPE = "Array.prototype";
@@ -1071,23 +1076,92 @@ export const ecmascriptModels: NativeModel = {
                 {
                     name: "create",
                     invoke: (p: NativeFunctionParams) => {
-                        if (p.path.node.arguments.length >= 1)
-                            widenArgument(p.path.node.arguments[0], p);
-                        if (p.path.node.arguments.length >= 2)
-                            warnNativeUsed("Object.create", p, "with properties object"); // TODO
-                        returnPackageObject(p);
+                        const args = p.path.node.arguments;
+                        if (args.length === 0)
+                            return;
+
+                        let obj: ObjectPropertyVarObj;
+                        if (options.alloc) {
+                            if (!isExpression(args[0])) {
+                                warnNativeUsed("Object.create", p, "with non-expression as prototype");
+                                return;
+                            }
+
+                            obj = p.solver.globalState.canonicalizeToken(new ObjectToken(p.path.node, p.moduleInfo.packageInfo));
+
+                            // the returned object gets the object passed as 1st argument as prototype:
+                            p.solver.addForAllConstraint(p.op.expVar(args[0], p.path), TokenListener.NATIVE_OBJECT_CREATE, p.path.node, (t: Token) => {
+                                if (isObjectProperyVarObj(t))
+                                    p.solver.addInherits(obj, t);
+                            });
+                        } else
+                            obj = p.op.packageObjectToken;
+
+                        returnToken(obj, p);
+
+                        if (args.length >= 2) {
+                            if (!isExpression(args[1])) {
+                                warnNativeUsed("Object.create", p, "with non-expression as property descriptors");
+                                return;
+                            }
+
+                            // model the part of Object.create's logic that is similar to Object.defineProperties
+                            const nodes = [p.path.node, args[0], args[1]];
+                            const ivars = prepareDefineProperties("Object.create", args[1], nodes as any, p);
+                            if (ivars) {
+                                const enclosing = p.solver.globalState.getEnclosingFunctionOrModule(p.path, p.moduleInfo);
+                                for (const {prop, ac, ivar} of ivars)
+                                    p.op.writeProperty(ivar, obj, prop, p.path.node, enclosing, undefined, ac, false);
+                            }
+                        }
                     }
                 },
                 {
                     name: "defineProperties",
                     invoke: (p: NativeFunctionParams) => {
-                        warnNativeUsed("Object.defineProperties", p); // TODO
+                        const args = p.path.node.arguments;
+                        if (args.length < 2)
+                            return;
+
+                        if (!isExpression(args[0]) || !isExpression(args[1])) {
+                            warnNativeUsed("Object.defineProperties", p, "with non-expressions?");
+                            return;
+                        }
+
+                        const obj = p.op.expVar(args[0], p.path);
+                        if (!obj)
+                            return;
+
+                        const nodes = [p.path.node, args[0], args[1]];
+                        const ivars = prepareDefineProperties("Object.defineProperties", args[1], nodes as any, p);
+                        if (ivars)
+                            defineProperties(obj, TokenListener.NATIVE_OBJECT_DEFINE_PROPERTIES, ivars, p);
                     }
                 },
                 {
                     name: "defineProperty",
                     invoke: (p: NativeFunctionParams) => {
-                        warnNativeUsed("Object.defineProperty", p); // TODO
+                        const args = p.path.node.arguments;
+                        if (args.length < 3)
+                            return;
+
+                        if (!isStringLiteral(args[1])) {
+                            warnNativeUsed("Object.defineProperty", p, "with computed property name");
+                            return;
+                        }
+
+                        if (!isExpression(args[0]) || !isExpression(args[2])) {
+                            warnNativeUsed("Object.defineProperty", p, "with non-expressions?");
+                            return;
+                        }
+
+                        const obj = p.op.expVar(args[0], p.path);
+                        const descriptor = p.op.expVar(args[2], p.path);
+                        if (!obj || !descriptor)
+                            return;
+
+                        const ivars = prepareDefineProperty("Object.defineProperty", args[1].value, descriptor, args as any, p);
+                        defineProperties(obj, TokenListener.NATIVE_OBJECT_DEFINE_PROPERTY, ivars, p);
                     }
                 },
                 {

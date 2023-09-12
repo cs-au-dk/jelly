@@ -49,6 +49,38 @@ test("tests/micro/accessors2", async () => {
     });
 });
 
+test("tests/micro/defineProperty", async () => {
+    await runTest("tests/micro", "defineProperty.js", {
+        soundness: "tests/micro/defineProperty.json",
+        functionInfos: 10,
+        moduleInfos: 1,
+        numberOfFunctionToFunctionEdges: 12,
+        oneCalleeCalls: 15,
+        funFound: 6,
+        funTotal: 6,
+        callFound: 9,
+        callTotal: 9,
+        reachableFound: 11,
+        reachableTotal: 11,
+    });
+});
+
+test("tests/micro/create", async () => {
+    await runTest("tests/micro", "create.js", {
+        soundness: "tests/micro/create.json",
+        functionInfos: 2,
+        moduleInfos: 1,
+        numberOfFunctionToFunctionEdges: 2,
+        oneCalleeCalls: 2,
+        funFound: 2,
+        funTotal: 2,
+        callFound: 2,
+        callTotal: 2,
+        reachableFound: 3,
+        reachableTotal: 3,
+    });
+});
+
 test("tests/micro/eval", async () => {
     await runTest("tests/micro", "eval.js", {
         soundness: "tests/micro/eval.json",

@@ -5,7 +5,8 @@ import {
     ArrayToken,
     FunctionToken,
     NativeObjectToken,
-    PackageObjectToken
+    PackageObjectToken,
+    Token,
 } from "./tokens";
 import {ModuleInfo, PackageInfo} from "./infos";
 import {IDENTIFIER_KIND} from "./astvisitor";
@@ -62,6 +63,10 @@ export class NodeVar extends ConstraintVar {
 export type AccessorType = "get" | "set" | "normal";
 
 export type ObjectPropertyVarObj = AllocationSiteToken | FunctionToken | NativeObjectToken | PackageObjectToken;
+
+export function isObjectProperyVarObj(t: Token | undefined): t is ObjectPropertyVarObj {
+    return t instanceof AllocationSiteToken || t instanceof FunctionToken || t instanceof PackageObjectToken || t instanceof NativeObjectToken;
+}
 
 /**
  * A constraint variable for an object property.

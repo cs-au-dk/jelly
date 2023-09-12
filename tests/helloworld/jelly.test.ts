@@ -13,13 +13,13 @@ test("tests/helloworld/app", async () => {
         soundness: "tests/helloworld/app.json",
         functionInfos: 775,
         moduleInfos: 94,
-        numberOfFunctionToFunctionEdges: 1398,
-        oneCalleeCalls: 905,
-        funFound: 129,
+        numberOfFunctionToFunctionEdges: 1355,
+        oneCalleeCalls: 974,
+        funFound: 124,
         funTotal: 138,
-        callFound: 194,
+        callFound: 184,
         callTotal: 204,
-        reachableFound: 122,
-        reachableTotal: 189
+        reachableFound: 138,
+        reachableTotal: 189,
     });
 }, 20000);

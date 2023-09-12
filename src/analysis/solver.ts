@@ -504,23 +504,52 @@ export default class Solver {
         if (!st.has(parent)) {
             if (logger.isDebugEnabled())
                 logger.debug(`Adding inheritance relation ${child} -> ${parent}`);
-            st.add(parent);
-            mapGetSet(f.reverseInherits, parent).add(child);
+
             if (propagate) {
-                for (const des of f.getDescendants(child)) {
-                    const ts = f.ancestorListeners.get(des);
-                    if (ts)
-                        for (const anc of f.getAncestors(parent))
-                            for (const [n, listener] of ts) {
-                                const p = mapGetSet(f.ancestorListenersProcessed, n);
-                                if (!p.has(anc)) {
-                                    this.enqueueListenerCall([listener, anc]);
-                                    this.ancestorListenerNotifications++;
-                                    p.add(anc);
-                                }
+                const ancestors = f.getAncestors(parent);
+                const descendants = f.getDescendants(child);
+
+                // flood fill graph from Q and return reachable nodes
+                function flood(Q: Token[], edges: Map<Token, Set<Token>>): Set<Token> {
+                    const res = new Set(Q);
+                    while (Q.length) {
+                        const tok = Q.pop()!;
+                        for (const j of edges.get(tok) ?? [])
+                            if (!res.has(j)) {
+                                res.add(j);
+                                Q.push(j);
                             }
+                    }
+                    return res;
+                }
+
+                // collect descendants which already inherit from parent
+                // we don't need to notify them or any of their descendants
+                const optDes = flood([...descendants].filter((des) => f.inherits.get(des)!.has(parent)), f.reverseInherits);
+
+                // similar, but for ancestors
+                for (const anc of flood([...ancestors].filter((anc) => st.has(anc)), f.inherits))
+                    ancestors.delete(anc);
+
+                for (const des of descendants) if (!optDes.has(des)) {
+                    const ts = f.ancestorListeners.get(des);
+                    if (!ts)
+                        continue
+
+                    for (const anc of ancestors)
+                        for (const [n, listener] of ts) {
+                            const p = mapGetSet(f.ancestorListenersProcessed, n);
+                            if (!p.has(anc)) {
+                                this.enqueueListenerCall([listener, anc]);
+                                this.ancestorListenerNotifications++;
+                                p.add(anc);
+                            }
+                        }
                 }
             }
+
+            st.add(parent);
+            mapGetSet(f.reverseInherits, parent).add(child);
         }
     }
 
