@@ -367,7 +367,7 @@ export function mapCallsToFunctions(cg: CallGraph): Map<number, number> {
         }
 
     function compareLC(a: { line: number, column: number }, b: { line: number, column: number }): number {
-        return a.line !== b.line? a.line - b.line : a.column - b.column;
+        return a.line !== b.line ? a.line - b.line : a.column - b.column;
     }
 
     // orders source locations primarily in ascending order by start location

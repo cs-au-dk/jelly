@@ -30,7 +30,6 @@ import assert from "assert";
 import {NodePath} from "@babel/traverse";
 import {Operations} from "../analysis/operations";
 import {AccessorType, ConstraintVar, IntermediateVar, ObjectPropertyVarObj, isObjectProperyVarObj} from "../analysis/constraintvars";
-import {locationToStringWithFile} from "../misc/util";
 
 /**
  * Models an assignment from a function parameter (0-based indexing) to a property of the base object.
@@ -512,15 +511,13 @@ export function invokeCallbackBound(kind: CallbackKind, p: NativeFunctionParams,
             solver.addSubsetConstraint(pBaseVar, pResultVar);
             break;
         case "Map.prototype.forEach":
-            if (bt.kind !== "Map")
-                break;
-            modelCall([vp.objPropVar(bt, MAP_VALUES), vp.objPropVar(bt, MAP_KEYS), pBaseVar], arg1Var);
+            if (bt.kind === "Map" && ft instanceof FunctionToken)
+                modelCall([vp.objPropVar(bt, MAP_VALUES), vp.objPropVar(bt, MAP_KEYS), pBaseVar], arg1Var);
             break;
         case "Set.prototype.forEach":
-            if (bt.kind !== "Set")
-                break;
-            // TODO: what if called via e.g. bind? (same for other baseVar constraints above)
-            modelCall([vp.objPropVar(bt, SET_VALUES), vp.objPropVar(bt, SET_VALUES), pBaseVar], arg1Var);
+            if (bt.kind === "Set" && ft instanceof FunctionToken)
+                // TODO: what if called via e.g. bind? (same for other baseVar constraints above)
+                modelCall([vp.objPropVar(bt, SET_VALUES), vp.objPropVar(bt, SET_VALUES), pBaseVar], arg1Var);
             break;
         case "new Promise": {
             const resolveFunVar = iVar("resolve");
@@ -952,12 +949,11 @@ type PreparedDefineProperty = {
 export function prepareDefineProperty(
     name: "Object.defineProperty" | "Object.defineProperties" | "Object.create",
     prop: string,
-    descriptor: Expression,
+    descriptor: ConstraintVar | undefined,
     nodes: [Node, Node, Node],
     p: NativeFunctionParams,
 ): Array<PreparedDefineProperty> {
-    const dvar = p.op.expVar(descriptor, p.path);
-    if (!dvar)
+    if (!descriptor)
         return [];
 
     // FIXME: we want to read 3 properties from the descriptor object at the same AST node.
@@ -967,7 +963,7 @@ export function prepareDefineProperty(
     const enclosing = p.solver.globalState.getEnclosingFunctionOrModule(p.path, p.moduleInfo);
     return (["value", "get", "set"] as const).map((descriptorProp, i) => {
         const ivar = p.solver.varProducer.intermediateVar(p.path.node, `${name} (${prop}.${descriptorProp})`);
-        p.op.readProperty(dvar, descriptorProp, ivar, nodes[i], enclosing);
+        p.op.readProperty(descriptor, descriptorProp, ivar, nodes[i], enclosing);
         return {prop, ac: descriptorProp === "value"? "normal" : descriptorProp, ivar};
     });
 }
@@ -996,6 +992,9 @@ export function prepareDefineProperties(
         return [];
     }
 
+    // get the canonicalized object token for the object expression
+    const pobj = p.op.newObjectToken(props);
+
     return props.properties.flatMap((oprop) => {
         if (!isObjectProperty(oprop)) {
             warnNativeUsed(name, p, `with property kind: '${oprop.type}'`);
@@ -1008,10 +1007,8 @@ export function prepareDefineProperties(
             return [];
         }
 
-        if (!isExpression(oprop.value))
-            assert.fail(`Unexpected Property value type ${oprop.value?.type} at ${locationToStringWithFile(oprop.loc)}`);
-
-        return prepareDefineProperty(name, key, oprop.value, nodes, p);
+        const dvar = p.solver.varProducer.objPropVar(pobj, key);
+        return prepareDefineProperty(name, key, dvar, nodes, p);
     });
 }
 
@@ -1032,16 +1029,15 @@ export function defineProperties(
 
     const enclosing = p.solver.globalState.getEnclosingFunctionOrModule(p.path, p.moduleInfo);
 
-    function write(t: ObjectPropertyVarObj) {
+    function write(t: Token, lVar?: ConstraintVar) {
         for (const {prop, ac, ivar} of ivars)
-            p.op.writeProperty(ivar, t, prop, p.path.node, enclosing, undefined, ac, false);
+            p.op.writeProperty(ivar, lVar, t, prop, p.path.node, enclosing, undefined, ac, false);
     }
 
     if (obj instanceof Token)
         write(obj);
-    else
-        p.solver.addForAllConstraint(p.op.expVar(obj, p.path), key, p.path.node, (t: Token) => {
-            if (isObjectProperyVarObj(t))
-                write(t);
-        });
+    else {
+        const lVar = p.op.expVar(obj, p.path);
+        p.solver.addForAllConstraint(lVar, key, p.path.node, (t: Token) => write(t, lVar));
+    }
 }

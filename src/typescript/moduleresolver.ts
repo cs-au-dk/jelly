@@ -78,7 +78,7 @@ export class TSModuleResolver {
   resolveModuleName(str: string, file: FilePath): FilePath {
       const opts = this.getTSOptions(file);
       const resolutionMode = ts.getImpliedNodeFormatForFile(file as ts.Path, undefined, host, opts);
-      const t = str.endsWith(".ts") && resolutionMode !== ts.ModuleKind.ESNext? str.substring(0, str.length - 3) : str;
+      const t = str.endsWith(".ts") && resolutionMode !== ts.ModuleKind.ESNext ? str.substring(0, str.length - 3) : str;
       const filepath = ts.resolveModuleName(t, file, opts, host, undefined, undefined, resolutionMode).resolvedModule?.resolvedFileName;
       // TS does not always respect noDtsResolution=true when the enclosing package has a 'typesVersions' field
       if (!filepath || (filepath.endsWith(".d.ts") && !str.endsWith(".d.ts")))

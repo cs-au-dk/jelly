@@ -121,7 +121,7 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
                     for (const p of a.packageInfos.values()) {
                         await solver.checkAbort();
 
-                        // skip the package if it doesn't contain any modules that have been analyzed
+                        // skip the package if it doesn't contain any analyzed modules
                         if (!Array.from(p.modules.values()).some(m => fragmentStates.has(m)))
                             continue;
 

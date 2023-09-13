@@ -438,13 +438,17 @@ export class FragmentState {
         this.unhandledDynamicPropertyReads.add(node);
     }
 
+    private makeMsg(msg: string, node?: Node): string {
+        return `${msg}${node ? ` at ${locationToStringWithFile(node.loc)}` : ""}`;
+    }
+
     /**
      * Emits an error message.
      * Avoids duplicates.
      */
     error(msg: string, node?: Node) {
         if (addMapHybridSet(node, msg, this.errors))
-            logger.error(`Error: ${msg}${node ? ` at ${locationToStringWithFile(node.loc)}` : ""}`);
+            logger.error(`Error: ${this.makeMsg(msg, node)}`);
     }
 
     /**
@@ -453,7 +457,7 @@ export class FragmentState {
      */
     warn(msg: string, node?: Node) {
         if (addMapHybridSet(node, msg, this.warnings))
-            logger.warn(`Warning: ${msg}${node ? ` at ${locationToStringWithFile(node.loc)}` : ""}`);
+            logger.warn(`Warning: ${this.makeMsg(msg, node)}`);
     }
 
     /**
@@ -462,7 +466,7 @@ export class FragmentState {
      */
     warnUnsupported(node: Node, msg: string = node.type) {
         if (addMapHybridSet(node, msg, this.warningsUnsupported) && options.warningsUnsupported)
-            logger.warn(`Warning: ${msg} at ${locationToStringWithFile(node.loc)}`);
+            logger.warn(`Warning: ${this.makeMsg(msg, node)}`);
     }
 
     /**

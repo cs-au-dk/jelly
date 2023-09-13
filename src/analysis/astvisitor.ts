@@ -749,7 +749,7 @@ export function visit(ast: File, op: Operations) {
         const calleeVar = isExpression(path.node.callee) ? op.expVar(path.node.callee, path) : undefined;
         const bp = getBaseAndProperty(path);
         const baseVar = bp ? op.expVar(bp.base, path) : undefined;
-        const resultVar = op.expVar(path.node, path);
+        const resultVar = vp.nodeVar(path.node);
         op.callFunction(calleeVar, baseVar, path.node.arguments, resultVar, isNew, path);
     }
 

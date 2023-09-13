@@ -246,7 +246,7 @@ export default class Solver {
         if (!asn)
             this.addToken(f.a.canonicalizeToken(new AccessPathToken(ap2)), f.getRepresentative(to));
         // collect information for PatternMatcher
-        const t = to instanceof IntermediateVar && to.label === "import" ? to.node : to instanceof NodeVar? to.node : undefined; // special treatment of 'import' expressions
+        const t = to instanceof IntermediateVar && to.label === "import" ? to.node : to instanceof NodeVar ? to.node : undefined; // special treatment of 'import' expressions
         if (t !== undefined) {
             if (ap2 instanceof ModuleAccessPath)
                 mapGetSet(f.moduleAccessPaths, ap2).add(t);
@@ -685,6 +685,7 @@ export default class Solver {
      * @param result the constraint variable for the result of the property read operation
      * @param base the constraint variable for the base expression
      * @param pck the current package object token
+     * @param prop the property name
      */
     collectPropertyRead(result: ConstraintVar | undefined, base: ConstraintVar | undefined, pck: PackageObjectToken, prop: string | undefined) { // TODO: rename to registerPropertyRead, move to FragmentState
         if (result && base)
@@ -940,6 +941,8 @@ export default class Solver {
                         this.totalCycleEliminationRuns++;
                         const timer2 = new Timer();
                         // process new tokens for the component representatives in topological order
+                        if (logger.isVerboseEnabled())
+                            logger.verbose(`Processing ${this.unprocessedTokensSize} new token${this.unprocessedTokensSize !== 1 ? "s" : ""}`);
                         for (let i = reps.length - 1; i >= 0; i--) {
                             const v = reps[i];
                             this.processTokens(v);
@@ -956,6 +959,8 @@ export default class Solver {
                     this.totalPropagationTime += timer3.elapsedCPU();
                 } else {
                     // process all tokens in worklist until empty
+                    if (logger.isVerboseEnabled())
+                        logger.verbose(`Processing ${this.unprocessedTokensSize} new token${this.unprocessedTokensSize !== 1 ? "s" : ""}`);
                     const timer = new Timer();
                     this.nodesWithNewEdges.clear();
                     this.restored.clear();
@@ -967,7 +972,7 @@ export default class Solver {
                 }
             }
             if (this.unprocessedTokens.size !== 0 || this.unprocessedTokensSize !== 0 || this.nodesWithNewEdges.size !== 0 || this.restored.size !== 0)
-                assert.fail(`worklist non-empty: unprocessedTokens.size: ${this.unprocessedTokens.size}, unprocessedTokensSize: ${this.unprocessedTokensSize}, nodesWithNewSubsetEdges.size: ${this.nodesWithNewEdges.size}, restoredSubsetEdges.size: ${this.restored.size}`);
+                assert.fail(`worklist non-empty: unprocessedTokens.size: ${this.unprocessedTokens.size}, unprocessedTokensSize: ${this.unprocessedTokensSize}, nodesWithNewEdges.size: ${this.nodesWithNewEdges.size}, restored.size: ${this.restored.size}`);
             // process all enqueued listener calls (excluding those created during the processing)
             if (logger.isVerboseEnabled())
                 logger.verbose(`Processing listener calls: ${f.postponedListenerCalls.length}`);

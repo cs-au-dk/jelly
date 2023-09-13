@@ -13,7 +13,6 @@ import {
     DiagnosticsRequest,
     DiagnosticsResponse,
     ExpandPathsRequest,
-    ExpandPathsResponse,
     FilesRequest,
     HTMLCallGraphRequest,
     HTMLDataFlowGraphRequest,
@@ -195,10 +194,14 @@ async function main() {
         },
 
         expandpaths: async (req: ExpandPathsRequest) => {
-            const body = expand(req.arguments);
-            const res: ExpandPathsResponse = prepareResponse(true, req, {body});
-            logger.info("Expanded paths");
-            return res;
+            try {
+                const body = expand(req.arguments);
+                const res = prepareResponse(true, req, {body});
+                logger.info("Expanded paths");
+                return res;
+            } catch (e) {
+                return prepareResponse(false, req, {message: `Error: ${e instanceof Error ? e.message : "Unable to expand paths"}`});
+            }
         },
 
         files: async (req: FilesRequest) => {
@@ -356,7 +359,7 @@ async function main() {
                 vr.module = vulnerabilityDetector.findModulesThatMayDependOnVulnerableModules(f);
                 vr.function = vulnerabilityDetector.findFunctionsThatMayReachVulnerableFunctions(f);
                 vr.call = vulnerabilityDetector.findCallsThatMayReachVulnerableFunctions(f, vr.function);
-                vr.matches = vulnerabilityDetector.patternMatch(f, typer, solver.diagnostics)
+                vr.matches = vulnerabilityDetector.patternMatch(f, typer, solver.diagnostics);
                 // TODO: include vulnerability pattern match reachability like in main.ts
             }
             exportCallGraphHtml(solver.fragmentState, options.callgraphHtml, vr);

@@ -44,7 +44,7 @@ import {
     PackageObjectToken,
     Token
 } from "./tokens";
-import {AccessorType, ConstraintVar, IntermediateVar, isObjectProperyVarObj, NodeVar, ObjectPropertyVarObj} from "./constraintvars";
+import {AccessorType, ConstraintVar, IntermediateVar, isObjectProperyVarObj, NodeVar} from "./constraintvars";
 import {
     CallResultAccessPath,
     IgnoredAccessPath,
@@ -140,12 +140,12 @@ export class Operations {
      * @param calleeVar constraint variable describing the callee, undefined if not applicable
      * @param baseVar constraint variable describing the method call base, undefined if not applicable
      * @param args arguments array of arguments
-     * @param resultVar constraint variable describing the call result, undefined if not applicable
+     * @param resultVar constraint variable describing the call result
      * @param isNew true if this is a 'new' call
      * @param path path of the call expression
      */
     callFunction(calleeVar: ConstraintVar | undefined, baseVar: ConstraintVar | undefined, args: CallExpression["arguments"],
-                 resultVar: ConstraintVar | undefined, isNew: boolean, path: CallNodePath) {
+                 resultVar: ConstraintVar, isNew: boolean, path: CallNodePath) {
         const f = this.solver.fragmentState; // (don't use in callbacks)
         const caller = this.a.getEnclosingFunctionOrModule(path, this.moduleInfo);
 
@@ -415,6 +415,7 @@ export class Operations {
     /**
      * Models writing a property to an object.
      * @param src constraint variable representing the value to be written
+     * @param lVar constraint variable for the object that is written to (for access paths)
      * @param base token representing the object that is written to
      * @param prop property name
      * @param node AST node where the operation occurs (used for constraint keys etc.)
@@ -424,7 +425,7 @@ export class Operations {
      * @param invokeSetters if true, models invocation of setters (i.e. the [[Set]] internal method is modeled instead of [[DefineOwnPropery]])
      */
     writeProperty(
-        src: ConstraintVar | undefined, base: ObjectPropertyVarObj, prop: string,
+        src: ConstraintVar | undefined, lVar: ConstraintVar | undefined, base: Token, prop: string,
         node: Node, enclosing: FunctionInfo | ModuleInfo, escapeNode: Node = node,
         ac: AccessorType = "normal", invokeSetters: boolean = true,
     ) {
@@ -436,24 +437,47 @@ export class Operations {
                 this.solver.fragmentState.registerCall(node, this.moduleInfo, {accessor: true});
                 this.solver.fragmentState.registerCallEdge(node, enclosing, this.a.functionInfos.get(t.fun)!, {accessor: true});
             }
-        }
+        };
 
-        // FIXME: special treatment of writes to "prototype" and "__proto__"
+        if (isObjectProperyVarObj(base)) {
+            // FIXME: special treatment of writes to "prototype" and "__proto__"
 
-        // constraint: ...: ⟦E2⟧ ⊆ ⟦base.p⟧
-        this.solver.addSubsetConstraint(src, this.solver.varProducer.objPropVar(base, prop, ac));
+            // constraint: ...: ⟦E2⟧ ⊆ ⟦base.p⟧
+            this.solver.addSubsetConstraint(src, this.solver.varProducer.objPropVar(base, prop, ac));
 
-        if (invokeSetters)
-            // constraint: ...: ∀ functions t2 ∈ ⟦(set)base.p⟧: ⟦E2⟧ ⊆ ⟦x⟧ where x is the parameter of t2
-            this.solver.addForAllConstraint(this.solver.varProducer.objPropVar(base, prop, "set"), TokenListener.ASSIGN_SETTER, node, writeToSetter);
+            if (invokeSetters)
+                // constraint: ...: ∀ functions t2 ∈ ⟦(set)base.p⟧: ⟦E2⟧ ⊆ ⟦x⟧ where x is the parameter of t2
+                this.solver.addForAllConstraint(this.solver.varProducer.objPropVar(base, prop, "set"), TokenListener.ASSIGN_SETTER, node, writeToSetter);
 
-        // values written to native object escape
-        if (base instanceof NativeObjectToken && (base.moduleInfo || base.name === "globalThis")) // TODO: other natives? packageObjectTokens?
+            // values written to native object escape
+            if (base instanceof NativeObjectToken && (base.moduleInfo || base.name === "globalThis")) // TODO: other natives? packageObjectTokens?
+                this.solver.fragmentState.registerEscapingToExternal(src, escapeNode);
+
+            // if writing to module.exports, also write to %exports.default
+            if (base instanceof NativeObjectToken && base.name === "module" && prop === "exports")
+                this.solver.addSubsetConstraint(src, this.solver.varProducer.objPropVar(this.moduleSpecialNatives.get("exports")!, "default", ac));
+
+        } else if (lVar && base instanceof AccessPathToken) {
+            // constraint: ...: ⟦E2⟧ ⊆ ⟦k.p⟧ where k is the current PackageObjectToken
+            this.solver.addSubsetConstraint(src, this.solver.varProducer.packagePropVar(this.packageInfo, prop));
+
+            // collect property write operation @E1.p
+            this.solver.addAccessPath(new PropertyAccessPath(lVar, prop), this.solver.varProducer.nodeVar(escapeNode), base.ap);
+
+            // values written to external objects escape
             this.solver.fragmentState.registerEscapingToExternal(src, escapeNode);
 
-        // if writing to module.exports, also write to %exports.default
-        if (base instanceof NativeObjectToken && base.name === "module" && prop === "exports")
-            this.solver.addSubsetConstraint(src, this.solver.varProducer.objPropVar(this.moduleSpecialNatives.get("exports")!, "default", ac));
+            // TODO: the following apparently has no effect on call graph or pattern matching...
+            // // constraint: assign UnknownAccessPath to arguments to function values for external functions
+            // this.solver.addForAllConstraint2(eVar, TokenListener.ASSIGN_..., path.node, (at: Token) => {
+            //     if (at instanceof FunctionToken) {
+            //         for (let j = 0; j < at.fun.params.length; j++)
+            //             if (isIdentifier(at.fun.params[j])) // TODO: non-identifier parameters?
+            //                 this.solver.addAccessPath(theUnknownAccessPath, at.fun.params[j]);
+            //     }
+            // });
+            // TODO: also add the assigned value (and everything reachable from it) to escaping?
+        }
     }
 
     /**
@@ -499,11 +523,10 @@ export class Operations {
                 if (options.ignoreUnresolved || options.ignoreDependencies) {
                     if (logger.isVerboseEnabled())
                         logger.verbose(`Ignoring unresolved module '${str}' at ${locationToStringWithFile(path.node.loc)}`);
-                } else
-                    if (isInTryBlockOrBranch(path))
-                        f.warn(`Unable to resolve conditionally loaded module '${str}'`, path.node);
-                    else
-                        f.error(`Unable to resolve module '${str}'`, path.node);
+                } else if (isInTryBlockOrBranch(path))
+                    f.warn(`Unable to resolve conditionally loaded module '${str}'`, path.node);
+                else
+                    f.error(`Unable to resolve module '${str}'`, path.node);
 
                 // couldn't find module file (probably hasn't been installed), use a DummyModuleInfo if absolute module name
                 if (!"./#".includes(str[0]))
@@ -555,31 +578,8 @@ export class Operations {
                 // E1.prop = E2
 
                 // constraint: ∀ objects t ∈ ⟦E1⟧: ...
-                this.solver.addForAllConstraint(lVar, TokenListener.ASSIGN_MEMBER_BASE, dst, (t: Token) => {
-                    if (isObjectProperyVarObj(t))
-                        this.writeProperty(src, t, prop, dst, this.a.getEnclosingFunctionOrModule(path, this.moduleInfo), path.node);
-                    else if (lVar && t instanceof AccessPathToken) {
-                        // constraint: ...: ⟦E2⟧ ⊆ ⟦k.p⟧ where k is the current PackageObjectToken
-                        this.solver.addSubsetConstraint(src, this.solver.varProducer.packagePropVar(this.packageInfo, prop));
-
-                        // collect property write operation @E1.p
-                        this.solver.addAccessPath(new PropertyAccessPath(lVar, prop), this.solver.varProducer.nodeVar(path.node), t.ap);
-
-                        // values written to external objects escape
-                        this.solver.fragmentState.registerEscapingToExternal(src, path.node);
-
-                        // TODO: the following apparently has no effect on call graph or pattern matching...
-                        // // constraint: assign UnknownAccessPath to arguments to function values for external functions
-                        // this.solver.addForAllConstraint2(eVar, TokenListener.ASSIGN_..., path.node, (at: Token) => {
-                        //     if (at instanceof FunctionToken) {
-                        //         for (let j = 0; j < at.fun.params.length; j++)
-                        //             if (isIdentifier(at.fun.params[j])) // TODO: non-identifier parameters?
-                        //                 this.solver.addAccessPath(theUnknownAccessPath, at.fun.params[j]);
-                        //     }
-                        // });
-                        // TODO: also add the assigned value (and everything reachable from it) to escaping?
-                    }
-                });
+                this.solver.addForAllConstraint(lVar, TokenListener.ASSIGN_MEMBER_BASE, dst, (t: Token) =>
+                    this.writeProperty(src, lVar, t, prop, dst, this.a.getEnclosingFunctionOrModule(path, this.moduleInfo), path.node));
 
                 // TODO: special treatment for E.prototype? and other standard properties?
 

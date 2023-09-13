@@ -1143,7 +1143,7 @@ export const ecmascriptModels: NativeModel = {
                             return;
                         }
 
-                        const ivars = prepareDefineProperty("Object.defineProperty", args[1].value, args[2], args as any, p);
+                        const ivars = prepareDefineProperty("Object.defineProperty", args[1].value, p.op.expVar(args[2], p.path), args as any, p);
                         defineProperties(args[0], TokenListener.NATIVE_OBJECT_DEFINE_PROPERTY, ivars, p);
                     }
                 },

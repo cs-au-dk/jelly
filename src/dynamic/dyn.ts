@@ -14,7 +14,7 @@ const IGNORED_COMMANDS = [
 ];
 
 // only write messages to stdout if it is a TTY
-const log = process.stdout.isTTY? console.log.bind(console) : () => {};
+const log = process.stdout.isTTY ? console.log.bind(console) : () => {};
 
 // capture before application can change directory
 const cwd = process.cwd();

@@ -289,7 +289,7 @@ export function compareCallGraphs(
     // measure recall in terms of reachable functions
     const [dcgReach, scgReach, comReach] = compareReachability && computeReachableFunctions(file2, cg1, cg2) || [0, 0, 0];
 
-    const formatFraction = (num: number, den: number) => `${num}/${den}${den === 0? "" : ` (${percent(num / den)})`}`;
+    const formatFraction = (num: number, den: number) => `${num}/${den}${den === 0 ? "" : ` (${percent(num / den)})`}`;
     if (compareBothWays)
         logger.info(`Function->function edges in ${file2} that are also in ${file1}: ${formatFraction(foundFun2, totalFun2)}`);
     logger.info(`Function->function edges in ${file1} that are also in ${file2}: ${formatFraction(foundFun1, totalFun1)}`);

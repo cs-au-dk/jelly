@@ -226,7 +226,13 @@ async function main() {
 
         if (!autoDetectBaseDir(program.args))
             return;
-        const files = expand(program.args);
+        let files;
+        try {
+            files = expand(program.args);
+        } catch (e) {
+            logger.info(`Error: ${e instanceof Error ? "code" in e && e.code === "ENOENT" && "path" in e ? `File not found ${e.path}` : e.message : "Unable to expand paths"}`);
+            return;
+        }
         if (logger.isVerboseEnabled()) {
             logger.verbose("Entry files:");
             for (const file of files)

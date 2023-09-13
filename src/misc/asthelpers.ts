@@ -123,9 +123,9 @@ export function getClass(path: NodePath<any>): Class | undefined {
  */
 export function getAdjustedCallNodePath(path: CallNodePath): NodePath {
     return isParenthesizedExpression(path.parentPath.node) &&
-        (isNewExpression(path.node) ||
-         (!isParenthesizedExpression(path.node.callee) && !isFunctionExpression(path.node.callee))) ?
-         path.parentPath : path;
+    (isNewExpression(path.node) ||
+        (!isParenthesizedExpression(path.node.callee) && !isFunctionExpression(path.node.callee))) ?
+        path.parentPath : path;
 }
 
 /**
