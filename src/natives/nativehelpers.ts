@@ -1,4 +1,4 @@
-import {CallExpression, Expression, Function, isExpression, isIdentifier, isObjectExpression, isObjectProperty} from "@babel/types";
+import {CallExpression, Expression, isExpression, isObjectExpression, isObjectProperty} from "@babel/types";
 import {
     AccessPathToken,
     AllocationSiteToken,
@@ -10,10 +10,11 @@ import {
     PackageObjectToken,
     Token
 } from "../analysis/tokens";
-import {getAdjustedCallNodePath, getBaseAndProperty, getKey, isParentExpressionStatement} from "../misc/asthelpers";
+import {getBaseAndProperty, getKey, isParentExpressionStatement} from "../misc/asthelpers";
 import {Node} from "@babel/core";
 import {
     ARRAY_PROTOTYPE,
+    FUNCTION_PROTOTYPE,
     GENERATOR_PROTOTYPE_NEXT,
     MAP_KEYS,
     MAP_VALUES,
@@ -28,7 +29,7 @@ import {TokenListener} from "../analysis/listeners";
 import assert from "assert";
 import {NodePath} from "@babel/traverse";
 import {Operations} from "../analysis/operations";
-import {AccessorType, IntermediateVar, ObjectPropertyVarObj, isObjectProperyVarObj} from "../analysis/constraintvars";
+import {AccessorType, ConstraintVar, IntermediateVar, ObjectPropertyVarObj, isObjectProperyVarObj} from "../analysis/constraintvars";
 import {locationToStringWithFile} from "../misc/util";
 
 /**
@@ -355,6 +356,20 @@ export function returnIterator(kind: IteratorKind, p: NativeFunctionParams) { //
     }
 }
 
+/*
+ * Adds constraints to extract the contents of an array (known and unknown entries) to the destination.
+ * The destination defaults to the array itself, which is useful for propagating known to unknown entries.
+ */
+function extractArrayContents(t: ArrayToken, p: NativeFunctionParams, dst?: ConstraintVar) {
+    const s = p.solver;
+    const vp = s.varProducer;
+    dst ??= vp.arrayValueVar(t);
+
+    s.addSubsetConstraint(vp.arrayValueVar(t), dst);
+    s.addForAllArrayEntriesConstraint(t, TokenListener.NATIVE_22, p.path.node, (prop: string) =>
+                                      s.addSubsetConstraint(s.varProducer.objPropVar(t, prop), dst));
+}
+
 type CallbackKind =
     "Array.prototype.forEach" |
     "Array.prototype.every" |
@@ -369,6 +384,7 @@ type CallbackKind =
     "Array.prototype.sort" |
     "Map.prototype.forEach" |
     "Set.prototype.forEach" |
+    "new Promise" |
     "Promise.prototype.then$onFulfilled" |
     "Promise.prototype.then$onRejected" |
     "Promise.prototype.catch$onRejected" |
@@ -383,177 +399,12 @@ export function invokeCallback(kind: CallbackKind, p: NativeFunctionParams, arg:
         const funarg = args[arg];
         const bp = getBaseAndProperty(p.path);
         if (isExpression(funarg) && bp) { // TODO: SpreadElement? non-MemberExpression?
-            const a = p.solver.globalState;
+            // const a = p.solver.globalState;
             const baseVar = p.solver.varProducer.expVar(bp.base, p.path);
             const funVar = p.solver.varProducer.expVar(funarg, p.path);
-            const caller = a.getEnclosingFunctionOrModule(p.path, p.moduleInfo);
-            p.solver.addForAllPairsConstraint(baseVar, funVar, key, p.path.node, (bt: AllocationSiteToken, ft: FunctionToken | AccessPathToken) => { // TODO: ignoring native functions etc.
-                const vp = p.solver.varProducer; // (don't use in callbacks)
-                type Param = Function["params"][0] | undefined;
-                let param1: Param, param2: Param, param3: Param, param4: Param;
-                if (ft instanceof FunctionToken) {
-                    p.solver.fragmentState.registerCallEdge(getAdjustedCallNodePath(p.path).node, caller, a.functionInfos.get(ft.fun)!, {native: true}); // TODO: call graph edges for promise-related calls?
-                    param1 = ft.fun.params.length > 0 && isIdentifier(ft.fun.params[0]) ? ft.fun.params[0] : undefined; // TODO: non-Identifier parameters?
-                    param2 = ft.fun.params.length > 1 && isIdentifier(ft.fun.params[1]) ? ft.fun.params[1] : undefined;
-                    param3 = ft.fun.params.length > 2 && isIdentifier(ft.fun.params[2]) ? ft.fun.params[2] : undefined;
-                    param4 = ft.fun.params.length > 3 && isIdentifier(ft.fun.params[3]) ? ft.fun.params[3] : undefined;
-                }
-                const connectThis = () => { // TODO: only bind 'this' if the callback is a proper function (not a lambda?)
-                    if (ft instanceof FunctionToken && args.length > 1 && isExpression(args[1])) { // TODO: SpreadElement
-                        // bind thisArg to 'this' of the callback
-                        const thisArgVar = vp.expVar(args[1], p.path);
-                        p.solver.addSubsetConstraint(thisArgVar, vp.thisVar(ft.fun));
-                    }
-                }
-                switch (kind) {
-                    case "Array.prototype.forEach":
-                    case "Array.prototype.every":
-                    case "Array.prototype.filter":
-                    case "Array.prototype.find":
-                    case "Array.prototype.findIndex":
-                    case "Array.prototype.flatMap":
-                    case "Array.prototype.map":
-                    case "Array.prototype.some":
-                        // write array elements to param1
-                        if (param1) {
-                            p.solver.addSubsetConstraint(vp.arrayValueVar(bt), vp.nodeVar(param1));
-                            p.solver.addForAllArrayEntriesConstraint(bt, TokenListener.NATIVE_19, param1, (prop: string) =>
-                                p.solver.addSubsetConstraint(vp.objPropVar(bt, prop), p.solver.varProducer.nodeVar(param1)));
-                        }
-                        switch (kind) {
-                            case "Array.prototype.map":
-                                // return new array with elements from the callback return values
-                                const t = newArray(p);
-                                if (ft instanceof FunctionToken)
-                                    p.solver.addSubsetConstraint(vp.returnVar(ft.fun), vp.arrayValueVar(t));
-                                returnToken(t, p);
-                                break;
-                            case "Array.prototype.flatMap":
-                                warnNativeUsed("Array.prototype.flatMap", p, "(return value ignored)"); // TODO: flatMap return value...
-                                break;
-                        }
-                        p.solver.addSubsetConstraint(baseVar, vp.nodeVar(param3));
-                        connectThis();
-                        // TODO: array functions are generic (can be applied to any array-like object, including strings), can also be sub-classed
-                        break;
-                    case "Array.prototype.reduce":
-                    case "Array.prototype.reduceRight": {
-                        // write array elements to param2
-                        if (param2) {
-                            p.solver.addSubsetConstraint(vp.arrayValueVar(bt), vp.nodeVar(param2));
-                            p.solver.addForAllArrayEntriesConstraint(bt, TokenListener.NATIVE_20, param2, (prop: string) =>
-                                p.solver.addSubsetConstraint(p.solver.varProducer.objPropVar(bt, prop), p.solver.varProducer.nodeVar(param2)));
-                        }
-                        p.solver.addSubsetConstraint(baseVar, vp.nodeVar(param4));
-
-                        const resultVar = vp.expVar(p.path.node, p.path);
-                        if (args.length > 1 && isExpression(args[1])) { // TODO: SpreadElement
-                            // bind initialValue to previousValue and resultVar
-                            const arg1Var = vp.expVar(args[1], p.path);
-                            p.solver.addSubsetConstraint(arg1Var, vp.nodeVar(param1));
-                            p.solver.addSubsetConstraint(arg1Var, resultVar);
-                        } else if (args.length === 1) {
-                            // initialValue is bt[0]
-                            p.solver.addSubsetConstraint(vp.arrayValueVar(bt), vp.nodeVar(param1));
-                            p.solver.addSubsetConstraint(vp.objPropVar(bt, "0"), vp.nodeVar(param1));
-                            p.solver.addSubsetConstraint(vp.arrayValueVar(bt), resultVar);
-                            p.solver.addSubsetConstraint(vp.objPropVar(bt, "0"), resultVar);
-                        }
-
-                        // connect callback return value to previousValue and to result
-                        if (ft instanceof FunctionToken) {
-                            const retVar = vp.returnVar(ft.fun);
-                            p.solver.addSubsetConstraint(retVar, vp.nodeVar(param1));
-                            p.solver.addSubsetConstraint(retVar, resultVar);
-                        }
-                        break;
-                    }
-                    case "Array.prototype.sort":
-                        // write array elements to param1 and param2 and to the array
-                        if (bt instanceof ArrayToken && ft instanceof FunctionToken) { // TODO: currently limited support for generic array methods
-                            const btVar = vp.arrayValueVar(bt);
-                            p.solver.addSubsetConstraint(btVar, vp.nodeVar(param1));
-                            p.solver.addSubsetConstraint(btVar, vp.nodeVar(param2));
-                            p.solver.addForAllArrayEntriesConstraint(bt, TokenListener.NATIVE_21, ft.fun, (prop: string) => {
-                                const btPropVar = vp.objPropVar(bt, prop)
-                                p.solver.addSubsetConstraint(btPropVar, p.solver.varProducer.nodeVar(param1));
-                                p.solver.addSubsetConstraint(btPropVar, p.solver.varProducer.nodeVar(param2));
-                                p.solver.addSubsetConstraint(btPropVar, btVar);
-                            });
-                        }
-                        p.solver.addSubsetConstraint(baseVar, vp.nodeVar(p.path.node));
-                        break;
-                    case "Map.prototype.forEach":
-                        if (bt.kind !== "Map")
-                            break;
-                        p.solver.addSubsetConstraint(vp.objPropVar(bt, MAP_VALUES), vp.nodeVar(param1));
-                        p.solver.addSubsetConstraint(vp.objPropVar(bt, MAP_KEYS), vp.nodeVar(param2));
-                        p.solver.addSubsetConstraint(baseVar, vp.nodeVar(param3));
-                        connectThis();
-                        break;
-                    case "Set.prototype.forEach":
-                        if (bt.kind !== "Set")
-                            break;
-                        p.solver.addSubsetConstraint(vp.objPropVar(bt, SET_VALUES), vp.nodeVar(param1));
-                        p.solver.addSubsetConstraint(vp.objPropVar(bt, SET_VALUES), vp.nodeVar(param2));
-                        p.solver.addSubsetConstraint(baseVar, vp.nodeVar(param3)); // TODO: what if called via e.g. bind? (same for other baseVar constraints above)
-                        connectThis();
-                        break;
-                    case "Promise.prototype.then$onFulfilled":
-                    case "Promise.prototype.then$onRejected":
-                    case "Promise.prototype.catch$onRejected":
-                    case "Promise.prototype.finally$onFinally":
-                        if (bt.kind !== "Promise")
-                            break;
-                        let prop, key;
-                        switch (kind) {
-                            case "Promise.prototype.then$onFulfilled":
-                                prop = PROMISE_FULFILLED_VALUES;
-                                key = TokenListener.CALL_PROMISE_ONFULFILLED;
-                                break;
-                            case "Promise.prototype.then$onRejected":
-                            case "Promise.prototype.catch$onRejected":
-                                prop = PROMISE_REJECTED_VALUES;
-                                key = TokenListener.CALL_PROMISE_ONREJECTED;
-                                break;
-                            case "Promise.prototype.finally$onFinally":
-                                prop = undefined;
-                                key = TokenListener.CALL_PROMISE_ONFINALLY;
-                                break;
-                        }
-                        // create a new promise
-                        const thenPromise = a.canonicalizeToken(new AllocationSiteToken("Promise", p.path.node, p.moduleInfo.packageInfo));
-                        p.solver.addInherits(thenPromise, p.globalSpecialNatives.get(PROMISE_PROTOTYPE)!);
-                        if (prop) {
-                            // assign promise fulfilled/rejected value to the callback parameter
-                            p.solver.addSubsetConstraint(vp.objPropVar(bt, prop), vp.nodeVar(param1));
-                        }
-                        // for all return values of the callback...
-                        if (ft instanceof FunctionToken)
-                            p.solver.addForAllConstraint(vp.returnVar(ft.fun), key, p.path.node, (t: Token) => {
-                                if (t instanceof AllocationSiteToken && t.kind === "Promise") {
-                                    // when callback return value is a promise, transfer its values to the new promise
-                                    if (kind !== "Promise.prototype.finally$onFinally")
-                                        p.solver.addSubsetConstraint(p.solver.varProducer.objPropVar(t, PROMISE_FULFILLED_VALUES), p.solver.varProducer.objPropVar(thenPromise, PROMISE_FULFILLED_VALUES));
-                                    p.solver.addSubsetConstraint(p.solver.varProducer.objPropVar(t, PROMISE_REJECTED_VALUES), p.solver.varProducer.objPropVar(thenPromise, PROMISE_REJECTED_VALUES));
-                                } else if (kind !== "Promise.prototype.finally$onFinally") {
-                                    // callback return value is a non-promise value, assign it to the fulfilled value of the new promise
-                                    p.solver.addTokenConstraint(t, p.solver.varProducer.objPropVar(thenPromise, PROMISE_FULFILLED_VALUES));
-                                }
-                            });
-                        // use identity function as onFulfilled handler at catch
-                        if (kind === "Promise.prototype.catch$onRejected")
-                            p.solver.addSubsetConstraint(vp.objPropVar(bt, PROMISE_FULFILLED_VALUES), vp.objPropVar(thenPromise, PROMISE_FULFILLED_VALUES));
-                        // pipe through fulfilled/rejected values at finally
-                        else if (kind === "Promise.prototype.finally$onFinally") {
-                            p.solver.addSubsetConstraint(vp.objPropVar(bt, PROMISE_FULFILLED_VALUES), vp.objPropVar(thenPromise, PROMISE_FULFILLED_VALUES));
-                            p.solver.addSubsetConstraint(vp.objPropVar(bt, PROMISE_REJECTED_VALUES), vp.objPropVar(thenPromise, PROMISE_REJECTED_VALUES));
-                        }
-                        // TODO: should use identity function for onFulfilled/onRejected in general if funVar is a non-function value
-                        // return the new promise
-                        p.solver.addTokenConstraint(thenPromise, vp.expVar(p.path.node, p.path));
-                        break;
-                }
+            // const caller = a.getEnclosingFunctionOrModule(p.path, p.moduleInfo);
+            p.solver.addForAllPairsConstraint(baseVar, funVar, key, funarg, (bt: AllocationSiteToken, ft: FunctionToken | AccessPathToken) => { // TODO: ignoring native functions etc.
+                invokeCallbackBound(kind, p, bt, ft, baseVar!);
                 if (ft instanceof AccessPathToken) {
                     p.solver.fragmentState.registerEscapingToExternal(funVar, funarg);
 
@@ -564,66 +415,250 @@ export function invokeCallback(kind: CallbackKind, p: NativeFunctionParams, arg:
     }
 }
 
+export function invokeCallbackBound(kind: CallbackKind, p: NativeFunctionParams, bt: AllocationSiteToken, ft: FunctionToken | AccessPathToken, pBaseVar: ConstraintVar | undefined) {
+    const solver = p.solver;
+    const f = solver.fragmentState;
+    const vp = f.varProducer;
+    const a = solver.globalState;
+    const args = p.path.node.arguments;
+    const arg1Var = isExpression(args[1]) ? vp.expVar(args[1], p.path) : undefined;
+    const pResultVar = vp.expVar(p.path.node, p.path);
+    const caller = a.getEnclosingFunctionOrModule(p.path, p.moduleInfo);
+
+    const modelCall = (argVars: Array<ConstraintVar | undefined>, baseVar?: ConstraintVar, resultVar?: ConstraintVar) => {
+        assert(ft instanceof FunctionToken);
+        p.op.callFunctionTokenBound(ft, baseVar, caller, argVars, resultVar, p.path, {native: true});
+    };
+
+    // helper for constructing unique intermediate variables
+    const iVarKey = `NativeCallback(${kind},${bt},${ft})`;
+    const iVar = (label: string) => vp.intermediateVar(p.path.node, `${iVarKey}: ${label}`); // TODO: necessary to use such a long label?
+
+    switch (kind) {
+        case "Array.prototype.forEach":
+        case "Array.prototype.every":
+        case "Array.prototype.filter":
+        case "Array.prototype.find":
+        case "Array.prototype.findIndex":
+        case "Array.prototype.flatMap":
+        case "Array.prototype.map":
+        case "Array.prototype.some": {
+            let resultVar;
+
+            switch (kind) {
+                case "Array.prototype.map": {
+                    // return new array with elements from the callback return values
+                    const t = newArray(p);
+                    resultVar = vp.arrayValueVar(t);
+                    returnToken(t, p);
+                    break;
+                }
+                case "Array.prototype.find":
+                case "Array.prototype.filter":
+                case "Array.prototype.flatMap":
+                    warnNativeUsed(kind, p, "(return value ignored)"); // TODO: return value...
+                    break;
+            }
+
+            if (ft instanceof FunctionToken) {
+                const elementVar = iVar("element");
+                // write array elements to param1
+                if (bt instanceof ArrayToken)
+                    extractArrayContents(bt, p, elementVar);
+                modelCall([elementVar, undefined, pBaseVar], arg1Var, resultVar);
+            }
+
+            // TODO: array functions are generic (can be applied to any array-like object, including strings), can also be sub-classed
+            break;
+        }
+        case "Array.prototype.reduce":
+        case "Array.prototype.reduceRight":
+            if (ft instanceof FunctionToken) {
+                const accVar = iVar("accumulator");
+                const curVar = iVar("currentValue");
+
+                if (args.length > 1) {
+                    // bind initialValue to previousValue and resultVar
+                    solver.addSubsetConstraint(arg1Var, accVar);
+                    solver.addSubsetConstraint(arg1Var, pResultVar);
+                } else if (args.length === 1) {
+                    // initialValue is bt[0]
+                    solver.addSubsetConstraint(vp.arrayValueVar(bt), accVar);
+                    solver.addSubsetConstraint(vp.objPropVar(bt, "0"), accVar);
+                    solver.addSubsetConstraint(vp.arrayValueVar(bt), pResultVar);
+                    solver.addSubsetConstraint(vp.objPropVar(bt, "0"), pResultVar);
+                }
+
+                // bind initialValue to previousValue
+                solver.addSubsetConstraint(arg1Var, accVar);
+
+                // write array elements to currentValue
+                if (bt instanceof ArrayToken)
+                    extractArrayContents(bt, p, curVar);
+
+                // connect callback return value to previousValue
+                const retVar = vp.returnVar(ft.fun);
+                solver.addSubsetConstraint(retVar, accVar);
+
+                modelCall([accVar, curVar, undefined, pBaseVar], undefined, pResultVar);
+            }
+            break;
+        case "Array.prototype.sort":
+            if (bt instanceof ArrayToken && ft instanceof FunctionToken) { // TODO: currently limited support for generic array methods
+                extractArrayContents(bt, p); // smash array
+                const btVar = vp.arrayValueVar(bt);
+                modelCall([btVar, btVar]);
+            }
+            solver.addSubsetConstraint(pBaseVar, pResultVar);
+            break;
+        case "Map.prototype.forEach":
+            if (bt.kind !== "Map")
+                break;
+            modelCall([vp.objPropVar(bt, MAP_VALUES), vp.objPropVar(bt, MAP_KEYS), pBaseVar], arg1Var);
+            break;
+        case "Set.prototype.forEach":
+            if (bt.kind !== "Set")
+                break;
+            // TODO: what if called via e.g. bind? (same for other baseVar constraints above)
+            modelCall([vp.objPropVar(bt, SET_VALUES), vp.objPropVar(bt, SET_VALUES), pBaseVar], arg1Var);
+            break;
+        case "new Promise": {
+            const resolveFunVar = iVar("resolve");
+            solver.addTokenConstraint(newObject("PromiseResolve", p.globalSpecialNatives.get(FUNCTION_PROTOTYPE)!, p), resolveFunVar);
+            const rejectFunVar = iVar("reject");
+            solver.addTokenConstraint(newObject("PromiseReject", p.globalSpecialNatives.get(FUNCTION_PROTOTYPE)!, p), rejectFunVar);
+            modelCall([resolveFunVar, rejectFunVar]);
+            break;
+        }
+        case "Promise.prototype.then$onFulfilled":
+        case "Promise.prototype.then$onRejected":
+        case "Promise.prototype.catch$onRejected":
+        case "Promise.prototype.finally$onFinally": {
+            if (bt.kind !== "Promise")
+                break;
+            let prop, key;
+            switch (kind) {
+                case "Promise.prototype.then$onFulfilled":
+                    prop = PROMISE_FULFILLED_VALUES;
+                    key = TokenListener.CALL_PROMISE_ONFULFILLED;
+                    break;
+                case "Promise.prototype.then$onRejected":
+                case "Promise.prototype.catch$onRejected":
+                    prop = PROMISE_REJECTED_VALUES;
+                    key = TokenListener.CALL_PROMISE_ONREJECTED;
+                    break;
+                case "Promise.prototype.finally$onFinally":
+                    prop = undefined;
+                    key = TokenListener.CALL_PROMISE_ONFINALLY;
+                    break;
+            }
+            // create a new promise
+            const thenPromise = a.canonicalizeToken(new AllocationSiteToken("Promise", p.path.node, p.moduleInfo.packageInfo));
+            solver.addInherits(thenPromise, p.globalSpecialNatives.get(PROMISE_PROTOTYPE)!);
+
+            if (ft instanceof FunctionToken) {
+                // assign promise fulfilled/rejected value to the callback parameter and add call edge
+                modelCall([prop !== undefined? vp.objPropVar(bt, prop) : undefined]);
+
+                // for all return values of the callback...
+                solver.addForAllConstraint(vp.returnVar(ft.fun), key, p.path.node, (t: Token) => {
+                    if (t instanceof AllocationSiteToken && t.kind === "Promise") {
+                        // when callback return value is a promise, transfer its values to the new promise
+                        if (kind !== "Promise.prototype.finally$onFinally")
+                            solver.addSubsetConstraint(solver.varProducer.objPropVar(t, PROMISE_FULFILLED_VALUES), solver.varProducer.objPropVar(thenPromise, PROMISE_FULFILLED_VALUES));
+                        solver.addSubsetConstraint(solver.varProducer.objPropVar(t, PROMISE_REJECTED_VALUES), solver.varProducer.objPropVar(thenPromise, PROMISE_REJECTED_VALUES));
+                    } else if (kind !== "Promise.prototype.finally$onFinally") {
+                        // callback return value is a non-promise value, assign it to the fulfilled value of the new promise
+                        solver.addTokenConstraint(t, solver.varProducer.objPropVar(thenPromise, PROMISE_FULFILLED_VALUES));
+                    }
+                });
+            }
+            // use identity function as onFulfilled handler at catch
+            if (kind === "Promise.prototype.catch$onRejected")
+                solver.addSubsetConstraint(vp.objPropVar(bt, PROMISE_FULFILLED_VALUES), vp.objPropVar(thenPromise, PROMISE_FULFILLED_VALUES));
+            // pipe through fulfilled/rejected values at finally
+            else if (kind === "Promise.prototype.finally$onFinally") {
+                solver.addSubsetConstraint(vp.objPropVar(bt, PROMISE_FULFILLED_VALUES), vp.objPropVar(thenPromise, PROMISE_FULFILLED_VALUES));
+                solver.addSubsetConstraint(vp.objPropVar(bt, PROMISE_REJECTED_VALUES), vp.objPropVar(thenPromise, PROMISE_REJECTED_VALUES));
+            }
+            // TODO: should use identity function for onFulfilled/onRejected in general if funVar is a non-function value
+            // return the new promise
+            returnToken(thenPromise, p);
+            break;
+        }
+        default:
+            kind satisfies never; // ensure that switch is exhaustive
+    }
+}
+
+type CallApplyKind = "Function.prototype.call" | "Function.prototype.apply";
+
 /**
  * Models 'call' or 'apply'.
  */
-export function invokeCallApply(kind: "Function.prototype.call" | "Function.prototype.apply", p: NativeFunctionParams) {
-    const args = p.path.node.arguments;
-    const basearg = args[0];
+export function invokeCallApply(kind: CallApplyKind, p: NativeFunctionParams) {
     const bp = getBaseAndProperty(p.path);
     if (bp) {
-        const a = p.solver.globalState;
         const funVar = p.solver.varProducer.expVar(bp.base, p.path);
-        const caller = a.getEnclosingFunctionOrModule(p.path, p.moduleInfo);
         p.solver.addForAllConstraint(funVar, TokenListener.NATIVE_INVOKE_CALL_APPLY, p.path.node, (ft: Token) => {
-            const vp = p.solver.varProducer;
-            if (ft instanceof FunctionToken) {
-                p.solver.fragmentState.registerCallEdge(getAdjustedCallNodePath(p.path).node, caller, a.functionInfos.get(ft.fun)!, {native: true}); // TODO: call graph edges for promise-related calls?
-                if (isExpression(basearg)) { // TODO: SpreadElement? non-MemberExpression?
-                    // base value
-                    const baseVar = vp.expVar(basearg, p.path);
-                    p.solver.addSubsetConstraint(baseVar, vp.thisVar(ft.fun)); // TODO: only bind 'this' if the callback is a proper function (not a lambda?)
-                }
-                // TODO: also model conversion for basearg to objects, see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/call
-                // arguments
-                switch (kind) {
-                    case "Function.prototype.call":
-                        for (let i = 1; i < args.length; i++) {
-                            const arg = args[i];
-                            const param = ft.fun.params[i - 1];
-                            if (isExpression(arg) && isIdentifier(param)) { // TODO: SpreadElement, non-Identifier parameters?
-                                const argVar = vp.expVar(arg, p.path);
-                                const paramVar = vp.nodeVar(param);
-                                p.solver.addSubsetConstraint(argVar, paramVar);
-                            }
-                        }
-                        break;
-                    case "Function.prototype.apply":
-                        if (args.length >= 2 && isExpression(args[1])) { // TODO: SpreadElement
-                            const argVar = vp.expVar(args[1], p.path);
-                            p.solver.addForAllConstraint(argVar, TokenListener.NATIVE_INVOKE_CALL_APPLY2, ft.fun, (t: Token) => {
-                                if (t instanceof ArrayToken) {
-                                    p.solver.addForAllArrayEntriesConstraint(t, TokenListener.NATIVE_INVOKE_CALL_APPLY3, ft.fun, (prop: string) => {
-                                        const param = parseInt(prop);
-                                        if (param >= 0 && param < ft.fun.params.length) {
-                                            const paramVar = p.solver.varProducer.nodeVar(ft.fun.params[param]);
-                                            p.solver.addSubsetConstraint(p.solver.varProducer.objPropVar(t, prop), paramVar);
-                                        }
-                                    });
-                                    // TODO: p.solver.addSubsetConstraint(vp.arrayValueVar(t), ...);
-                                }
-                            });
-                        }
-                        break;
-                }
-                // TODO: also model callee 'arguments'
-                // return value
-                const retVar = vp.returnVar(ft.fun);
-                p.solver.addSubsetConstraint(retVar, vp.expVar(p.path.node, p.path));
-            } else if (ft instanceof NativeObjectToken && ft.invoke)
-                warnNativeUsed(`${kind} with native function`, p); // TODO: call/apply to native function
+            if (ft instanceof FunctionToken || ft instanceof NativeObjectToken)
+                invokeCallApplyBound(kind, p, ft);
         });
     }
+}
+
+export function invokeCallApplyBound(kind: CallApplyKind, p: NativeFunctionParams, ft: FunctionToken | NativeObjectToken) {
+    if (ft instanceof NativeObjectToken) {
+        if (ft.invoke)
+            warnNativeUsed(`${kind} with native function`, p); // TODO: call/apply to native function
+        return;
+    }
+
+    const a = p.solver.globalState;
+    const vp = p.solver.varProducer;
+    const args = p.path.node.arguments;
+    const basearg = args[0];
+    const caller = a.getEnclosingFunctionOrModule(p.path, p.moduleInfo);
+
+    let argVars: Array<ConstraintVar | undefined> = [];
+    // TODO: also model conversion for basearg to objects, see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/call
+    // arguments
+    switch (kind) {
+        case "Function.prototype.call":
+            // TODO: SpreadElement
+            argVars = args.slice(1).map(arg => isExpression(arg) ? vp.expVar(arg, p.path) : undefined);
+            break;
+        case "Function.prototype.apply": {
+            if (args.length >= 2 && isExpression(args[1])) { // TODO: SpreadElement
+                const escapes = ft.moduleInfo !== p.moduleInfo;
+                const argVar = vp.expVar(args[1], p.path);
+                // model dynamic parameter passing like 'callFunctionTokenBound'
+                p.solver.addForAllConstraint(argVar, TokenListener.NATIVE_INVOKE_CALL_APPLY2, ft.fun, (t: Token) => {
+                    if (t instanceof ArrayToken) {
+                        p.solver.addForAllArrayEntriesConstraint(t, TokenListener.NATIVE_INVOKE_CALL_APPLY3, ft.fun, (prop: string) => {
+                            const param = parseInt(prop);
+                            if (param >= 0 && param < ft.fun.params.length) {
+                                const opv = p.solver.varProducer.objPropVar(t, prop);
+                                const paramVar = p.solver.varProducer.nodeVar(ft.fun.params[param]);
+                                p.solver.addSubsetConstraint(opv, paramVar);
+
+                                if (escapes)
+                                    p.solver.fragmentState.registerEscapingFromModule(opv);
+                            }
+                        });
+                        // TODO: p.solver.addSubsetConstraint(vp.arrayValueVar(t), ...);
+                    }
+                });
+            }
+            break;
+        }
+    }
+
+    // base value
+    // TODO: SpreadElement? non-MemberExpression?
+    const baseVar = isExpression(basearg) ? vp.expVar(basearg, p.path) : undefined;
+    const resultVar = vp.expVar(p.path.node, p.path);
+    p.op.callFunctionTokenBound(ft, baseVar, caller, argVars, resultVar, p.path, {native: true});
 }
 
 /**
@@ -706,11 +741,8 @@ export function assignBaseArrayValueToArray(t: ArrayToken, p: NativeFunctionPara
         const baseVar = p.solver.varProducer.expVar(bp.base, p.path);
         const dst = p.solver.varProducer.arrayValueVar(t);
         p.solver.addForAllConstraint(baseVar, TokenListener.NATIVE_9, p.path.node, (t2: Token) => {
-            if (t2 instanceof ArrayToken) {
-                p.solver.addSubsetConstraint(p.solver.varProducer.arrayValueVar(t2), dst);
-                p.solver.addForAllArrayEntriesConstraint(t2, TokenListener.NATIVE_22, p.path.node, (prop: string) =>
-                    p.solver.addSubsetConstraint(p.solver.varProducer.objPropVar(t2, prop), dst));
-            }
+            if (t2 instanceof ArrayToken)
+                extractArrayContents(t2, p, dst);
         });
     }
 }
@@ -724,11 +756,8 @@ export function assignBaseArrayArrayValueToArray(t: ArrayToken, p: NativeFunctio
         const baseVar = p.solver.varProducer.expVar(bp.base, p.path);
         const dst = p.solver.varProducer.arrayValueVar(t);
         const fn = (t3: Token) => {
-            if (t3 instanceof ArrayToken) {
-                p.solver.addSubsetConstraint(p.solver.varProducer.arrayValueVar(t3), dst);
-                p.solver.addForAllArrayEntriesConstraint(t3, TokenListener.NATIVE_23, p.path.node, (prop: string) =>
-                    p.solver.addSubsetConstraint(p.solver.varProducer.objPropVar(t3, prop), dst));
-            }
+            if (t3 instanceof ArrayToken)
+                extractArrayContents(t3, p, dst);
         };
         p.solver.addForAllConstraint(baseVar, TokenListener.NATIVE_10, p.path.node, (t2: Token) => {
             if (t2 instanceof ArrayToken) {
@@ -741,20 +770,15 @@ export function assignBaseArrayArrayValueToArray(t: ArrayToken, p: NativeFunctio
 }
 
 /**
- * Models call to a promise executor with resolveFunction and rejectFunction as arguments.
+ * Models call to a promise executor.
  */
-export function callPromiseExecutor(promise: AllocationSiteToken, resolveFunction: AllocationSiteToken, rejectFunction: AllocationSiteToken, p: NativeFunctionParams) {
+export function callPromiseExecutor(promise: AllocationSiteToken, p: NativeFunctionParams) {
     const args = p.path.node.arguments;
     if (args.length >= 1 && isExpression(args[0])) { // TODO: SpreadElement? non-MemberExpression?
         const funVar = p.solver.varProducer.expVar(args[0], p.path);
         p.solver.addForAllConstraint(funVar, TokenListener.CALL_PROMISE_EXECUTOR, p.path.node, (t: Token) => {
-            if (t instanceof FunctionToken) {
-                // TODO: register call and call edge for implicit call to promise executor?
-                const param1 = t.fun.params.length > 0 && isIdentifier(t.fun.params[0]) ? t.fun.params[0] : undefined; // TODO: non-Identifier parameters?
-                const param2 = t.fun.params.length > 1 && isIdentifier(t.fun.params[1]) ? t.fun.params[1] : undefined;
-                p.solver.addTokenConstraint(resolveFunction, p.solver.varProducer.nodeVar(param1));
-                p.solver.addTokenConstraint(rejectFunction, p.solver.varProducer.nodeVar(param2));
-            }
+            if (t instanceof FunctionToken)
+                invokeCallbackBound("new Promise", p, promise, t, undefined);
         });
     }
 }
@@ -772,13 +796,14 @@ export function callPromiseResolve(t: ObjectToken, args: CallExpression["argumen
                 case "PromiseResolve":
                     // for all argument values...
                     op.solver.addForAllConstraint(arg, TokenListener.CALL_PROMISE_RESOLVE, path.node, (vt: Token) => {
+                        const vp = op.solver.varProducer;
                         if (vt instanceof AllocationSiteToken && vt.kind === "Promise") {
                             // argument is a promise, transfer its values to the current promise
-                            op.solver.addSubsetConstraint(op.solver.varProducer.objPropVar(vt, PROMISE_FULFILLED_VALUES), op.solver.varProducer.objPropVar(promise, PROMISE_FULFILLED_VALUES));
-                            op.solver.addSubsetConstraint(op.solver.varProducer.objPropVar(vt, PROMISE_REJECTED_VALUES), op.solver.varProducer.objPropVar(promise, PROMISE_REJECTED_VALUES));
+                            op.solver.addSubsetConstraint(vp.objPropVar(vt, PROMISE_FULFILLED_VALUES), vp.objPropVar(promise, PROMISE_FULFILLED_VALUES));
+                            op.solver.addSubsetConstraint(vp.objPropVar(vt, PROMISE_REJECTED_VALUES), vp.objPropVar(promise, PROMISE_REJECTED_VALUES));
                         } else {
                             // argument is a non-promise value, assign it to the fulfilled value of the current promise
-                            op.solver.addTokenConstraint(vt, op.solver.varProducer.objPropVar(promise, PROMISE_FULFILLED_VALUES));
+                            op.solver.addTokenConstraint(vt, vp.objPropVar(promise, PROMISE_FULFILLED_VALUES));
                         }
                     });
                     break;

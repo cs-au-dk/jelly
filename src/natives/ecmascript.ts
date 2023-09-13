@@ -1255,9 +1255,7 @@ export const ecmascriptModels: NativeModel = {
             invoke: (p: NativeFunctionParams) => {
                 if (isNewExpression(p.path.node)) {
                     const promise = newObject("Promise", p.globalSpecialNatives.get(PROMISE_PROTOTYPE)!, p);
-                    const resolveFunction = newObject("PromiseResolve", p.globalSpecialNatives.get(FUNCTION_PROTOTYPE)!, p);
-                    const rejectFunction = newObject("PromiseReject", p.globalSpecialNatives.get(FUNCTION_PROTOTYPE)!, p);
-                    callPromiseExecutor(promise, resolveFunction, rejectFunction, p);
+                    callPromiseExecutor(promise, p);
                     returnToken(promise, p);
                 }
             },
@@ -1303,7 +1301,7 @@ export const ecmascriptModels: NativeModel = {
                 {
                     name: "catch",
                     invoke: (p: NativeFunctionParams) => {
-                       invokeCallback("Promise.prototype.catch$onRejected", p, 0, TokenListener.NATIVE_INVOKE_CALLBACK);
+                        invokeCallback("Promise.prototype.catch$onRejected", p, 0, TokenListener.NATIVE_INVOKE_CALLBACK);
                     }
                 },
                 {

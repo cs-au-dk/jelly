@@ -166,49 +166,20 @@ export class Operations {
                 f.warnUnsupported(path.node, "Unhandled 'require'");
         }
 
-        const argVars = args.map(arg => isExpression(arg) ? this.expVar(arg, path) : undefined);
+        const argVars = args.map(arg => {
+            if (isExpression(arg))
+                return this.expVar(arg, path);
+            else if (isSpreadElement(arg))
+                f.warnUnsupported(arg, "SpreadElement in arguments"); // TODO: SpreadElement in arguments
+            return undefined;
+        });
 
         // expression E0(E1,...,En) or new E0(E1,...,En)
         // constraint: ∀ functions t ∈ ⟦E0⟧: ...
         this.solver.addForAllConstraint(calleeVar, TokenListener.CALL_FUNCTION_CALLEE, path.node, (t: Token) => {
             const f = this.solver.fragmentState; // (don't use in callbacks)
-            const vp = f.varProducer; // (don't use in callbacks)
             if (t instanceof FunctionToken) {
-                f.registerCallEdge(pars.node, caller, this.a.functionInfos.get(t.fun)!);
-                if (t.moduleInfo !== this.moduleInfo)
-                    f.registerEscapingFromModuleArguments(args, path);
-                const hasArguments = f.functionsWithArguments.has(t.fun);
-                const argumentsToken = hasArguments ? this.a.canonicalizeToken(new ArrayToken(t.fun.body, this.packageInfo)) : undefined;
-                for (let i = 0; i < argVars.length; i++) {
-                    const argVar = argVars[i];
-                    // constraint: ...: ⟦Ei⟧ ⊆ ⟦Xi⟧ for each argument/parameter i (Xi may be a pattern)
-                    if (argVar) {
-                        if (i < t.fun.params.length) {
-                            const param = t.fun.params[i];
-                            if (isRestElement(param)) {
-                                // read the remaining arguments into a fresh array
-                                const rest = argVars.slice(i);
-                                const t = this.newArrayToken(param);
-                                for (const [i, argVar] of rest.entries())
-                                    if (argVar) // TODO: SpreadElement in arguments (warning emitted below)
-                                        this.solver.addSubsetConstraint(argVar, vp.objPropVar(t, String(i)));
-                                this.solver.addTokenConstraint(t, vp.nodeVar(param));
-                            } else
-                                this.solver.addSubsetConstraint(argVar, vp.nodeVar(param));
-                        }
-                        // constraint ...: ⟦Ei⟧ ⊆ ⟦t_arguments[i]⟧ for each argument i if the function uses 'arguments'
-                        if (hasArguments)
-                            this.solver.addSubsetConstraint(argVar, vp.objPropVar(argumentsToken!, String(i)));
-                    } else if (isSpreadElement(args[i]))
-                        f.warnUnsupported(args[i], "SpreadElement in arguments"); // TODO: SpreadElement in arguments
-                }
-                // constraint: ...: ⟦ret_t⟧ ⊆ ⟦(new) E0(E1,...,En)⟧
-                if (!isParentExpressionStatement(pars))
-                    this.solver.addSubsetConstraint(vp.returnVar(t.fun), resultVar);
-                // constraint: ...: t_arguments ∈ ⟦t_arguments⟧ if the function uses 'arguments'
-                if (hasArguments)
-                    this.solver.addTokenConstraint(argumentsToken!, vp.argumentsVar(t.fun));
-
+                this.callFunctionTokenBound(t, baseVar, caller, argVars, resultVar, path);
             } else if (t instanceof NativeObjectToken) {
                 f.registerCall(pars.node, this.moduleInfo, {native: true});
                 if (t.invoke && (!isNew || t.constr))
@@ -285,6 +256,58 @@ export class Operations {
             this.solver.addTokenConstraint(promise, this.expVar(path.node, path));
             this.solver.addSubsetConstraint(v, this.solver.varProducer.objPropVar(promise, PROMISE_FULFILLED_VALUES));
         }
+    }
+
+    callFunctionTokenBound(
+        t: FunctionToken,
+        baseVar: ConstraintVar | undefined,
+        caller: FunctionInfo | ModuleInfo,
+        argVars: Array<ConstraintVar | undefined>,
+        resultVar: ConstraintVar | undefined,
+        path: CallNodePath,
+        kind: {native?: boolean, accessor?: boolean, external?: boolean} = {},
+    ) {
+        const f = this.solver.fragmentState; // (don't use in callbacks)
+        const vp = f.varProducer;
+        const pars = getAdjustedCallNodePath(path);
+        f.registerCallEdge(pars.node, caller, this.a.functionInfos.get(t.fun)!, kind);
+        if (t.moduleInfo !== this.moduleInfo)
+            for (const argVar of argVars)
+                f.registerEscapingFromModule(argVar);
+        const hasArguments = f.functionsWithArguments.has(t.fun);
+        const argumentsToken = hasArguments ? this.a.canonicalizeToken(new ArrayToken(t.fun.body, this.packageInfo)) : undefined;
+        for (let i = 0; i < argVars.length; i++) {
+            const argVar = argVars[i];
+            // constraint: ...: ⟦Ei⟧ ⊆ ⟦Xi⟧ for each argument/parameter i (Xi may be a pattern)
+            if (argVar) {
+                if (i < t.fun.params.length) {
+                    const param = t.fun.params[i];
+                    if (isRestElement(param)) {
+                        // read the remaining arguments into a fresh array
+                        const rest = argVars.slice(i);
+                        const t = this.newArrayToken(param);
+                        for (const [i, argVar] of rest.entries())
+                            if (argVar) // TODO: SpreadElement in arguments (warning emitted below)
+                                this.solver.addSubsetConstraint(argVar, vp.objPropVar(t, String(i)));
+                        this.solver.addTokenConstraint(t, vp.nodeVar(param));
+                    } else
+                        this.solver.addSubsetConstraint(argVar, vp.nodeVar(param));
+                }
+                // constraint ...: ⟦Ei⟧ ⊆ ⟦t_arguments[i]⟧ for each argument i if the function uses 'arguments'
+                if (hasArguments)
+                    this.solver.addSubsetConstraint(argVar, vp.objPropVar(argumentsToken!, String(i)));
+            }
+        }
+        // constraint: if E0 is a member expression E.m and t uses 'this', then ⟦E⟧ ⊆ ⟦this_f⟧
+        if (baseVar && f.functionsWithThis.has(t.fun))
+            // TODO: introduce special subset edge that only propagates FunctionToken and AllocationSiteToken?
+            this.solver.addSubsetConstraint(baseVar, vp.thisVar(t.fun));
+        // constraint: ...: ⟦ret_t⟧ ⊆ ⟦(new) E0(E1,...,En)⟧
+        if (!isParentExpressionStatement(pars))
+            this.solver.addSubsetConstraint(vp.returnVar(t.fun), resultVar);
+        // constraint: ...: t_arguments ∈ ⟦t_arguments⟧ if the function uses 'arguments'
+        if (hasArguments)
+            this.solver.addTokenConstraint(argumentsToken!, vp.argumentsVar(t.fun));
     }
 
     /**

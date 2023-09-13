@@ -757,16 +757,16 @@ describe("tests/micro/promises", () => {
                 soundness: "tests/micro/promises.json",
                 functionInfos: 40,
                 moduleInfos: 1,
-                numberOfFunctionToFunctionEdges: callgraphNative? 51 : 25,
-                oneCalleeCalls: callgraphNative? 20 : 14,
+                numberOfFunctionToFunctionEdges: callgraphNative? 54 : 25,
+                oneCalleeCalls: callgraphNative? 23 : 14,
                 funFound: 24,
                 funTotal: 28,
                 callFound: 24,
                 callTotal: 28,
-                reachableFound: callgraphNative? 29 : 1,
-                reachableTotal: 33
+                reachableFound: callgraphNative? 32 : 1,
+                reachableTotal: 33,
             });
-        })
+        });
 });
 
 test("tests/micro/promiseall", async () => {
