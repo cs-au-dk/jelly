@@ -109,7 +109,7 @@ test("tests/micro/client1", async () => {
         callFound: 3,
         callTotal: 3,
         reachableFound: 5,
-        reachableTotal: 5
+        reachableTotal: 5,
     });
 });
 
@@ -210,6 +210,40 @@ test("tests/micro/client8", async () => {
         functionInfos: 0,
         moduleInfos: 1,
         matches: {total: 1}
+    });
+});
+
+describe("tests/micro/client9", () => {
+    test("normal", async () => {
+        await runTest("tests/micro", "client9.js", {
+            soundness: "tests/micro/client9.json",
+            functionInfos: 4,
+            moduleInfos: 2,
+            numberOfFunctionToFunctionEdges: 4,
+            oneCalleeCalls: 4,
+            funFound: 2,
+            funTotal: 2,
+            callFound: 2,
+            callTotal: 2,
+            reachableFound: 6,
+            reachableTotal: 6,
+        });
+    });
+
+    test.each([
+        ["ignoreDependencies", true],
+        ["excludePackages", ["library"]],
+        ["includePackages", ["micro"]],
+    ] as const)("%s=%p", async (opt, value: any) => {
+        options[opt] = value;
+        await runTest("tests/micro", "client9.js", {
+            soundness: "tests/micro/client9.json",
+            functionInfos: 3,
+            moduleInfos: 2,
+            funFound: 0,
+            callFound: 0,
+            reachableFound: 4,
+        });
     });
 });
 

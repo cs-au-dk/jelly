@@ -165,7 +165,7 @@ export class PatternMatcher {
             for (const [ap, ns] of this.fragmentState.moduleAccessPaths) {
                 const m = ap.moduleInfo;
                 if (isMatch(m.getOfficialName()) || (ap.requireName && isMatch(ap.requireName)))
-                    if (options.patterns && m instanceof ModuleInfo && !options.ignoreDependencies)
+                    if (options.patterns && m instanceof ModuleInfo && m.isIncluded)
                         logger.error(`Error: Pattern contains analyzed module ${m.getOfficialName()} (see --ignore-dependencies)`);
                     else
                         res.push([ap, ns]);

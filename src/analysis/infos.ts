@@ -54,14 +54,19 @@ export class ModuleInfo {
 
     readonly isEntry: boolean; // true for entry modules
 
+    // true if the module is included in the analysis, i.e., whether the module will be
+    // analyzed in some fragment state
+    readonly isIncluded: boolean;
+
     node: Program | undefined; // top-level source location (set by analyzeFiles)
 
     readonly hash: number;
 
-    constructor(relativePath: string, packageInfo: PackageInfo, isEntry: boolean) {
+    constructor(relativePath: string, packageInfo: PackageInfo, isEntry: boolean, isIncluded: boolean) {
         this.relativePath = relativePath;
         this.packageInfo = packageInfo;
         this.isEntry = isEntry;
+        this.isIncluded = isIncluded;
         this.hash = strHash(this.toString());
     }
 

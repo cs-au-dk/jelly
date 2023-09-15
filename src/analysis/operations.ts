@@ -536,11 +536,11 @@ export class Operations {
             if (m) {
 
                 // add access path token
-                const analyzed = m instanceof ModuleInfo && (!options.ignoreDependencies || this.a.entryFiles.has(m.getPath()));
+                const analyzed = m instanceof ModuleInfo && m.isIncluded;
                 if (!analyzed || options.vulnerabilities) {
                     const s = normalizeModuleName(str);
                     const tracked = options.trackedModules && options.trackedModules.find(e =>
-                        micromatch.isMatch(m!.getOfficialName(), e) || micromatch.isMatch(s, e))
+                        micromatch.isMatch(m!.getOfficialName(), e) || micromatch.isMatch(s, e));
                     this.solver.addAccessPath(tracked ? new ModuleAccessPath(m, s) : IgnoredAccessPath.instance, resultVar);
                 }
 
