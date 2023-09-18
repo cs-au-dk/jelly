@@ -574,12 +574,27 @@ export class Operations {
         } else if (isMemberExpression(dst) || isOptionalMemberExpression(dst)) {
             const lVar = this.expVar(dst.object, path);
             const prop = getProperty(dst);
+            const enclosing = this.a.getEnclosingFunctionOrModule(path, this.moduleInfo);
+
+            const assignRequireExtensions = (t: Token) => {
+                if (t instanceof NativeObjectToken && t.name === "require.extensions")
+                    // when a function is assigned to require.extensions, add an external call edge
+                    this.solver.addForAllConstraint(src, TokenListener.ASSIGN_REQUIRE_EXTENSIONS, path.node, (t: Token) => {
+                        if (t instanceof FunctionToken) {
+                            this.solver.fragmentState.registerCall(dst, this.moduleInfo, {external: true});
+                            this.solver.fragmentState.registerCallEdge(dst, enclosing, this.a.functionInfos.get(t.fun)!, {external: true});
+                        }
+                    });
+            };
+
             if (prop !== undefined) {
                 // E1.prop = E2
 
                 // constraint: ∀ objects t ∈ ⟦E1⟧: ...
-                this.solver.addForAllConstraint(lVar, TokenListener.ASSIGN_MEMBER_BASE, dst, (t: Token) =>
-                    this.writeProperty(src, lVar, t, prop, dst, this.a.getEnclosingFunctionOrModule(path, this.moduleInfo), path.node));
+                this.solver.addForAllConstraint(lVar, TokenListener.ASSIGN_MEMBER_BASE, dst, (t: Token) => {
+                    this.writeProperty(src, lVar, t, prop, dst, enclosing, path.node);
+                    assignRequireExtensions(t);
+                });
 
                 // TODO: special treatment for E.prototype? and other standard properties?
 
@@ -603,6 +618,8 @@ export class Operations {
                             if (logger.isInfoEnabled())
                                 this.solver.fragmentState.registerUnhandledDynamicPropertyWrite(path.node, src, options.warningsUnsupported && logger.isVerboseEnabled() ? path.getSource() : undefined);
                         }
+
+                        assignRequireExtensions(t);
                     });
                 // TODO: computed property assignments (with known prefix/suffix)
 

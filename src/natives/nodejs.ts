@@ -1,5 +1,6 @@
 import module from "module";
 import {NativeFunctionParams, NativeModel, NativeModelParams} from "./nativebuilder";
+import {NativeObjectToken} from "../analysis/tokens";
 
 /**
  * Names of Node.js built-in modules.
@@ -19,7 +20,17 @@ export const nodejsModels: NativeModel = {
     },
     params: [
         {
-            name: "require"
+            name: "require",
+            init: ({solver, moduleInfo}: NativeModelParams) => {
+                const a = solver.globalState;
+                const rt = a.canonicalizeToken(new NativeObjectToken("require", moduleInfo));
+                // add a special object representing the value of require.extensions
+                // to the extensions property of the require variable
+                solver.addTokenConstraint(
+                    a.canonicalizeToken(new NativeObjectToken("require.extensions", moduleInfo)),
+                    solver.varProducer.objPropVar(rt, "extensions"));
+                return rt;
+            },
         },
         {
             name: "module"
@@ -150,4 +161,4 @@ export const nodejsModels: NativeModel = {
             // TODO
         }
     ]
-}
+};

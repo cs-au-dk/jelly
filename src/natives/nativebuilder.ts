@@ -164,7 +164,7 @@ export function buildNatives(solver: Solver, moduleInfo: ModuleInfo): {globals: 
         // implicit parameters
         if (m.params)
             for (const v of m.params)
-                defineGlobal(v.name, true);
+                defineGlobal(v.name, true, undefined, undefined, undefined, v.init);
 
         // global variables
         if (m.variables)

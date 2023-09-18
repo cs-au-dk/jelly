@@ -900,6 +900,16 @@ test("tests/micro/for-in", async () => {
     });
 });
 
+test("tests/micro/require-extensions", async () => {
+    await runTest("tests/micro", "require-extensions.js", {
+        soundness: "tests/micro/require-extensions.json",
+        moduleInfos: 2,
+        functionInfos: 3,
+        reachableFound: 3,
+        reachableTotal: 3,
+    });
+});
+
 test("tests/micro/packagejson", async () => {
     const vulnerabilities: Vulnerability[] = [{
         osv: {
