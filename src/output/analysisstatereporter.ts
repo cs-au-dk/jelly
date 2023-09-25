@@ -39,7 +39,7 @@ export class AnalysisStateReporter {
                 firstvar = false;
             else
                 fs.writeSync(fd, ",");
-            fs.writeSync(fd, `\n { "var": ${JSON.stringify(v.toString)}, "tokens": [`);
+            fs.writeSync(fd, `\n { "var": ${JSON.stringify(v.toString())}, "tokens": [`);
             let firsttoken = true;
             for (const t of ts) {
                 if (firsttoken)
@@ -338,7 +338,7 @@ export class AnalysisStateReporter {
      * Returns the functions that have zero callers.
      */
     getZeroCallerFunctions(): Set<FunctionInfo> {
-        let funs = new Set(this.a.functionInfos.values());
+        const funs = new Set(this.a.functionInfos.values());
         for (const fs of this.f.functionToFunction.values())
             deleteAll(fs.values(), funs);
         return funs;
