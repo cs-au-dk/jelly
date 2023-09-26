@@ -1,7 +1,6 @@
 import {ModuleInfo} from "./infos";
 import {AccessPathToken, AllocationSiteToken, FunctionToken, NativeObjectToken, ObjectToken, Token} from "./tokens";
-import {ConstraintVar, ObjectPropertyVar} from "./constraintvars";
-import {mapGetArray} from "../misc/util";
+import {ConstraintVar, ObjectPropertyVarObj} from "./constraintvars";
 import logger from "../misc/logger";
 import {isIdentifier} from "@babel/types";
 import Solver from "./solver";
@@ -16,7 +15,7 @@ import {UnknownAccessPath} from "./accesspaths";
 export function findEscapingObjects(m: ModuleInfo, solver: Solver): Set<ObjectToken> {
     const a = solver.globalState;
     const f = solver.fragmentState; // (don't use in callbacks)
-    const worklist: Array<Token> = [];
+    const worklist: Array<ObjectPropertyVarObj> = [];
     const visited = new Set<Token>();
     const escaping = new Set<ObjectToken>();
     const theUnknownAccessPathToken = a.canonicalizeToken(new AccessPathToken(UnknownAccessPath.instance));
@@ -26,31 +25,29 @@ export function findEscapingObjects(m: ModuleInfo, solver: Solver): Set<ObjectTo
      * Note: PackageObjectTokens, AccessPathTokens and (most) NativeObjectTokens are ignored.
      */
     function addToWorklist(v: ConstraintVar) {
-        for (const t of f.getTokens(v))
+        for (const t of f.getTokens(f.getRepresentative(v)))
             if ((t instanceof AllocationSiteToken || t instanceof FunctionToken || (t instanceof NativeObjectToken && t.name === "exports")) && !visited.has(t)) {
                 worklist.push(t);
                 visited.add(t);
             }
     }
 
-    // find object properties
-    const objprops = new Map<Token, Array<ObjectPropertyVar>>();
-    for (const v of f.vars)
-        if (v instanceof ObjectPropertyVar)
-            mapGetArray(objprops, v.obj).push(v);
-
     // first round, seed worklist with module.exports, find functions accessible via property reads
     addToWorklist(f.varProducer.objPropVar(a.canonicalizeToken(new NativeObjectToken("module", m)), "exports"));
-    const w2: Array<Token> = [];
+    const w2: Array<ObjectPropertyVarObj> = [];
     while (worklist.length !== 0) {
         const t = worklist.shift()!; // breadth-first
         if (t instanceof FunctionToken)
             w2.push(t);
         else if (t instanceof ObjectToken || (t instanceof NativeObjectToken && t.name === "exports"))
-            for (const w of mapGetArray(objprops, t))
-                addToWorklist(w);
+            for (const p of f.objectProperties.get(t) ?? [])
+                addToWorklist(f.varProducer.objPropVar(t, p));
     }
-    worklist.push(...w2);
+    visited.clear();
+    for (const t of w2) {
+        visited.add(t);
+        worklist.push(t);
+    }
     // add expressions collected during AST traversal
     for (const v of f.maybeEscapingFromModule)
         addToWorklist(v);
@@ -79,9 +76,10 @@ export function findEscapingObjects(m: ModuleInfo, solver: Solver): Set<ObjectTo
         }
 
         // properties of escaping objects are escaping
-        for (const w of mapGetArray(objprops, t)) {
+        for (const p of f.objectProperties.get(t) ?? []) {
+            const w = f.varProducer.objPropVar(t, p);
             addToWorklist(w);
-            solver.addToken(theUnknownAccessPathToken, w);
+            solver.addToken(theUnknownAccessPathToken, f.getRepresentative(w));
         }
     }
 
