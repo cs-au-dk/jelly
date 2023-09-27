@@ -188,7 +188,7 @@ export function visit(ast: File, op: Operations) {
                         if (fun.node.generator) {
                             // find the iterator object (it is returned via Function)
                             // constraint: ... ⊆ ⟦i.value⟧ where i is the iterator object for the function
-                            const iter = a.canonicalizeToken(new AllocationSiteToken("Iterator", fun.node.body, op.packageInfo));
+                            const iter = a.canonicalizeToken(new AllocationSiteToken("Iterator", fun.node.body));
                             resVar = vp.objPropVar(iter, "value");
                         } else {
                             // constraint: ... ⊆ ⟦ret_f⟧ where f is the enclosing function (ignoring top-level returns)
@@ -238,7 +238,7 @@ export function visit(ast: File, op: Operations) {
                 // function*
 
                 // constraint: %(Async)Generator.prototype.next ⊆ ⟦i.next⟧ where i is the iterator object for the function
-                const iter = a.canonicalizeToken(new AllocationSiteToken("Iterator", fun.body, op.packageInfo));
+                const iter = a.canonicalizeToken(new AllocationSiteToken("Iterator", fun.body));
                 const iterNext = vp.objPropVar(iter, "next");
                 solver.addTokenConstraint(op.globalSpecialNatives.get(fun.async ? ASYNC_GENERATOR_PROTOTYPE_NEXT : GENERATOR_PROTOTYPE_NEXT)!, iterNext);
 
@@ -394,12 +394,12 @@ export function visit(ast: File, op: Operations) {
                         let dst;
                         if (options.alloc && isObjectProperty(path.node)) {
                             // constraint: ⟦E⟧ ⊆ ⟦i.p⟧ where i is the object literal
-                            dst = vp.objPropVar(a.canonicalizeToken(new ObjectToken(path.parentPath.node, op.packageInfo)), key);
+                            dst = vp.objPropVar(a.canonicalizeToken(new ObjectToken(path.parentPath.node)), key);
                         } else if (options.alloc && (isClassProperty(path.node) || isClassAccessorProperty(path.node) || isClassPrivateProperty(path.node)) && path.node.static) {
                             // constraint: ⟦E⟧ ⊆ ⟦c.p⟧ where c is the class
                             const cls = getClass(path);
                             assert(cls);
-                            dst = vp.objPropVar(a.canonicalizeToken(new ClassToken(cls, op.packageInfo)), key);
+                            dst = vp.objPropVar(a.canonicalizeToken(new ClassToken(cls)), key);
                         } else {
                             // constraint: ⟦E⟧ ⊆ ⟦k.p⟧ where k is the current package
                             dst = vp.packagePropVar(op.file, key);
@@ -430,13 +430,13 @@ export function visit(ast: File, op: Operations) {
                             if (options.alloc && isObjectMethod(path.node)) {
                                 // constraint: t ∈ ⟦(ac)i.p⟧ where t denotes the function, i is the object literal,
                                 // and (ac) specifies whether it is a getter, setter or normal property
-                                dst = vp.objPropVar(a.canonicalizeToken(new ObjectToken(path.parentPath.node, op.packageInfo)), key, ac);
+                                dst = vp.objPropVar(a.canonicalizeToken(new ObjectToken(path.parentPath.node)), key, ac);
                             } else if (options.alloc && (isClassMethod(path.node) || isClassPrivateMethod(path.node)) && path.node.static) {
                                 // constraint: t ∈ ⟦(ac)c.p⟧ where t denotes the function, c is the class,
                                 // and (ac) specifies whether it is a getter, setter or normal property
                                 const cls = getClass(path);
                                 assert(cls);
-                                dst = vp.objPropVar(a.canonicalizeToken(new ClassToken(cls, op.packageInfo)), key, ac);
+                                dst = vp.objPropVar(a.canonicalizeToken(new ClassToken(cls)), key, ac);
 
                             } else {
                                 // constraint: t ∈ ⟦(ac)k.p⟧ where t denotes the function and k is the current package,
@@ -698,7 +698,7 @@ export function visit(ast: File, op: Operations) {
         YieldExpression(path: NodePath<YieldExpression>) {
             const fun = path.getFunctionParent()?.node;
             assert(fun, "yield not in function?!");
-            const iter = a.canonicalizeToken(new AllocationSiteToken("Iterator", fun.body, op.packageInfo));
+            const iter = a.canonicalizeToken(new AllocationSiteToken("Iterator", fun.body));
             const iterValue = vp.objPropVar(iter, "value");
             if (path.node.argument) {
                 if (path.node.delegate) {

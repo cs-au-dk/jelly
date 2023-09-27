@@ -1,5 +1,5 @@
 import {Function, Node} from "@babel/types";
-import {locationToStringWithFileAndEnd} from "../misc/util";
+import {Location, locationToStringWithFileAndEnd} from "../misc/util";
 import assert from "assert";
 import {ModuleInfo, PackageInfo} from "./infos";
 import {AccessPath} from "./accesspaths";
@@ -54,13 +54,10 @@ export class AllocationSiteToken extends Token {
 
     readonly allocSite: Node;
 
-    readonly packageInfo: PackageInfo;
-
-    constructor(kind: ObjectKind, allocSite: Node, packageInfo: PackageInfo) {
+    constructor(kind: ObjectKind, allocSite: Node) {
         super();
         this.kind = kind;
         this.allocSite = allocSite;
-        this.packageInfo = packageInfo;
         assert(this instanceof ArrayToken || kind !== "Array", "AllocationSiteTokens of kind Array must be created using ArrayToken");
         assert(this instanceof ObjectToken || kind !== "Object", "AllocationSiteTokens of kind Object must be created using ObjectToken");
         assert(this instanceof ClassToken || kind !== "Class", "AllocationSiteTokens of kind Class must be created using ClassToken");
@@ -76,8 +73,14 @@ export class AllocationSiteToken extends Token {
  */
 export class ObjectToken extends AllocationSiteToken {
 
-    constructor(allocSite: Node, packageInfo: PackageInfo) {
-        super("Object", allocSite, packageInfo);
+    constructor(allocSite: Node) {
+        super("Object", allocSite);
+    }
+
+    getPackageInfo() {
+        const loc = this.allocSite.loc as Location;
+        assert(loc && loc.module);
+        return loc.module.packageInfo;
     }
 }
 
@@ -86,8 +89,8 @@ export class ObjectToken extends AllocationSiteToken {
  */
 export class ArrayToken extends AllocationSiteToken {
 
-    constructor(allocSite: Node, packageInfo: PackageInfo) {
-        super("Array", allocSite, packageInfo);
+    constructor(allocSite: Node) {
+        super("Array", allocSite);
     }
 }
 
@@ -96,8 +99,8 @@ export class ArrayToken extends AllocationSiteToken {
  */
 export class ClassToken extends AllocationSiteToken {
 
-    constructor(allocSite: Node, packageInfo: PackageInfo) {
-        super("Class", allocSite, packageInfo);
+    constructor(allocSite: Node) {
+        super("Class", allocSite);
     }
 }
 
@@ -143,7 +146,7 @@ export class PackageObjectToken extends Token {
     }
 
     toString() {
-        return `*${this.kind === "Object" ? "" : `(${this.kind})`}[${this.packageInfo}]`
+        return `*${this.kind === "Object" ? "" : `(${this.kind})`}[${this.packageInfo}]`;
     }
 }
 

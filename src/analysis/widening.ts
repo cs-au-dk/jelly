@@ -30,7 +30,7 @@ export function widenObjects(m: ModuleInfo, widened: Set<ObjectToken>, solver: S
 
     const tokenMap: Map<ObjectToken, PackageObjectToken> = new Map;
     for (const t of widened)
-        tokenMap.set(t, a.canonicalizeToken(new PackageObjectToken(t.packageInfo)));
+        tokenMap.set(t, a.canonicalizeToken(new PackageObjectToken(t.getPackageInfo())));
 
     /**
      * Returns the widened version of the given token, or the given token itself if it is not being widened.
@@ -92,7 +92,7 @@ export function widenObjects(m: ModuleInfo, widened: Set<ObjectToken>, solver: S
     function widenVar(v: ConstraintVar): ConstraintVar {
         if (v instanceof ObjectPropertyVar && v.obj instanceof ObjectToken && widened.has(v.obj)) {
             const vobj = v.obj;
-            return getOrSet(varMap, v, () => f.varProducer.packagePropVar(vobj.packageInfo, v.prop, v.accessor));
+            return getOrSet(varMap, v, () => f.varProducer.packagePropVar(vobj.getPackageInfo(), v.prop, v.accessor));
         } else
             return v;
     }

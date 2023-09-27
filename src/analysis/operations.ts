@@ -275,7 +275,7 @@ export class Operations {
             for (const argVar of argVars)
                 f.registerEscapingFromModule(argVar);
         const hasArguments = f.functionsWithArguments.has(t.fun);
-        const argumentsToken = hasArguments ? this.a.canonicalizeToken(new ArrayToken(t.fun.body, this.packageInfo)) : undefined;
+        const argumentsToken = hasArguments ? this.a.canonicalizeToken(new ArrayToken(t.fun.body)) : undefined;
         for (let i = 0; i < argVars.length; i++) {
             const argVar = argVars[i];
             // constraint: ...: ⟦Ei⟧ ⊆ ⟦Xi⟧ for each argument/parameter i (Xi may be a pattern)
@@ -734,7 +734,7 @@ export class Operations {
      */
     newObjectToken(n: Node): ObjectToken | PackageObjectToken {
         if (options.alloc) {
-            const t = this.a.canonicalizeToken(new ObjectToken(n, this.packageInfo));
+            const t = this.a.canonicalizeToken(new ObjectToken(n));
             if (!(this.solver.fragmentState.widened && this.solver.fragmentState.widened.has(t))) {
                 this.solver.addInherits(t, this.globalSpecialNatives.get(OBJECT_PROTOTYPE)!);
                 return t;
@@ -747,7 +747,7 @@ export class Operations {
      * Creates a new ArrayToken that inherits from Array.prototype.
      */
     newArrayToken(n: Node): ArrayToken {
-        const t = this.a.canonicalizeToken(new ArrayToken(n, this.packageInfo));
+        const t = this.a.canonicalizeToken(new ArrayToken(n));
         this.solver.addInherits(t, this.globalSpecialNatives.get(ARRAY_PROTOTYPE)!);
         return t;
     }
@@ -756,7 +756,7 @@ export class Operations {
      * Creates a new ClassToken that inherits from Function.prototype.
      */
     newClassToken(n: Node): ClassToken {
-        const t = this.a.canonicalizeToken(new ClassToken(n, this.packageInfo));
+        const t = this.a.canonicalizeToken(new ClassToken(n));
         this.solver.addInherits(t, this.globalSpecialNatives.get(FUNCTION_PROTOTYPE)!);
         return t;
     }
@@ -783,7 +783,7 @@ export class Operations {
      * Creates a AllocationSiteToken of kind Promise that inherits from Promise.prototype.
      */
     newPromiseToken(n: Node): AllocationSiteToken {
-        const t = this.a.canonicalizeToken(new AllocationSiteToken("Promise", n, this.packageInfo));
+        const t = this.a.canonicalizeToken(new AllocationSiteToken("Promise", n));
         this.solver.addInherits(t, this.globalSpecialNatives.get(PROMISE_PROTOTYPE)!);
         return t;
     }

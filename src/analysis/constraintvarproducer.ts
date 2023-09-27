@@ -112,7 +112,7 @@ export class ConstraintVarProducer {
      */
     objPropVar(obj: ObjectPropertyVarObj, prop: string, accessor: AccessorType = "normal"): ObjectPropertyVar {
         if (obj instanceof ObjectToken && this.f.widened.has(obj))
-            return this.packagePropVar(obj.packageInfo, prop, accessor);
+            return this.packagePropVar(obj.getPackageInfo(), prop, accessor);
         return this.a.canonicalizeVar(new ObjectPropertyVar(obj, prop, accessor));
     }
 
