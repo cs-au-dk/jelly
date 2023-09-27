@@ -23,7 +23,7 @@ import {
 import assert from "assert";
 import {AccessPath, CallResultAccessPath, ComponentAccessPath, IgnoredAccessPath, ModuleAccessPath, PropertyAccessPath, UnknownAccessPath} from "./accesspaths";
 import {isAssignmentExpression, Node} from "@babel/types";
-import {FragmentState, ListenerID} from "./fragmentstate";
+import {FragmentState, ListenerID, MergeRepresentativeVar, RepresentativeVar} from "./fragmentstate";
 import {TokenListener} from "./listeners";
 import {nuutila} from "../misc/scc";
 import {options, patternProperties} from "../options";
@@ -45,7 +45,7 @@ export default class Solver {
         return this.fragmentState.varProducer;
     }
 
-    unprocessedTokens: Map<ConstraintVar, Array<Token>> = new Map;
+    unprocessedTokens: Map<RepresentativeVar, Array<Token>> = new Map;
 
     nodesWithNewEdges: Set<ConstraintVar> = new Set;
 
@@ -150,7 +150,7 @@ export default class Solver {
      * Adds a single token if not already present.
      * Also enqueues notification of listeners and registers object properties and array entries from the constraint variable.
      */
-    addToken(t: Token, toRep: ConstraintVar): boolean {
+    addToken(t: Token, toRep: RepresentativeVar): boolean {
         const f = this.fragmentState;
         if (f.addToken(t, toRep)) {
             if (logger.isVerboseEnabled())
@@ -172,7 +172,7 @@ export default class Solver {
      * Adds a set of tokens if not already present.
      * By default also adds to worklist and notifies listeners.
      */
-    private addTokens(ts: Iterable<Token>, toRep: ConstraintVar, propagate: boolean = true) {
+    private addTokens(ts: Iterable<Token>, toRep: RepresentativeVar, propagate: boolean = true) {
         const f = this.fragmentState;
         f.vars.add(toRep);
         let any = false;
@@ -292,7 +292,7 @@ export default class Solver {
         this.addSubsetEdge(f.getRepresentative(from), f.getRepresentative(to));
     }
 
-    addSubsetEdge(fromRep: ConstraintVar, toRep: ConstraintVar, propagate: boolean = true) {
+    addSubsetEdge(fromRep: RepresentativeVar, toRep: RepresentativeVar, propagate: boolean = true) {
         if (fromRep !== toRep) {
             const f = this.fragmentState;
             const s = mapGetSet(f.subsetEdges, fromRep);
@@ -705,149 +705,143 @@ export default class Solver {
      * Redirects constraint variable.
      * Updates the subset edges and listeners, and propagates worklist tokens along redirected edges.
      * Assumes that there is a subset path from v to rep.
+     *
+     * The caller should carefully observe that once the function returns, v is likely not a representative
+     * any more, but v's type will not reflect this fact.
+     * Do not use v as a representative after calling redirect!
+     *
      * @param v constraint variable to redirect
-     * @param rep new representative (possibly v itself if v previously had another representative)
+     * @param rep new representative
      */
-    redirect(v: ConstraintVar, rep: ConstraintVar) {
+    redirect(v: RepresentativeVar, rep: RepresentativeVar) {
         const f = this.fragmentState;
-        assert(f.vars.has(v));
-        const oldRep = f.getRepresentative(v);
-        if (oldRep === rep) {
-            // v is already represented by rep
+        assert(f.vars.has(v) && f.vars.has(rep));
+
+        if (v === rep)
             return;
-        }
+
+        // TODO: remove these - they are guaranteed by the RepresentativeVar invariant
+        assert(f.isRepresentative(v) && f.isRepresentative(rep));
+        assert(f.getRepresentative(v) === v && f.getRepresentative(rep) === rep);
         if (logger.isDebugEnabled())
             logger.debug(`Redirecting ${v} to ${rep}`);
-        if (oldRep !== v) {
-            // v is already redirected, so it shouldn't have any subset edges, listeners or tokens
-            assert(!f.subsetEdges.has(v));
-            assert(!f.reverseSubsetEdges.has(v));
-            assert(!f.tokenListeners.has(v));
-            assert(!f.pairListeners1.has(v));
-            assert(!f.pairListeners2.has(v));
-            assert(!f.hasVar(v));
-            assert(!this.unprocessedTokens.has(v));
-            assert(!this.nodesWithNewEdges.has(v));
-        }
-        if (v === rep) {
-            // v now becomes its own representative, and oldRep !== rep === v so the assertions above apply
-            f.redirections.delete(v);
-            f.vars.add(v);
-        } else {
-            // set rep as new representative for v
-            f.redirections.set(v, rep);
-            if (oldRep === v) { // if v was already redirected, then the assertions above apply
-                // ignore v's new outgoing subset edges
-                this.nodesWithNewEdges.delete(v);
-                // propagate v's worklist tokens (assuming there is a subset path from v to rep)
-                this.processTokens(v);
-                const [size, has] = this.fragmentState.getSizeAndHas(v);
-                this.fragmentState.deleteVar(v);
-                f.numberOfTokens -= size;
-                // find tokens in rep that are not in v
-                const rts: Set<Token> = new Set;
-                for (const t of f.getTokens(rep))
-                    if (!has(t))
-                        rts.add(t);
-                // redirect subset edges
-                const repOut = mapGetSet(f.subsetEdges, rep);
-                const repIn = mapGetSet(f.reverseSubsetEdges, rep);
-                const vOut = f.subsetEdges.get(v);
-                if (vOut) {
-                    for (const w of vOut) {
-                        if (w !== rep) {
-                            const qs = f.reverseSubsetEdges.get(w);
-                            assert(qs, "Subset edges empty");
-                            qs.delete(v);
-                            if (!repOut.has(w)) {
-                                repOut.add(w);
-                                qs.add(rep);
-                                f.numberOfSubsetEdges++;
-                            }
-                            this.addTokens(rts, w);
-                        }
+
+        /*
+        To preserve the invariants of the RepresentativeVar type, the data structures
+        in FragmentState that only contain representative variables must be carefully
+        updated to preserve that property. I.e., all references to v MUST be replaced!
+        */
+
+        // set rep as new representative for v
+        f.redirections.set(v, rep);
+        // ignore v's new outgoing subset edges
+        this.nodesWithNewEdges.delete(v);
+        // propagate v's worklist tokens (assuming there is a subset path from v to rep)
+        this.processTokens(v);
+        const [size, has] = this.fragmentState.getSizeAndHas(v);
+        this.fragmentState.deleteVar(v);
+        f.numberOfTokens -= size;
+        // find tokens in rep that are not in v
+        const rts: Set<Token> = new Set;
+        for (const t of f.getTokens(rep))
+            if (!has(t))
+                rts.add(t);
+        // redirect subset edges
+        const repOut = mapGetSet(f.subsetEdges, rep);
+        const repIn = mapGetSet(f.reverseSubsetEdges, rep);
+        const vOut = f.subsetEdges.get(v);
+        if (vOut) {
+            for (const w of vOut) {
+                if (w !== rep) {
+                    const qs = f.reverseSubsetEdges.get(w);
+                    assert(qs, "Subset edges empty");
+                    qs.delete(v);
+                    if (!repOut.has(w)) {
+                        repOut.add(w);
+                        qs.add(rep);
+                        f.numberOfSubsetEdges++;
                     }
-                    f.numberOfSubsetEdges -= vOut.size;
-                    f.subsetEdges.delete(v);
+                    this.addTokens(rts, w);
                 }
-                const vIn = f.reverseSubsetEdges.get(v);
-                if (vIn) {
-                    for (const w of vIn)
-                        if (w !== rep) {
-                            const qs = f.subsetEdges.get(w);
-                            assert(qs, "Subset edges empty");
-                            qs.delete(v);
-                            if (!repIn.has(w)) {
-                                repIn.add(w);
-                                qs.add(rep);
-                                f.numberOfSubsetEdges++;
-                            }
-                        }
-                    f.numberOfSubsetEdges -= vIn.size;
-                    f.reverseSubsetEdges.delete(v);
-                }
-                repOut.delete(v);
-                repIn.delete(v);
-                if (repOut.size === 0)
-                    f.subsetEdges.delete(rep);
-                if (repIn.size === 0)
-                    f.reverseSubsetEdges.delete(rep);
-                // redirect listeners, invoke on tokens in rep that are not in v
-                const tr = f.tokenListeners.get(v);
-                if (tr) {
-                    const qr = mapGetMap(f.tokenListeners, rep);
-                    for (const [k, listener] of tr) {
-                        qr.set(k, listener);
-                        for (const t of rts)
-                            this.callListener(k, listener, t);
-                    }
-                    f.tokenListeners.delete(v);
-                }
-                const tr1 = f.pairListeners1.get(v);
-                if (tr1) {
-                    const bases: Array<AllocationSiteToken> = [];
-                    for (const t of rts)
-                        if (t instanceof AllocationSiteToken)
-                            bases.push(t);
-                    const qr1 = mapGetMap(f.pairListeners1, rep)
-                    for (const [k, v2l] of tr1) {
-                        qr1.set(k, v2l);
-                        const [v2, listener] = v2l;
-                        for (const t2 of f.getTokens(v2))
-                            if (t2 instanceof FunctionToken || t2 instanceof AccessPathToken)
-                                for (const t of bases)
-                                    this.callPairListener(k, listener, t, t2);
-                    }
-                    f.pairListeners1.delete(v);
-                }
-                const tr2 = f.pairListeners2.get(v);
-                if (tr2) {
-                    const funs: Array<FunctionToken | AccessPathToken> = [];
-                    for (const t of rts)
-                        if (t instanceof FunctionToken || t instanceof AccessPathToken)
-                            funs.push(t);
-                    const qr2 = mapGetMap(f.pairListeners2, rep)
-                    for (const [k, v1l] of tr2) {
-                        qr2.set(k, v1l);
-                        const [v1, listener] = v1l;
-                        for (const t1 of f.getTokens(v1))
-                            if (t1 instanceof AllocationSiteToken)
-                                for (const t of funs)
-                                    this.callPairListener(k, listener, t1, t);
-                    }
-                    f.pairListeners2.delete(v);
-                }
-                assert(!this.unprocessedTokens.has(v));
-                f.vars.delete(v);
-                f.vars.add(rep);
             }
+            f.numberOfSubsetEdges -= vOut.size;
+            f.subsetEdges.delete(v);
         }
+        const vIn = f.reverseSubsetEdges.get(v);
+        if (vIn) {
+            for (const w of vIn)
+                if (w !== rep) {
+                    const qs = f.subsetEdges.get(w);
+                    assert(qs, "Subset edges empty");
+                    qs.delete(v);
+                    if (!repIn.has(w)) {
+                        repIn.add(w);
+                        qs.add(rep);
+                        f.numberOfSubsetEdges++;
+                    }
+                }
+            f.numberOfSubsetEdges -= vIn.size;
+            f.reverseSubsetEdges.delete(v);
+        }
+        repOut.delete(v);
+        repIn.delete(v);
+        if (repOut.size === 0)
+            f.subsetEdges.delete(rep);
+        if (repIn.size === 0)
+            f.reverseSubsetEdges.delete(rep);
+        // redirect listeners, invoke on tokens in rep that are not in v
+        const tr = f.tokenListeners.get(v);
+        if (tr) {
+            const qr = mapGetMap(f.tokenListeners, rep);
+            for (const [k, listener] of tr) {
+                qr.set(k, listener);
+                for (const t of rts)
+                    this.callListener(k, listener, t);
+            }
+            f.tokenListeners.delete(v);
+        }
+        const tr1 = f.pairListeners1.get(v);
+        if (tr1) {
+            const bases: Array<AllocationSiteToken> = [];
+            for (const t of rts)
+                if (t instanceof AllocationSiteToken)
+                    bases.push(t);
+            const qr1 = mapGetMap(f.pairListeners1, rep);
+            for (const [k, v2l] of tr1) {
+                qr1.set(k, v2l);
+                const [v2, listener] = v2l;
+                for (const t2 of f.getTokens(f.getRepresentative(v2)))
+                    if (t2 instanceof FunctionToken || t2 instanceof AccessPathToken)
+                        for (const t of bases)
+                            this.callPairListener(k, listener, t, t2);
+            }
+            f.pairListeners1.delete(v);
+        }
+        const tr2 = f.pairListeners2.get(v);
+        if (tr2) {
+            const funs: Array<FunctionToken | AccessPathToken> = [];
+            for (const t of rts)
+                if (t instanceof FunctionToken || t instanceof AccessPathToken)
+                    funs.push(t);
+            const qr2 = mapGetMap(f.pairListeners2, rep);
+            for (const [k, v1l] of tr2) {
+                qr2.set(k, v1l);
+                const [v1, listener] = v1l;
+                for (const t1 of f.getTokens(f.getRepresentative(v1)))
+                    if (t1 instanceof AllocationSiteToken)
+                        for (const t of funs)
+                            this.callPairListener(k, listener, t1, t);
+            }
+            f.pairListeners2.delete(v);
+        }
+        assert(!this.unprocessedTokens.has(v));
+        f.vars.delete(v);
     }
 
     /**
      * Processes the items in the token worklist for the given constraint variable.
      */
-    processTokens(v: ConstraintVar) {
+    processTokens(v: RepresentativeVar) {
         const ts = this.unprocessedTokens.get(v);
         if (ts) {
             if (logger.isDebugEnabled())
@@ -925,13 +919,13 @@ export default class Solver {
             if (this.unprocessedTokens.size > 0 || this.nodesWithNewEdges.size > 0 || this.restored.size > 0) {
                 if (options.cycleElimination) {
                     // find vars that are end points of new or restored subset edges
-                    const nodes = new Set<ConstraintVar>();
+                    const nodes = new Set<RepresentativeVar>();
                     for (const v of [...this.nodesWithNewEdges, ...this.restored])
                         nodes.add(f.getRepresentative(v));
                     if (nodes.size > 0) {
                         // find strongly connected components
                         const timer1 = new Timer();
-                        const [reps, repmap] = nuutila(nodes, (v: ConstraintVar) => f.subsetEdges.get(v)); // TODO: only consider new edges for entry nodes?
+                        const [reps, repmap] = nuutila(nodes, (v: RepresentativeVar) => f.subsetEdges.get(v)); // TODO: only consider new edges for entry nodes?
                         if (logger.isVerboseEnabled())
                             logger.verbose(`Cycle detection nodes: ${f.vars.size}, roots: ${nodes.size}, components: ${reps.length}`);
                         // cycle elimination
@@ -1021,7 +1015,9 @@ export default class Solver {
     /**
      * Merges the given fragment state into the current fragment state.
      */
-    merge(s: FragmentState, propagate: boolean) { // TODO: reconsider use of 'propagate' flag
+    merge(_s: FragmentState, propagate: boolean) { // TODO: reconsider use of 'propagate' flag
+        // use a different type for s' representative variables to prevent accidental mixups
+        const s = _s as unknown as FragmentState<MergeRepresentativeVar>;
         const f = this.fragmentState;
         // merge redirections
         if (options.cycleElimination)

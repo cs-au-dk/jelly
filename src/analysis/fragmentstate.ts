@@ -32,9 +32,48 @@ import {ConstraintVarProducer} from "./constraintvarproducer";
 export type ListenerID = bigint;
 
 /**
+ * A RepresentativeVar is a constraint variable that is statically guaranteed to be its own representative (see below for exceptions).
+ * Using the RepresentativeVar type in place of the plain ConstraintVar type in APIs that require representatives
+ * allows us catch bugs (passing non-representative variables to such APIs) at compile time.
+ *
+ * The actual type declaration for RepresentativeVar uses a concept known as "type branding" in the TypeScript world.
+ * See e.g. https://www.mikepalmer.dev/blog/stricter-types-in-typescript-with-brands
+ * It is similar to "newtypes" in other statically typed languages.
+ * See https://github.com/Microsoft/TypeScript/issues/4895 for a discussion on support for less ad-hoc newtypes in TypeScript.
+ * RepresentativeVar is a subtype of ConstraintVar, so it can be used as a regular ConstraintVar when required.
+ *
+ * RepresentativeVars are obtained through the `getRepresentative` and `isRepresentative` functions on `FragmentState`:
+ * ```ts
+ * const v: ConstraintVar = ...
+ * const rep: RepresentativeVar = f.getRepresentative(v);
+ * // or
+ * if (f.isRepresentative(v))
+ *   // the type of v in this branch is `RepresentativeVar`
+ * ```
+ * Alternatively they can be acquired by iterating over the data structures in `FragmentState` that contain representatives.
+ *
+ * Shortcomings:
+ * `solver.redirect(v, rep)` invalidates the invariant that `v` is a representative (unless `v === rep`),
+ * but we cannot model that in TypeScript's type system. This would require affine types, which TypeScript does not support.
+ * Clients of `redirect` must be careful to take this into account.
+ *
+ * Bugs in the implementation of `solver.redirect` can easily invalidate the invariant for constraint variables
+ * that are stored in data structures for representative variables, without us being able to detect that statically.
+ * TODO: set up regression testing for this...
+ *
+ * A representative variable in one FragmentState is not guaranteed to be a representative in another.
+ * Like the implementation of `solver.redirect`, code that merges variables from different fragment states must
+ * handle representative variables carefully!
+ * In this case it is possible to use `FragmentState<MergeRepresentativeVar>` for the second fragment state
+ * to prevent representative variable mixups.
+ */
+export type RepresentativeVar = ConstraintVar & { readonly __repr: unique symbol };
+export type MergeRepresentativeVar = ConstraintVar & { readonly __repr: unique symbol };
+
+/**
  * Analysis state for a fragment (a module or a package with dependencies, depending on the analysis phase).
  */
-export class FragmentState {
+export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVar = RepresentativeVar> {
 
     readonly a: GlobalState;
 
@@ -47,12 +86,12 @@ export class FragmentState {
      * The current analysis solution.
      * Singleton sets are represented as plain references, larger sets are represented as ES2015 sets.
      */
-    private readonly tokens: Map<ConstraintVar, Token | Set<Token>> = new Map;
+    private readonly tokens: Map<RVT, Token | Set<Token>> = new Map;
 
     /**
      * The set of constraint variables (including those with tokens, subset edges, or listeners, but excluding those that are redirected).
      */
-    readonly vars: Set<ConstraintVar> = new Set;
+    readonly vars: Set<RVT> = new Set;
 
     /**
      * Indirection introduced by cycle elimination.
@@ -66,9 +105,9 @@ export class FragmentState {
 
     numberOfSubsetEdges: number = 0;
 
-    readonly subsetEdges: Map<ConstraintVar, Set<ConstraintVar>> = new Map;
+    readonly subsetEdges: Map<RVT, Set<RVT>> = new Map;
 
-    readonly reverseSubsetEdges: Map<ConstraintVar, Set<ConstraintVar>> = new Map; // (used by solver.redirect)
+    readonly reverseSubsetEdges: Map<RVT, Set<RVT>> = new Map; // (used by solver.redirect)
 
     /**
      * Inheritance relation. For each token, the map provides the tokens it may inherit from directly.
@@ -81,11 +120,11 @@ export class FragmentState {
 
     objectProperties: Map<ObjectPropertyVarObj, Set<string>> = new Map;
 
-    readonly tokenListeners: Map<ConstraintVar, Map<ListenerID, (t: Token) => void>> = new Map;
+    readonly tokenListeners: Map<RVT, Map<ListenerID, (t: Token) => void>> = new Map;
 
-    readonly pairListeners1: Map<ConstraintVar, Map<ListenerID, [ConstraintVar, (t1: AllocationSiteToken, t2: FunctionToken | AccessPathToken) => void]>> = new Map;
+    readonly pairListeners1: Map<RVT, Map<ListenerID, [ConstraintVar, (t1: AllocationSiteToken, t2: FunctionToken | AccessPathToken) => void]>> = new Map;
 
-    readonly pairListeners2: Map<ConstraintVar, Map<ListenerID, [ConstraintVar, (t1: AllocationSiteToken, t2: FunctionToken | AccessPathToken) => void]>> = new Map;
+    readonly pairListeners2: Map<RVT, Map<ListenerID, [ConstraintVar, (t1: AllocationSiteToken, t2: FunctionToken | AccessPathToken) => void]>> = new Map;
 
     readonly listenersProcessed: Map<ListenerID, Set<Token>> = new Map;
 
@@ -540,7 +579,7 @@ export class FragmentState {
      * Returns the representative of the given constraint variable.
      * Also shortcuts redirections that involve multiple steps.
      */
-    getRepresentative(v: ConstraintVar): ConstraintVar {
+    getRepresentative(v: ConstraintVar): RVT {
         let w = v;
         const ws = [];
         while (true) {
@@ -555,14 +594,24 @@ export class FragmentState {
             assert(ws[i] !== w);
             this.redirections.set(ws[i], w);
         }
-        return w;
+        return w as RVT;
     }
+
+    /**
+     * Returns whether the given constraint variable is a representative.
+     */
+    isRepresentative(v: ConstraintVar): v is RVT {
+        const res = !this.redirections.has(v);
+        assert(res || !this.vars.has(v as RVT));  // sanity check - probably superfluous
+        return res;
+    }
+
 
     /**
      * Returns the tokens in the solution for the given constraint variable
      * (or empty if v is undefined).
      */
-    getTokens(v: ConstraintVar | undefined): Iterable<Token> {
+    getTokens(v: RVT | undefined): Iterable<Token> {
         if (v) {
             const ts = this.tokens.get(v);
             if (ts) {
@@ -577,7 +626,7 @@ export class FragmentState {
     /**
      * Returns the number of tokens in the solution for the given constraint variable, and the tokens.
      */
-    getTokensSize(v: ConstraintVar | undefined): [number, Iterable<Token>] {
+    getTokensSize(v: RVT | undefined): [number, Iterable<Token>] {
         if (v) {
             const ts = this.tokens.get(v);
             if (ts) {
@@ -592,7 +641,7 @@ export class FragmentState {
     /**
      * Returns all constraint variables with their tokens and number of tokens.
      */
-    *getAllVarsAndTokens(): Iterable<[ConstraintVar, Set<Token> | Array<Token>, number]> {
+    *getAllVarsAndTokens(): Iterable<[RVT, Set<Token> | Array<Token>, number]> {
         for (const [v, ts] of this.tokens)
             if (ts instanceof Token)
                 yield [v, [ts], 1];
@@ -603,7 +652,7 @@ export class FragmentState {
     /**
      * Returns the number of tokens and a 'has' function for the given constraint variable.
      */
-    getSizeAndHas(v: ConstraintVar | undefined): [number, (t: Token) => boolean] {
+    getSizeAndHas(v: RVT | undefined): [number, (t: Token) => boolean] {
         if (v) {
             const ts = this.tokens.get(v);
             if (ts) {
@@ -649,21 +698,21 @@ export class FragmentState {
     /**
      * Checks whether the given variable has tokens.
      */
-    hasVar(v: ConstraintVar) {
+    hasVar(v: RVT) {
         return this.tokens.has(v);
     }
 
     /**
      * Removes all tokens from the given variable.
      */
-    deleteVar(v: ConstraintVar) {
+    deleteVar(v: RVT) {
         this.tokens.delete(v);
     }
 
     /**
      * Replaces tokens for a constraint variable.
      */
-    replaceTokens(v: ConstraintVar, ts: Set<Token>, old: number) {
+    replaceTokens(v: RVT, ts: Set<Token>, old: number) {
         this.tokens.set(v, ts.size === 1 ? ts.values().next().value : ts);
         this.numberOfTokens += ts.size - old;
     }
@@ -672,7 +721,7 @@ export class FragmentState {
      * Adds the given token to the solution for the given constraint variable.
      * @return true if not already there, false if already there
      */
-    addToken(t: Token, v: ConstraintVar): boolean {
+    addToken(t: Token, v: RVT): boolean {
         const ts = this.tokens.get(v);
         if (!ts)
             this.tokens.set(v, t);
@@ -694,7 +743,7 @@ export class FragmentState {
      * It is assumed that the given set does not contain any duplicates.
      * @return the tokens that have been added, excluding those already there
      */
-    addTokens(ts: Iterable<Token>, v: ConstraintVar): Array<Token> {
+    addTokens(ts: Iterable<Token>, v: RVT): Array<Token> {
         const added: Array<Token> = [];
         let vs = this.tokens.get(v);
         for (const t of ts) {

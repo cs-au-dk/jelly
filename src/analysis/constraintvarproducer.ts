@@ -39,16 +39,16 @@ import {FilePath, Location} from "../misc/util";
 import {PackageInfo} from "./infos";
 import {GlobalState} from "./globalstate";
 import {getClass} from "../misc/asthelpers";
-import {FragmentState} from "./fragmentstate";
+import {FragmentState, MergeRepresentativeVar, RepresentativeVar} from "./fragmentstate";
 import assert from "assert";
 
-export class ConstraintVarProducer {
+export class ConstraintVarProducer<RVT extends RepresentativeVar | MergeRepresentativeVar = RepresentativeVar> {
 
-    private readonly f: FragmentState;
+    private readonly f: FragmentState<RVT>;
 
     private readonly a: GlobalState; // shortcut to f.a
 
-    constructor(f: FragmentState) {
+    constructor(f: FragmentState<RVT>) {
         this.f = f;
         this.a = f.a;
     }

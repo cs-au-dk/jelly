@@ -33,7 +33,7 @@ export function getAPIExported(f: FragmentState): Map<ObjectPropertyVarObj, Set<
     const worklist = new Map<ObjectPropertyVarObj, Set<AccessPathPattern>>();
 
     function add(v: ConstraintVar, ap: ImportAccessPathPattern | PropertyAccessPathPattern | CallResultAccessPathPattern) {
-        for (const t of f.getTokens(v))
+        for (const t of f.getTokens(f.getRepresentative(v)))
             // TODO: ignore certain tokens? ((t instanceof NativeObjectToken && t.name === "exports") || t instanceof AllocationSiteToken || t instanceof FunctionToken) {
             if (t instanceof NativeObjectToken || t instanceof AllocationSiteToken || t instanceof FunctionToken || t instanceof PackageObjectToken) {
                 const aps = mapGetSet(res, t);

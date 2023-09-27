@@ -418,7 +418,7 @@ export class AnalysisStateReporter {
         const funargs = new Map<Function, number>();
         for (const [f, vs] of this.f.functionParameters) {
             for (const v of vs)
-                for (const t of this.f.getTokens(v))
+                for (const t of this.f.getTokens(this.f.getRepresentative(v)))
                     if (t instanceof FunctionToken)
                         funargs.set(f, (funargs.get(f) || 0) + 1);
         }

@@ -477,8 +477,9 @@ export class PatternMatcher {
      * Find the access paths that escape to external code.
      */
     findEscapingAccessPathsToExternal() {
-        for (const [v, ns] of this.fragmentState.maybeEscapingToExternal)
-            for (const t of this.fragmentState.getTokens(v))
+        const f = this.fragmentState;
+        for (const [v, ns] of f.maybeEscapingToExternal)
+            for (const t of f.getTokens(f.getRepresentative(v)))
                 if (t instanceof AccessPathToken)
                     addAll(ns, mapGetSet(this.escapingToExternal, t.ap));
     }
