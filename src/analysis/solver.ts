@@ -1,4 +1,4 @@
-import {ConstraintVar, IntermediateVar, NodeVar, ObjectPropertyVar, ObjectPropertyVarObj} from "./constraintvars";
+import {ConstraintVar, IntermediateVar, NodeVar, ObjectPropertyVarObj} from "./constraintvars";
 import logger, {isTTY, writeStdOut} from "../misc/logger";
 import {AccessPathToken, AllocationSiteToken, ArrayToken, FunctionToken, ObjectToken, PackageObjectToken, Token} from "./tokens";
 import {GlobalState} from "./globalstate";
@@ -39,7 +39,7 @@ export default class Solver {
 
     readonly globalState: GlobalState = new GlobalState;
 
-    fragmentState: FragmentState = new FragmentState(this.globalState);
+    fragmentState: FragmentState = new FragmentState(this);
 
     get varProducer() {
         return this.fragmentState.varProducer;
@@ -157,12 +157,6 @@ export default class Solver {
                 assert(!f.redirections.has(toRep));
             f.vars.add(toRep);
             this.tokenAdded(toRep, t);
-            // add object property and array entry if applicable
-            if (toRep instanceof ObjectPropertyVar) {
-                this.addObjectProperty(toRep.obj, toRep.prop);
-                if (toRep.obj instanceof ArrayToken)
-                    this.addArrayEntry(toRep.obj, toRep.prop);
-            }
             return true;
         }
         return false;
@@ -175,18 +169,10 @@ export default class Solver {
     private addTokens(ts: Iterable<Token>, toRep: RepresentativeVar, propagate: boolean = true) {
         const f = this.fragmentState;
         f.vars.add(toRep);
-        let any = false;
         let ws: Array<Token> | undefined = undefined;
         for (const t of f.addTokens(ts, toRep)) {
-            any = true;
             if (propagate)
                 ws = this.tokenAdded(toRep, t, ws);
-        }
-        // add object property and array entry if applicable
-        if (any && toRep instanceof ObjectPropertyVar) {
-            this.addObjectProperty(toRep.obj, toRep.prop, propagate);
-            if (toRep.obj instanceof ArrayToken)
-                this.addArrayEntry(toRep.obj, toRep.prop, propagate);
         }
     }
 
@@ -1009,7 +995,7 @@ export default class Solver {
      * Initializes a new fragment state.
      */
     prepare() {
-        this.fragmentState = new FragmentState(this.globalState);
+        this.fragmentState = new FragmentState(this);
     }
 
     /**
@@ -1102,6 +1088,13 @@ export default class Solver {
                 }
             }
         }
+        // add new object properties and array entries
+        for (const [t, props] of s.objectProperties)
+            for (const prop of props)
+                this.addObjectProperty(t, prop, propagate);
+        for (const [t, entries] of s.arrayEntries)
+            for (const entry of entries)
+                this.addArrayEntry(t, entry, propagate);
         // add new array entry listeners and object property listeners
         mapMapSetAll(s.arrayEntriesListeners, f.arrayEntriesListeners);
         mapMapSetAll(s.objectPropertiesListeners, f.objectPropertiesListeners);

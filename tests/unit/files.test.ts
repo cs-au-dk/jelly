@@ -3,13 +3,12 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 import {Node} from "@babel/types";
-import {FragmentState} from "../../src/analysis/fragmentstate";
-import {GlobalState} from "../../src/analysis/globalstate";
 import {requireResolve} from "../../src/misc/files";
 import {options, resetOptions} from "../../src/options";
 import {FilePath} from "../../src/misc/util";
 import logger from "../../src/misc/logger";
 import {realpathSync} from "fs";
+import Solver from "../../src/analysis/solver";
 
 describe("tests/unit/files/requireResolve", () => {
 	interface NestedDirectoryJSON {
@@ -417,7 +416,7 @@ describe("tests/unit/files/requireResolve", () => {
 
 		try {
 			const from = path.resolve(basedir, data.fromFile);
-			const resolve = () => requireResolve(data.requireStr, from, {} as Node, new FragmentState(new GlobalState()));
+			const resolve = () => requireResolve(data.requireStr, from, {} as Node, new Solver().fragmentState);
 			if ("expected" in data)
 				expect(resolve()).toBe(data.expected && path.resolve(basedir, data.expected));
 			else

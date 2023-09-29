@@ -253,7 +253,7 @@ test("tests/micro/arrays", async () => {
         functionInfos: 4,
         moduleInfos: 1,
         numberOfFunctionToFunctionEdges: 4,
-        oneCalleeCalls: 0,
+        oneCalleeCalls: 1,
         funFound: 3,
         funTotal: 3,
         callFound: 3,

@@ -11,7 +11,7 @@ import {JELLY_NODE_ID} from "../../src/parsing/extras";
 import {Location} from "../../src/misc/util";
 import {TokenListener} from "../../src/analysis/listeners";
 
-describe("tests/unit", () => {
+describe("tests/unit/analysis", () => {
     beforeAll(() => {
         resetOptions();
         options.cycleElimination = true;
@@ -153,6 +153,21 @@ describe("tests/unit", () => {
 
             expect(f.postponedListenerCalls, "Pair listener call should be enqueued", {showMatcherMessage: false}).
                 toContainEqual([fn, [at, ft]]);
+        });
+
+        test("object property", () => {
+            const {solver, a, f, redirect} = setup;
+
+            const ot = a.canonicalizeToken(new ObjectToken(param));
+            const ft = a.canonicalizeToken(new FunctionToken(fun0, m));
+            const vA = f.varProducer.objPropVar(ot, "A");
+            redirect(vA, vRep);
+            solver.addTokenConstraint(ft, vRep);
+
+            expect(
+                f.objectProperties.get(ot),
+                "An object property for ot should be registered regardless of redirection",
+            ).toEqual(new Set(["A"]));
         });
     });
 

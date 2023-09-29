@@ -28,6 +28,7 @@ import logger from "../misc/logger";
 import {NodePath} from "@babel/traverse";
 import {GlobalState} from "./globalstate";
 import {ConstraintVarProducer} from "./constraintvarproducer";
+import Solver from "./solver";
 
 export type ListenerID = bigint;
 
@@ -331,9 +332,9 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
      */
     dynamicPropertyWrites: Set<ConstraintVar> = new Set;
 
-    constructor(a: GlobalState) {
-        this.a = a;
-        this.varProducer = new ConstraintVarProducer(this);
+    constructor(s: Solver) {
+        this.a = s.globalState;
+        this.varProducer = new ConstraintVarProducer(s, this);
     }
 
     /**

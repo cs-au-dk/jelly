@@ -41,15 +41,16 @@ import {GlobalState} from "./globalstate";
 import {getClass} from "../misc/asthelpers";
 import {FragmentState, MergeRepresentativeVar, RepresentativeVar} from "./fragmentstate";
 import assert from "assert";
+import Solver from "./solver";
 
 export class ConstraintVarProducer<RVT extends RepresentativeVar | MergeRepresentativeVar = RepresentativeVar> {
 
-    private readonly f: FragmentState<RVT>;
+    private readonly a: GlobalState;
 
-    private readonly a: GlobalState; // shortcut to f.a
-
-    constructor(f: FragmentState<RVT>) {
-        this.f = f;
+    constructor(
+        private readonly s: Solver,
+        private readonly f: FragmentState<RVT>,
+    ) {
         this.a = f.a;
     }
 
@@ -113,7 +114,7 @@ export class ConstraintVarProducer<RVT extends RepresentativeVar | MergeRepresen
     objPropVar(obj: ObjectPropertyVarObj, prop: string, accessor: AccessorType = "normal"): ObjectPropertyVar {
         if (obj instanceof ObjectToken && this.f.widened.has(obj))
             return this.packagePropVar(obj.getPackageInfo(), prop, accessor);
-        return this.a.canonicalizeVar(new ObjectPropertyVar(obj, prop, accessor));
+        return this.a.canonicalizeVar(ObjectPropertyVar.make(this.s, obj, prop, accessor));
     }
 
     /**

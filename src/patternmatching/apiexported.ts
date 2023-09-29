@@ -16,7 +16,7 @@ import {
 } from "./patterns";
 import logger from "../misc/logger";
 import {mapGetSet, locationContains, locationToStringWithFileAndEnd} from "../misc/util";
-import {ConstraintVar, FunctionReturnVar, ObjectPropertyVar, ObjectPropertyVarObj} from "../analysis/constraintvars";
+import {ConstraintVar, FunctionReturnVar, ObjectPropertyVarObj} from "../analysis/constraintvars";
 import {resolve} from "path";
 import {FunctionInfo, ModuleInfo} from "../analysis/infos";
 import assert from "assert";
@@ -63,7 +63,7 @@ export function getAPIExported(f: FragmentState): Map<ObjectPropertyVarObj, Set<
 
     // find exports
     for (const m of f.a.moduleInfos.values())
-        add(f.a.canonicalizeVar(new ObjectPropertyVar(f.a.canonicalizeToken(new NativeObjectToken("module", m)), "exports")),
+        add(f.varProducer.objPropVar(f.a.canonicalizeToken(new NativeObjectToken("module", m)), "exports"),
             c.canonicalize(new ImportAccessPathPattern(m.getOfficialName()))); // TODO: technically, official-name is not a glob?
 
     // iteratively find reachable objects and functions
@@ -76,7 +76,7 @@ export function getAPIExported(f: FragmentState): Map<ObjectPropertyVarObj, Set<
             // look at object properties
             if (t instanceof ObjectToken || t instanceof NativeObjectToken || t instanceof PackageObjectToken)
                 for (const prop of f.objectProperties.get(t) ?? [])
-                    add(f.a.canonicalizeVar(new ObjectPropertyVar(t, prop)),
+                    add(f.varProducer.objPropVar(t, prop),
                         c.canonicalize(new PropertyAccessPathPattern(ap, [prop])));
 
             // look at function returns

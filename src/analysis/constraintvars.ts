@@ -10,6 +10,7 @@ import {
 } from "./tokens";
 import {ModuleInfo, PackageInfo} from "./infos";
 import {IDENTIFIER_KIND} from "./astvisitor";
+import Solver from "./solver";
 
 /**
  * A constraint variable.
@@ -73,17 +74,23 @@ export function isObjectProperyVarObj(t: Token | undefined): t is ObjectProperty
  */
 export class ObjectPropertyVar extends ConstraintVar {
 
-    readonly obj: ObjectPropertyVarObj;
-
-    readonly prop: string
-
-    readonly accessor: AccessorType;
-
-    constructor(obj: ObjectPropertyVarObj, prop: string, accessor: AccessorType = "normal") {
+    private constructor(
+        readonly obj: ObjectPropertyVarObj,
+        readonly prop: string,
+        readonly accessor: AccessorType,
+    ) {
         super();
-        this.prop = prop;
-        this.obj = obj;
-        this.accessor = accessor;
+    }
+
+    /*
+     * Factory method for creation of ObjectPropertyVars.
+     * The (obj, prop) pair is registered on the provided solver instance and listener calls may be enqueued.
+     */
+    static make(solver: Solver, obj: ObjectPropertyVarObj, prop: string, accessor: AccessorType = "normal"): ObjectPropertyVar {
+        solver.addObjectProperty(obj, prop);
+        if (obj instanceof ArrayToken)
+            solver.addArrayEntry(obj, prop);
+        return new ObjectPropertyVar(obj, prop, accessor);
     }
 
     toString(): string {
