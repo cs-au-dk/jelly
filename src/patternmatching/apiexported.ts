@@ -61,12 +61,6 @@ export function getAPIExported(f: FragmentState): Map<ObjectPropertyVarObj, Set<
             }
     }
 
-    // find object properties
-    const objprops = new Map<ObjectPropertyVarObj, Set<string>>();
-    for (const v of f.vars)
-        if (v instanceof ObjectPropertyVar)
-            mapGetSet(objprops, v.obj).add(v.prop);
-
     // find exports
     for (const m of f.a.moduleInfos.values())
         add(f.a.canonicalizeVar(new ObjectPropertyVar(f.a.canonicalizeToken(new NativeObjectToken("module", m)), "exports")),
@@ -80,10 +74,10 @@ export function getAPIExported(f: FragmentState): Map<ObjectPropertyVarObj, Set<
                 worklist.delete(t);
 
             // look at object properties
-           if (t instanceof ObjectToken || t instanceof NativeObjectToken || t instanceof PackageObjectToken)
-                for (const prop of mapGetSet(objprops, t))
+            if (t instanceof ObjectToken || t instanceof NativeObjectToken || t instanceof PackageObjectToken)
+                for (const prop of f.objectProperties.get(t) ?? [])
                     add(f.a.canonicalizeVar(new ObjectPropertyVar(t, prop)),
-                        c.canonicalize(new PropertyAccessPathPattern(ap, [prop])))
+                        c.canonicalize(new PropertyAccessPathPattern(ap, [prop])));
 
             // look at function returns
             if (t instanceof FunctionToken)
@@ -127,17 +121,9 @@ function findFunctionAtLocation(a: GlobalState, loc: string): FunctionInfo | Mod
     return undefined;
 }
 
-function getReverseCallGraph(f: FragmentState): Map<FunctionInfo, Set<FunctionInfo | ModuleInfo>> {
-    const r = new Map<FunctionInfo, Set<FunctionInfo | ModuleInfo>>();
-    for (const [from, tos] of f.functionToFunction)
-            for (const to of tos)
-                mapGetSet(r, to).add(from);
-    return r;
-}
-
-function getReverseRequireGraph(f: FragmentState): Map<ModuleInfo, Set<FunctionInfo | ModuleInfo>> {
-    const r = new Map<ModuleInfo, Set<FunctionInfo | ModuleInfo>>();
-    for (const [from, tos] of f.requireGraph)
+function getReverseGraph<N1, N2>(g: Map<N1, Set<N2>>): Map<N2, Set<N1>> {
+    const r = new Map<N2, Set<N1>>();
+    for (const [from, tos] of g)
         for (const to of tos)
             mapGetSet(r, to).add(from);
     return r;
@@ -148,8 +134,8 @@ function getReverseRequireGraph(f: FragmentState): Map<ModuleInfo, Set<FunctionI
  * The functions and modules are the keys of the resulting map; the values are the successors toward the given function.
  */
 function findReachingFunctions(f: FragmentState, fun: FunctionInfo | ModuleInfo): Map<FunctionInfo | ModuleInfo, Set<FunctionInfo | ModuleInfo>> {
-    const callers = getReverseCallGraph(f);
-    const requires = getReverseRequireGraph(f);
+    const callers = getReverseGraph(f.functionToFunction);
+    const requires = getReverseGraph(f.requireGraph);
     const r = new Map<FunctionInfo | ModuleInfo, Set<FunctionInfo | ModuleInfo>>();
     const w = new Set<FunctionInfo | ModuleInfo>();
     r.set(fun, new Set());
