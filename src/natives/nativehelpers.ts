@@ -555,7 +555,7 @@ export function invokeCallbackBound(kind: CallbackKind, p: NativeFunctionParams,
 
             if (ft instanceof FunctionToken) {
                 // assign promise fulfilled/rejected value to the callback parameter and add call edge
-                modelCall([prop !== undefined? vp.objPropVar(bt, prop) : undefined]);
+                modelCall([prop !== undefined ? vp.objPropVar(bt, prop) : undefined]);
 
                 // for all return values of the callback...
                 solver.addForAllConstraint(vp.returnVar(ft.fun), key, p.path.node, (t: Token) => {

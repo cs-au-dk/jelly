@@ -1060,7 +1060,7 @@ export const ecmascriptModels: NativeModel = {
             invoke: (p: NativeFunctionParams) => {
                 // Object(...) can return primitive wrapper objects, but they are not relevant
                 returnToken(
-                    !options.alloc? p.op.packageObjectToken :
+                    !options.alloc ? p.op.packageObjectToken :
                     newObject("Object", p.globalSpecialNatives.get(OBJECT_PROTOTYPE)!, p), p);
                 returnArgument(p.path.node.arguments[0], p);
             },
