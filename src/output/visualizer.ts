@@ -1,6 +1,6 @@
 import {readFileSync, writeFileSync} from "fs";
 import {FunctionInfo, ModuleInfo, PackageInfo} from "../analysis/infos";
-import {addAll, getOrSet, mapGetMap} from "../misc/util";
+import {addAll, getOrSet, mapGetArray, mapGetMap} from "../misc/util";
 import {ConstraintVar, NodeVar, ObjectPropertyVar} from "../analysis/constraintvars";
 import {FragmentState} from "../analysis/fragmentstate";
 import {NativeObjectToken, Token} from "../analysis/tokens";
@@ -107,12 +107,16 @@ function getReachable(f: FragmentState): Set<PackageInfo | ModuleInfo | Function
  * Checks whether the constraint variable is "trivial", i.e., it has no tokens or it is a native object property
  * with only the native library value, or it represents 'undefined'.
  */
-function isTrivialVar(v: ConstraintVar, ts: Iterable<Token>, size: number): boolean {
+function isTrivialVar(v: ConstraintVar, ts: Iterable<Token>, size: number, redir: Map<ConstraintVar, Array<ConstraintVar>>): boolean {
     if (size > 1)
         return false;
     if (size === 0 || (v instanceof NodeVar && isIdentifier(v.node) && v.node.loc?.start.line === 0))
         return true;
-    return v instanceof ObjectPropertyVar && v.obj instanceof NativeObjectToken && ts[Symbol.iterator]().next().value instanceof NativeObjectToken;
+    const first = ts[Symbol.iterator]().next().value;
+    for (const w of [v, ...redir.get(v) ?? []])
+        if (!(w instanceof ObjectPropertyVar && w.obj instanceof NativeObjectToken && first instanceof NativeObjectToken))
+            return false;
+    return true;
 }
 
 /**
@@ -299,8 +303,11 @@ function getVisualizerDataFlowGraphs(f: FragmentState): VisualizerGraphs {
     const packageTokenCounts = new Map<PackageInfo, number>();
     const nontrivialVars = new Set<ConstraintVar>(), anyEdges = new Set<ConstraintVar>();
     const parents = new Map<ConstraintVar, PackageInfo | ModuleInfo>();
+    const redir = new Map<ConstraintVar, Array<ConstraintVar>>();
+    for (const [v, w] of f.redirections)
+        mapGetArray(redir, f.getRepresentative(w)).push(v);
     for (const [v, ts, size] of f.getAllVarsAndTokens()) {
-        if (!isTrivialVar(v, ts, size)) {
+        if (!isTrivialVar(v, ts, size, redir)) {
             nontrivialVars.add(v);
             const p = f.a.getConstraintVarParent(v);
             if (p)

@@ -45,7 +45,7 @@ import {
     Node
 } from "@babel/types";
 import micromatch from "micromatch";
-import {AccessPathToken} from "../analysis/tokens";
+import {AccessPathToken, Token} from "../analysis/tokens";
 import logger from "../misc/logger";
 import {ConstraintVar, NodeVar} from "../analysis/constraintvars";
 import {
@@ -411,14 +411,21 @@ export class PatternMatcher {
     private findUnknowns(): Array<Node> {
         if (!this.unknownsCache) {
             this.unknownsCache = [];
+            const check = (v: NodeVar, ts: Iterable<Token>) => {
+                for (const t of ts)
+                    if (t instanceof AccessPathToken && t.ap instanceof UnknownAccessPath) {
+                        if (logger.isDebugEnabled())
+                            logger.debug(`Unknown: ${v} (${t})`);
+                        this.unknownsCache!.push(v.node);
+                        break;
+                    }
+            };
             for (const [v, ts] of this.fragmentState.getAllVarsAndTokens()) // only includes representatives, but always followed by property read
                 if (v instanceof NodeVar)
-                    for (const t of ts)
-                        if (t instanceof AccessPathToken && t.ap instanceof UnknownAccessPath) {
-                            if (logger.isDebugEnabled())
-                                logger.debug(`Unknown: ${v} (${t})`);
-                            this.unknownsCache.push(v.node);
-                        }
+                    check(v, ts);
+            for (const v of this.fragmentState.redirections)
+                if (v instanceof NodeVar)
+                    check(v, this.fragmentState.getTokens(this.fragmentState.getRepresentative(v)));
         }
         return this.unknownsCache;
     }

@@ -1,9 +1,9 @@
 import logger from "../misc/logger";
-import {deleteAll, FilePath, getOrSet, Location, locationToStringWithFile, locationToStringWithFileAndEnd} from "../misc/util";
+import {deleteAll, FilePath, getOrSet, Location, locationToStringWithFile, locationToStringWithFileAndEnd, mapGetArray} from "../misc/util";
 import {GlobalState} from "../analysis/globalstate";
 import {FunctionToken, NativeObjectToken, Token} from "../analysis/tokens";
 import fs from "fs";
-import {ConstraintVar, FunctionReturnVar, NodeVar, ObjectPropertyVar} from "../analysis/constraintvars";
+import {ConstraintVar, NodeVar, ObjectPropertyVar} from "../analysis/constraintvars";
 import {FragmentState} from "../analysis/fragmentstate";
 import {relative, resolve} from "path";
 import {options} from "../options";
@@ -229,14 +229,29 @@ export class AnalysisStateReporter {
      */
     reportTokens() {
         logger.info("Tokens:");
-        for (const [v, ts, size] of this.f.getAllVarsAndTokens())
-            if (size > 0 &&
-                !(((v instanceof ObjectPropertyVar && v.obj instanceof NativeObjectToken) || // TODO: don't omit native variables that contain non-native values?
-                    (v instanceof NodeVar && isIdentifier(v.node) && v.node.loc?.start.line === 0)) && size === 1)) {
-                logger.info(`  ${v}: (size ${size})`);
-                for (const t of ts)
-                    logger.info(`    ${t}`);
+        const redir = new Map<ConstraintVar, Array<ConstraintVar>>();
+        for (const [v, w] of this.f.redirections)
+            mapGetArray(redir, this.f.getRepresentative(w)).push(v);
+        for (const [v, ts, size] of this.f.getAllVarsAndTokens()) {
+            if (size === 0)
+                continue;
+            if (size === 1) {
+                let any = false;
+                for (const w of [v, ...redir.get(v) ?? []])
+                    if (!((w instanceof ObjectPropertyVar && w.obj instanceof NativeObjectToken) || // TODO: don't omit native variables that contain non-native values?
+                        (w instanceof NodeVar && isIdentifier(w.node) && w.node.loc?.start.line === 0))) {
+                        any = true;
+                        break;
+                    }
+                if (!any)
+                    continue;
             }
+            logger.info(`  ${v}: (size ${size})`);
+            for (const w of redir.get(v) ?? [])
+                logger.info(`  ${w} (redirected)`);
+            for (const t of ts)
+                logger.info(`    ${t}`);
+        }
     }
 
     /**
@@ -423,11 +438,12 @@ export class AnalysisStateReporter {
                         funargs.set(f, (funargs.get(f) || 0) + 1);
         }
         const funreturns = new Map<Function, number>();
-        for (const v of this.f.vars)
-            if (v instanceof FunctionReturnVar)
-                for (const t of this.f.getTokens(v))
-                    if (t instanceof FunctionToken)
-                        funreturns.set(v.fun, (funreturns.get(v.fun) || 0) + 1);
+        for (const f of this.a.functionInfos.keys()) {
+            const v = this.f.varProducer.returnVar(f);
+            for (const t of this.f.getTokens(this.f.getRepresentative(v)))
+                if (t instanceof FunctionToken)
+                    funreturns.set(f, (funreturns.get(f) || 0) + 1);
+        }
         logger.info("Higher-order functions (function arguments + function return values):");
         const a = [];
         for (const f of [...funargs.keys(), ...funreturns.keys()])
