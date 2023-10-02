@@ -8,27 +8,17 @@ import assert from "assert";
  */
 export class PackageInfo {
 
-    readonly name: string; // package name, "<main>" is used for entry files if no package.json is found
-
-    readonly version: string | undefined; // package version, undefined if not available
-
-    readonly main: string | undefined; // package main file, undefined if not available
-
-    readonly dir: FilePath; // absolute path to representative package root directory, or current working directory if no package.json is found for the entry files (transient)
-
     readonly modules: Map<string, ModuleInfo> = new Map; // map from path relative to the package root to module info
 
     readonly directDependencies: Set<PackageInfo> = new Set; // the direct dependencies of this package
 
-    readonly isEntry: boolean; // true for entry packages
-
-    constructor(name: string, version: string | undefined, main: string | undefined, dir: FilePath, isEntry: boolean) {
-        this.name = name;
-        this.version = version;
-        this.main = main;
-        this.dir = dir;
-        this.isEntry = isEntry;
-    }
+    constructor(
+        readonly name: string, // package name, "<main>" is used for entry files if no package.json is found
+        readonly version: string | undefined, // package version, undefined if not available
+        readonly main: string | undefined, // package main file, undefined if not available
+        readonly dir: FilePath, // absolute path to representative package root directory, or current working directory if no package.json is found for the entry files (transient)
+        readonly isEntry: boolean // true for entry packages
+    ) {}
 
     toString(): string {
         return `${this.name}${this.version ? `@${this.version}` : ""}`;
@@ -46,27 +36,18 @@ export function normalizeModuleName(s: string): string {
  */
 export class ModuleInfo {
 
-    readonly relativePath: string; // path relative to the package root
-
-    readonly packageInfo: PackageInfo; // package containing this module
-
     readonly functions: Set<FunctionInfo> = new Set; // functions directly inside this module
-
-    readonly isEntry: boolean; // true for entry modules
-
-    // true if the module is included in the analysis, i.e., whether the module will be
-    // analyzed in some fragment state
-    readonly isIncluded: boolean;
 
     node: Program | undefined; // top-level source location (set by analyzeFiles)
 
     readonly hash: number;
 
-    constructor(relativePath: string, packageInfo: PackageInfo, isEntry: boolean, isIncluded: boolean) {
-        this.relativePath = relativePath;
-        this.packageInfo = packageInfo;
-        this.isEntry = isEntry;
-        this.isIncluded = isIncluded;
+    constructor(
+        readonly relativePath: string, // path relative to the package root
+        readonly packageInfo: PackageInfo, // package containing this module
+        readonly isEntry: boolean, // true for entry modules
+        readonly isIncluded: boolean // true if the module is included in the analysis, i.e., analyzed in some fragment state
+    ) {
         this.hash = strHash(this.toString());
     }
 
@@ -99,12 +80,9 @@ export class ModuleInfo {
  */
 export class DummyModuleInfo { // used for module files that can't be found (typically because they haven't been installed)
 
-    readonly requireName: string;
-
     readonly normalizedRequireName: string; // require string (normalized but not resolved to a file)
 
-    constructor(requireName: string) {
-        this.requireName = requireName;
+    constructor(readonly requireName: string) {
         this.normalizedRequireName = normalizeModuleName(requireName);
     }
 
@@ -122,23 +100,17 @@ export class DummyModuleInfo { // used for module files that can't be found (typ
  */
 export class FunctionInfo {
 
-    readonly name: string | undefined; // function name
-
-    readonly node: Function; // function source location
-
-    readonly moduleInfo: ModuleInfo; // module containing this function
-
     readonly functions: Set<FunctionInfo> = new Set; // functions directly inside this function
 
     get packageInfo(): PackageInfo {
         return this.moduleInfo.packageInfo;
     }
 
-    constructor(name: string | undefined, node: Function, moduleInfo: ModuleInfo) {
-        this.name = name;
-        this.node = node;
-        this.moduleInfo = moduleInfo;
-    }
+    constructor(
+        readonly name: string | undefined, // function name
+        readonly node: Function, // function source location
+        readonly moduleInfo: ModuleInfo // module containing this function
+    ) {}
 
     toString() {
         return `${this.moduleInfo}:${locationToString(this.node.loc)}:${this.name ?? "<anonymous>"}`;

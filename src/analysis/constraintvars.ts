@@ -38,11 +38,8 @@ export abstract class ConstraintVar {
  */
 export class NodeVar extends ConstraintVar {
 
-    readonly node: Node;
-
-    constructor(node: Node) {
+    constructor(readonly node: Node) {
         super();
-        this.node = node;
     }
 
     toString(): string {
@@ -110,11 +107,8 @@ export class ObjectPropertyVar extends ConstraintVar {
  */
 export class ArrayValueVar extends ConstraintVar {
 
-    readonly array: ArrayToken;
-
-    constructor(array: ArrayToken) {
+    constructor(readonly array: ArrayToken) {
         super();
-        this.array = array;
     }
 
     toString(): string {
@@ -131,11 +125,8 @@ export class ArrayValueVar extends ConstraintVar {
  */
 export class FunctionReturnVar extends ConstraintVar {
 
-    readonly fun: Function;
-
-    constructor(fun: Function) {
+    constructor(readonly fun: Function) {
         super();
-        this.fun = fun;
     }
 
     toString() {
@@ -152,11 +143,8 @@ export class FunctionReturnVar extends ConstraintVar {
  */
 export class ThisVar extends ConstraintVar {
 
-    readonly fun: Function;
-
-    constructor(fun: Function) {
+    constructor(readonly fun: Function) {
         super();
-        this.fun = fun;
     }
 
     toString() {
@@ -173,11 +161,8 @@ export class ThisVar extends ConstraintVar {
  */
 export class ArgumentsVar extends ConstraintVar {
 
-    readonly fun: Function;
-
-    constructor(fun: Function) {
+    constructor(readonly fun: Function) {
         super();
-        this.fun = fun;
     }
 
     toString() {
@@ -194,11 +179,8 @@ export class ArgumentsVar extends ConstraintVar {
  */
 export class ClassExtendsVar extends ConstraintVar {
 
-    readonly cl: Class;
-
-    constructor(cl: Class) {
+    constructor(readonly cl: Class) {
         super();
-        this.cl = cl;
     }
 
     toString() {
@@ -215,14 +197,11 @@ export class ClassExtendsVar extends ConstraintVar {
  */
 export class IntermediateVar extends ConstraintVar {
 
-    readonly node: Node;
-
-    readonly label: string;
-
-    constructor(node: Node, label: string) {
+    constructor(
+        readonly node: Node,
+        readonly label: string
+    ) {
         super();
-        this.node = node;
-        this.label = label;
     }
 
     toString() {

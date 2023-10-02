@@ -4,22 +4,18 @@ export type Glob = string;
 
 export abstract class DetectionPattern {
 
-    readonly ap: AccessPathPattern;
-
-    protected constructor(ap: AccessPathPattern) {
-        this.ap = ap;
-    }
+    protected constructor(readonly ap: AccessPathPattern) {}
 
     abstract toString(): string
 }
 
 export class ImportDetectionPattern extends DetectionPattern {
 
-    readonly onlyDefault: boolean; // TODO: change to "importDefault"?
-
-    constructor(ap: ImportAccessPathPattern, onlyDefault: boolean) {
+    constructor(
+        ap: ImportAccessPathPattern,
+        readonly onlyDefault: boolean // TODO: change to "importDefault"?
+    ) {
         super(ap);
-        this.onlyDefault = onlyDefault;
     }
 
     toString(): string {
@@ -29,14 +25,12 @@ export class ImportDetectionPattern extends DetectionPattern {
 
 export class ReadDetectionPattern extends DetectionPattern {
 
-    readonly notInvoked: boolean; // TODO: change to "readNotCall"?
-
-    readonly baseFilter: Array<Type> | undefined;
-
-    constructor(ap: PropertyAccessPathPattern, notInvoked: boolean, baseFilter: Array<Type> | undefined) {
+    constructor(
+        ap: PropertyAccessPathPattern,
+        readonly notInvoked: boolean, // TODO: change to "readNotCall"?
+        readonly baseFilter: Array<Type> | undefined
+    ) {
         super(ap);
-        this.notInvoked = notInvoked;
-        this.baseFilter = baseFilter;
     }
 
     toString(): string {
@@ -47,14 +41,12 @@ export class ReadDetectionPattern extends DetectionPattern {
 
 export class WriteDetectionPattern extends DetectionPattern {
 
-    readonly valueFilter: Array<Type> | undefined;
-
-    readonly baseFilter: Array<Type> | undefined;
-
-    constructor(ap: PropertyAccessPathPattern, valueFilter: Array<Type> | undefined, baseFilter: Array<Type> | undefined) {
+    constructor(
+        ap: PropertyAccessPathPattern,
+        readonly valueFilter: Array<Type> | undefined,
+        readonly baseFilter: Array<Type> | undefined
+    ) {
         super(ap);
-        this.valueFilter = valueFilter;
-        this.baseFilter = baseFilter;
         // TODO: assert type 'any' not in filters?
     }
 
@@ -67,20 +59,14 @@ export class WriteDetectionPattern extends DetectionPattern {
 
 export class CallDetectionPattern extends DetectionPattern { // TODO: introduce ComponentDetectionPattern? (see ComponentAccessPathPattern)
 
-    readonly onlyReturnChanged: boolean; // TODO: change to "callReturns"?
-
-    readonly onlyWhenUsedAsPromise: boolean;
-
-    readonly onlyNonNewCalls: boolean;
-
-    readonly filters: Array<Filter> | undefined;
-
-    constructor(ap: AccessPathPattern, onlyReturnChanged: boolean, onlyWhenUsedAsPromise: boolean, onlyNonNewCalls: boolean, filters: Array<Filter> | undefined) {
+    constructor(
+        ap: AccessPathPattern,
+        readonly onlyReturnChanged: boolean, // TODO: change to "callReturns"?
+        readonly onlyWhenUsedAsPromise: boolean,
+        readonly onlyNonNewCalls: boolean,
+        readonly filters: Array<Filter> | undefined
+    ) {
         super(ap);
-        this.onlyReturnChanged = onlyReturnChanged;
-        this.onlyWhenUsedAsPromise = onlyWhenUsedAsPromise;
-        this.onlyNonNewCalls = onlyNonNewCalls;
-        this.filters = filters;
     }
 
     toString(): string {
@@ -97,11 +83,7 @@ export interface AccessPathPattern {
 
 export class ImportAccessPathPattern {
 
-    readonly glob: Glob;
-
-    constructor(glob: Glob) {
-        this.glob = glob;
-    }
+    constructor(readonly glob: Glob) {}
 
     toString(): string {
         return `<${this.glob}>`;
@@ -114,14 +96,10 @@ export class ImportAccessPathPattern {
 
 export class PropertyAccessPathPattern {
 
-    readonly base: AccessPathPattern;
-
-    readonly props: Array<string>;
-
-    constructor(base: AccessPathPattern, props: Array<string>) {
-        this.base = base;
-        this.props = props;
-    }
+    constructor(
+        readonly base: AccessPathPattern,
+        readonly props: Array<string>
+    ) {}
 
     toString(): string {
         return `${this.base}.${this.props.length === 1 ? `${this.props[0]}` : `{${this.props.join(',')}}`}`;
@@ -135,11 +113,7 @@ export class PropertyAccessPathPattern {
 
 export class CallResultAccessPathPattern {
 
-    readonly fun: AccessPathPattern;
-
-    constructor(fun: AccessPathPattern) {
-        this.fun = fun;
-    }
+    constructor(readonly fun: AccessPathPattern) {}
 
     toString(): string {
         return `${this.fun}()`;
@@ -153,11 +127,7 @@ export class CallResultAccessPathPattern {
 
 export class ComponentAccessPathPattern {
 
-    readonly component: AccessPathPattern;
-
-    constructor(component: AccessPathPattern) {
-        this.component = component;
-    }
+    constructor(readonly component: AccessPathPattern) {}
 
     toString(): string {
         return `${this.component}<>`;
@@ -171,11 +141,7 @@ export class ComponentAccessPathPattern {
 
 export class AbbreviatedPathPattern {
 
-    readonly prefix: AccessPathPattern;
-
-    constructor(prefix: AccessPathPattern) {
-        this.prefix = prefix;
-    }
+    constructor(readonly prefix: AccessPathPattern) {}
 
     toString(): string {
         return `${this.prefix}…`;
@@ -189,11 +155,7 @@ export class AbbreviatedPathPattern {
 
 export class DisjunctionAccessPathPattern {
 
-    readonly aps: Array<AccessPathPattern>;
-
-    constructor(aps: Array<AccessPathPattern>) {
-        this.aps = aps;
-    }
+    constructor(readonly aps: Array<AccessPathPattern>) {}
 
     toString(): string {
         return `{${this.aps.map((ap: AccessPathPattern) => ap.toString()).join(',')}}`;
@@ -208,11 +170,10 @@ export class DisjunctionAccessPathPattern {
 
 export class ExclusionAccessPathPattern {
 
-    readonly include: AccessPathPattern;
-
-    readonly exclude: AccessPathPattern;
-
-    constructor(include: AccessPathPattern, exclude: AccessPathPattern) {
+    constructor(
+        readonly include: AccessPathPattern,
+        readonly exclude: AccessPathPattern
+    ) {
         this.include = include;
         this.exclude = exclude;
     }
@@ -230,11 +191,7 @@ export class ExclusionAccessPathPattern {
 
 export class WildcardAccessPathPattern {
 
-    readonly ap: AccessPathPattern;
-
-    constructor(ap: AccessPathPattern) {
-        this.ap = ap;
-    }
+    constructor(readonly ap: AccessPathPattern) {}
 
     toString(): string {
         return `${this.ap}**`;
@@ -248,11 +205,7 @@ export class WildcardAccessPathPattern {
 
 export class PotentiallyUnknownAccessPathPattern {
 
-    readonly ap: AccessPathPattern;
-
-    constructor(ap: AccessPathPattern) {
-        this.ap = ap;
-    }
+    constructor(readonly ap: AccessPathPattern) {}
 
     toString(): string {
         return `${this.ap}?`;
@@ -271,14 +224,11 @@ export abstract class Filter {
 
 export class NumArgsCallFilter extends Filter {
 
-    readonly minArgs: number | undefined;
-
-    readonly maxArgs: number | undefined;
-
-    constructor(minArgs: number | undefined, maxArgs: number | undefined) {
+    constructor(
+        readonly minArgs: number | undefined,
+        readonly maxArgs: number | undefined
+    ) {
         super();
-        this.minArgs = minArgs;
-        this.maxArgs = maxArgs;
     }
 
     public toString(): string {
@@ -288,14 +238,11 @@ export class NumArgsCallFilter extends Filter {
 
 export class TypeFilter extends Filter {
 
-    readonly selector: FilterSelector;
-
-    readonly types: Array<Type>;
-
-    constructor(selector: FilterSelector, types: Array<Type>) {
+    constructor(
+        readonly selector: FilterSelector,
+        readonly types: Array<Type>
+    ) {
         super();
-        this.selector = selector;
-        this.types = types;
         // TODO: type 'any' should only be used with access path selectors
     }
 
@@ -306,14 +253,10 @@ export class TypeFilter extends Filter {
 
 export class FilterSelector {
 
-    head: number | "base";
-
-    props: Array<string> | undefined;
-
-    constructor(head: number | "base", props: Array<string> | undefined) {
-        this.head = head;
-        this.props = props;
-    }
+    constructor(
+        readonly head: number | "base",
+        readonly props: Array<string> | undefined
+    ) {}
 
     public toString(): string {
         return `${this.head}${this.props ? `.${this.props.join(".")}` : ""}`;
@@ -326,21 +269,14 @@ export type ValueType = string | number | boolean;
 
 export class Type {
 
-    readonly simpleType: SimpleType | undefined; // 'any' only for access path selectors
-
-    readonly functionArgs: number | undefined; // only for type "function"
-
-    readonly valueType: ValueType | undefined;
-
-    readonly tsType: string | undefined; // TODO: assume disjoint from String(this.type)?
-
-    constructor(simpleType: SimpleType | undefined, functionArgs: number | undefined, valueType: ValueType | undefined, tsType: string | undefined) {
+    constructor(
+        readonly simpleType: SimpleType | undefined, // 'any' only for access path selectors
+        readonly functionArgs: number | undefined, // only for type "function"
+        readonly valueType: ValueType | undefined,
+        readonly tsType: string | undefined // TODO: assume disjoint from String(this.type)?
+    ) {
         assert((simpleType !== undefined ? 1 : 0) + (valueType !== undefined ? 1 : 0) + (tsType !== undefined ? 1 : 0) === 1);
         assert(!functionArgs || simpleType === "function");
-        this.simpleType = simpleType;
-        this.functionArgs = functionArgs;
-        this.valueType = valueType;
-        this.tsType = tsType;
     }
 
     toString(): string {

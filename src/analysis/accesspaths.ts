@@ -6,11 +6,7 @@ import {ConstraintVar} from "./constraintvars";
  */
 export abstract class AccessPath {
 
-    private readonly str: string;
-
-    protected constructor(str: string) {
-        this.str = str;
-    }
+    protected constructor(private readonly str: string) {}
 
     toString(): string {
         return this.str;
@@ -22,14 +18,14 @@ export abstract class AccessPath {
  */
 export class ModuleAccessPath extends AccessPath {
 
-    readonly moduleInfo: ModuleInfo | DummyModuleInfo;
-
     readonly requireName: string | undefined;
 
-    constructor(moduleInfo: ModuleInfo | DummyModuleInfo, requireName: string) {
+    constructor(
+        readonly moduleInfo: ModuleInfo | DummyModuleInfo,
+        requireName: string
+    ) {
         const t = !"./#".includes(requireName[0]) && requireName !== moduleInfo.getOfficialName() ? requireName : undefined; // only use require name if not relative and different from official name
         super(`<${moduleInfo.getOfficialName()}${moduleInfo instanceof ModuleInfo ? `@${moduleInfo.packageInfo.version}` : ''}${t ? `(${t})` : ""}>`);
-        this.moduleInfo = moduleInfo;
         this.requireName = t;
     }
 }
@@ -39,14 +35,11 @@ export class ModuleAccessPath extends AccessPath {
  */
 export class PropertyAccessPath extends AccessPath {
 
-    readonly base: ConstraintVar;
-
-    readonly prop: string;
-
-    constructor(base: ConstraintVar, prop: string) {
+    constructor(
+        readonly base: ConstraintVar,
+        readonly prop: string
+    ) {
         super(`${base}.${prop}`);
-        this.base = base;
-        this.prop = prop;
     }
 }
 
@@ -55,11 +48,8 @@ export class PropertyAccessPath extends AccessPath {
  */
 export class CallResultAccessPath extends AccessPath {
 
-    readonly caller: ConstraintVar;
-
-    constructor(caller: ConstraintVar) {
+    constructor(readonly caller: ConstraintVar) {
         super(`${caller}()`);
-        this.caller = caller;
     }
 }
 
@@ -68,11 +58,8 @@ export class CallResultAccessPath extends AccessPath {
  */
 export class ComponentAccessPath extends AccessPath {
 
-    readonly component: ConstraintVar;
-
-    constructor(component: ConstraintVar) {
+    constructor(readonly component: ConstraintVar) {
         super(`${component}<>`);
-        this.component = component;
     }
 }
 

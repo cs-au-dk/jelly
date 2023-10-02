@@ -82,12 +82,6 @@ import {callPromiseResolve} from "../natives/nativehelpers";
  */
 export class Operations {
 
-    readonly file: FilePath;
-
-    readonly solver: Solver;
-
-    readonly moduleSpecialNatives: SpecialNativeObjects;
-
     readonly globalSpecialNatives: SpecialNativeObjects; // shortcut to this.solver.globalState.globalSpecialNatives
 
     readonly a: GlobalState; // shortcut to this.solver.globalState
@@ -100,11 +94,11 @@ export class Operations {
 
     readonly exportsObjectToken: NativeObjectToken;
 
-    constructor(file: FilePath, solver: Solver, moduleSpecialNatives: SpecialNativeObjects) {
-        this.file = file;
-        this.solver = solver;
-        this.moduleSpecialNatives = moduleSpecialNatives;
-
+    constructor(
+        readonly file: FilePath,
+        readonly solver: Solver,
+        readonly moduleSpecialNatives: SpecialNativeObjects
+    ) {
         this.globalSpecialNatives = this.solver.globalState.globalSpecialNatives!;
         this.a = this.solver.globalState;
 

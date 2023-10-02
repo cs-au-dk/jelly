@@ -18,14 +18,11 @@ export abstract class Token {
  */
 export class FunctionToken extends Token {
 
-    readonly fun: Function;
-
-    readonly moduleInfo: ModuleInfo;
-
-    constructor(fun: Function, moduleInfo: ModuleInfo) {
+    constructor(
+        readonly fun: Function,
+        readonly moduleInfo: ModuleInfo
+    ) {
         super();
-        this.fun = fun;
-        this.moduleInfo = moduleInfo;
     }
 
     toString() {
@@ -50,14 +47,11 @@ export type ObjectKind = "Object" | "Array" | "Class" | "Map" | "Set" | "WeakMap
  */
 export class AllocationSiteToken extends Token {
 
-    readonly kind: ObjectKind;
-
-    readonly allocSite: Node;
-
-    constructor(kind: ObjectKind, allocSite: Node) {
+    constructor(
+        readonly kind: ObjectKind,
+        readonly allocSite: Node
+    ) {
         super();
-        this.kind = kind;
-        this.allocSite = allocSite;
         assert(this instanceof ArrayToken || kind !== "Array", "AllocationSiteTokens of kind Array must be created using ArrayToken");
         assert(this instanceof ObjectToken || kind !== "Object", "AllocationSiteTokens of kind Object must be created using ObjectToken");
         assert(this instanceof ClassToken || kind !== "Class", "AllocationSiteTokens of kind Class must be created using ClassToken");
@@ -109,20 +103,13 @@ export class ClassToken extends AllocationSiteToken {
  */
 export class NativeObjectToken extends Token {
 
-    readonly name: string;
-
-    readonly moduleInfo: ModuleInfo | undefined;
-
-    readonly invoke: NativeFunctionAnalyzer | undefined;
-
-    readonly constr: boolean;
-
-    constructor(name: string, moduleInfo?: ModuleInfo, invoke?: NativeFunctionAnalyzer, constr: boolean = false) {
+    constructor(
+        readonly name: string,
+        readonly moduleInfo?: ModuleInfo,
+        readonly invoke?: NativeFunctionAnalyzer,
+        readonly constr: boolean = false
+    ) {
         super();
-        this.name = name;
-        this.moduleInfo = moduleInfo;
-        this.invoke = invoke;
-        this.constr = constr;
     }
 
     toString() {
@@ -135,14 +122,11 @@ export class NativeObjectToken extends Token {
  */
 export class PackageObjectToken extends Token {
 
-    readonly kind: ObjectKind;
-
-    readonly packageInfo: PackageInfo;
-
-    constructor(packageInfo: PackageInfo, kind: ObjectKind = "Object") {
+    constructor(
+        readonly packageInfo: PackageInfo,
+        readonly kind: ObjectKind = "Object"
+    ) {
         super();
-        this.kind = kind;
-        this.packageInfo = packageInfo;
     }
 
     toString() {
@@ -156,11 +140,8 @@ export class PackageObjectToken extends Token {
  */
 export class AccessPathToken extends Token {
 
-    readonly ap: AccessPath;
-
-    constructor(ap: AccessPath) {
+    constructor(readonly ap: AccessPath) {
         super();
-        this.ap = ap;
     }
 
     toString(): string {
