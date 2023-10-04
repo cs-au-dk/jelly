@@ -38,11 +38,11 @@ export function assignParameterToThisProperty(param: number, prop: string, p: Na
     if (p.path.node.arguments.length > param) {
         const bp = getBaseAndProperty(p.path);
         const arg = p.path.node.arguments[param];
-        if (isExpression(arg) && bp) { // TODO: non-expression arguments?
+        const argVar = isExpression(arg) ? p.solver.varProducer.expVar(arg, p.path) : undefined;
+        if (argVar && bp) { // TODO: non-expression arguments?
             const baseVar = p.solver.varProducer.expVar(bp.base, p.path);
             p.solver.addForAllConstraint(baseVar, TokenListener.NATIVE_1, arg, (t: Token) => {
                 if (t instanceof NativeObjectToken || t instanceof AllocationSiteToken || t instanceof FunctionToken || t instanceof PackageObjectToken) {
-                    const argVar = p.solver.varProducer.expVar(arg, p.path);
                     p.solver.addSubsetConstraint(argVar, p.solver.varProducer.objPropVar(t, prop));
                 }
             });
