@@ -299,9 +299,6 @@ export class Operations {
         // constraint: ...: ⟦ret_t⟧ ⊆ ⟦(new) E0(E1,...,En)⟧
         if (!isParentExpressionStatement(pars))
             this.solver.addSubsetConstraint(vp.returnVar(t.fun), resultVar);
-        // constraint: ...: t_arguments ∈ ⟦t_arguments⟧ if the function uses 'arguments'
-        if (hasArguments)
-            this.solver.addTokenConstraint(argumentsToken!, vp.argumentsVar(t.fun));
     }
 
     /**

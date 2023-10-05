@@ -78,7 +78,7 @@ import {
 } from "@babel/types";
 import {
     AccessPathToken,
-    AllocationSiteToken,
+    AllocationSiteToken, ArrayToken,
     ClassToken,
     FunctionToken,
     NativeObjectToken,
@@ -207,43 +207,55 @@ export function visit(ast: File, op: Operations) {
             }
         },
 
-        Function(path: NodePath<Function>) { // FunctionDeclaration | FunctionExpression | ObjectMethod | ArrowFunctionExpression | ClassMethod | ClassPrivateMethod
-            // record that a function/method/constructor/getter/setter has been reached, connect to its enclosing function or module
-            const fun = path.node;
-            let cls;
-            if (isClassMethod(fun) && fun.kind === "constructor")
-                cls = getClass(path);
-            const name = isFunctionDeclaration(path.node) || isFunctionExpression(path.node) ? path.node.id?.name :
-                (isObjectMethod(path.node) || isClassMethod(path.node)) ? getKey(path.node) :
-                    cls ? cls.id?.name : undefined;// for constructors, use the class name if present
-            const anon = isFunctionDeclaration(path.node) || isFunctionExpression(path.node) ? path.node.id === null : isArrowFunctionExpression(path.node);
-            const msg = cls ? "constructor" : `${name ?? (anon ? "<anonymous>" : "<computed>")}`;
-            if (logger.isVerboseEnabled())
-                logger.verbose(`Reached function ${msg} at ${locationToStringWithFile(fun.loc)}`);
-            a.registerFunctionInfo(op.file, path, name, fun);
-            if (!name && !anon)
-                f.warnUnsupported(fun, `Computed ${isFunctionDeclaration(path.node) || isFunctionExpression(path.node) ? "function" : "method"} name`); // TODO: handle functions/methods with unknown name?
+        Function: { // FunctionDeclaration | FunctionExpression | ObjectMethod | ArrowFunctionExpression | ClassMethod | ClassPrivateMethod
+            enter(path: NodePath<Function>) {
 
-            // process destructuring for parameters and register identifier parameters
-            for (const param of fun.params) {
-                const paramVar = op.solver.varProducer.nodeVar(param);
-                if (isIdentifier(param))
-                    f.registerFunctionParameter(paramVar, path.node);
-                else
-                    op.assign(paramVar, param, path);
-            }
+                // record that a function/method/constructor/getter/setter has been reached, connect to its enclosing function or module
+                const fun = path.node;
+                let cls;
+                if (isClassMethod(fun) && fun.kind === "constructor")
+                    cls = getClass(path);
+                const name = isFunctionDeclaration(path.node) || isFunctionExpression(path.node) ? path.node.id?.name :
+                    (isObjectMethod(path.node) || isClassMethod(path.node)) ? getKey(path.node) :
+                        cls ? cls.id?.name : undefined;// for constructors, use the class name if present
+                const anon = isFunctionDeclaration(path.node) || isFunctionExpression(path.node) ? path.node.id === null : isArrowFunctionExpression(path.node);
+                const msg = cls ? "constructor" : `${name ?? (anon ? "<anonymous>" : "<computed>")}`;
+                if (logger.isVerboseEnabled())
+                    logger.verbose(`Reached function ${msg} at ${locationToStringWithFile(fun.loc)}`);
+                a.registerFunctionInfo(op.file, path, name, fun);
+                if (!name && !anon)
+                    f.warnUnsupported(fun, `Computed ${isFunctionDeclaration(path.node) || isFunctionExpression(path.node) ? "function" : "method"} name`); // TODO: handle functions/methods with unknown name?
 
-            if (fun.generator) {
+                // process destructuring for parameters and register identifier parameters
+                for (const param of fun.params) {
+                    const paramVar = op.solver.varProducer.nodeVar(param);
+                    if (isIdentifier(param))
+                        f.registerFunctionParameter(paramVar, path.node);
+                    else
+                        op.assign(paramVar, param, path);
+                }
 
-                // function*
+                if (fun.generator) {
 
-                // constraint: %(Async)Generator.prototype.next ⊆ ⟦i.next⟧ where i is the iterator object for the function
-                const iter = a.canonicalizeToken(new AllocationSiteToken("Iterator", fun.body));
-                const iterNext = vp.objPropVar(iter, "next");
-                solver.addTokenConstraint(op.globalSpecialNatives.get(fun.async ? ASYNC_GENERATOR_PROTOTYPE_NEXT : GENERATOR_PROTOTYPE_NEXT)!, iterNext);
+                    // function*
 
-                // constraint i ∈ ⟦ret_f⟧ where i is the iterator object for the function
-                solver.addTokenConstraint(iter, vp.returnVar(fun));
+                    // constraint: %(Async)Generator.prototype.next ⊆ ⟦i.next⟧ where i is the iterator object for the function
+                    const iter = a.canonicalizeToken(new AllocationSiteToken("Iterator", fun.body));
+                    const iterNext = vp.objPropVar(iter, "next");
+                    solver.addTokenConstraint(op.globalSpecialNatives.get(fun.async ? ASYNC_GENERATOR_PROTOTYPE_NEXT : GENERATOR_PROTOTYPE_NEXT)!, iterNext);
+
+                    // constraint i ∈ ⟦ret_f⟧ where i is the iterator object for the function
+                    solver.addTokenConstraint(iter, vp.returnVar(fun));
+                }
+            },
+
+            exit(path: NodePath<Function>) {
+                // constraint: ...: t_arguments ∈ ⟦t_arguments⟧ if the function uses 'arguments'
+                const fun = path.node;
+                if (f.functionsWithArguments.has(fun)) {
+                    const argumentsToken = a.canonicalizeToken(new ArrayToken(fun.body));
+                    solver.addTokenConstraint(argumentsToken!, vp.argumentsVar(fun));
+                }
             }
         },
 
