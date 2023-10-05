@@ -5,9 +5,10 @@ import {options} from "../options";
 
 const RED = "\x1b[31m";
 const YELLOW = "\x1b[33m";
-const WHITE = "\x1b[37m";
+const DEFAULT = "\x1b[39m";
 const GREEN = "\x1b[32m";
 const CYAN = "\x1b[36m";
+const WHITE = "\x1b[97m";
 const RESET =  "\x1b[0m";
 const CLEAR = "\u001b[0K";
 
@@ -16,7 +17,7 @@ const colors: {
 } = {
     error: RED,
     warn: YELLOW,
-    info: WHITE,
+    info: DEFAULT,
     verbose: GREEN,
     debug: CYAN,
 }
@@ -48,7 +49,7 @@ export function logToFile(file?: string): Transport {
 }
 
 export function writeStdOut(s: string) {
-    process.stdout.write(s + "\u001b[0K\r");
+    process.stdout.write(WHITE + s.substring(0, process.stdout.columns) + RESET + CLEAR + "\r");
 }
 
 export function writeStdOutIfActive(s: string) {
