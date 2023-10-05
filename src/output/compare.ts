@@ -1,8 +1,7 @@
 import {readFileSync} from "fs";
 import {CallGraph} from "../typings/callgraph";
-import {SourceLocationsToJSON, mapArrayAdd, mapCallsToFunctions, mapGetSet, percent} from "../misc/util";
+import {LocationJSON, SourceLocationsToJSON, mapArrayAdd, mapCallsToFunctions, mapGetSet, percent} from "../misc/util";
 import logger from "../misc/logger";
-import {LocationJSON} from "../misc/util";
 import assert from "assert";
 import {SourceLocation} from "@babel/types";
 
@@ -275,7 +274,7 @@ export function compareCallGraphs(
     const ignores2 = getIgnores(cg2);
     compareLocationObjects(cg1.functions, cg2.functions, file1, file2, cg1, cg2, file2files, "Function", ignores2);
     if (compareBothWays)
-        compareLocationObjects(cg2.functions, cg1.functions, file2, file1, cg2, cg1, file1files!,  "Function", ignores1);
+        compareLocationObjects(cg2.functions, cg1.functions, file2, file1, cg2, cg1, file1files!, "Function", ignores1);
     compareLocationObjects(cg1.calls, cg2.calls, file1, file2, cg1, cg2, file2files, "Call", ignores2);
     if (compareBothWays)
         compareLocationObjects(cg2.calls, cg1.calls, file2, file1, cg2, cg1, file1files!, "Call", ignores1);

@@ -1,0 +1,6 @@
+{
+	"name": "npm-packages",
+	"dependencies": {
+		"glob": "8.0.3"
+	}
+}

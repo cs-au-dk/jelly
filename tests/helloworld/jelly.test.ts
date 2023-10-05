@@ -1,15 +1,10 @@
-import {options, resetOptions} from "../../src/options";
-import logger from "../../src/misc/logger";
 import {runTest} from "../../src/testing/runtest";
 
-beforeEach(() => {
-    resetOptions();
-    logger.transports[0].level = options.loglevel = "error";
-});
+jest.setTimeout(20000);
 
-test("tests/helloworld/app", async () => {
-    options.callgraphExternal = false;
-    await runTest("tests/helloworld", "app.js", {
+describe("tests/helloworld", () => {
+    runTest("tests/helloworld", "app.js", {
+        options: {callgraphExternal: false},
         soundness: "tests/helloworld/app.json",
         functionInfos: 775,
         moduleInfos: 94,
@@ -22,4 +17,4 @@ test("tests/helloworld/app", async () => {
         reachableFound: 138,
         reachableTotal: 189,
     });
-}, 20000);
+});

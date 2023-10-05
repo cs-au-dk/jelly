@@ -60,7 +60,6 @@ export type ListenerID = bigint;
  *
  * Bugs in the implementation of `solver.redirect` can easily invalidate the invariant for constraint variables
  * that are stored in data structures for representative variables, without us being able to detect that statically.
- * TODO: set up regression testing for this...
  *
  * A representative variable in one FragmentState is not guaranteed to be a representative in another.
  * Like the implementation of `solver.redirect`, code that merges variables from different fragment states must
@@ -602,9 +601,7 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
      * Returns whether the given constraint variable is a representative.
      */
     isRepresentative(v: ConstraintVar): v is RVT {
-        const res = !this.redirections.has(v);
-        assert(res || !this.vars.has(v as RVT));  // sanity check - probably superfluous
-        return res;
+        return !this.redirections.has(v);
     }
 
 

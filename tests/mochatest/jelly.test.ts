@@ -1,16 +1,9 @@
-import {options, resetOptions} from "../../src/options";
-import logger from "../../src/misc/logger";
 import {runTest} from "../../src/testing/runtest";
 
 describe("tests/mochatest", () => {
-    beforeEach(() => {
-        resetOptions();
-        logger.transports[0].level = options.loglevel = "error";
-    });
-
-    test("normal", async () => {
-        options.callgraphExternal = false;
-        await runTest("tests/mochatest", "test.js", {
+    describe("normal", () =>
+        runTest("tests/mochatest", "test.js", {
+            options: {callgraphExternal: false},
             soundness: "tests/mochatest/test.json",
             functionInfos: 5,
             moduleInfos: 2,
@@ -21,13 +14,12 @@ describe("tests/mochatest", () => {
             callFound: 3,
             callTotal: 3,
             reachableFound: 2,
-            reachableTotal: 7
-        });
-    });
+            reachableTotal: 7,
+        }));
 
-    test("with-require-hook", async () => {
-        options.callgraphExternal = false;
-        await runTest("tests/mochatest", ["test.js", "require-hook.js"], {
+    describe("with-require-hook", () =>
+        runTest("tests/mochatest", ["test.js", "require-hook.js"], {
+            options: {callgraphExternal: false},
             soundness: "tests/mochatest/test-with-hook.json",
             functionInfos: 14,
             moduleInfos: 4,
@@ -38,7 +30,6 @@ describe("tests/mochatest", () => {
             callFound: 6,
             callTotal: 6,
             reachableFound: 6,
-            reachableTotal: 12
-        });
-    });
+            reachableTotal: 12,
+        }));
 });

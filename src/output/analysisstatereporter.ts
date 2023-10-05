@@ -1,7 +1,7 @@
 import logger from "../misc/logger";
 import {deleteAll, FilePath, getOrSet, Location, locationToStringWithFile, locationToStringWithFileAndEnd, mapGetArray} from "../misc/util";
 import {GlobalState} from "../analysis/globalstate";
-import {FunctionToken, NativeObjectToken, Token} from "../analysis/tokens";
+import {FunctionToken, NativeObjectToken, ObjectToken, Token} from "../analysis/tokens";
 import fs from "fs";
 import {ConstraintVar, NodeVar, ObjectPropertyVar} from "../analysis/constraintvars";
 import {FragmentState} from "../analysis/fragmentstate";
@@ -31,10 +31,12 @@ export class AnalysisStateReporter {
      * Saves the constraint variables and their tokens to a JSON file.
      */
     saveTokens(outfile: string) {
+        const varIndex = new Map<ConstraintVar, number>();
         const fd = fs.openSync(outfile, "w");
         fs.writeSync(fd, "[");
         let firstvar = true;
         for (const [v, ts] of this.f.getAllVarsAndTokens()) {
+            varIndex.set(v, varIndex.size);
             if (firstvar)
                 firstvar = false;
             else
@@ -49,6 +51,17 @@ export class AnalysisStateReporter {
                 fs.writeSync(fd, `\n  ${JSON.stringify(t.toString())}`);
             }
             fs.writeSync(fd, "\n ] }");
+        }
+        for (const v of this.f.redirections.keys()) {
+            // skip properties of widened objects
+            if (v instanceof ObjectPropertyVar && v.obj instanceof ObjectToken && this.f.widened.has(v.obj))
+                continue;
+
+            const repi = varIndex.get(this.f.getRepresentative(v));
+            if (repi !== undefined) {
+                assert(!firstvar);
+                fs.writeSync(fd, `,\n { "var": ${JSON.stringify(v.toString())}, "rep": ${repi} }`);
+            }
         }
         fs.writeSync(fd, "\n]");
         fs.closeSync(fd);

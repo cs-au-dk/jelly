@@ -267,7 +267,7 @@ function getVisualizerCallGraph(f: FragmentState, vulnerabilities: Vulnerability
                 title: getVulnerabilityId(v),
                 package: {sources: [], targets: []},
                 module: {sources: [], targets: []},
-                function:  {sources: [], targets: []}
+                function: {sources: [], targets: []}
             };
             for (const kind of ["package", "module", "function"] as const) {
                 const ss = sources.get(v);
