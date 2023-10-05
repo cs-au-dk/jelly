@@ -78,7 +78,8 @@ import {
 } from "@babel/types";
 import {
     AccessPathToken,
-    AllocationSiteToken, ArrayToken,
+    AllocationSiteToken,
+    ArrayToken,
     ClassToken,
     FunctionToken,
     NativeObjectToken,
@@ -88,7 +89,7 @@ import {
 } from "./tokens";
 import {ModuleInfo} from "./infos";
 import logger from "../misc/logger";
-import {mapArrayAdd, locationToStringWithFile} from "../misc/util";
+import {locationToStringWithFile, mapArrayAdd} from "../misc/util";
 import assert from "assert";
 import {options} from "../options";
 import {ComponentAccessPath, PropertyAccessPath, UnknownAccessPath} from "./accesspaths";

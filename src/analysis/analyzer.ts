@@ -8,7 +8,6 @@ import {visit} from "./astvisitor";
 import {ModuleInfo, PackageInfo} from "./infos";
 import {options, resolveBaseDir} from "../options";
 import assert from "assert";
-import {getComponents, nuutila} from "../misc/scc";
 import {widenObjects} from "./widening";
 import {findModules} from "./modulefinder";
 import {parseAndDesugar} from "../parsing/parser";
@@ -112,126 +111,34 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
 
             if (!options.modulesOnly) {
 
-                if (!options.bottomUp) {
+                // combine analysis states for all modules
+                solver.prepare();
+                const totalNumPackages = Array.from(a.packageInfos.values()).reduce((acc, p) =>
+                    acc + (Array.from(p.modules.values()).some(m => fragmentStates.has(m)) ? 1 : 0), 0);
+                for (const p of a.packageInfos.values()) {
+                    await solver.checkAbort();
 
-                    // combine analysis states for all modules
-                    solver.prepare();
-                    const totalNumPackages = Array.from(a.packageInfos.values()).reduce((acc, p) =>
-                        acc + (Array.from(p.modules.values()).some(m => fragmentStates.has(m)) ? 1 : 0), 0);
-                    for (const p of a.packageInfos.values()) {
-                        await solver.checkAbort();
+                    // skip the package if it doesn't contain any analyzed modules
+                    if (!Array.from(p.modules.values()).some(m => fragmentStates.has(m)))
+                        continue;
 
-                        // skip the package if it doesn't contain any analyzed modules
-                        if (!Array.from(p.modules.values()).some(m => fragmentStates.has(m)))
-                            continue;
+                    solver.diagnostics.packages++;
+                    if (options.printProgress)
+                        logger.info(`Analyzing package ${p} (${solver.diagnostics.packages}/${totalNumPackages})`);
 
-                        solver.diagnostics.packages++;
-                        if (options.printProgress)
-                            logger.info(`Analyzing package ${p} (${solver.diagnostics.packages}/${totalNumPackages})`);
+                    // merge analysis state for each module
+                    for (const m of p.modules.values())
+                        merge(m);
 
-                        // merge analysis state for each module
-                        for (const m of p.modules.values())
-                            merge(m);
-
-                        // connect neighbors
-                        for (const d of p.directDependencies)
-                            solver.addPackageNeighbor(p, d);
-                    }
-
-                    // propagate tokens until fixpoint reached
-                    await solver.propagate();
-                    await patchDynamics(solver);
-
-                } else {
-
-                    // compute strongly connected components from the package dependency graph
-                    if (logger.isVerboseEnabled())
-                        for (const p of a.packageInfos.values()) {
-                            logger.verbose(`Package ${p} dependencies:${p.directDependencies.size === 0 ? " -" : ""}`);
-                            for (const d of p.directDependencies)
-                                logger.verbose(`  ${d}`);
-                        }
-                    const components = getComponents(nuutila(a.packageInfos.values(), (p: PackageInfo) => p.directDependencies));
-
-                    // combine local analysis results bottom-up in the package structure
-                    const transdeps = new Map<PackageInfo, Set<PackageInfo>>(); // direct and transitive dependencies in other components
-                    const totalNumPackages = components.reduce((acc, scc) =>
-                        acc + scc.reduce((acc, p) =>
-                            acc + (Array.from(p.modules.values()).some(m => fragmentStates.has(m)) ? 1 : 0), 0), 0);
-                    for (const scc of components) {
-
-                        // skip the component if it doesn't contain any modules that have been analyzed
-                        if (!(Array.from(scc).some(p => Array.from(p.modules.values()).some(m => fragmentStates.has(m)))))
-                            continue;
-
-                        solver.diagnostics.packages += scc.length;
-                        if (options.printProgress)
-                            if (scc.length === 1)
-                                logger.info(`Analyzing package ${scc[0]} (${solver.diagnostics.packages}/${totalNumPackages})`);
-                            else
-                                logger.info(`Analyzing mutually dependent packages ${scc.join(", ")}`);
-
-                        // compute solution for the strongly connected component
-                        solver.prepare();
-                        const deps = new Set<PackageInfo>(); // direct dependencies in other components
-                        const trans = new Set<PackageInfo>(); // transitive dependencies in other components
-                        for (const p of scc) {
-
-                            // merge state for the modules of the packages in the component
-                            for (const m of p.modules.values())
-                                merge(m);
-
-                            // collect dependencies in other components
-                            const pd = new Set<PackageInfo>();
-                            for (const d of p.directDependencies)
-                                if (!scc.includes(d)) {
-                                    pd.add(d);
-                                    const td = transdeps.get(d);
-                                    if (td)
-                                        for (const dd of td) {
-                                            pd.add(dd);
-                                            trans.add(dd);
-                                        }
-                                }
-                            transdeps.set(p, pd);
-
-                            // collect direct dependencies in other components and connect neighbors
-                            for (const d of p.directDependencies) {
-                                if (!scc.includes(d))
-                                    deps.add(d);
-                                solver.addPackageNeighbor(p, d);
-                            }
-                        }
-                        // merge state from the direct dependencies in other components
-                        for (const p of deps)
-                            if (!trans.has(p)) // transitive dependencies can safely be skipped
-                                merge(p);
-
-                        // propagate tokens until fixpoint reached for the scc packages with their dependencies
-                        await solver.propagate();
-
-                        await patchDynamics(solver);
-
-                        // shelve the analysis state for the packages in the component
-                        for (const p of scc) {
-                            if (logger.isDebugEnabled())
-                                logger.debug(`Shelving state for ${p}`);
-                            fragmentStates.set(p, solver.fragmentState);
-                        }
-
-                        assert(a.pendingFiles.length === 0, "Unexpected module"); // (new modules shouldn't be discovered in the bottom-up phase)
-                    }
-
-                    // merge state (safe to restore for one package of each component and to skip the last component)
-                    let lastComponent = true;
-                    for (const scc of components.reverse()) {
-                        if (lastComponent) {
-                            lastComponent = false;
-                            continue;
-                        }
-                        merge(scc[0], false);
-                    }
+                    // connect neighbors
+                    for (const d of p.directDependencies)
+                        solver.addPackageNeighbor(p, d);
                 }
+
+                // propagate tokens until fixpoint reached
+                await solver.propagate();
+                await patchDynamics(solver);
+
                 assert(a.pendingFiles.length === 0, "Unexpected module"); // (new modules shouldn't be discovered in the second phase)
                 solver.updateDiagnostics();
             }
@@ -285,7 +192,7 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
                 logger.info(`Iterations: ${solver.diagnostics.iterations}, listener notification rounds: ${solver.listenerNotificationRounds}`);
                 if (options.maxRounds !== undefined)
                     logger.info(`Fixpoint round limit reached: ${solver.roundLimitReached} time${solver.roundLimitReached !== 1 ? "s" : ""}`);
-                logger.info(`Constraint vars: ${f.getNumberOfVarsWithTokens()} (${f.vars.size}), tokens: ${f.numberOfTokens}, subset edges: ${f.numberOfSubsetEdges}, max tokens: ${f.getLargestTokenSetSize()}, max subset out: ${f.getLargestSubsetEdgeOutDegree()}`);
+                logger.info(`Constraint vars: ${f.getNumberOfVarsWithTokens()} (${f.vars.size}), tokens: ${f.numberOfTokens}, subset edges: ${f.numberOfSubsetEdges}, max tokens: ${f.getLargestTokenSetSize()}, max subset out: ${f.getLargestSubsetEdgeOutDegree()}, redirections: ${f.redirections.size}`);
                 logger.info(`Listeners (notifications) token: ${mapMapSize(f.tokenListeners)} (${solver.tokenListenerNotifications}), ` +
                     `pair: ${mapMapSize(f.pairListeners1) + mapMapSize(f.pairListeners2)} (${solver.pairListenerNotifications}), ` +
                     (options.readNeighbors ? `neighbor: ${mapMapSize(f.packageNeighborListeners)} (${solver.packageNeighborListenerNotifications}), ` : "") +

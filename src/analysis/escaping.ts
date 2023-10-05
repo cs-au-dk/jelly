@@ -51,6 +51,7 @@ export function findEscapingObjects(m: ModuleInfo, solver: Solver): Set<ObjectTo
     // add expressions collected during AST traversal
     for (const v of f.maybeEscapingFromModule)
         addToWorklist(v);
+    f.maybeEscapingFromModule.clear(); // no longer needed
 
     // FIXME: arguments to (non-modeled) native functions should also be considered escaped?
 

@@ -886,6 +886,8 @@ export default class Solver {
         const f = this.fragmentState;
         f.a.timeoutTimer.checkTimeout();
         await this.checkAbort();
+        if (logger.isVerboseEnabled())
+            logger.verbose(`Propagating (${this.unprocessedTokens.size}, ${this.nodesWithNewEdges.size}, ${this.restored.size}, ${f.postponedListenerCalls.length})`);
         let round = 0;
         while (this.unprocessedTokens.size > 0 || this.nodesWithNewEdges.size > 0 || this.restored.size > 0 || f.postponedListenerCalls.length > 0) {
             round++;

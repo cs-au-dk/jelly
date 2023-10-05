@@ -59,7 +59,6 @@ program
     .option("--tokens-json <file>", "save tokens for constraint variables as JSON file")
     .option("--tokens", "report tokens for constraint variables")
     .option("--largest", "report largest token sets and subset relations")
-    // .option("--bottom-up", "analyze bottom-up in package dependency structure") // TODO: bottom-up analysis disabled for now
     .option("--no-alloc", "disable light-weight allocation site abstraction")
     .option("--no-widening", "disable widening")
     .option("--no-patch-dynamics", "disable dynamic property access heuristic")
