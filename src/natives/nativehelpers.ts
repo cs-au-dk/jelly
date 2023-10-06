@@ -29,7 +29,7 @@ import {TokenListener} from "../analysis/listeners";
 import assert from "assert";
 import {NodePath} from "@babel/traverse";
 import {Operations} from "../analysis/operations";
-import {AccessorType, ConstraintVar, IntermediateVar, ObjectPropertyVarObj, isObjectProperyVarObj} from "../analysis/constraintvars";
+import {AccessorType, ConstraintVar, IntermediateVar, ObjectPropertyVarObj, isObjectPropertyVarObj} from "../analysis/constraintvars";
 
 /**
  * Models an assignment from a function parameter (0-based indexing) to a property of the base object.
@@ -225,7 +225,7 @@ export function newObject(kind: ObjectKind, proto: NativeObjectToken | PackageOb
         p.solver.addInherits(t, proto);
     else
         p.solver.addForAllConstraint(p.op.expVar(proto, p.path), TokenListener.NATIVE_25, p.path.node, (pt: Token) => {
-            if (isObjectProperyVarObj(pt))
+            if (isObjectPropertyVarObj(pt))
                 p.solver.addInherits(t, pt);
         });
     return t;

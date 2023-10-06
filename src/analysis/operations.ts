@@ -44,7 +44,7 @@ import {
     PackageObjectToken,
     Token
 } from "./tokens";
-import {AccessorType, ConstraintVar, IntermediateVar, isObjectProperyVarObj, NodeVar} from "./constraintvars";
+import {AccessorType, ConstraintVar, IntermediateVar, isObjectPropertyVarObj, NodeVar} from "./constraintvars";
 import {
     CallResultAccessPath,
     IgnoredAccessPath,
@@ -434,7 +434,7 @@ export class Operations {
             }
         };
 
-        if (isObjectProperyVarObj(base)) {
+        if (isObjectPropertyVarObj(base)) {
             // FIXME: special treatment of writes to "prototype" and "__proto__"
 
             // constraint: ...: ⟦E2⟧ ⊆ ⟦base.p⟧
