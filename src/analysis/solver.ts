@@ -51,7 +51,7 @@ export default class Solver {
 
     restored: Set<ConstraintVar> = new Set;
 
-    readonly listeners: Map<ListenerID, [TokenListener, Node]> = new Map;
+    readonly listeners: Map<ListenerID, [TokenListener, Node | Token]> = new Map;
 
     // TODO: move some of this into AnalysisDiagnostics?
     // for diagnostics only
@@ -307,17 +307,25 @@ export default class Solver {
     }
 
     /**
-     * Provides a unique'ish ID for the given key and node.
+     * Provides a unique'ish ID for the given key and node or token.
      */
-    private getListenerID(key: TokenListener, n: Node): ListenerID {
-        const nid = (n as any)[JELLY_NODE_ID];
-        assert(nid !== undefined);
-        const id = (BigInt(nid) << 32n) + (BigInt(key) << 16n) + BigInt((n.loc && (n.loc as Location).module?.hash) ?? 0); // TODO: hash collision possible
+    private getListenerID(key: TokenListener, n: Node | Token): ListenerID {
+        let id = (BigInt(key) << 16n);
+        if (n instanceof Token)
+            id += BigInt(n.hash);
+        else {
+            const nid = (n as any)[JELLY_NODE_ID];
+            assert(nid !== undefined);
+            id += (BigInt(nid) << 32n);
+            const h = n.loc && (n.loc as Location).module?.hash;
+            if (h)
+                id += BigInt(h);
+        }
         const x = this.listeners.get(id);
         if (x) {
             const [xk, xn] = x;
             if (xk !== key || xn !== n)
-                logger.error("Error: Hash collision in getListenerID");
+                logger.error("Error: Hash collision in getListenerID"); // TODO: hash collision possible
         } else
             this.listeners.set(id, [key, n]);
         return id;
@@ -325,15 +333,15 @@ export default class Solver {
 
     /**
      * Adds a universally quantified constraint.
-     * The constraint variable, the key, and the node must together uniquely determine the function.
+     * The constraint variable, the key, the node or token must together uniquely determine the function.
      */
-    addForAllConstraint(v: ConstraintVar | undefined, key: TokenListener, n: Node, listener: (t: Token) => void) {
+    addForAllConstraint(v: ConstraintVar | undefined, key: TokenListener, n: Node | Token, listener: (t: Token) => void) {
         if (v === undefined)
             return;
         const f = this.fragmentState;
         const vRep = f.getRepresentative(v);
         if (logger.isDebugEnabled())
-            logger.debug(`Adding universally quantified constraint #${TokenListener[key]} to ${vRep} at ${locationToStringWithFileAndEnd(n.loc)}`);
+            logger.debug(`Adding universally quantified constraint #${TokenListener[key]} to ${vRep} at ${n instanceof Token ? n : locationToStringWithFileAndEnd(n.loc)}`);
         const m = mapGetMap(f.tokenListeners, vRep);
         const id = this.getListenerID(key, n);
         if (!m.has(id)) {

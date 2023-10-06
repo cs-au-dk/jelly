@@ -1,5 +1,5 @@
 import {Class, Function, Identifier, Node} from "@babel/types";
-import {FilePath, getOrSet, Location, locationToString} from "../misc/util";
+import {FilePath, getOrSet, Location, locationToString, strHash} from "../misc/util";
 import {ConstraintVar, NodeVar} from "./constraintvars";
 import {Token} from "./tokens";
 import {getPackageJsonInfo, PackageJsonInfo} from "../misc/packagejson";
@@ -157,7 +157,9 @@ export class GlobalState {
      */
     canonicalizeToken<T extends Token>(t: T): T {
         this.numberOfCanonicalizeTokenCalls++;
-        return getOrSet(this.canonicalTokens, t.toString(), () => t) as T;
+        const s = t.toString();
+        t.hash = strHash(s);
+        return getOrSet(this.canonicalTokens, s, () => t) as T;
     }
 
     /**
