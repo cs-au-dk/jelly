@@ -5,11 +5,12 @@ import {ConstraintVar, IntermediateVar, ObjectPropertyVar} from "../../src/analy
 import {findEscapingObjects} from "../../src/analysis/escaping";
 import {ModuleInfo, PackageInfo} from "../../src/analysis/infos";
 import Solver from "../../src/analysis/solver";
-import {AccessPathToken, FunctionToken, NativeObjectToken, ObjectToken} from "../../src/analysis/tokens";
+import {AccessPathToken, FunctionToken, NativeObjectToken, ObjectToken, PackageObjectToken} from "../../src/analysis/tokens";
 import {options, resetOptions} from "../../src/options";
 import {JELLY_NODE_ID} from "../../src/parsing/extras";
 import {Location} from "../../src/misc/util";
 import {TokenListener} from "../../src/analysis/listeners";
+import {widenObjects} from "../../src/analysis/widening";
 
 describe("tests/unit/analysis", () => {
     beforeAll(() => {
@@ -27,8 +28,8 @@ describe("tests/unit/analysis", () => {
             enter(node: Node) {
                 (node as any)[JELLY_NODE_ID] ??= ++nextNodeID;
                 node.loc ??= <Location>{
-                    start: {line: 0, column: ++nextNodeID},
-                    end: {line: 0, column: ++nextNodeID},
+                    start: {line: nextNodeID, column: ++nextNodeID},
+                    end: {line: nextNodeID, column: ++nextNodeID},
                     module: m,
                 };
             },
@@ -123,6 +124,7 @@ describe("tests/unit/analysis", () => {
 
             const at = a.canonicalizeToken(new ObjectToken(param));
             const ft = a.canonicalizeToken(new FunctionToken(fun0, m));
+            expect(at).not.toBe(ft);
 
             const fn = jest.fn();
             solver.addForAllPairsConstraint(vA, vB, TokenListener.AWAIT, param, fn);
@@ -216,8 +218,11 @@ describe("tests/unit/analysis", () => {
 
             const tObject = a.canonicalizeToken(new ObjectToken(param));
             solver.addTokenConstraint(tObject, vExports);
+
             const vA = f.varProducer.objPropVar(tObject, "A");
-            solver.addTokenConstraint(a.canonicalizeToken(new ObjectToken(fun0)), vA);
+            const tObject2 = a.canonicalizeToken(new ObjectToken(fun0));
+            expect(tObject).not.toBe(tObject2);
+            solver.addTokenConstraint(tObject2, vA);
 
             // Note: objects that are assigned to 'exports' (or to properties of such objects) are not considered escaping
             expect(findEscapingObjects(m, solver)).toEqual(new Set());
@@ -286,6 +291,109 @@ describe("tests/unit/analysis", () => {
             expect(findEscapingObjects(m, solver)).toEqual(new Set([tObject]));
             expect(getTokens(rep)).toEqual([tFunction, tUnknown]);
             expect(getTokens(f.varProducer.nodeVar(param))).toEqual([tUnknown]);
+        });
+    });
+
+    describe("widening", () => {
+        let setup: ReturnType<typeof getSolver>;
+        let [vA]: Array<ConstraintVar> = [];
+        let ot: ObjectToken;
+        let pt: PackageObjectToken;
+
+        beforeEach(() => {
+            const {f, a} = setup = getSolver();
+            ot = a.canonicalizeToken(new ObjectToken(param));
+            pt = a.canonicalizeToken(new PackageObjectToken(p));
+            [vA] = "A B rep rep1 rep2".split(" ").map(s => f.varProducer.intermediateVar(param, s));
+        });
+
+        test("simple", () => {
+            const {solver, f, a, getTokens} = setup;
+            solver.addTokenConstraint(ot, vA);
+            const ot2 = a.canonicalizeToken(new ObjectToken(fun0));
+            solver.addTokenConstraint(ot2, vA);
+
+            widenObjects(new Set([ot]), solver);
+
+            expect([...f.widened]).toContain(ot);
+            expect([...f.widened]).not.toContain(ot2);
+            expect(getTokens(vA).sort()).toEqual([ot2, pt].sort());
+        });
+
+        test("token is put in unprocessedTokens for PackagePropVar", () => {
+            const {solver, f, getTokens} = setup;
+
+            const ppV = f.varProducer.packagePropVar(p, "A");
+            const opV = f.varProducer.objPropVar(ot, "A");
+            solver.addTokenConstraint(ot, opV);
+
+            widenObjects(new Set([ot]), solver);
+
+            expect(f.getRepresentative(opV)).toBe(ppV);
+            expect(getTokens(ppV)).toEqual([pt]);
+            assert(f.isRepresentative(ppV));
+            expect(solver.unprocessedTokens.get(ppV)).toContain(pt);
+        });
+
+        test("PackageObjectToken gets object properties", () => {
+            const {solver, f} = setup;
+
+            solver.addObjectProperty(ot, "A");
+
+            const fn = jest.fn();
+            solver.addForAllObjectPropertiesConstraint(pt, TokenListener.AWAIT, param, fn);
+
+            widenObjects(new Set([ot]), solver);
+
+            expect(f.objectProperties.get(pt)).toEqual(new Set(["A"]));
+            expect(f.postponedListenerCalls, "Object property listener should be enqueued", {showMatcherMessage: false}).
+                toContainEqual([fn, "A"]);
+        });
+
+        test("PackagePropVar gets object property listeners", () => {
+            const {solver, a, f} = setup;
+
+            const ot1 = a.canonicalizeToken(new ObjectToken(fun0));
+            expect(ot).not.toBe(ot1);
+
+            const ot2 = a.canonicalizeToken(new ObjectToken(fun1));
+            const fn1 = jest.fn();
+            const fn2 = jest.fn();
+            solver.addForAllObjectPropertiesConstraint(ot1, TokenListener.NATIVE_1, param, fn1);
+            solver.addForAllObjectPropertiesConstraint(ot2, TokenListener.NATIVE_2, param, fn2);
+
+            solver.addObjectProperty(ot, "A");
+
+            widenObjects(new Set([ot, ot1, ot2]), solver);
+
+            expect(f.objectProperties.get(pt)).toEqual(new Set(["A"]));
+            expect([...f.objectProperties.keys()]).toEqual([pt]);
+            expect([...f.objectPropertiesListeners.keys()]).toEqual([pt]);
+            expect(f.objectPropertiesListeners.get(pt)!.size).toBe(2);
+            expect(f.postponedListenerCalls, "Object property listener 1 should be enqueued", {showMatcherMessage: false}).
+                toContainEqual([fn1, "A"]);
+            expect(f.postponedListenerCalls, "Object property listener 2 should be enqueued", {showMatcherMessage: false}).
+                toContainEqual([fn2, "A"]);
+        });
+
+        test("PackagePropVar gets listeners from redirected ObjectPropertyVar", async () => {
+            const {solver, f, redirect} = setup;
+
+            const ppV = f.varProducer.packagePropVar(p, "A");
+            solver.addTokenConstraint(pt, ppV);
+
+            const opV = f.varProducer.objPropVar(ot, "A");
+            const fn = jest.fn();
+            solver.addForAllConstraint(opV, TokenListener.AWAIT, param, fn);
+
+            redirect(opV, vA);
+            await solver.propagate(); // clear nodesWithNewEdges
+
+            widenObjects(new Set([ot]), solver);
+
+            expect(fn).not.toHaveBeenCalled();
+            expect(f.postponedListenerCalls, "Token listener should be enqueued", {showMatcherMessage: false}).
+                toContainEqual([fn, pt]);
         });
     });
 });

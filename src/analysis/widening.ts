@@ -3,7 +3,6 @@ import {ObjectToken, PackageObjectToken, Token} from "./tokens";
 import logger from "../misc/logger";
 import {ConstraintVar, ObjectPropertyVar} from "./constraintvars";
 import {addAll, getOrSet, mapGetMap, mapGetSet} from "../misc/util";
-import {ModuleInfo} from "./infos";
 import Timer from "../misc/timer";
 import {CallResultAccessPath, ComponentAccessPath, PropertyAccessPath} from "./accesspaths";
 import assert from "assert";
@@ -15,7 +14,7 @@ import assert from "assert";
  * Widens the selected objects from allocation-site to package abstraction.
  * This roughly takes time proportional to the size of the information stored for the constraint variables and tokens.
  */
-export function widenObjects(m: ModuleInfo, widened: Set<ObjectToken>, solver: Solver) {
+export function widenObjects(widened: Set<ObjectToken>, solver: Solver) {
     const a = solver.globalState;
     const f = solver.fragmentState;
     if (logger.isVerboseEnabled())
@@ -55,13 +54,6 @@ export function widenObjects(m: ModuleInfo, widened: Set<ObjectToken>, solver: S
             size += s.size;
         }
         return [res, size];
-    }
-
-    function widenTokenMapSetKeys<T extends Token, V>(m: Map<T, Set<V>>): Map<T | PackageObjectToken, Set<V>> {
-        const res: Map<T | PackageObjectToken, Set<V>> = new Map;
-        for (const [t, vs] of m)
-            addAll(vs, mapGetSet(res, widenToken(t)));
-        return res;
     }
 
     function widenTokenMapSetKeysValues(m: Map<Token, Set<Token>>): Map<Token, Set<Token>> {
@@ -126,20 +118,33 @@ export function widenObjects(m: ModuleInfo, widened: Set<ObjectToken>, solver: S
     }
 
     // update the tokens
-   [solver.unprocessedTokens, solver.unprocessedTokensSize] = widenTokenMapArrayValues(solver.unprocessedTokens);
+    [solver.unprocessedTokens, solver.unprocessedTokensSize] = widenTokenMapArrayValues(solver.unprocessedTokens);
     assert(solver.nodesWithNewEdges.size === 0);
     solver.replaceTokens(tokenMap);
+    f.ancestorListeners = widenTokenMapMapKeys(f.ancestorListeners);
+    // transfer ancestors from widened objects
+    for (const [t, pt] of tokenMap)
+        for (const anc of f.inherits.get(t) ?? [])
+            solver.addInherits(pt, anc);
     f.inherits = widenTokenMapSetKeysValues(f.inherits);
     f.reverseInherits = widenTokenMapSetKeysValues(f.reverseInherits);
-    f.ancestorListeners = widenTokenMapMapKeys(f.ancestorListeners); // FIXME: if a token gets a new ancestor because of widening, ancestor listeners may need to be invoked?
-    f.objectPropertiesListeners = widenTokenMapMapKeys(f.objectPropertiesListeners); // FIXME: if an ObjectPropertyVarObj token gets a new property because of widening, object properties listeners may need to be invoked?
-    f.objectProperties = widenTokenMapSetKeys(f.objectProperties);
+    f.objectPropertiesListeners = widenTokenMapMapKeys(f.objectPropertiesListeners);
+    // transfer object properties from widened objects
+    for (const [t, pt] of tokenMap) {
+        const props = f.objectProperties.get(t);
+        if (props !== undefined) {
+            f.objectProperties.delete(t);
+            for (const prop of props)
+                solver.addObjectProperty(pt, prop);
+        }
+    }
 
     // update the constraint variables
-    for (const v of f.vars) {
-        const rep = f.getRepresentative(widenVar(v));
-        solver.addSubsetEdge(v, rep); // ensures that tokens get transferred at redirect
-        solver.redirect(v, rep);
+    for (const v of [...f.vars, ...f.redirections.keys()]) {
+        const vRep = f.getRepresentative(v);
+        const wRep = f.getRepresentative(widenVar(v));
+        solver.addSubsetEdge(vRep, wRep); // ensures that tokens get transferred at redirect
+        solver.redirect(vRep, wRep);
     }
     f.dynamicPropertyWrites = widenVarSet(f.dynamicPropertyWrites);
     for (const e of f.maybeEmptyPropertyReads) {

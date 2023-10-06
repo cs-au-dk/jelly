@@ -95,7 +95,7 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
 
                     // if enabled, widen escaping objects for this module
                     if (options.alloc && options.widening)
-                        widenObjects(moduleInfo, escaping, solver);
+                        widenObjects(escaping, solver);
 
                     // propagate tokens (again) until fixpoint reached
                     await solver.propagate();
