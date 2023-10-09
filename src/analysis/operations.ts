@@ -451,7 +451,8 @@ export class Operations {
             // FIXME: special treatment of writes to "prototype" and "__proto__"
 
             // constraint: ...: ⟦E2⟧ ⊆ ⟦base.p⟧
-            this.solver.addSubsetConstraint(src, this.solver.varProducer.objPropVar(base, prop, ac));
+            if (src)
+                this.solver.addSubsetConstraint(src, this.solver.varProducer.objPropVar(base, prop, ac));
 
             if (invokeSetters)
                 if (!(base instanceof NativeObjectToken) && prop !== "prototype") {
@@ -473,7 +474,8 @@ export class Operations {
 
         } else if (lVar && base instanceof AccessPathToken) {
             // constraint: ...: ⟦E2⟧ ⊆ ⟦k.p⟧ where k is the current PackageObjectToken
-            this.solver.addSubsetConstraint(src, this.solver.varProducer.packagePropVar(this.packageInfo, prop));
+            if (src)
+                this.solver.addSubsetConstraint(src, this.solver.varProducer.packagePropVar(this.packageInfo, prop));
 
             // collect property write operation @E1.p
             this.solver.addAccessPath(new PropertyAccessPath(lVar, prop), this.solver.varProducer.nodeVar(escapeNode), base.ap);

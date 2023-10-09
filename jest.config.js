@@ -159,7 +159,7 @@ const base = {
     // watchman: true,
 };
 
-export default {
+module.exports = {
     // The coverage-related options are put in the root (global configuration)
     // instead of in the project-specific configuration (through base) until
     // https://github.com/jestjs/jest/issues/13576 is resolved.
@@ -212,4 +212,4 @@ export default {
             transformIgnorePatterns: ["node_modules/(?!(jelly-previous)/)"]
         },
     ],
-}
+};

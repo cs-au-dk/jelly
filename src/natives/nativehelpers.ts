@@ -1,4 +1,4 @@
-import {CallExpression, Expression, isExpression, isObjectExpression, isObjectProperty} from "@babel/types";
+import {CallExpression, Expression, isExpression, isIdentifier, isObjectExpression, isObjectProperty} from "@babel/types";
 import {
     AccessPathToken,
     AllocationSiteToken,
@@ -634,13 +634,14 @@ export function invokeCallApplyBound(kind: CallApplyKind, p: NativeFunctionParam
                     if (t instanceof ArrayToken) {
                         p.solver.addForAllArrayEntriesConstraint(t, TokenListener.NATIVE_INVOKE_CALL_APPLY3, ft.fun, (prop: string) => {
                             const param = parseInt(prop);
-                            if (param >= 0 && param < ft.fun.params.length) {
+                            if (param >= 0 && param < ft.fun.params.length && isIdentifier(ft.fun.params[param])) { // TODO: non-Identifier parameters?
                                 const opv = p.solver.varProducer.objPropVar(t, prop);
                                 const paramVar = p.solver.varProducer.nodeVar(ft.fun.params[param]);
                                 p.solver.addSubsetConstraint(opv, paramVar);
-
-                                if (escapes)
-                                    p.solver.fragmentState.registerEscapingFromModule(opv);
+                            }
+                            if (escapes) {
+                                const opv = p.solver.varProducer.objPropVar(t, prop);
+                                p.solver.fragmentState.registerEscapingFromModule(opv);
                             }
                         });
                         // TODO: p.solver.addSubsetConstraint(vp.arrayValueVar(t), ...);

@@ -118,7 +118,7 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
 
     readonly arrayEntries: Map<ArrayToken, Set<string>> = new Map;
 
-    objectProperties: Map<ObjectPropertyVarObj, Set<string>> = new Map;
+    readonly objectProperties: Map<ObjectPropertyVarObj, Set<string>> = new Map;
 
     readonly tokenListeners: Map<RVT, Map<ListenerID, (t: Token) => void>> = new Map;
 
@@ -775,7 +775,7 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
         res.add(t);
         const w = [t];
         while (w.length !== 0) {
-            const s = this.inherits.get(w.shift()!);
+            const s = this.inherits.get(w.pop()!);
             if (s)
                 for (const p of s)
                     if (!res.has(p)) {
@@ -794,7 +794,7 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
         res.add(t);
         const w = [t];
         while (w.length !== 0) {
-            const s = this.reverseInherits.get(w.shift()!);
+            const s = this.reverseInherits.get(w.pop()!);
             if (s)
                 for (const p of s)
                     if (!res.has(p)) {

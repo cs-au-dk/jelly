@@ -12,7 +12,7 @@
 
 - ECMAScript standard library
   - Function.prototype.{apply,call,bind} (partly modeled...)
-  - Object.{defineProperty, defineProperties, ...}
+  - Object.{defineProperty, defineProperties, ...} (partly modeled...)
   - Promise
     - thenables (https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise#thenables)
     - 'throw' in promise handlers converting exceptions to rejections, rejected promises at 'await' converting rejections to exceptions
