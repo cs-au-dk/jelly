@@ -1,4 +1,4 @@
-<!DOCTYPE>
+<!DOCTYPE html>
 <html lang="utf8">
 <head>
   <title>Jelly</title>
@@ -8,6 +8,11 @@
   <script src="https://cdn.jsdelivr.net/npm/cose-base@2.2.0/cose-base.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/webcola@3.4.0/WebCola/cola.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/cytoscape-cola@2.5.1/cytoscape-cola.min.js"></script>
+  <!-- Extra dependencies for fcose layout
+  <script src="https://unpkg.com/layout-base/layout-base.js"></script>
+  <script src="https://unpkg.com/cose-base/cose-base.js"></script>
+  <script src="https://unpkg.com/cytoscape-fcose/cytoscape-fcose.js"></script>
+  -->
   <script src="https://cdn.jsdelivr.net/npm/cytoscape-expand-collapse@4.1.0/cytoscape-expand-collapse.min.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cytoscape-panzoom@2.5.3/cytoscape.js-panzoom.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css">
@@ -122,7 +127,6 @@
           {
             selector: 'node.cy-expand-collapse-collapsed-node',
             style: {
-              'shape': 'rectangle',
               'border-width': '1px',
               'border-style': 'solid',
               'border-color': '#000000'
@@ -265,6 +269,12 @@
             }
           },
           {
+            selector: 'node.cy-expand-collapse-collapsed-node',
+            style: {
+              'shape': 'rectangle',
+            },
+          },
+          {
             selector: ':parent',
             style: {
               'background-opacity': 0.333
@@ -374,10 +384,7 @@
       });
 
       let layout;
-      function stopLayout() {
-        if (layout)
-          layout.stop();
-      }
+      const stopLayout = () => layout?.stop();
       function newLayout(fit = false) {
         layout = cy.layout({
           name: 'cola',
@@ -387,8 +394,18 @@
           fit,
           centerGraph: false,
           avoidOverlap: true,
-          maxSimulationTime: 3000
+          maxSimulationTime: 3000,
         });
+
+        // layout = cy.layout({
+        //   name: 'fcose',
+        //   quality: "proof",
+        //   padding: 20,
+        //   animate: true,
+        //   randomize: false,
+        //   fit,
+        //   nodeDimensionsIncludeLabels: true,
+        // });
         layout.start();
       }
 
@@ -396,8 +413,7 @@
       function hide() {
         stopLayout();
         if (removed) {
-          const ns = removed.filter("node");
-          ns.restore();
+          removed.filter("node").restore();
           removed.filter("edge").forEach(e => {
             if (e.source().inside() && e.target().inside())
               e.restore();
@@ -495,6 +511,23 @@
         hide();
         newLayout();
       });
+      document.getElementById("showPredecessors").addEventListener("click", () => {
+        const es = cy.$("node:selected");
+        if (es.size() > 0) {
+          stopLayout();
+          const collapsed = cy.$("node.cy-expand-collapse-collapsed-node");
+          ec.expandAllEdges();
+          ec.expandAll();
+          const sources = es.union(es.descendants());
+          const pred = sources.predecessors().union(sources);
+          const keep = pred.union(pred.ancestors())
+          cy.nodes().difference(keep).remove();
+          ec.collapseRecursively(collapsed.intersection(keep));
+          ec.collapseAllEdges();
+          hide();
+          newLayout();
+        }
+      });
       document.getElementById("removeSelected").addEventListener("click", () => {
         const es = cy.$(":selected");
         if (es.size() > 0) {
@@ -565,6 +598,9 @@
       let graph;
 
       function showVulnerabilities() {
+        if (!graph.vulnerabilities)
+          return;
+
         stopLayout();
         const vulnerabilityTitle = document.getElementById("vulnerabilities").value;
         const e = document.getElementsByName("vulnerabilityLevel");
@@ -575,14 +611,13 @@
             break;
           }
         const sources = new Set(), targets = new Set();
-        if (graph.vulnerabilities)
-          for (const v of graph.vulnerabilities)
-            if (v.title === vulnerabilityTitle) {
-              for (const s of v[level].sources)
-                sources.add(String(s));
-              for (const s of v[level].targets)
-                targets.add(String(s));
-            }
+        for (const v of graph.vulnerabilities)
+          if (v.title === vulnerabilityTitle) {
+            for (const s of v[level].sources)
+              sources.add(String(s));
+            for (const s of v[level].targets)
+              targets.add(String(s));
+          }
         function has(collection, node) {
           return collection.has(node.data("id")) || (ec.isExpandable(node) && ec.getCollapsedChildrenRecursively(node).some(n => collection.has(n.data("id"))));
         }
@@ -671,6 +706,7 @@
 </div>
 <br/>
 <div class="group">
+<button id="showPredecessors">Show predecessors</button>
 <button id="removeSelected">Remove selected</button>
 <button id="removeNonSelected">Remove non-selected</button>
 </div>
