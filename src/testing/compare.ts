@@ -11,8 +11,7 @@ import {FragmentState, RepresentativeVar} from "../analysis/fragmentstate";
 import {Operations} from "../analysis/operations";
 import {AnalysisStateReporter} from "../output/analysisstatereporter";
 import {Node, isNode} from "@babel/types";
-import {ConstraintVar, ObjectPropertyVar} from "../analysis/constraintvars";
-import {ObjectToken} from "../analysis/tokens";
+import {ConstraintVar} from "../analysis/constraintvars";
 import {nuutila} from "../misc/scc";
 
 declare module "expect" {
@@ -239,12 +238,8 @@ export const toMatchAnalysisResults: MatcherFunction<[Solver | FragmentState]> =
         }
 
         // add already redirected variables to component
-        for (const [v, rep] of f.redirections) {
-            if (v instanceof ObjectPropertyVar && v.obj instanceof ObjectToken && f.widened.has(v.obj))
-                continue;
-
-            comps.get(grep(rep))!.comp.push(v);
-        }
+        for (const v of f.redirections.keys())
+            comps.get(grep(v))!.comp.push(v);
 
         for (const c of comps.values())
             c.comp.sort();
@@ -283,6 +278,7 @@ export const toMatchAnalysisResults: MatcherFunction<[Solver | FragmentState]> =
             assert.equal(m.size, f.objectProperties.size);
             return m;
         }],
+        ["Widened objects", f => [...f.widened].map(t => t.toString()).sort()],
         // ["Constraint variables", f => {
         //     const {comps} = f === actual ? aComps : eComps;
         //     return [...comps.values()].flatMap(({comp}) => comp.map(v => v.toString())).sort();

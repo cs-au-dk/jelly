@@ -1,7 +1,7 @@
 import logger from "../misc/logger";
 import {deleteAll, FilePath, getOrSet, Location, locationToStringWithFile, locationToStringWithFileAndEnd, mapGetArray} from "../misc/util";
 import {GlobalState} from "../analysis/globalstate";
-import {FunctionToken, NativeObjectToken, ObjectToken, Token} from "../analysis/tokens";
+import {FunctionToken, NativeObjectToken, Token} from "../analysis/tokens";
 import fs from "fs";
 import {ConstraintVar, NodeVar, ObjectPropertyVar} from "../analysis/constraintvars";
 import {FragmentState} from "../analysis/fragmentstate";
@@ -53,10 +53,6 @@ export class AnalysisStateReporter {
             fs.writeSync(fd, "\n ] }");
         }
         for (const v of this.f.redirections.keys()) {
-            // skip properties of widened objects
-            if (v instanceof ObjectPropertyVar && v.obj instanceof ObjectToken && this.f.widened.has(v.obj))
-                continue;
-
             const repi = varIndex.get(this.f.getRepresentative(v));
             if (repi !== undefined) {
                 assert(!firstvar);

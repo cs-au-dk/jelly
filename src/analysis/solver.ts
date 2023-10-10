@@ -1015,19 +1015,18 @@ export default class Solver {
         // use a different type for s' representative variables to prevent accidental mixups
         const s = _s as unknown as FragmentState<MergeRepresentativeVar>;
         const f = this.fragmentState;
-        // merge redirections
-        if (options.cycleElimination)
-            for (const [v, rep] of s.redirections) {
-                const fRep = f.getRepresentative(v);
-                const repRep = f.getRepresentative(rep);
-                this.addSubsetEdge(fRep, repRep);
-                this.redirect(fRep, repRep);
-            }
         // add processed listeners
         mapSetAddAll(s.ancestorListenersProcessed, f.ancestorListenersProcessed);
         mapSetAddAll(s.listenersProcessed, f.listenersProcessed);
         for (const [id, m] of s.pairListenersProcessed)
             mapSetAddAll(m, mapGetMap(f.pairListenersProcessed, id));
+        // merge redirections
+        for (const [v, rep] of s.redirections) {
+            const fRep = f.getRepresentative(v);
+            const repRep = f.getRepresentative(rep);
+            this.addSubsetEdge(fRep, repRep);
+            this.redirect(fRep, repRep);
+        }
         // run new array entry listeners on existing entries
         for (const [t, m] of s.arrayEntriesListeners)
             for (const [id, listener] of m)
