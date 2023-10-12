@@ -1,5 +1,5 @@
 import {options} from "../options";
-import {AnalysisDiagnostics} from "./diagnostics";
+import AnalysisDiagnostics from "../analysis/diagnostics";
 import {AccessPathPatternToLocations} from "../patternmatching/apiusage";
 import {PatternMatchesJSON} from "../patternmatching/patternmatcher";
 import {SemanticPatch} from "./tapir";

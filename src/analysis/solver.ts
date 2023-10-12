@@ -29,9 +29,9 @@ import {nuutila} from "../misc/scc";
 import {options, patternProperties} from "../options";
 import Timer from "../misc/timer";
 import {setImmediate} from "timers/promises";
-import {AnalysisDiagnostics} from "../typings/diagnostics";
 import {getMemoryUsage} from "../misc/memory";
 import {JELLY_NODE_ID} from "../parsing/extras";
+import AnalysisDiagnostics from "./diagnostics";
 
 export class AbortedException extends Error {}
 
@@ -53,52 +53,7 @@ export default class Solver {
 
     readonly listeners: Map<ListenerID, [TokenListener, Node | Token]> = new Map;
 
-    // TODO: move some of this into AnalysisDiagnostics?
-    // for diagnostics only
-    unprocessedTokensSize: number = 0;
-    fixpointRound: number = 0;
-    listenerNotificationRounds: number = 0;
-    lastPrintDiagnosticsTime: number = 0;
-    tokenListenerNotifications: number = 0;
-    pairListenerNotifications: number = 0;
-    packageNeighborListenerNotifications: number = 0;
-    ancestorListenerNotifications: number = 0;
-    arrayEntriesListenerNotifications: number = 0;
-    objectPropertiesListenerNotifications: number = 0;
-    roundLimitReached: number = 0;
-    totalCycleEliminationTime: number = 0;
-    totalCycleEliminationRuns: number = 0;
-    totalPropagationTime: number = 0;
-    totalListenerCallTime: number = 0;
-    totalWideningTime: number = 0;
-
-    diagnostics: AnalysisDiagnostics = {
-        packages: 0,
-        modules: 0,
-        functions: 0,
-        vars: 0,
-        listeners: 0,
-        tokens: 0,
-        subsetEdges: 0,
-        functionToFunctionEdges: 0,
-        iterations: 0,
-        uniqueTokens: 0,
-        aborted: false,
-        timeout: false,
-        time: 0,
-        cpuTime: 0,
-        codeSize: 0,
-        maxMemoryUsage: 0,
-        errors: 0,
-        warnings: 0,
-        totalCallSites: 0,
-        callsWithUniqueCallee: 0,
-        callsWithNoCallee: 0,
-        nativeOnlyCalls: 0,
-        externalOnlyCalls: 0,
-        nativeOrExternalCalls: 0,
-        functionsWithZeroCallers: 0
-    };
+    diagnostics = new AnalysisDiagnostics;
 
     readonly abort?: () => boolean;
 
@@ -121,7 +76,8 @@ export default class Solver {
         d.tokens = f.numberOfTokens;
         d.subsetEdges = f.numberOfSubsetEdges;
         d.functionToFunctionEdges = f.numberOfFunctionToFunctionEdges;
-        d.uniqueTokens = f.a.canonicalTokens.size;
+        d.callToFunctionEdges = f.numberOfCallToFunctionEdges;
+        d.uniqueTokens = a.canonicalTokens.size;
         d.maxMemoryUsage = Math.max(d.maxMemoryUsage, getMemoryUsage());
     }
 
@@ -206,8 +162,8 @@ export default class Solver {
             logger.debug(`Added token ${t} to ${toRep}`);
         // add to worklist
         (ws ??= mapGetArray(this.unprocessedTokens, toRep)).push(t);
-        this.unprocessedTokensSize++;
-        if (this.unprocessedTokensSize % 100 === 0)
+        this.diagnostics.unprocessedTokensSize++;
+        if (this.diagnostics.unprocessedTokensSize % 100 === 0)
             this.printDiagnostics();
         return ws;
     }
@@ -253,13 +209,13 @@ export default class Solver {
     private printDiagnostics() {
         if (options.printProgress && options.tty && isTTY && logger.level === "info") {
             const d = new Date().getTime();
-            if (d > this.lastPrintDiagnosticsTime + 100) { // only report every 100ms
-                this.lastPrintDiagnosticsTime = d;
+            if (d > this.diagnostics.lastPrintDiagnosticsTime + 100) { // only report every 100ms
+                this.diagnostics.lastPrintDiagnosticsTime = d;
                 const a = this.globalState;
                 const f = this.fragmentState;
                 writeStdOut(`Packages: ${a.packageInfos.size}, modules: ${a.moduleInfos.size}, call edges: ${f.numberOfFunctionToFunctionEdges}, ` +
-                    (options.diagnostics ? `vars: ${f.getNumberOfVarsWithTokens()}, tokens: ${f.numberOfTokens}, subsets: ${f.numberOfSubsetEdges}, round: ${this.fixpointRound}, ` : "") +
-                    `iterations: ${this.diagnostics.iterations}, worklist: ${this.unprocessedTokensSize}` +
+                    (options.diagnostics ? `vars: ${f.getNumberOfVarsWithTokens()}, tokens: ${f.numberOfTokens}, subsets: ${f.numberOfSubsetEdges}, round: ${this.diagnostics.fixpointRound}, ` : "") +
+                    `iterations: ${this.diagnostics.iterations}, worklist: ${this.diagnostics.unprocessedTokensSize}` +
                     (options.diagnostics ? `, listeners: ${f.postponedListenerCalls.length}` : ""));
                 f.a.timeoutTimer.checkTimeout();
             }
@@ -296,9 +252,9 @@ export default class Solver {
                     const [size, ts] = this.fragmentState.getTokensSize(fromRep);
                     if (size > 0) {
                         if (logger.isDebugEnabled())
-                            logger.debug(`Worklist size: ${this.unprocessedTokensSize}, propagating ${size} token${size !== 1 ? "s" : ""} from ${fromRep}`);
+                            logger.debug(`Worklist size: ${this.diagnostics.unprocessedTokensSize}, propagating ${size} token${size !== 1 ? "s" : ""} from ${fromRep}`);
                         this.addTokens(ts, toRep);
-                        this.incrementFixpointIterations();
+                        this.incrementIterations();
                     }
                     this.nodesWithNewEdges.add(fromRep);
                 }
@@ -396,7 +352,7 @@ export default class Solver {
         if (!s.has(t)) {
             s.add(t);
             this.enqueueListenerCall([listener, t]);
-            this.tokenListenerNotifications++;
+            this.diagnostics.tokenListenerNotifications++;
         }
     }
 
@@ -408,7 +364,7 @@ export default class Solver {
         if (!s.has(t2)) {
             s.add(t2);
             this.enqueueListenerCall([listener, [t1, t2]]);
-            this.pairListenerNotifications++;
+            this.diagnostics.pairListenerNotifications++;
         }
     }
 
@@ -438,7 +394,7 @@ export default class Solver {
             if (qs)
                 for (const q of qs) {
                     this.enqueueListenerCall([listener, q]);
-                    this.packageNeighborListenerNotifications++;
+                    this.diagnostics.packageNeighborListenerNotifications++;
                 }
             return m;
         } else
@@ -466,7 +422,7 @@ export default class Solver {
                 if (ts)
                     for (const listener of ts.values()) {
                         this.enqueueListenerCall([listener, neighbor]);
-                        this.packageNeighborListenerNotifications++;
+                        this.diagnostics.packageNeighborListenerNotifications++;
                     }
             }
         }
@@ -491,7 +447,7 @@ export default class Solver {
                 const p = mapGetSet(f.ancestorListenersProcessed, n);
                 if (!p.has(a)) {
                     this.enqueueListenerCall([listener, a]);
-                    this.ancestorListenerNotifications++;
+                    this.diagnostics.ancestorListenerNotifications++;
                     mapGetSet(f.ancestorListenersProcessed, n).add(a);
                 }
             }
@@ -549,7 +505,7 @@ export default class Solver {
                             const p = mapGetSet(f.ancestorListenersProcessed, n);
                             if (!p.has(anc)) {
                                 this.enqueueListenerCall([listener, anc]);
-                                this.ancestorListenerNotifications++;
+                                this.diagnostics.ancestorListenerNotifications++;
                                 p.add(anc);
                             }
                         }
@@ -587,7 +543,7 @@ export default class Solver {
             if (ps)
                 for (const p of ps) {
                     this.enqueueListenerCall([listener, p]);
-                    this.arrayEntriesListenerNotifications++;
+                    this.diagnostics.arrayEntriesListenerNotifications++;
                 }
             return m;
         } else
@@ -613,7 +569,7 @@ export default class Solver {
                 if (ts)
                     for (const listener of ts.values()) {
                         this.enqueueListenerCall([listener, prop]);
-                        this.arrayEntriesListenerNotifications++;
+                        this.diagnostics.arrayEntriesListenerNotifications++;
                     }
             }
         }
@@ -645,7 +601,7 @@ export default class Solver {
             if (ps)
                 for (const p of ps) {
                     this.enqueueListenerCall([listener, p]);
-                    this.objectPropertiesListenerNotifications++;
+                    this.diagnostics.objectPropertiesListenerNotifications++;
                 }
             return m;
         } else
@@ -668,7 +624,7 @@ export default class Solver {
                 if (ts)
                     for (const listener of ts.values()) {
                         this.enqueueListenerCall([listener, prop]);
-                        this.objectPropertiesListenerNotifications++;
+                        this.diagnostics.objectPropertiesListenerNotifications++;
                     }
             }
         }
@@ -839,9 +795,9 @@ export default class Solver {
         const ts = this.unprocessedTokens.get(v);
         if (ts) {
             if (logger.isDebugEnabled())
-                logger.debug(`Worklist size: ${this.unprocessedTokensSize}, propagating ${ts.length} token${ts.length !== 1 ? "s" : ""} from ${v}`);
+                logger.debug(`Worklist size: ${this.diagnostics.unprocessedTokensSize}, propagating ${ts.length} token${ts.length !== 1 ? "s" : ""} from ${v}`);
             this.unprocessedTokens.delete(v);
-            this.unprocessedTokensSize -= ts.length;
+            this.diagnostics.unprocessedTokensSize -= ts.length;
             // propagate new tokens to successors
             const f = this.fragmentState;
             assert(f.vars.has(v));
@@ -849,7 +805,7 @@ export default class Solver {
             if (s) {
                 for (const to of s)
                     this.addTokens(ts, to);
-                this.incrementFixpointIterations();
+                this.incrementIterations();
             }
             // notify listeners
             const tr = f.tokenListeners.get(v);
@@ -876,7 +832,7 @@ export default class Solver {
         }
     }
 
-    incrementFixpointIterations() {
+    incrementIterations() {
         this.diagnostics.iterations++;
         if (this.diagnostics.iterations % 100 === 0) {
             this.globalState.timeoutTimer.checkTimeout();
@@ -899,13 +855,13 @@ export default class Solver {
         let round = 0;
         while (this.unprocessedTokens.size > 0 || this.nodesWithNewEdges.size > 0 || this.restored.size > 0 || f.postponedListenerCalls.length > 0) {
             round++;
-            this.fixpointRound = round;
+            this.diagnostics.fixpointRound = round;
             if (logger.isVerboseEnabled())
                 logger.verbose(`Fixpoint round: ${round} (call edges: ${f.numberOfFunctionToFunctionEdges}, vars: ${f.getNumberOfVarsWithTokens()}, tokens: ${f.numberOfTokens}, subsets: ${f.numberOfSubsetEdges})`);
             if (options.maxRounds !== undefined && round > options.maxRounds) {
                 f.warn(`Fixpoint round limit reached, aborting propagation`);
-                this.roundLimitReached++;
-                this.unprocessedTokensSize = 0;
+                this.diagnostics.roundLimitReached++;
+                this.diagnostics.unprocessedTokensSize = 0;
                 this.unprocessedTokens.clear();
                 this.nodesWithNewEdges.clear();
                 this.restored.clear();
@@ -927,18 +883,18 @@ export default class Solver {
                         // cycle elimination
                         for (const [v, rep] of repmap)
                             this.redirect(v, rep); // TODO: this includes processing pending edges and tokens for v, which may be unnecessary?
-                        this.totalCycleEliminationTime += timer1.elapsedCPU();
-                        this.totalCycleEliminationRuns++;
+                        this.diagnostics.totalCycleEliminationTime += timer1.elapsedCPU();
+                        this.diagnostics.totalCycleEliminationRuns++;
                         const timer2 = new Timer();
                         // process new tokens for the component representatives in topological order
                         if (logger.isVerboseEnabled())
-                            logger.verbose(`Processing ${this.unprocessedTokensSize} new token${this.unprocessedTokensSize !== 1 ? "s" : ""}`);
+                            logger.verbose(`Processing ${this.diagnostics.unprocessedTokensSize} new token${this.diagnostics.unprocessedTokensSize !== 1 ? "s" : ""}`);
                         for (let i = reps.length - 1; i >= 0; i--) {
                             const v = reps[i];
                             this.processTokens(v);
                             await this.checkAbort(true);
                         }
-                        this.totalPropagationTime += timer2.elapsedCPU();
+                        this.diagnostics.totalPropagationTime += timer2.elapsedCPU();
                         this.nodesWithNewEdges.clear();
                         this.restored.clear();
                     }
@@ -946,11 +902,11 @@ export default class Solver {
                     const timer3 = new Timer();
                     for (const v of this.unprocessedTokens.keys())
                         this.processTokens(v);
-                    this.totalPropagationTime += timer3.elapsedCPU();
+                    this.diagnostics.totalPropagationTime += timer3.elapsedCPU();
                 } else {
                     // process all tokens in worklist until empty
                     if (logger.isVerboseEnabled())
-                        logger.verbose(`Processing ${this.unprocessedTokensSize} new token${this.unprocessedTokensSize !== 1 ? "s" : ""}`);
+                        logger.verbose(`Processing ${this.diagnostics.unprocessedTokensSize} new token${this.diagnostics.unprocessedTokensSize !== 1 ? "s" : ""}`);
                     const timer = new Timer();
                     this.nodesWithNewEdges.clear();
                     this.restored.clear();
@@ -958,17 +914,17 @@ export default class Solver {
                         this.processTokens(v);
                         await this.checkAbort(true);
                     }
-                    this.totalPropagationTime += timer.elapsedCPU();
+                    this.diagnostics.totalPropagationTime += timer.elapsedCPU();
                 }
             }
-            if (this.unprocessedTokens.size !== 0 || this.unprocessedTokensSize !== 0 || this.nodesWithNewEdges.size !== 0 || this.restored.size !== 0)
-                assert.fail(`worklist non-empty: unprocessedTokens.size: ${this.unprocessedTokens.size}, unprocessedTokensSize: ${this.unprocessedTokensSize}, nodesWithNewEdges.size: ${this.nodesWithNewEdges.size}, restored.size: ${this.restored.size}`);
+            if (this.unprocessedTokens.size !== 0 || this.diagnostics.unprocessedTokensSize !== 0 || this.nodesWithNewEdges.size !== 0 || this.restored.size !== 0)
+                assert.fail(`worklist non-empty: unprocessedTokens.size: ${this.unprocessedTokens.size}, unprocessedTokensSize: ${this.diagnostics.unprocessedTokensSize}, nodesWithNewEdges.size: ${this.nodesWithNewEdges.size}, restored.size: ${this.restored.size}`);
             // process all enqueued listener calls (excluding those created during the processing)
             if (logger.isVerboseEnabled())
                 logger.verbose(`Processing listener calls: ${f.postponedListenerCalls.length}`);
             if (f.postponedListenerCalls.length > 0) {
                 const timer = new Timer();
-                this.listenerNotificationRounds++;
+                this.diagnostics.listenerNotificationRounds++;
                 const calls = Array.from(f.postponedListenerCalls);
                 f.postponedListenerCalls.length = 0;
                 let count = 0;
@@ -979,11 +935,11 @@ export default class Solver {
                         this.printDiagnostics();
                     }
                 }
-                this.totalListenerCallTime += timer.elapsedCPU();
+                this.diagnostics.totalListenerCallTime += timer.elapsedCPU();
             }
         }
-        if (this.unprocessedTokensSize !== 0)
-            assert.fail(`unprocessedTokensSize non-zero after propagate: ${this.unprocessedTokensSize}`);
+        if (this.diagnostics.unprocessedTokensSize !== 0)
+            assert.fail(`unprocessedTokensSize non-zero after propagate: ${this.diagnostics.unprocessedTokensSize}`);
     }
 
     async checkAbort(throttle: boolean = false) {

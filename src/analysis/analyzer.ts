@@ -22,6 +22,7 @@ import {FragmentState} from "./fragmentstate";
 
 export async function analyzeFiles(files: Array<string>, solver: Solver) {
     const a = solver.globalState;
+    const d = solver.diagnostics;
     const timer = new Timer();
     resolveBaseDir();
     const fragmentStates = new Map<ModuleInfo | PackageInfo, FragmentState>();
@@ -53,9 +54,9 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
                 // initialize analysis state for the module
                 solver.prepare();
 
-                solver.diagnostics.modules++;
+                d.modules++;
                 if (!options.modulesOnly && options.printProgress)
-                    logger.info(`Analyzing module ${file} (${solver.diagnostics.modules})`);
+                    logger.info(`Analyzing module ${file} (${d.modules})`);
 
                 const str = fs.readFileSync(file, "utf8"); // TODO: OK to assume utf8? (ECMAScript says utf16??)
                 writeStdOutIfActive(`Parsing ${file} (${Math.ceil(str.length / 1024)}KB)...`);
@@ -66,7 +67,7 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
                 }
                 moduleInfo.node = ast.program;
                 a.filesAnalyzed.push(file);
-                solver.diagnostics.codeSize += statSync(file).size;
+                d.codeSize += statSync(file).size;
 
                 if (options.modulesOnly) {
 
@@ -122,9 +123,9 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
                     if (!Array.from(p.modules.values()).some(m => fragmentStates.has(m)))
                         continue;
 
-                    solver.diagnostics.packages++;
+                    d.packages++;
                     if (options.printProgress)
-                        logger.info(`Analyzing package ${p} (${solver.diagnostics.packages}/${totalNumPackages})`);
+                        logger.info(`Analyzing package ${p} (${d.packages}/${totalNumPackages})`);
 
                     // merge analysis state for each module
                     for (const m of p.modules.values())
@@ -151,27 +152,26 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
     } catch (ex) {
         solver.updateDiagnostics();
         if (ex instanceof TimeoutException) {
-            solver.diagnostics.timeout = true;
+            d.timeout = true;
         } else if (ex instanceof AbortedException) {
-            solver.diagnostics.aborted = true;
+            d.aborted = true;
         } else
             throw ex;
     }
-    solver.diagnostics.time = timer.elapsed();
-    solver.diagnostics.cpuTime = timer.elapsedCPU();
-    solver.diagnostics.errors = getMapHybridSetSize(solver.fragmentState.errors) + a.filesWithParseErrors.length;
-    solver.diagnostics.warnings = getMapHybridSetSize(solver.fragmentState.warnings) + getMapHybridSetSize(solver.fragmentState.warningsUnsupported);
+    d.time = timer.elapsed();
+    d.cpuTime = timer.elapsedCPU();
+    d.errors = getMapHybridSetSize(solver.fragmentState.errors) + a.filesWithParseErrors.length;
+    d.warnings = getMapHybridSetSize(solver.fragmentState.warnings) + getMapHybridSetSize(solver.fragmentState.warningsUnsupported);
 
-    if (solver.diagnostics.aborted)
+    if (d.aborted)
         logger.warn("Received abort signal, analysis aborted");
-    else if (solver.diagnostics.timeout)
+    else if (d.timeout)
         logger.warn("Time limit reached, analysis aborted");
 
     // output statistics
     if (!options.modulesOnly && files.length > 0) {
         const f = solver.fragmentState; // current fragment (not final if aborted due to timeout)
         const r = new AnalysisStateReporter(f);
-        const d = solver.diagnostics;
         d.callsWithUniqueCallee = r.getOneCalleeCalls();
         d.totalCallSites = f.callLocations.size;
         d.callsWithNoCallee = r.getZeroCalleeCalls().size;
@@ -180,30 +180,30 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
         d.nativeOrExternalCalls = r.getZeroButNativeOrExternalCalleeCalls();
         d.functionsWithZeroCallers = r.getZeroCallerFunctions().size;
         if (logger.isInfoEnabled()) {
-            logger.info(`Analyzed packages: ${solver.diagnostics.packages}, modules: ${solver.diagnostics.modules}, functions: ${a.functionInfos.size}, code size: ${Math.ceil(solver.diagnostics.codeSize / 1024)}KB`);
+            logger.info(`Analyzed packages: ${d.packages}, modules: ${d.modules}, functions: ${a.functionInfos.size}, code size: ${Math.ceil(d.codeSize / 1024)}KB`);
             logger.info(`Call edges function->function: ${f.numberOfFunctionToFunctionEdges}, call->function: ${f.numberOfCallToFunctionEdges}`);
             const n = d.totalCallSites - d.callsWithNoCallee - d.nativeOnlyCalls - d.externalOnlyCalls - d.nativeOrExternalCalls;
             logger.info(`Calls with unique callee: ${d.callsWithUniqueCallee}/${n}${n > 0 ? ` (${percent(d.callsWithUniqueCallee / n)})` : ""}` +
                 ` (excluding ${d.callsWithNoCallee} zero-callee, ${d.nativeOnlyCalls} native-only, ${d.externalOnlyCalls} external-only and ${d.nativeOrExternalCalls} native-or-external-only)`)
             logger.info(`Functions with zero callers: ${r.getZeroCallerFunctions().size}/${a.functionInfos.size}`);
-            logger.info(`Analysis time: ${solver.diagnostics.time}ms, memory usage: ${solver.diagnostics.maxMemoryUsage}MB${!options.gc ? " (without --gc)" : ""}`);
-            logger.info(`Analysis errors: ${solver.diagnostics.errors}, warnings: ${solver.diagnostics.warnings}${getMapHybridSetSize(f.warningsUnsupported) > 0 && !options.warningsUnsupported ? " (show all with --warnings-unsupported)" : ""}`);
+            logger.info(`Analysis time: ${d.time}ms, memory usage: ${d.maxMemoryUsage}MB${!options.gc ? " (without --gc)" : ""}`);
+            logger.info(`Analysis errors: ${d.errors}, warnings: ${d.warnings}${getMapHybridSetSize(f.warningsUnsupported) > 0 && !options.warningsUnsupported ? " (show all with --warnings-unsupported)" : ""}`);
             if (options.diagnostics) {
-                logger.info(`Iterations: ${solver.diagnostics.iterations}, listener notification rounds: ${solver.listenerNotificationRounds}`);
+                logger.info(`Iterations: ${d.iterations}, listener notification rounds: ${d.listenerNotificationRounds}`);
                 if (options.maxRounds !== undefined)
-                    logger.info(`Fixpoint round limit reached: ${solver.roundLimitReached} time${solver.roundLimitReached !== 1 ? "s" : ""}`);
+                    logger.info(`Fixpoint round limit reached: ${d.roundLimitReached} time${d.roundLimitReached !== 1 ? "s" : ""}`);
                 logger.info(`Constraint vars: ${f.getNumberOfVarsWithTokens()} (${f.vars.size}), tokens: ${f.numberOfTokens}, subset edges: ${f.numberOfSubsetEdges}, max tokens: ${f.getLargestTokenSetSize()}, max subset out: ${f.getLargestSubsetEdgeOutDegree()}, redirections: ${f.redirections.size}`);
-                logger.info(`Listeners (notifications) token: ${mapMapSize(f.tokenListeners)} (${solver.tokenListenerNotifications}), ` +
-                    `pair: ${mapMapSize(f.pairListeners1) + mapMapSize(f.pairListeners2)} (${solver.pairListenerNotifications}), ` +
-                    (options.readNeighbors ? `neighbor: ${mapMapSize(f.packageNeighborListeners)} (${solver.packageNeighborListenerNotifications}), ` : "") +
-                    `ancestor: ${mapMapSize(f.ancestorListeners)} (${solver.ancestorListenerNotifications}), ` +
-                    `array: ${mapMapSize(f.arrayEntriesListeners)} (${solver.arrayEntriesListenerNotifications}), ` +
-                    `obj: ${mapMapSize(f.objectPropertiesListeners)} (${solver.objectPropertiesListenerNotifications})`);
+                logger.info(`Listeners (notifications) token: ${mapMapSize(f.tokenListeners)} (${d.tokenListenerNotifications}), ` +
+                    `pair: ${mapMapSize(f.pairListeners1) + mapMapSize(f.pairListeners2)} (${d.pairListenerNotifications}), ` +
+                    (options.readNeighbors ? `neighbor: ${mapMapSize(f.packageNeighborListeners)} (${d.packageNeighborListenerNotifications}), ` : "") +
+                    `ancestor: ${mapMapSize(f.ancestorListeners)} (${d.ancestorListenerNotifications}), ` +
+                    `array: ${mapMapSize(f.arrayEntriesListeners)} (${d.arrayEntriesListenerNotifications}), ` +
+                    `obj: ${mapMapSize(f.objectPropertiesListeners)} (${d.objectPropertiesListenerNotifications})`);
                 logger.info(`Canonicalize vars: ${a.canonicalConstraintVars.size} (${a.numberOfCanonicalizeVarCalls}), tokens: ${a.canonicalTokens.size} (${a.numberOfCanonicalizeTokenCalls}), access paths: ${a.canonicalAccessPaths.size} (${a.numberOfCanonicalizeAccessPathCalls})`);
-                logger.info(`CPU time: ${solver.diagnostics.cpuTime}ms, propagation: ${solver.totalPropagationTime}ms, listeners: ${solver.totalListenerCallTime}ms` +
-                    (options.alloc && options.widening ? `, widening: ${solver.totalWideningTime}ms` : ""));
+                logger.info(`CPU time: ${d.cpuTime}ms, propagation: ${d.totalPropagationTime}ms, listeners: ${d.totalListenerCallTime}ms` +
+                    (options.alloc && options.widening ? `, widening: ${d.totalWideningTime}ms` : ""));
                 if (options.cycleElimination)
-                    logger.info(`Cycle elimination time: ${solver.totalCycleEliminationTime}ms, runs: ${solver.totalCycleEliminationRuns}, nodes removed: ${f.redirections.size}`);
+                    logger.info(`Cycle elimination time: ${d.totalCycleEliminationTime}ms, runs: ${d.totalCycleEliminationRuns}, nodes removed: ${f.redirections.size}`);
             }
         }
     }

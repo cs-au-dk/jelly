@@ -118,7 +118,7 @@ export function widenObjects(widened: Set<ObjectToken>, solver: Solver) {
     }
 
     // update the tokens
-    [solver.unprocessedTokens, solver.unprocessedTokensSize] = widenTokenMapArrayValues(solver.unprocessedTokens);
+    [solver.unprocessedTokens, solver.diagnostics.unprocessedTokensSize] = widenTokenMapArrayValues(solver.unprocessedTokens);
     assert(solver.nodesWithNewEdges.size === 0);
     solver.replaceTokens(tokenMap);
     f.ancestorListeners = widenTokenMapMapKeys(f.ancestorListeners);
@@ -172,7 +172,7 @@ export function widenObjects(widened: Set<ObjectToken>, solver: Solver) {
         }
 
     const ms = timer.elapsed();
-    solver.totalWideningTime += ms;
+    solver.diagnostics.totalWideningTime += ms;
     if (logger.isVerboseEnabled())
         logger.verbose(`Widening completed in ${ms}ms`);
 }

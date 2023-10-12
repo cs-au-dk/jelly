@@ -10,7 +10,7 @@ import {options} from "../options";
 import {DummyModuleInfo, FunctionInfo, ModuleInfo} from "../analysis/infos";
 import {Function, isIdentifier, Node, SourceLocation} from "@babel/types";
 import assert from "assert";
-import {AnalysisDiagnostics} from "../typings/diagnostics";
+import AnalysisDiagnostics from "../analysis/diagnostics";
 import {CallGraph} from "../typings/callgraph";
 
 /**

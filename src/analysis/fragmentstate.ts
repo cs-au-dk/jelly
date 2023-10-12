@@ -172,12 +172,12 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
     readonly callToModule: Map<Node, Set<ModuleInfo | DummyModuleInfo>> = new Map; // TODO: redundant? see callToFunctionOrModule
 
     /**
-     * Total number of function->function call graph edges. (For statistics only.)
+     * Total number of function->function call graph edges in this fragment. (For statistics only.)
      */
     numberOfFunctionToFunctionEdges: number = 0;
 
     /**
-     * Total number of call->function call graph edges. (For statistics only.)
+     * Total number of call->function call graph edges in this fragment. (For statistics only.)
      */
     numberOfCallToFunctionEdges: number = 0;
 
