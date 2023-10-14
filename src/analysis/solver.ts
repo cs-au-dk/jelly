@@ -759,11 +759,12 @@ export default class Solver {
         const tr = f.tokenListeners.get(v);
         if (tr) {
             const qr = mapGetMap(f.tokenListeners, rep);
-            for (const [k, listener] of tr) {
-                qr.set(k, listener);
-                for (const t of rts)
-                    this.callTokenListener(k, listener, t);
-            }
+            for (const [k, listener] of tr)
+                if (!qr.has(k)) {
+                    qr.set(k, listener);
+                    for (const t of rts)
+                        this.callTokenListener(k, listener, t);
+                }
             f.tokenListeners.delete(v);
         }
         const tr1 = f.pairListeners1.get(v);
@@ -773,14 +774,15 @@ export default class Solver {
                 if (t instanceof AllocationSiteToken)
                     bases.push(t);
             const qr1 = mapGetMap(f.pairListeners1, rep);
-            for (const [k, v2l] of tr1) {
-                qr1.set(k, v2l);
-                const [v2, listener] = v2l;
-                for (const t2 of f.getTokens(f.getRepresentative(v2)))
-                    if (t2 instanceof FunctionToken || t2 instanceof AccessPathToken)
-                        for (const t of bases)
-                            this.callTokenPairListener(k, listener, t, t2);
-            }
+            for (const [k, v2l] of tr1)
+                if (!qr1.has(k)) {
+                    qr1.set(k, v2l);
+                    const [v2, listener] = v2l;
+                    for (const t2 of f.getTokens(f.getRepresentative(v2)))
+                        if (t2 instanceof FunctionToken || t2 instanceof AccessPathToken)
+                            for (const t of bases)
+                                this.callTokenPairListener(k, listener, t, t2);
+                }
             f.pairListeners1.delete(v);
         }
         const tr2 = f.pairListeners2.get(v);
@@ -790,14 +792,15 @@ export default class Solver {
                 if (t instanceof FunctionToken || t instanceof AccessPathToken)
                     funs.push(t);
             const qr2 = mapGetMap(f.pairListeners2, rep);
-            for (const [k, v1l] of tr2) {
-                qr2.set(k, v1l);
-                const [v1, listener] = v1l;
-                for (const t1 of f.getTokens(f.getRepresentative(v1)))
-                    if (t1 instanceof AllocationSiteToken)
-                        for (const t of funs)
-                            this.callTokenPairListener(k, listener, t1, t);
-            }
+            for (const [k, v1l] of tr2)
+                if (!qr2.has(k)) {
+                    qr2.set(k, v1l);
+                    const [v1, listener] = v1l;
+                    for (const t1 of f.getTokens(f.getRepresentative(v1)))
+                        if (t1 instanceof AllocationSiteToken)
+                            for (const t of funs)
+                                this.callTokenPairListener(k, listener, t1, t);
+                }
             f.pairListeners2.delete(v);
         }
         assert(!this.unprocessedTokens.has(v));
