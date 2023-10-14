@@ -1,7 +1,7 @@
 import {options} from "../options";
 import assert from "assert";
 import * as v8 from "v8";
-import logger from "./logger";
+import logger, {writeStdOutIfActive} from "./logger";
 
 /**
  * Triggers garbage collection if option --gc is enabled and returns the current size of heap used in MB.
@@ -9,6 +9,7 @@ import logger from "./logger";
 export function getMemoryUsage(): number {
     if (options.gc) {
         assert(typeof gc === "function");
+        writeStdOutIfActive("Garbage collecting...");
         gc();
     }
     const res = Math.ceil(process.memoryUsage().heapUsed / 1048576);
