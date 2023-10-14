@@ -597,7 +597,7 @@ export function visit(ast: File, op: Operations) {
 
                 // constraint: ∀ objects t ∈ ⟦import...⟧: ⟦t.p⟧ ⊆ ⟦x⟧ where p is the property and x is the local identifier
                 // for each import specifier
-                solver.addForAllConstraint(vp.nodeVar(path.node), TokenListener.IMPORT_BASE, path.node, (t: Token) => {
+                solver.addForAllTokensConstraint(vp.nodeVar(path.node), TokenListener.IMPORT_BASE, path.node, (t: Token) => {
                     for (const imp of path.node.specifiers)
                         if (isImportSpecifier(imp) || isImportDefaultSpecifier(imp)) {
                             const prop = getImportName(imp);
@@ -748,7 +748,7 @@ export function visit(ast: File, op: Operations) {
         JSXElement(path: NodePath<JSXElement>) {
             const componentVar = op.expVar(path.node.openingElement.name, path);
             if (componentVar)
-                solver.addForAllConstraint(componentVar, TokenListener.JSX_ELEMENT, path.node, (t: Token) => {
+                solver.addForAllTokensConstraint(componentVar, TokenListener.JSX_ELEMENT, path.node, (t: Token) => {
                     if (t instanceof AccessPathToken)
                         solver.addAccessPath(new ComponentAccessPath(componentVar), solver.varProducer.nodeVar(path.node), t.ap);
                 });

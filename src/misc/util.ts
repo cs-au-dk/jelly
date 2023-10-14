@@ -159,7 +159,7 @@ export function arrayToString(a: Array<any>, sep: string): string {
 export function mapMapSize<K1, K2, V>(m: Map<K1, Map<K2, V>>): number {
     let c = 0;
     for (const n of m.values())
-        c += n.size
+        c += n.size;
     return c;
 }
 

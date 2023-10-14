@@ -126,15 +126,11 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
 
     readonly pairListeners2: Map<RVT, Map<ListenerID, [ConstraintVar, (t1: AllocationSiteToken, t2: FunctionToken | AccessPathToken) => void]>> = new Map;
 
-    readonly listenersProcessed: Map<ListenerID, Set<Token>> = new Map;
-
-    readonly pairListenersProcessed: Map<ListenerID, Map<AllocationSiteToken, Set<FunctionToken | AccessPathToken>>> = new Map;
+    readonly listenersProcessed: Map<ListenerID, Set<Token | bigint>> = new Map;
 
     readonly packageNeighborListeners: Map<PackageInfo, Map<Node, (neighbor: PackageInfo) => void>> = new Map;
 
     ancestorListeners: Map<Token, Map<Node, (descendant: Token) => void>> = new Map;
-
-    readonly ancestorListenersProcessed: Map<Node, Set<Token>> = new Map;
 
     readonly arrayEntriesListeners: Map<ArrayToken, Map<ListenerID, (prop: string) => void>> = new Map;
 

@@ -263,20 +263,27 @@ export default class Solver {
     }
 
     /**
+     * Provides a unique'ish ID for the given node.
+     */
+    private getNodeHash(n: Node): bigint {
+        const nid = (n as any)[JELLY_NODE_ID];
+        assert(nid !== undefined);
+        let id = (BigInt(nid) << 32n);
+        const h = n.loc && (n.loc as Location).module?.hash;
+        if (h)
+            id += BigInt(h);
+        return id;
+    }
+
+    /**
      * Provides a unique'ish ID for the given key and node or token.
      */
     private getListenerID(key: TokenListener, n: Node | Token): ListenerID {
         let id = (BigInt(key) << 16n);
         if (n instanceof Token)
             id += BigInt(n.hash);
-        else {
-            const nid = (n as any)[JELLY_NODE_ID];
-            assert(nid !== undefined);
-            id += (BigInt(nid) << 32n);
-            const h = n.loc && (n.loc as Location).module?.hash;
-            if (h)
-                id += BigInt(h);
-        }
+        else
+            id += this.getNodeHash(n);
         const x = this.listeners.get(id);
         if (x) {
             const [xk, xn] = x;
@@ -288,10 +295,17 @@ export default class Solver {
     }
 
     /**
-     * Adds a universally quantified constraint.
-     * The constraint variable, the key, the node or token must together uniquely determine the function.
+     * Provides a unique'ish ID for the given token and node.
      */
-    addForAllConstraint(v: ConstraintVar | undefined, key: TokenListener, n: Node | Token, listener: (t: Token) => void) {
+    private getAncestorListenerID(t: Token, n: Node): ListenerID {
+        return BigInt(t.hash) + this.getNodeHash(n); // TODO: hash collision possible
+    }
+
+    /**
+     * Adds a universally quantified constraint for a constraint variable.
+     * The pair of the key and the node or token must together uniquely determine the function (including its free variables).
+     */
+    addForAllTokensConstraint(v: ConstraintVar | undefined, key: TokenListener, n: Node | Token, listener: (t: Token) => void) {
         if (v === undefined)
             return;
         const f = this.fragmentState;
@@ -303,7 +317,7 @@ export default class Solver {
         if (!m.has(id)) {
             // run listener on all existing tokens
             for (const t of f.getTokens(vRep))
-                this.callListener(id, listener, t);
+                this.callTokenListener(id, listener, t);
             // register listener for future tokens
             m.set(id, listener);
         }
@@ -313,9 +327,9 @@ export default class Solver {
     /**
      * Adds a universally quantified constraint for a pair of constraint variables.
      * Only allocation site tokens are considered for the first constraint variable, and only function tokens are considered for the second constraint variable.
-     * Each constraint variable together with the key and the node must uniquely determine the function and the other constraint variable.
+     * The pair of the key and the node must uniquely determine the function (including its free variables).
      */
-    addForAllPairsConstraint(v1: ConstraintVar | undefined, v2: ConstraintVar | undefined, key: TokenListener, n: Node, listener: (t1: AllocationSiteToken, t2: FunctionToken | AccessPathToken) => void) {
+    addForAllTokenPairsConstraint(v1: ConstraintVar | undefined, v2: ConstraintVar | undefined, key: TokenListener, n: Node, listener: (t1: AllocationSiteToken, t2: FunctionToken | AccessPathToken) => void) {
         if (v1 === undefined || v2 === undefined)
             return;
         assert(key !== undefined);
@@ -335,7 +349,7 @@ export default class Solver {
             for (const t1 of f.getTokens(v1Rep))
                 if (t1 instanceof AllocationSiteToken)
                     for (const t2 of funs)
-                        this.callPairListener(id, listener, t1, t2);
+                        this.callTokenPairListener(id, listener, t1, t2);
             // register listener for future tokens
             m1.set(id, [v2Rep, listener]);
             mapGetMap(f.pairListeners2, v2Rep).set(id, [v1Rep, listener]);
@@ -347,7 +361,7 @@ export default class Solver {
     /**
      * Enqueues a call to a token listener if it hasn't been done before.
      */
-    private callListener(id: ListenerID, listener: (t: Token) => void, t: Token) {
+    private callTokenListener(id: ListenerID, listener: (t: Token) => void, t: Token) {
         const s = mapGetSet(this.fragmentState.listenersProcessed, id);
         if (!s.has(t)) {
             s.add(t);
@@ -359,10 +373,11 @@ export default class Solver {
     /**
      * Enqueues a call to a token pair listener if it hasn't been done before.
      */
-    private callPairListener(id: ListenerID, listener: (t1: AllocationSiteToken, t2: FunctionToken | AccessPathToken) => void, t1: AllocationSiteToken, t2: FunctionToken | AccessPathToken) {
-        const s = mapGetSet(mapGetMap(this.fragmentState.pairListenersProcessed, id), t1);
-        if (!s.has(t2)) {
-            s.add(t2);
+    private callTokenPairListener(id: ListenerID, listener: (t1: AllocationSiteToken, t2: FunctionToken | AccessPathToken) => void, t1: AllocationSiteToken, t2: FunctionToken | AccessPathToken) {
+        const x = (BigInt(t1.hash) << 32n) + BigInt(t2.hash);
+        const s = mapGetSet(this.fragmentState.listenersProcessed, id);
+        if (!s.has(x)) {
+            s.add(x);
             this.enqueueListenerCall([listener, [t1, t2]]);
             this.diagnostics.pairListenerNotifications++;
         }
@@ -370,7 +385,7 @@ export default class Solver {
 
     /**
      * Adds a quantified constraint for all neighbors of the given package.
-     * The PackageInfo and the node must together uniquely determine the function.
+     * The pair of the PackageInfo and the node must uniquely determine the function (including its free variables).
      */
     addForAllPackageNeighborsConstraint(k: PackageInfo, n: Node, listener: (neighbor: PackageInfo) => void) {
         if (logger.isDebugEnabled())
@@ -443,12 +458,13 @@ export default class Solver {
         const m = mapGetMap(f.ancestorListeners, t);
         if (!m.has(n)) {
             // run listener on all existing ancestors
+            const id = this.getAncestorListenerID(t, n);
             for (const a of f.getAncestors(t)) {
-                const p = mapGetSet(f.ancestorListenersProcessed, n);
+                const p = mapGetSet(f.listenersProcessed, id);
                 if (!p.has(a)) {
+                    p.add(a);
                     this.enqueueListenerCall([listener, a]);
                     this.diagnostics.ancestorListenerNotifications++;
-                    mapGetSet(f.ancestorListenersProcessed, n).add(a);
                 }
             }
             // register listener for future inheritance relations
@@ -468,7 +484,6 @@ export default class Solver {
         if (!st.has(parent)) {
             if (logger.isDebugEnabled())
                 logger.debug(`Adding inheritance relation ${child} -> ${parent}`);
-
             if (propagate) {
                 const ancestors = f.getAncestors(parent);
                 const descendants = f.getDescendants(child);
@@ -497,21 +512,19 @@ export default class Solver {
 
                 for (const des of descendants) if (!optDes.has(des)) {
                     const ts = f.ancestorListeners.get(des);
-                    if (!ts)
-                        continue
-
-                    for (const anc of ancestors)
-                        for (const [n, listener] of ts) {
-                            const p = mapGetSet(f.ancestorListenersProcessed, n);
-                            if (!p.has(anc)) {
-                                this.enqueueListenerCall([listener, anc]);
-                                this.diagnostics.ancestorListenerNotifications++;
-                                p.add(anc);
+                    if (ts)
+                        for (const anc of ancestors)
+                            for (const [n, listener] of ts) {
+                                const id = this.getAncestorListenerID(child, n);
+                                const p = mapGetSet(f.listenersProcessed, id);
+                                if (!p.has(anc)) {
+                                    p.add(anc);
+                                    this.enqueueListenerCall([listener, anc]);
+                                    this.diagnostics.ancestorListenerNotifications++;
+                                }
                             }
-                        }
                 }
             }
-
             st.add(parent);
             mapGetSet(f.reverseInherits, parent).add(child);
         }
@@ -519,6 +532,7 @@ export default class Solver {
 
     /**
      * Adds a quantified constraint for all explicit numeric properties of the given array.
+     * The triple consisting of the token, the key, and the node must together uniquely determine the function (including its free variables).
      */
     addForAllArrayEntriesConstraint(t: ArrayToken, key: TokenListener, n: Node, listener: (prop: string) => void) {
         if (logger.isDebugEnabled())
@@ -532,8 +546,8 @@ export default class Solver {
     }
 
     /**
-     * Runs array entry listener on all existing entries if new.
-     * Returns listener map if new.
+     * Runs array entry listener on all existing entries if the listener is new.
+     * Returns listener map (or false if the listener is not new).
      */
     private runArrayEntriesListener(t: ArrayToken, id: ListenerID, listener: (prop: string) => void): Map<ListenerID, (prop: string) => void> | false {
         const f = this.fragmentState;
@@ -577,6 +591,7 @@ export default class Solver {
 
     /**
      * Adds a quantified constraint for all properties of the given object.
+     * The triple consisting of the token, the key, and the node must together uniquely determine the function (including its free variables).
      */
     addForAllObjectPropertiesConstraint(t: ObjectPropertyVarObj, key: TokenListener, n: Node, listener: (prop: string) => void) {
         if (logger.isDebugEnabled())
@@ -590,8 +605,8 @@ export default class Solver {
     }
 
     /**
-     * Runs object property listener on all existing properties if new.
-     * Returns listener map if new.
+     * Runs object property listener on all existing properties if the listener is new.
+     * Returns listener map (or false if the listener is not new).
      */
     private runObjectPropertiesListener(t: ObjectPropertyVarObj, id: ListenerID, listener: (prop: string) => void): Map<ListenerID, (prop: string) => void> | false {
         const f = this.fragmentState;
@@ -746,7 +761,7 @@ export default class Solver {
             for (const [k, listener] of tr) {
                 qr.set(k, listener);
                 for (const t of rts)
-                    this.callListener(k, listener, t);
+                    this.callTokenListener(k, listener, t);
             }
             f.tokenListeners.delete(v);
         }
@@ -763,7 +778,7 @@ export default class Solver {
                 for (const t2 of f.getTokens(f.getRepresentative(v2)))
                     if (t2 instanceof FunctionToken || t2 instanceof AccessPathToken)
                         for (const t of bases)
-                            this.callPairListener(k, listener, t, t2);
+                            this.callTokenPairListener(k, listener, t, t2);
             }
             f.pairListeners1.delete(v);
         }
@@ -780,7 +795,7 @@ export default class Solver {
                 for (const t1 of f.getTokens(f.getRepresentative(v1)))
                     if (t1 instanceof AllocationSiteToken)
                         for (const t of funs)
-                            this.callPairListener(k, listener, t1, t);
+                            this.callTokenPairListener(k, listener, t1, t);
             }
             f.pairListeners2.delete(v);
         }
@@ -812,7 +827,7 @@ export default class Solver {
             if (tr)
                 for (const t of ts)
                     for (const [id, listener] of tr)
-                        this.callListener(id, listener, t);
+                        this.callTokenListener(id, listener, t);
             const tr1 = f.pairListeners1.get(v);
             if (tr1)
                 for (const t of ts)
@@ -820,7 +835,7 @@ export default class Solver {
                         for (const [id, [v2, listener]] of tr1)
                             for (const t2 of f.getTokens(f.getRepresentative(v2)))
                                 if (t2 instanceof FunctionToken || t2 instanceof AccessPathToken)
-                                    this.callPairListener(id, listener, t, t2);
+                                    this.callTokenPairListener(id, listener, t, t2);
             let tr2 = f.pairListeners2.get(v);
             if (tr2)
                 for (const t of ts)
@@ -828,7 +843,7 @@ export default class Solver {
                         for (const [id, [v1, listener]] of tr2)
                             for (const t1 of f.getTokens(f.getRepresentative(v1)))
                                 if (t1 instanceof AllocationSiteToken)
-                                    this.callPairListener(id, listener, t1, t);
+                                    this.callTokenPairListener(id, listener, t1, t);
         }
     }
 
@@ -972,10 +987,7 @@ export default class Solver {
         const s = _s as unknown as FragmentState<MergeRepresentativeVar>;
         const f = this.fragmentState;
         // add processed listeners
-        mapSetAddAll(s.ancestorListenersProcessed, f.ancestorListenersProcessed);
         mapSetAddAll(s.listenersProcessed, f.listenersProcessed);
-        for (const [id, m] of s.pairListenersProcessed)
-            mapSetAddAll(m, mapGetMap(f.pairListenersProcessed, id));
         // merge redirections
         for (const [v, rep] of s.redirections) {
             const fRep = f.getRepresentative(v);
@@ -1008,17 +1020,17 @@ export default class Solver {
                 for (const t of f.getTokens(vRep)) {
                     if (ntr)
                         for (const [id, listener] of ntr)
-                            this.callListener(id, listener, t);
+                            this.callTokenListener(id, listener, t);
                     if (t instanceof AllocationSiteToken && ntr1)
                         for (const [id, [v2, listener]] of ntr1)
                             for (const t2 of [...f.getTokens(f.getRepresentative(v2)), ...s.getTokens(s.getRepresentative(v2))])
                                 if (t2 instanceof FunctionToken || t2 instanceof AccessPathToken)
-                                    this.callPairListener(id, listener, t, t2);
+                                    this.callTokenPairListener(id, listener, t, t2);
                     if ((t instanceof FunctionToken || t instanceof AccessPathToken) && ntr2)
                         for (const [id, [v1, listener]] of ntr2)
                             for (const t1 of [...f.getTokens(f.getRepresentative(v1)), ...s.getTokens(s.getRepresentative(v1))])
                                 if (t1 instanceof AllocationSiteToken)
-                                    this.callPairListener(id, listener, t1, t);
+                                    this.callTokenPairListener(id, listener, t1, t);
                 }
                 // propagate existing tokens along new subset edges
                 if (svs)

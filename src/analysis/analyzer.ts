@@ -151,11 +151,11 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
 
     } catch (ex) {
         solver.updateDiagnostics();
-        if (ex instanceof TimeoutException) {
+        if (ex instanceof TimeoutException)
             d.timeout = true;
-        } else if (ex instanceof AbortedException) {
+        else if (ex instanceof AbortedException)
             d.aborted = true;
-        } else
+        else
             throw ex;
     }
     d.time = timer.elapsed();
