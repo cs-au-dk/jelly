@@ -348,7 +348,7 @@ export class Operations {
                             this.solver.addForAllTokensConstraint(getter, TokenListener.READ_PROPERTY_GETTER_THIS, t, (t3: Token) => bindGetterThis(t, t3));
                         }
 
-                        if (t2 instanceof PackageObjectToken) {
+                        if (t2 instanceof PackageObjectToken && t2.kind === "Object") {
                             // TODO: also reading from neighbor packages if t2 is a PackageObjectToken...
                             if (options.readNeighbors)
                                 this.solver.addForAllPackageNeighborsConstraint(t2.packageInfo, node, (neighbor: PackageInfo) => { // TODO: also use t2.kind

@@ -45,6 +45,7 @@ export const OBJECT_PROTOTYPE = "Object.prototype";
 export const ARRAY_PROTOTYPE = "Array.prototype";
 export const FUNCTION_PROTOTYPE = "Function.prototype";
 export const REGEXP_PROTOTYPE = "RegExp.prototype";
+export const ERROR_PROTOTYPE = "Error.prototype";
 export const DATE_PROTOTYPE = "Date.prototype";
 export const MAP_PROTOTYPE = "Map.prototype";
 export const SET_PROTOTYPE = "Set.prototype";
@@ -77,13 +78,16 @@ export const ecmascriptModels: NativeModel = {
         const theArrayPackageObjectToken = p.solver.globalState.canonicalizeToken(new PackageObjectToken(p.moduleInfo.packageInfo, "Array"));
         const theDatePackageObjectToken = p.solver.globalState.canonicalizeToken(new PackageObjectToken(p.moduleInfo.packageInfo, "Date"));
         const theRegExpPackageObjectToken = p.solver.globalState.canonicalizeToken(new PackageObjectToken(p.moduleInfo.packageInfo, "RegExp"));
+        const theErrorPackageObjectToken = p.solver.globalState.canonicalizeToken(new PackageObjectToken(p.moduleInfo.packageInfo, "Error"));
         p.solver.addInherits(thePackageObjectToken, p.globalSpecialNatives.get(OBJECT_PROTOTYPE)!);
         p.solver.addInherits(theArrayPackageObjectToken, p.globalSpecialNatives.get(ARRAY_PROTOTYPE)!);
         p.solver.addInherits(theDatePackageObjectToken, p.globalSpecialNatives.get(DATE_PROTOTYPE)!);
         p.solver.addInherits(theRegExpPackageObjectToken, p.globalSpecialNatives.get(REGEXP_PROTOTYPE)!);
+        p.solver.addInherits(theErrorPackageObjectToken, p.globalSpecialNatives.get(ERROR_PROTOTYPE)!);
         p.solver.addInherits(p.globalSpecialNatives.get(ARRAY_PROTOTYPE)!, p.globalSpecialNatives.get(OBJECT_PROTOTYPE)!);
         p.solver.addInherits(p.globalSpecialNatives.get(DATE_PROTOTYPE)!, p.globalSpecialNatives.get(OBJECT_PROTOTYPE)!);
         p.solver.addInherits(p.globalSpecialNatives.get(REGEXP_PROTOTYPE)!, p.globalSpecialNatives.get(OBJECT_PROTOTYPE)!);
+        p.solver.addInherits(p.globalSpecialNatives.get(ERROR_PROTOTYPE)!, p.globalSpecialNatives.get(OBJECT_PROTOTYPE)!);
         p.solver.addInherits(p.globalSpecialNatives.get(FUNCTION_PROTOTYPE)!, p.globalSpecialNatives.get(OBJECT_PROTOTYPE)!);
         p.solver.addInherits(p.globalSpecialNatives.get(PROMISE_PROTOTYPE)!, p.globalSpecialNatives.get(OBJECT_PROTOTYPE)!);
         // TODO: all ObjectToken objects should also inherit from Object.prototype and Array.prototype?
@@ -147,7 +151,7 @@ export const ecmascriptModels: NativeModel = {
             name: "AggregateError",
             invoke: (p: NativeFunctionParams) => {
                 warnNativeUsed("AggregateError", p); // TODO
-                returnPackageObject(p); // TODO: should inherit toString from Error
+                returnPackageObject(p, "Error");
             }
         },
         {
@@ -634,7 +638,7 @@ export const ecmascriptModels: NativeModel = {
             invoke: (p: NativeFunctionParams) => {
                 if (p.path.node.arguments.length > 1)
                     warnNativeUsed("Error", p, "with multiple arguments"); // TODO
-                returnPackageObject(p);
+                returnPackageObject(p, "Error");
             }
         },
         {
@@ -642,7 +646,7 @@ export const ecmascriptModels: NativeModel = {
             invoke: (p: NativeFunctionParams) => {
                 if (p.path.node.arguments.length > 1)
                     warnNativeUsed("EvalError", p, "with multiple arguments"); // TODO
-                returnPackageObject(p); // TODO: should inherit toString from Error
+                returnPackageObject(p, "Error");
             }
             // TODO
         },
@@ -761,7 +765,7 @@ export const ecmascriptModels: NativeModel = {
             invoke: (p: NativeFunctionParams) => {
                 if (p.path.node.arguments.length > 1)
                     warnNativeUsed("InternalError", p, "with multiple arguments"); // TODO
-                returnPackageObject(p); // TODO: should inherit toString from Error
+                returnPackageObject(p, "Error");
             }
             // TODO
         },
@@ -779,7 +783,8 @@ export const ecmascriptModels: NativeModel = {
                     invoke: (p: NativeFunctionParams) => {
                         if (p.path.node.arguments.length > 1)
                             warnNativeUsed("JSON.parse", p, "with reviver"); // TODO
-                        returnPackageObject(p);
+                        returnPackageObject(p, "Object");
+                        returnPackageObject(p, "Array");
                     }
                 },
                 {
@@ -1338,7 +1343,7 @@ export const ecmascriptModels: NativeModel = {
             invoke: (p: NativeFunctionParams) => {
                 if (p.path.node.arguments.length > 1)
                     warnNativeUsed("RangeError", p, "with multiple arguments"); // TODO
-                returnPackageObject(p); // TODO: should inherit toString from Error
+                returnPackageObject(p, "Error");
             }
             // TODO
         },
@@ -1347,7 +1352,7 @@ export const ecmascriptModels: NativeModel = {
             invoke: (p: NativeFunctionParams) => {
                 if (p.path.node.arguments.length > 1)
                     warnNativeUsed("ReferenceError", p, "with multiple arguments"); // TODO
-                returnPackageObject(p); // TODO: should inherit toString from Error
+                returnPackageObject(p, "Error");
             }
             // TODO
         },
@@ -1549,7 +1554,7 @@ export const ecmascriptModels: NativeModel = {
             invoke: (p: NativeFunctionParams) => {
                 if (p.path.node.arguments.length > 1)
                     warnNativeUsed("SyntaxError", p, "with multiple arguments"); // TODO
-                returnPackageObject(p); // TODO: should inherit toString from Error
+                returnPackageObject(p, "Error");
             }
             // TODO
         },
@@ -1563,7 +1568,7 @@ export const ecmascriptModels: NativeModel = {
             invoke: (p: NativeFunctionParams) => {
                 if (p.path.node.arguments.length > 1)
                     warnNativeUsed("TypeError", p, "with multiple arguments"); // TODO
-                returnPackageObject(p); // TODO: should inherit toString from Error
+                returnPackageObject(p, "Error");
             }
             // TODO
         },
@@ -1600,7 +1605,7 @@ export const ecmascriptModels: NativeModel = {
             invoke: (p: NativeFunctionParams) => {
                 if (p.path.node.arguments.length > 1)
                     warnNativeUsed("URIError", p, "with multiple arguments"); // TODO
-                returnPackageObject(p); // TODO: should inherit toString from Error
+                returnPackageObject(p, "Error");
             }
             // TODO
         },

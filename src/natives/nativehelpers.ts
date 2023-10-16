@@ -193,8 +193,8 @@ export function warnNativeUsed(name: string, p: NativeFunctionParams, extra?: st
 /**
  * Models that an object represented by the current PackageObjectToken is returned.
  */
-export function returnPackageObject(p: NativeFunctionParams) {
-    p.solver.addTokenConstraint(p.solver.globalState.canonicalizeToken(new PackageObjectToken(p.moduleInfo.packageInfo)), p.solver.varProducer.expVar(p.path.node, p.path));
+export function returnPackageObject(p: NativeFunctionParams, kind: ObjectKind = "Object") {
+    p.solver.addTokenConstraint(p.solver.globalState.canonicalizeToken(new PackageObjectToken(p.moduleInfo.packageInfo, kind)), p.solver.varProducer.expVar(p.path.node, p.path));
 }
 
 /**

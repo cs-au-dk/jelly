@@ -42,7 +42,7 @@ export class FunctionToken extends Token {
  * PromiseResolve and PromiseReject represent the resolve and reject function arguments of promise executors,
  * using the same allocation site as the promise they belong to.
  */
-export type ObjectKind = "Object" | "Array" | "Class" | "Map" | "Set" | "WeakMap" | "WeakSet" | "WeakRef" | "Iterator" | "RegExp" | "Date" | "Promise" | "PromiseResolve" | "PromiseReject";
+export type ObjectKind = "Object" | "Array" | "Class" | "Map" | "Set" | "WeakMap" | "WeakSet" | "WeakRef" | "Iterator" | "RegExp" | "Date" | "Promise" | "PromiseResolve" | "PromiseReject" | "Error";
 
 /**
  * Token that represents objects with a specific allocation site.
