@@ -4,7 +4,6 @@ import {
     AllocationSiteToken,
     FunctionToken,
     NativeObjectToken,
-    ObjectToken,
     PackageObjectToken
 } from "../analysis/tokens";
 import {FragmentState} from "../analysis/fragmentstate";
@@ -74,10 +73,9 @@ export function getAPIExported(f: FragmentState): Map<ObjectPropertyVarObj, Set<
                 worklist.delete(t);
 
             // look at object properties
-            if (t instanceof ObjectToken || t instanceof NativeObjectToken || t instanceof PackageObjectToken)
-                for (const prop of f.objectProperties.get(t) ?? [])
-                    add(f.varProducer.objPropVar(t, prop),
-                        c.canonicalize(new PropertyAccessPathPattern(ap, [prop])));
+            for (const prop of f.objectProperties.get(t) ?? [])
+                add(f.varProducer.objPropVar(t, prop),
+                    c.canonicalize(new PropertyAccessPathPattern(ap, [prop])));
 
             // look at function returns
             if (t instanceof FunctionToken)
