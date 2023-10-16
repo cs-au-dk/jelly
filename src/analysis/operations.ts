@@ -403,7 +403,7 @@ export class Operations {
                             this.solver.addSubsetConstraint(this.solver.varProducer.objPropVar(t, prop), dst));
                         // TODO: ignoring reads from prototype chain
 
-                    } else { // TODO: assuming dynamic reads from arrays only read array indices
+                    } else if (!(t instanceof AccessPathToken)) { // TODO: assuming dynamic reads from arrays only read array indices
                         if (logger.isInfoEnabled())
                             this.solver.fragmentState.registerUnhandledDynamicPropertyRead(node);
                     }
@@ -630,7 +630,7 @@ export class Operations {
 
                             // TODO: write to array setters also?
 
-                        } else {
+                        } else if (!(t instanceof AccessPathToken)) {
                             if (logger.isInfoEnabled())
                                 this.solver.fragmentState.registerUnhandledDynamicPropertyWrite(path.node, src, options.warningsUnsupported && logger.isVerboseEnabled() ? path.getSource() : undefined);
                         }

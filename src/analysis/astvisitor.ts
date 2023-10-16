@@ -225,7 +225,7 @@ export function visit(ast: File, op: Operations) {
                     logger.verbose(`Reached function ${msg} at ${locationToStringWithFile(fun.loc)}`);
                 a.registerFunctionInfo(op.file, path, name, fun);
                 if (!name && !anon)
-                    f.warnUnsupported(fun, `Computed ${isFunctionDeclaration(path.node) || isFunctionExpression(path.node) ? "function" : "method"} name`); // TODO: handle functions/methods with unknown name?
+                    f.warnUnsupported(fun, `Dynamic ${isFunctionDeclaration(path.node) || isFunctionExpression(path.node) ? "function" : "method"} name`); // TODO: handle functions/methods with unknown name?
 
                 // process destructuring for parameters and register identifier parameters
                 for (const param of fun.params) {
@@ -421,7 +421,7 @@ export function visit(ast: File, op: Operations) {
                         // TODO: special treatment for ClassPrivateProperty? static properties?
                     }
                 } else
-                    f.warnUnsupported(path.node, "Computed property name"); // TODO: nontrivial computed property name
+                    f.warnUnsupported(path.node, "Dynamic property name"); // TODO: nontrivial computed property name
                 if (isClassProperty(path.node)) // dyn.ts treats class property initializers as functions
                     f.registerArtificialFunction(op.moduleInfo, path.node.key);
             }
@@ -459,7 +459,7 @@ export function visit(ast: File, op: Operations) {
                             solver.addTokenConstraint(t, dst);
                             // TODO: special treatment for ClassPrivateMethod? static properties?
                         } else
-                            f.warnUnsupported(path.node, "Computed method name"); // TODO: nontrivial computed method name
+                            f.warnUnsupported(path.node, "Dynamic method name"); // TODO: nontrivial computed method name
                         break;
                     case "constructor":
 

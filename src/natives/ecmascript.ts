@@ -1134,7 +1134,7 @@ export const ecmascriptModels: NativeModel = {
                             return;
 
                         if (!isStringLiteral(args[1])) {
-                            warnNativeUsed("Object.defineProperty", p, "with computed property name");
+                            warnNativeUsed("Object.defineProperty", p, "with dynamic property name");
                             return;
                         }
 

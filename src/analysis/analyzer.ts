@@ -146,8 +146,8 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
         }
 
         const f = solver.fragmentState;
-        f.reportNonemptyUnhandledDynamicPropertyWrites();
-        f.reportNonemptyUnhandledDynamicPropertyReads();
+        f.reportUnhandledDynamicPropertyWrites();
+        f.reportUnhandledDynamicPropertyReads();
 
     } catch (ex) {
         solver.updateDiagnostics();

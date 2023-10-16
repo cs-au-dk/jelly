@@ -1004,7 +1004,7 @@ export function prepareDefineProperties(
 
         const key = getKey(oprop);
         if (!key) {
-            warnNativeUsed(name, p, "with computed property name");
+            warnNativeUsed(name, p, "with dynamic property name");
             return [];
         }
 

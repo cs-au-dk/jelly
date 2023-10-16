@@ -505,18 +505,20 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
     }
 
     /**
-     * Reports warnings about unhandled dynamic property write operations with nonempty token sets.
+     * Reports warnings about unhandled dynamic property write operations.
      * The source code and the tokens are included in the output if loglevel is verbose or higher.
      */
-    reportNonemptyUnhandledDynamicPropertyWrites() {
+    reportUnhandledDynamicPropertyWrites() {
         for (const [node, {src, source}] of this.unhandledDynamicPropertyWrites.entries()) {
-            const [size, ts] = this.getTokensSize(this.getRepresentative(src));
-            if (size > 0) {
-                let funs = 0;
-                for (const t of ts)
-                    if (t instanceof FunctionToken)
-                        funs++;
-                this.warnUnsupported(node, `Nonempty dynamic property write (${funs} function${funs === 1 ? "" : "s"})`);
+            const ts = this.getTokens(this.getRepresentative(src));
+            let funs = 0, others = 0;
+            for (const t of ts)
+                if (t instanceof FunctionToken)
+                    funs++;
+                else if (!(t instanceof AccessPathToken))
+                    others++;
+            if (funs > 0 || others > 0) {
+                this.warnUnsupported(node, `Dynamic property write (${funs} function${funs === 1 ? "" : "s"}, ${others} other object${others === 1 ? "" : "s"})`);
                 if (logger.isVerboseEnabled() && source !== undefined) {
                     logger.warn(source);
                     for (const t of ts)
@@ -529,7 +531,7 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
     /**
      * Reports warnings about unhandled dynamic property read operations.
      */
-    reportNonemptyUnhandledDynamicPropertyReads() {
+    reportUnhandledDynamicPropertyReads() {
         for (const node of this.unhandledDynamicPropertyReads)
             this.warnUnsupported(node, "Dynamic property read");
     }
