@@ -592,6 +592,7 @@ export default class Solver {
     /**
      * Adds a quantified constraint for all properties of the given object.
      * The triple consisting of the token, the key, and the node must together uniquely determine the function (including its free variables).
+     * The listener function must allow for the token to be widened.
      */
     addForAllObjectPropertiesConstraint(t: ObjectPropertyVarObj, key: TokenListener, n: Node, listener: (prop: string) => void) {
         if (logger.isDebugEnabled())

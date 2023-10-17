@@ -751,7 +751,7 @@ export class Operations {
     newObjectToken(n: Node): ObjectToken | PackageObjectToken {
         if (options.alloc) {
             const t = this.a.canonicalizeToken(new ObjectToken(n));
-            if (!(this.solver.fragmentState.widened && this.solver.fragmentState.widened.has(t))) {
+            if (!this.solver.fragmentState.widened.has(t)) {
                 this.solver.addInherits(t, this.globalSpecialNatives.get(OBJECT_PROTOTYPE)!);
                 return t;
             }

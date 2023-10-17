@@ -216,11 +216,13 @@ export function returnArgument(arg: Node, p: NativeFunctionParams) {
 /**
  * Creates a new AllocationSiteToken with the given kind and prototype.
  */
-export function newObject(kind: ObjectKind, proto: NativeObjectToken | PackageObjectToken | Expression, p: NativeFunctionParams): AllocationSiteToken {
-    const t = p.solver.globalState.canonicalizeToken(
+export function newObject(kind: ObjectKind, proto: NativeObjectToken | PackageObjectToken | Expression, p: NativeFunctionParams): AllocationSiteToken | PackageObjectToken {
+    let t: AllocationSiteToken | PackageObjectToken = p.solver.globalState.canonicalizeToken(
         kind ==="Object" ? new ObjectToken(p.path.node) :
             kind === "Array" ? new ArrayToken(p.path.node) :
                 new AllocationSiteToken(kind, p.path.node));
+    if (t instanceof ObjectToken && p.solver.fragmentState.widened.has(t))
+        t = p.solver.globalState.canonicalizeToken(new PackageObjectToken(t.getPackageInfo(), kind));
     if (proto instanceof Token)
         p.solver.addInherits(t, proto);
     else
@@ -414,7 +416,7 @@ export function invokeCallback(kind: CallbackKind, p: NativeFunctionParams, arg:
     }
 }
 
-export function invokeCallbackBound(kind: CallbackKind, p: NativeFunctionParams, bt: AllocationSiteToken, ft: FunctionToken | AccessPathToken, pBaseVar: ConstraintVar | undefined) {
+export function invokeCallbackBound(kind: CallbackKind, p: NativeFunctionParams, bt: AllocationSiteToken | PackageObjectToken, ft: FunctionToken | AccessPathToken, pBaseVar: ConstraintVar | undefined) {
     const solver = p.solver;
     const f = solver.fragmentState;
     const vp = f.varProducer;
@@ -480,7 +482,7 @@ export function invokeCallbackBound(kind: CallbackKind, p: NativeFunctionParams,
                     // bind initialValue to previousValue and resultVar
                     solver.addSubsetConstraint(arg1Var, accVar);
                     solver.addSubsetConstraint(arg1Var, pResultVar);
-                } else if (args.length === 1) {
+                } else if (args.length === 1 && bt instanceof ArrayToken) {
                     // initialValue is bt[0]
                     solver.addSubsetConstraint(vp.arrayValueVar(bt), accVar);
                     solver.addSubsetConstraint(vp.objPropVar(bt, "0"), accVar);
@@ -690,7 +692,7 @@ export function functionBind(p: NativeFunctionParams) {
 /**
  * Models flow from values of the given iterator's values to the given object property.
  */
-export function assignIteratorValuesToProperty(param: number, t: AllocationSiteToken, prop: string, p: NativeFunctionParams) {
+export function assignIteratorValuesToProperty(param: number, t: AllocationSiteToken | PackageObjectToken, prop: string, p: NativeFunctionParams) {
     const arg = p.path.node.arguments[param];
     if (isExpression(arg)) { // TODO: non-Expression argument
         const src = p.op.expVar(arg, p.path);
@@ -714,7 +716,7 @@ export function assignIteratorValuesToArrayValue(param: number, t: ArrayToken, p
 /**
  * Models flow from key-value pairs of the given iterator's values to the given object key and value properties.
  */
-export function assignIteratorMapValuePairs(param: number, t: AllocationSiteToken, keys: string | null, values: string, p: NativeFunctionParams) {
+export function assignIteratorMapValuePairs(param: number, t: AllocationSiteToken | PackageObjectToken, keys: string | null, values: string, p: NativeFunctionParams) {
     const arg = p.path.node.arguments[param];
     if (isExpression(arg)) { // TODO: non-Expression argument
         const src = p.op.expVar(arg, p.path);
@@ -770,7 +772,7 @@ export function assignBaseArrayArrayValueToArray(t: ArrayToken, p: NativeFunctio
 /**
  * Models call to a promise executor.
  */
-export function callPromiseExecutor(promise: AllocationSiteToken, p: NativeFunctionParams) {
+export function callPromiseExecutor(promise: AllocationSiteToken | PackageObjectToken, p: NativeFunctionParams) {
     const args = p.path.node.arguments;
     if (args.length >= 1 && isExpression(args[0])) { // TODO: SpreadElement? non-MemberExpression?
         const funVar = p.solver.varProducer.expVar(args[0], p.path);
@@ -868,7 +870,7 @@ export function returnPromiseIterator(kind: "all" | "allSettled" | "any" | "race
                 array = newArray(p);
                 p.solver.addTokenConstraint(array, p.solver.varProducer.objPropVar(promise, PROMISE_FULFILLED_VALUES));
             }
-            let allSettledObjects: AllocationSiteToken | undefined;
+            let allSettledObjects: AllocationSiteToken | PackageObjectToken | undefined;
             if (kind === "allSettled") {
                 // add a new object to the array
                 allSettledObjects = newObject("Object", p.globalSpecialNatives.get(OBJECT_PROTOTYPE)!, p);
