@@ -982,7 +982,6 @@ export function prepareDefineProperty(
 export function prepareDefineProperties(
     name: "Object.defineProperties" | "Object.create",
     props: Expression,
-    nodes: [Node, Node, Node],
     p: NativeFunctionParams,
 ): Array<PreparedDefineProperty> {
     // TODO: modeling this operation for non-literal expressions requires
@@ -1011,7 +1010,7 @@ export function prepareDefineProperties(
         }
 
         const dvar = p.solver.varProducer.objPropVar(pobj, key);
-        return prepareDefineProperty(name, key, dvar, nodes, p);
+        return prepareDefineProperty(name, key, dvar, [oprop, oprop.key, oprop.value], p);
     });
 }
 

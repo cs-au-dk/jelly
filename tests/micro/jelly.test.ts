@@ -51,6 +51,10 @@ describe("tests/micro", () => {
         reachableTotal: 11,
     });
 
+    runTest("tests/micro", "defineProperties.js", {
+        soundness: "tests/micro/defineProperties.json",
+    });
+
     runTest("tests/micro", "create.js", {
         soundness: "tests/micro/create.json",
         functionInfos: 2,

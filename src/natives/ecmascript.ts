@@ -1108,8 +1108,7 @@ export const ecmascriptModels: NativeModel = {
                             }
 
                             // model the part of Object.create's logic that is similar to Object.defineProperties
-                            const nodes = [p.path.node, args[0], args[1]];
-                            const ivars = prepareDefineProperties("Object.create", args[1], nodes as any, p);
+                            const ivars = prepareDefineProperties("Object.create", args[1], p);
                             defineProperties(obj, TokenListener.NATIVE_OBJECT_CREATE, ivars, p);
                         }
                     }
@@ -1126,8 +1125,7 @@ export const ecmascriptModels: NativeModel = {
                             return;
                         }
 
-                        const nodes = [p.path.node, args[0], args[1]];
-                        const ivars = prepareDefineProperties("Object.defineProperties", args[1], nodes as any, p);
+                        const ivars = prepareDefineProperties("Object.defineProperties", args[1], p);
                         defineProperties(args[0], TokenListener.NATIVE_OBJECT_DEFINE_PROPERTIES, ivars, p);
                     }
                 },
