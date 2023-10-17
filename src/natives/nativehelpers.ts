@@ -361,14 +361,13 @@ export function returnIterator(kind: IteratorKind, p: NativeFunctionParams) { //
  * Adds constraints to extract the contents of an array (known and unknown entries) to the destination.
  * The destination defaults to the array itself, which is useful for propagating known to unknown entries.
  */
-function extractArrayContents(t: ArrayToken, p: NativeFunctionParams, dst?: ConstraintVar) {
+function extractArrayContents(t: ArrayToken, p: NativeFunctionParams, dst?: ConstraintVar, key: TokenListener = TokenListener.NATIVE_22) {
     const s = p.solver;
     const vp = s.varProducer;
     dst ??= vp.arrayValueVar(t);
 
     s.addSubsetConstraint(vp.arrayValueVar(t), dst);
-    s.addForAllArrayEntriesConstraint(t, TokenListener.NATIVE_22, p.path.node, (prop: string) =>
-                                      s.addSubsetConstraint(s.varProducer.objPropVar(t, prop), dst));
+    s.addForAllArrayEntriesConstraint(t, key, p.path.node, (prop: string) => s.addSubsetConstraint(s.varProducer.objPropVar(t, prop), dst));
 }
 
 type CallbackKind =
@@ -404,7 +403,7 @@ export function invokeCallback(kind: CallbackKind, p: NativeFunctionParams, arg:
             const baseVar = p.solver.varProducer.expVar(bp.base, p.path);
             const funVar = p.solver.varProducer.expVar(funarg, p.path);
             // const caller = a.getEnclosingFunctionOrModule(p.path, p.moduleInfo);
-            p.solver.addForAllTokenPairsConstraint(baseVar, funVar, key, funarg, (bt: AllocationSiteToken, ft: FunctionToken | AccessPathToken) => { // TODO: ignoring native functions etc.
+            p.solver.addForAllTokenPairsConstraint(baseVar, funVar, key, funarg, kind, (bt: AllocationSiteToken, ft: FunctionToken | AccessPathToken) => { // TODO: ignoring native functions etc.
                 invokeCallbackBound(kind, p, bt, ft, baseVar!);
                 if (ft instanceof AccessPathToken) {
                     p.solver.fragmentState.registerEscapingToExternal(funVar, funarg);
@@ -434,6 +433,15 @@ export function invokeCallbackBound(kind: CallbackKind, p: NativeFunctionParams,
     // helper for constructing unique intermediate variables
     const iVarKey = `NativeCallback(${kind},${bt},${ft})`;
     const iVar = (label: string) => vp.intermediateVar(p.path.node, `${iVarKey}: ${label}`); // TODO: necessary to use such a long label?
+    const arrayElementVar = () => {
+        // use a label that is independent of kind and ft since the value only depends on bt.
+        // this is important for correctness as the forAllArrayEntriesConstraint attached in extractArrayContents can only
+        // be added once for the given array and native call node
+        const elementVar = vp.intermediateVar(p.path.node, `NativeCallback(${bt}): array element`);
+        if (bt instanceof ArrayToken)
+            extractArrayContents(bt, p, elementVar, TokenListener.NATIVE_INVOKE_CALLBACK_ARRAY_ELEMENT);
+        return elementVar;
+    };
 
     switch (kind) {
         case "Array.prototype.forEach":
@@ -460,11 +468,8 @@ export function invokeCallbackBound(kind: CallbackKind, p: NativeFunctionParams,
             }
 
             if (ft instanceof FunctionToken) {
-                const elementVar = iVar("element");
                 // write array elements to param1
-                if (bt instanceof ArrayToken)
-                    extractArrayContents(bt, p, elementVar);
-                modelCall([elementVar, undefined, pBaseVar], arg1Var, resultVar);
+                modelCall([arrayElementVar(), undefined, pBaseVar], arg1Var, resultVar);
             }
 
             // TODO: array functions are generic (can be applied to any array-like object, including strings), can also be sub-classed
@@ -473,8 +478,8 @@ export function invokeCallbackBound(kind: CallbackKind, p: NativeFunctionParams,
         case "Array.prototype.reduce":
         case "Array.prototype.reduceRight":
             if (ft instanceof FunctionToken) {
+                // TODO: maybe independent of kind?
                 const accVar = iVar("accumulator");
-                const curVar = iVar("currentValue");
 
                 if (args.length > 1) {
                     // bind initialValue to previousValue and resultVar
@@ -486,20 +491,15 @@ export function invokeCallbackBound(kind: CallbackKind, p: NativeFunctionParams,
                     solver.addSubsetConstraint(vp.objPropVar(bt, "0"), accVar);
                     solver.addSubsetConstraint(vp.arrayValueVar(bt), pResultVar);
                     solver.addSubsetConstraint(vp.objPropVar(bt, "0"), pResultVar);
+                    // TODO: is this incorrect for reduceRight?...
                 }
-
-                // bind initialValue to previousValue
-                solver.addSubsetConstraint(arg1Var, accVar);
-
-                // write array elements to currentValue
-                if (bt instanceof ArrayToken)
-                    extractArrayContents(bt, p, curVar);
 
                 // connect callback return value to previousValue
                 const retVar = vp.returnVar(ft.fun);
                 solver.addSubsetConstraint(retVar, accVar);
 
-                modelCall([accVar, curVar, undefined, pBaseVar], undefined, pResultVar);
+                // write array elements to currentValue
+                modelCall([accVar, arrayElementVar(), undefined, pBaseVar], undefined, pResultVar);
             }
             break;
         case "Array.prototype.sort":
@@ -520,9 +520,10 @@ export function invokeCallbackBound(kind: CallbackKind, p: NativeFunctionParams,
                 modelCall([vp.objPropVar(bt, SET_VALUES), vp.objPropVar(bt, SET_VALUES), pBaseVar], arg1Var);
             break;
         case "new Promise": {
-            const resolveFunVar = iVar("resolve");
+            // use labels that are independent of bt and ft to reduce number of variables
+            const resolveFunVar = vp.intermediateVar(p.path.node, `NativeCallback(${kind}): resolve`);
             solver.addTokenConstraint(newObject("PromiseResolve", p.globalSpecialNatives.get(FUNCTION_PROTOTYPE)!, p), resolveFunVar);
-            const rejectFunVar = iVar("reject");
+            const rejectFunVar = vp.intermediateVar(p.path.node, `NativeCallback(${kind}): reject`);
             solver.addTokenConstraint(newObject("PromiseReject", p.globalSpecialNatives.get(FUNCTION_PROTOTYPE)!, p), rejectFunVar);
             modelCall([resolveFunVar, rejectFunVar]);
             break;

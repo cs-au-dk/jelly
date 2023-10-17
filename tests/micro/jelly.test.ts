@@ -249,6 +249,14 @@ describe("tests/micro", () => {
         oneCalleeCalls: 6,
     });
 
+    runTest("tests/micro", "arrays4.js", {
+        soundness: "tests/micro/arrays4.json",
+    });
+
+    runTest("tests/micro", "arrays5.js", {
+        soundness: "tests/micro/arrays5.json",
+    });
+
     runTest("tests/micro", "iterators.js", {
         soundness: "tests/micro/iterators.json",
         functionInfos: 25,

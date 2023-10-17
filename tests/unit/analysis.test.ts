@@ -127,7 +127,7 @@ describe("tests/unit/analysis", () => {
             expect(at).not.toBe(ft);
 
             const fn = jest.fn();
-            solver.addForAllTokenPairsConstraint(vA, vB, TokenListener.AWAIT, param, fn);
+            solver.addForAllTokenPairsConstraint(vA, vB, TokenListener.AWAIT, param, "", fn);
             redirect(vB, vRep1);
             solver.addTokenConstraint(ft, vB);
             solver.addSubsetConstraint(vA, vRep2);
@@ -146,7 +146,7 @@ describe("tests/unit/analysis", () => {
             const ft = a.canonicalizeToken(new FunctionToken(fun0, m));
 
             const fn = jest.fn();
-            solver.addForAllTokenPairsConstraint(vA, vA, TokenListener.AWAIT, param, fn);
+            solver.addForAllTokenPairsConstraint(vA, vA, TokenListener.AWAIT, param, "", fn);
             solver.addTokenConstraint(ft, vA);
             assert(f.isRepresentative(vA) && f.isRepresentative(vRep));
             solver.addSubsetEdge(vA, vRep, false);

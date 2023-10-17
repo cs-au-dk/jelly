@@ -18,7 +18,8 @@ import {
     mapMapSize,
     mapSetAddAll,
     nodeToString,
-    setAll
+    setAll,
+    strHash
 } from "../misc/util";
 import assert from "assert";
 import {AccessPath, CallResultAccessPath, ComponentAccessPath, IgnoredAccessPath, ModuleAccessPath, PropertyAccessPath, UnknownAccessPath} from "./accesspaths";
@@ -327,9 +328,9 @@ export default class Solver {
     /**
      * Adds a universally quantified constraint for a pair of constraint variables.
      * Only allocation site tokens are considered for the first constraint variable, and only function tokens are considered for the second constraint variable.
-     * The pair of the key and the node must uniquely determine the function (including its free variables).
+     * The triple of the key, node and string must uniquely determine the function (including its free variables).
      */
-    addForAllTokenPairsConstraint(v1: ConstraintVar | undefined, v2: ConstraintVar | undefined, key: TokenListener, n: Node, listener: (t1: AllocationSiteToken, t2: FunctionToken | AccessPathToken) => void) {
+    addForAllTokenPairsConstraint(v1: ConstraintVar | undefined, v2: ConstraintVar | undefined, key: TokenListener, n: Node, extra: string, listener: (t1: AllocationSiteToken, t2: FunctionToken | AccessPathToken) => void) {
         if (v1 === undefined || v2 === undefined)
             return;
         assert(key !== undefined);
@@ -337,9 +338,9 @@ export default class Solver {
         const v1Rep = f.getRepresentative(v1);
         const v2Rep = f.getRepresentative(v2);
         if (logger.isDebugEnabled())
-            logger.debug(`Adding universally quantified pair constraint #${TokenListener[key]} to (${v1Rep}, ${v2Rep}) at ${locationToStringWithFileAndEnd(n.loc)}`);
+            logger.debug(`Adding universally quantified pair constraint #${TokenListener[key]}${extra ? ` ${extra}` : ""} to (${v1Rep}, ${v2Rep}) at ${locationToStringWithFileAndEnd(n.loc)}`);
         const m1 = mapGetMap(f.pairListeners1, v1Rep);
-        const id = this.getListenerID(key, n);
+        const id = this.getListenerID(key, n) ^ BigInt(strHash(extra));  // TODO: hash collision possible
         if (!m1.has(id)) {
             // run listener on all existing tokens
             const funs: Array<FunctionToken | AccessPathToken> = [];
