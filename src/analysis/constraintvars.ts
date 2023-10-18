@@ -103,24 +103,6 @@ export class ObjectPropertyVar extends ConstraintVar {
 }
 
 /**
- * A constraint variable for an unknown array entry.
- */
-export class ArrayValueVar extends ConstraintVar {
-
-    constructor(readonly array: ArrayToken) {
-        super();
-    }
-
-    toString(): string {
-        return `${this.array}.*`;
-    }
-
-    getParent(): Node {
-        return this.array.allocSite;
-    }
-}
-
-/**
  * A constraint variable for a function return.
  */
 export class FunctionReturnVar extends ConstraintVar {
@@ -130,7 +112,7 @@ export class FunctionReturnVar extends ConstraintVar {
     }
 
     toString() {
-        return `Return[${locationToStringWithFileAndEnd(this.fun.loc, true)}]`
+        return `Return[${locationToStringWithFileAndEnd(this.fun.loc, true)}]`;
     }
 
     getParent(): Node {

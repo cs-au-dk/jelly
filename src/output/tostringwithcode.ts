@@ -1,6 +1,5 @@
 import {
     ArgumentsVar,
-    ArrayValueVar,
     ClassExtendsVar,
     ConstraintVar,
     FunctionReturnVar,
@@ -47,8 +46,6 @@ export function constraintVarToStringWithCode(v: ConstraintVar): string {
         return `${v.toString()}${codeFromLocation(getTokenLocation(v.obj)) === "-" ? "" : ` (Object is "${codeFromLocation(getTokenLocation(v.obj))}")`}`;
     else if (v instanceof ArgumentsVar || v instanceof FunctionReturnVar || v instanceof ThisVar)
         return `${v.toString()}${codeFromLocation(v.fun.loc) === "-" ? "" : ` (Function is "${codeFromLocation(v.fun.loc)}")`}`;
-    else if (v instanceof ArrayValueVar)
-        return `${v.toString()}${codeFromLocation(v.array.allocSite.loc) === "-" ? "" : ` (Array is "${codeFromLocation(v.array.allocSite.loc)}")`}`;
     else if (v instanceof ClassExtendsVar)
         return `${v.toString()}${codeFromLocation(v.cl.loc) === "-" ? "" : ` (Class is "${codeFromLocation(v.cl.loc)}")`}`;
     else

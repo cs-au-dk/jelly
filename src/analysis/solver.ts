@@ -33,6 +33,7 @@ import {setImmediate} from "timers/promises";
 import {getMemoryUsage} from "../misc/memory";
 import {JELLY_NODE_ID} from "../parsing/extras";
 import AnalysisDiagnostics from "./diagnostics";
+import {ARRAY_UNKNOWN} from "../natives/ecmascript";
 
 export class AbortedException extends Error {}
 
@@ -245,7 +246,7 @@ export default class Solver {
                 f.numberOfSubsetEdges++;
                 mapGetSet(f.reverseSubsetEdges, toRep).add(fromRep);
                 if (logger.isVerboseEnabled())
-                    assert(!f.redirections.has(fromRep) && !f.redirections.has(toRep))
+                    assert(!f.redirections.has(fromRep) && !f.redirections.has(toRep));
                 f.vars.add(fromRep);
                 f.vars.add(toRep);
                 if (propagate) {
@@ -587,6 +588,12 @@ export default class Solver {
                         this.diagnostics.arrayEntriesListenerNotifications++;
                     }
             }
+            // add flow to summary var
+            this.addSubsetEdge(
+                f.getRepresentative(f.varProducer.objPropVar(a, prop)),
+                f.getRepresentative(f.varProducer.arrayAllVar(a)),
+                propagate,
+            );
         }
     }
 
@@ -644,6 +651,13 @@ export default class Solver {
                         this.diagnostics.objectPropertiesListenerNotifications++;
                     }
             }
+            if (a instanceof ArrayToken && prop === ARRAY_UNKNOWN)
+                // add flow to summary var
+                this.addSubsetEdge(
+                    f.getRepresentative(f.varProducer.arrayUnknownVar(a)),
+                    f.getRepresentative(f.varProducer.arrayAllVar(a)),
+                    propagate,
+                );
         }
     }
 

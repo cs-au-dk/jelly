@@ -56,6 +56,8 @@ export const GENERATOR_PROTOTYPE_NEXT = "Generator.prototype.next";
 export const ASYNC_GENERATOR_PROTOTYPE_NEXT = "AsyncGenerator.prototype.next";
 export const PROMISE_PROTOTYPE = "Promise.prototype";
 
+export const ARRAY_UNKNOWN = "%ARRAY_UNKNOWN";
+export const ARRAY_ALL = "%ARRAY_ALL";
 export const MAP_KEYS = "%MAP_KEYS";
 export const MAP_VALUES = "%MAP_VALUES";
 export const SET_VALUES = "%SET_VALUES";

@@ -233,14 +233,6 @@ export class Operations {
             }
         });
 
-        // constraint: if E0 is a member expression E.m: ∀ t ∈ ⟦E⟧, functions f ∈ ⟦E0⟧: if f uses 'this'...
-        this.solver.addForAllTokensConstraint(calleeVar, TokenListener.CALL_FUNCTION_BASE_CALLEE, path.node, (ft: Token) => {
-            if (ft instanceof FunctionToken && this.solver.fragmentState.functionsWithThis.has(ft.fun))
-
-                // constraint: ... ⟦E⟧ ⊆ ⟦this_f⟧
-                this.solver.addSubsetConstraint(baseVar, this.solver.varProducer.thisVar(ft.fun)); // TODO: introduce special subset edge that only propagates FunctionToken and AllocationSiteToken?
-        });
-
         // 'import' expression
         if (calleeVar instanceof NodeVar && isImport(calleeVar.node) && args.length >= 1) {
             const v = this.a.canonicalizeVar(new IntermediateVar(path.node, "import"));
@@ -366,7 +358,7 @@ export class Operations {
                             if (isArrayIndex(prop)) {
 
                                 // constraint: ... ⟦t2.*⟧ ⊆ ⟦E.p⟧
-                                this.solver.addSubsetConstraint(this.solver.varProducer.arrayValueVar(t2), dst);
+                                this.solver.addSubsetConstraint(this.solver.varProducer.arrayUnknownVar(t2), dst);
                             }
                         }
 
@@ -395,12 +387,9 @@ export class Operations {
                 this.solver.addForAllTokensConstraint(base, TokenListener.READ_PROPERTY_BASE_DYNAMIC, node, (t: Token) => {
                     if (t instanceof ArrayToken) {
 
-                        // constraint: ... ⟦t.*⟧ ⊆ ⟦E[i]⟧
-                        this.solver.addSubsetConstraint(this.solver.varProducer.arrayValueVar(t), dst);
-
                         // constraint: ...: ⟦t.p⟧ ⊆ ⟦E[i]⟧ where p is a property of t
-                        this.solver.addForAllArrayEntriesConstraint(t, TokenListener.READ_PROPERTY_BASE_DYNAMIC_ARRAY, node, (prop: string) =>
-                            this.solver.addSubsetConstraint(this.solver.varProducer.objPropVar(t, prop), dst));
+                        this.solver.addSubsetConstraint(this.solver.varProducer.arrayAllVar(t), dst);
+
                         // TODO: ignoring reads from prototype chain
 
                     } else if (!(t instanceof AccessPathToken)) { // TODO: assuming dynamic reads from arrays only read array indices
@@ -626,7 +615,7 @@ export class Operations {
                         if (t instanceof ArrayToken) {
 
                             // constraint: ...: ⟦E2⟧ ⊆ ⟦t.*⟧
-                            this.solver.addSubsetConstraint(src, this.solver.varProducer.arrayValueVar(t));
+                            this.solver.addSubsetConstraint(src, this.solver.varProducer.arrayUnknownVar(t));
 
                             // TODO: write to array setters also?
 
@@ -689,7 +678,7 @@ export class Operations {
                                     if (newprop >= 0)
                                         this.solver.addSubsetConstraint(this.solver.varProducer.objPropVar(t2, prop), this.solver.varProducer.objPropVar(t, String(newprop)));
                                 });
-                                this.solver.addSubsetConstraint(this.solver.varProducer.arrayValueVar(t2), this.solver.varProducer.arrayValueVar(t));
+                                this.solver.addSubsetConstraint(this.solver.varProducer.arrayUnknownVar(t2), this.solver.varProducer.arrayUnknownVar(t));
                             } // TODO: PropertyAccessPaths for rest elements in destructuring assignments for arrays?
                         });
                         this.solver.addTokenConstraint(t, vp.nodeVar(p));
@@ -723,9 +712,7 @@ export class Operations {
             if (t instanceof AllocationSiteToken)
                 switch (t.kind) {
                     case "Array":
-                        this.solver.addSubsetConstraint(vp.arrayValueVar(t), dst);
-                        this.solver.addForAllArrayEntriesConstraint(t, TokenListener.READ_ITERATOR_VALUE_ARRAY, node, (prop: string) =>
-                            this.solver.addSubsetConstraint(this.solver.varProducer.objPropVar(t, prop), dst));
+                        this.solver.addSubsetConstraint(vp.arrayAllVar(t), dst);
                         break;
                     case "Set":
                         this.solver.addSubsetConstraint(vp.objPropVar(t, SET_VALUES), dst);

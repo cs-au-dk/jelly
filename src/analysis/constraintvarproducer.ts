@@ -24,7 +24,6 @@ import {NodePath} from "@babel/traverse";
 import {
     AccessorType,
     ArgumentsVar,
-    ArrayValueVar,
     ClassExtendsVar,
     ConstraintVar,
     FunctionReturnVar,
@@ -42,6 +41,7 @@ import {getClass} from "../misc/asthelpers";
 import {FragmentState, MergeRepresentativeVar, RepresentativeVar} from "./fragmentstate";
 import assert from "assert";
 import Solver from "./solver";
+import {ARRAY_ALL, ARRAY_UNKNOWN} from "../natives/ecmascript";
 
 export class ConstraintVarProducer<RVT extends RepresentativeVar | MergeRepresentativeVar = RepresentativeVar> {
 
@@ -118,10 +118,18 @@ export class ConstraintVarProducer<RVT extends RepresentativeVar | MergeRepresen
     }
 
     /**
-     * Finds the constraint variable for an array value.
+     * Finds the constraint variable for the array's unknown entries.
      */
-    arrayValueVar(arr: ArrayToken): ArrayValueVar {
-        return this.a.canonicalizeVar(new ArrayValueVar(arr));
+    arrayUnknownVar(arr: ArrayToken): ObjectPropertyVar {
+        return this.objPropVar(arr, ARRAY_UNKNOWN);
+    }
+
+    /**
+     * Finds the summary constraint variable for the array.
+     * This variable contains the union of tokens in the array's known and unknown entries.
+     */
+    arrayAllVar(arr: ArrayToken): ObjectPropertyVar {
+        return this.objPropVar(arr, ARRAY_ALL);
     }
 
     /**
