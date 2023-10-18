@@ -478,6 +478,7 @@ export function invokeCallbackBound(kind: CallbackKind, p: NativeFunctionParams,
         case "Array.prototype.reduce":
         case "Array.prototype.reduceRight":
             if (ft instanceof FunctionToken) {
+                const elementVar = arrayElementVar();
                 // TODO: maybe independent of kind?
                 const accVar = iVar("accumulator");
 
@@ -486,12 +487,18 @@ export function invokeCallbackBound(kind: CallbackKind, p: NativeFunctionParams,
                     solver.addSubsetConstraint(arg1Var, accVar);
                     solver.addSubsetConstraint(arg1Var, pResultVar);
                 } else if (args.length === 1 && bt instanceof ArrayToken) {
-                    // initialValue is bt[0]
                     solver.addSubsetConstraint(vp.arrayValueVar(bt), accVar);
-                    solver.addSubsetConstraint(vp.objPropVar(bt, "0"), accVar);
                     solver.addSubsetConstraint(vp.arrayValueVar(bt), pResultVar);
+
+                    if (kind === "Array.prototype.reduce")
+                        // initialValue is bt[0]
+                        solver.addSubsetConstraint(vp.objPropVar(bt, "0"), accVar);
+                    else // kind === "Array.prototype.reduceRight"
+                        // initialValue is the last element
+                        solver.addSubsetConstraint(elementVar, accVar);
+
+                    // works for both reduce and reduceRight as the initialValue only goes to the result if the array has length 1
                     solver.addSubsetConstraint(vp.objPropVar(bt, "0"), pResultVar);
-                    // TODO: is this incorrect for reduceRight?...
                 }
 
                 // connect callback return value to previousValue
@@ -499,7 +506,7 @@ export function invokeCallbackBound(kind: CallbackKind, p: NativeFunctionParams,
                 solver.addSubsetConstraint(retVar, accVar);
 
                 // write array elements to currentValue
-                modelCall([accVar, arrayElementVar(), undefined, pBaseVar], undefined, pResultVar);
+                modelCall([accVar, elementVar, undefined, pBaseVar], undefined, pResultVar);
             }
             break;
         case "Array.prototype.sort":
