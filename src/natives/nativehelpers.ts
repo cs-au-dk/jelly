@@ -454,8 +454,6 @@ export function invokeCallbackBound(kind: CallbackKind, p: NativeFunctionParams,
                     returnToken(t, p);
                     break;
                 }
-                case "Array.prototype.find":
-                case "Array.prototype.filter":
                 case "Array.prototype.flatMap":
                     warnNativeUsed(kind, p, "(return value ignored)"); // TODO: return value...
                     break;
