@@ -56,6 +56,7 @@ program
     // .option("--graphviz-packages <package...>", "packages to include in Graphviz dot file (use with -g)")
     // .option("--graphviz-elide-functions", "elide functions (use with -g)")
     // .option("--graphviz-dependencies-only", "show module dependencies only (use with -g)")
+    .option("--callgraph", "report call graph")
     .option("--tokens-json <file>", "save tokens for constraint variables as JSON file")
     .option("--tokens", "report tokens for constraint variables")
     .option("--largest", "report largest token sets and subset relations")
@@ -307,6 +308,9 @@ async function main() {
                 closeSync(fd);
                 logger.info(`Call graph written to ${file}`);
             }
+
+            if (options.callgraph)
+                out.reportCallGraph();
 
             if (options.tokens)
                 out.reportTokens();

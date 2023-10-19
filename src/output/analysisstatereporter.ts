@@ -233,6 +233,17 @@ export class AnalysisStateReporter {
     }
 
     /**
+     * Reports the call graph (call sites -> functions).
+     */
+    reportCallGraph() {
+        logger.info("Call graph:");
+            for (const [src, dsts] of this.f.callToFunctionOrModule)
+                for (const dst of dsts)
+                    if (dst instanceof FunctionInfo || dst instanceof ModuleInfo)
+                        logger.info(`  ${locationToStringWithFileAndEnd(src.loc)} -> ${locationToStringWithFile(dst.node?.loc)}`);
+    }
+
+    /**
      * Reports the token sets for all constraint variables.
      * Native variables and object properties with one value are omitted.
      */
