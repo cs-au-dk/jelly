@@ -9,7 +9,7 @@ function compareStringArrays(as1: Array<string>, as2: Array<string>, file1: stri
     const s = new Set<string>(as2);
     for (const e of as1)
         if (!s.has(e))
-            logger.info(`${kind} ${e} found in ${file1}, missing in ${file2}`);
+            logger.warn(`${kind} ${e} found in ${file1}, missing in ${file2}`);
     return s;
 }
 
@@ -43,7 +43,7 @@ function compareLocationObjects(o1: {[index: number]: string}, o2: {[index: numb
         }
         if (!s.has(q)) {
             const extra = !file2files.has(f) ? ` (file ${f} missing)` : "";
-            logger.info(`${kind} ${q} found in ${file1}, missing in ${file2}${extra}`);
+            logger.warn(`${kind} ${q} found in ${file1}, missing in ${file2}${extra}`);
         }
     }
 }
