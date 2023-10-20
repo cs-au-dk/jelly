@@ -171,17 +171,19 @@ async function main() {
         if (options.npmTest) {
             cmd = "npm";
             args = ["test", ...program.args];
-            cwd = path.resolve(options.npmTest)
+            cwd = path.resolve(options.npmTest);
             // react-dom/test-utils' act method misbehaves in production environments
-            env = { NODE_ENV: "test" };
+            env = {NODE_ENV: "test"};
         } else {
             if (program.args.length === 0) {
                 logger.info("File missing, aborting");
                 return;
             }
+            const file = path.resolve(program.args[0]);
+            // use directory containing the analyzed file as basedir if unspecified
+            cwd = options.basedir ? path.resolve(options.basedir) : path.dirname(file);
             cmd = `${__dirname}/../bin/node`;
-            args = program.args;
-            cwd = process.cwd()
+            args = [path.relative(cwd, file)].concat(program.args.slice(1));
         }
         const dyn = path.resolve(options.dynamic);
         const t = spawnSync(cmd, args, {
@@ -192,8 +194,8 @@ async function main() {
                 ...env,
                 JELLY_OUT: dyn,
                 GRAAL_HOME: graalHome ? path.resolve(graalHome) : undefined,
-                PATH: `${__dirname}/../bin${path.delimiter}${process.env.PATH}`
-            }
+                PATH: `${__dirname}/../bin${path.delimiter}${process.env.PATH}`,
+            },
         });
         if (t.status === null) {
             logger.error(`Error: Unable to execute ${cmd}`);
@@ -207,7 +209,7 @@ async function main() {
             if (f.isFile()) {
                 const p = path.resolve(dir, f.name);
                 if (p.startsWith(`${dyn}-`)) { // instrumented execution has produced $JELLY-OUT-<PID> files
-                    cgs.push(JSON.parse(readFileSync(p, 'utf-8')) as CallGraph);
+                    cgs.push(JSON.parse(readFileSync(p, "utf-8")) as CallGraph);
                     unlinkSync(p);
                 }
             }
