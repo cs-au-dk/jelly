@@ -1,6 +1,7 @@
 import {Class, Function, isIdentifier, Node} from "@babel/types";
 import {nodeToString, locationToStringWithFileAndEnd} from "../misc/util";
 import {
+    AccessPathToken,
     AllocationSiteToken,
     ArrayToken,
     FunctionToken,
@@ -62,8 +63,8 @@ export type AccessorType = "get" | "set" | "normal";
 
 export type ObjectPropertyVarObj = AllocationSiteToken | FunctionToken | NativeObjectToken | PackageObjectToken;
 
-export function isObjectPropertyVarObj(t: Token | undefined): t is ObjectPropertyVarObj {
-    return t instanceof AllocationSiteToken || t instanceof FunctionToken || t instanceof PackageObjectToken || t instanceof NativeObjectToken;
+export function isObjectPropertyVarObj(t: Token): t is ObjectPropertyVarObj {
+    return !(t instanceof AccessPathToken);
 }
 
 /**

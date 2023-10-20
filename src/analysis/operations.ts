@@ -225,8 +225,8 @@ export class Operations {
                 // TODO: if caller is MemberExpression with property 'apply', 'call' or 'bind', treat as call to the native function of that name (relevant for lodash/atomizer TAPIR benchmark)
             }
 
-            // if 'new' and not a native object with an invoke function and not an access path token...
-            if (isNew && (!(t instanceof NativeObjectToken) || !t.invoke) && !(t instanceof AccessPathToken)) {
+            // if 'new' and function...
+            if (isNew && (t instanceof FunctionToken || t instanceof ClassToken)) {
 
                 // constraint: t ∈ ⟦new E0(E1,...,En)⟧ where t is the current PackageObjectToken
                 this.solver.addTokenConstraint(this.packageObjectToken, resultVar); // TODO: use allocation-site abstraction for 'new'?
