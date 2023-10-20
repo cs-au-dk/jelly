@@ -237,10 +237,10 @@ export class AnalysisStateReporter {
      */
     reportCallGraph() {
         logger.info("Call graph:");
-            for (const [src, dsts] of this.f.callToFunctionOrModule)
-                for (const dst of dsts)
-                    if (dst instanceof FunctionInfo || dst instanceof ModuleInfo)
-                        logger.info(`  ${locationToStringWithFileAndEnd(src.loc)} -> ${locationToStringWithFile(dst.node?.loc)}`);
+        for (const [src, dsts] of this.f.callToFunctionOrModule)
+            for (const dst of dsts)
+                if (dst instanceof FunctionInfo || dst instanceof ModuleInfo)
+                    logger.info(`  ${locationToStringWithFileAndEnd(src.loc)} -> ${locationToStringWithFile(dst.node?.loc)}`);
     }
 
     /**
@@ -272,6 +272,10 @@ export class AnalysisStateReporter {
             for (const t of ts)
                 logger.info(`    ${t}`);
         }
+        logger.info("Inheritance:");
+        for (const [t, as] of this.f.inherits)
+            for (const a of as)
+                logger.info(`  ${t} -> ${a}`);
     }
 
     /**

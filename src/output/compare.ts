@@ -200,7 +200,7 @@ function computeReachableFunctions(file2: string, cg1: CallGraph, cg2: CallGraph
         if (SCGreach.has(replocToIndex.get(reploc)!))
             comReach++;
         else
-            logger.info(`Function ${reploc} (${floc}) is unreachable in ${file2}`);
+            logger.info(`Function ${reploc} is unreachable in ${file2}`);
     }
 
     // report edges from cg1 where only the source is reachable

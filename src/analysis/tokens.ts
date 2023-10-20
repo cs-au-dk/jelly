@@ -10,7 +10,7 @@ import {NativeFunctionAnalyzer} from "../natives/nativebuilder";
  */
 export abstract class Token {
 
-    hash: number = 0; // set by canonicalizeToken
+    hash: number | undefined; // set by canonicalizeToken
 
     abstract toString(): string
 }
@@ -20,10 +20,7 @@ export abstract class Token {
  */
 export class FunctionToken extends Token {
 
-    constructor(
-        readonly fun: Function,
-        readonly moduleInfo: ModuleInfo
-    ) {
+    constructor(readonly fun: Function) {
         super();
     }
 

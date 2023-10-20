@@ -123,7 +123,7 @@ describe("tests/unit/analysis", () => {
             const {solver, a, f, redirect} = setup;
 
             const at = a.canonicalizeToken(new ObjectToken(param));
-            const ft = a.canonicalizeToken(new FunctionToken(fun0, m));
+            const ft = a.canonicalizeToken(new FunctionToken(fun0));
             expect(at).not.toBe(ft);
 
             const fn = jest.fn();
@@ -143,7 +143,7 @@ describe("tests/unit/analysis", () => {
             const {solver, a, f} = setup;
 
             const at = a.canonicalizeToken(new ObjectToken(param));
-            const ft = a.canonicalizeToken(new FunctionToken(fun0, m));
+            const ft = a.canonicalizeToken(new FunctionToken(fun0));
 
             const fn = jest.fn();
             solver.addForAllTokenPairsConstraint(vA, vA, TokenListener.AWAIT, param, "", fn);
@@ -161,7 +161,7 @@ describe("tests/unit/analysis", () => {
             const {solver, a, f, redirect} = setup;
 
             const ot = a.canonicalizeToken(new ObjectToken(param));
-            const ft = a.canonicalizeToken(new FunctionToken(fun0, m));
+            const ft = a.canonicalizeToken(new FunctionToken(fun0));
             const vA = f.varProducer.objPropVar(ot, "A");
             redirect(vA, vRep);
             solver.addTokenConstraint(ft, vRep);
@@ -192,7 +192,7 @@ describe("tests/unit/analysis", () => {
         test("module.exports = function", () => {
             const {solver, a, f, getTokens} = setup;
 
-            solver.addTokenConstraint(a.canonicalizeToken(new FunctionToken(fun1, m)), vExports);
+            solver.addTokenConstraint(a.canonicalizeToken(new FunctionToken(fun1)), vExports);
             expect([...f.vars]).toContain(vExports);
 
             const escaping = findEscapingObjects(m, solver);
@@ -204,7 +204,7 @@ describe("tests/unit/analysis", () => {
         test("maybeEscapingFromModule(function)", () => {
             const {solver, a, f, getTokens} = setup;
 
-            solver.addTokenConstraint(a.canonicalizeToken(new FunctionToken(fun1, m)), v);
+            solver.addTokenConstraint(a.canonicalizeToken(new FunctionToken(fun1)), v);
             f.registerEscapingFromModule(v);
 
             const escaping = findEscapingObjects(m, solver);
@@ -236,7 +236,7 @@ describe("tests/unit/analysis", () => {
             f.registerEscapingFromModule(v);
 
             const vA = f.varProducer.objPropVar(tObject, "A");
-            const tFunction = a.canonicalizeToken(new FunctionToken(fun1, m));
+            const tFunction = a.canonicalizeToken(new FunctionToken(fun1));
             solver.addTokenConstraint(tFunction, vA);
 
             expect(findEscapingObjects(m, solver)).toEqual(new Set([tObject]));
@@ -281,7 +281,7 @@ describe("tests/unit/analysis", () => {
             f.registerEscapingFromModule(v);
 
             const vA = f.varProducer.objPropVar(tObject, "A");
-            const tFunction = a.canonicalizeToken(new FunctionToken(fun1, m));
+            const tFunction = a.canonicalizeToken(new FunctionToken(fun1));
             solver.addTokenConstraint(tFunction, vA);
 
             const rep = f.varProducer.intermediateVar(param, "rep");

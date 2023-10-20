@@ -30,6 +30,7 @@ import assert from "assert";
 import {NodePath} from "@babel/traverse";
 import {Operations} from "../analysis/operations";
 import {AccessorType, ConstraintVar, IntermediateVar, ObjectPropertyVarObj, isObjectPropertyVarObj} from "../analysis/constraintvars";
+import {Location} from "../misc/util";
 
 /**
  * Models an assignment from a function parameter (0-based indexing) to a property of the base object.
@@ -599,7 +600,7 @@ export function invokeCallApplyBound(kind: CallApplyKind, p: NativeFunctionParam
             break;
         case "Function.prototype.apply": {
             if (args.length >= 2 && isExpression(args[1])) { // TODO: SpreadElement
-                const escapes = ft.moduleInfo !== p.moduleInfo;
+                const escapes = (ft.fun.loc as Location).module !== p.moduleInfo;
                 const argVar = vp.expVar(args[1], p.path);
                 // model dynamic parameter passing like 'callFunctionTokenBound'
                 p.solver.addForAllTokensConstraint(argVar, TokenListener.NATIVE_INVOKE_CALL_APPLY2, ft.fun, (t: Token) => {

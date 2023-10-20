@@ -257,7 +257,7 @@ export class Operations {
         const vp = f.varProducer;
         const pars = getAdjustedCallNodePath(path);
         f.registerCallEdge(pars.node, caller, this.a.functionInfos.get(t.fun)!, kind);
-        if (t.moduleInfo !== this.moduleInfo)
+        if ((t.fun.loc as Location).module !== this.moduleInfo)
             for (const argVar of argVars)
                 f.registerEscapingFromModule(argVar);
         const hasArguments = f.functionsWithArguments.has(t.fun);
@@ -285,7 +285,7 @@ export class Operations {
             }
         }
         // constraint: if E0 is a member expression E.m and t uses 'this', then ⟦E⟧ ⊆ ⟦this_f⟧
-        if (baseVar && f.functionsWithThis.has(t.fun))
+        if (baseVar && f.functionsWithThis.has(t.fun)) // XXX: omit if isNew?
             // TODO: introduce special subset edge that only propagates FunctionToken and AllocationSiteToken?
             this.solver.addSubsetConstraint(baseVar, vp.thisVar(t.fun));
         // constraint: ...: ⟦ret_t⟧ ⊆ ⟦(new) E0(E1,...,En)⟧
@@ -343,7 +343,7 @@ export class Operations {
                         if (t2 instanceof PackageObjectToken && t2.kind === "Object") {
                             // TODO: also reading from neighbor packages if t2 is a PackageObjectToken...
                             if (options.readNeighbors)
-                                this.solver.addForAllPackageNeighborsConstraint(t2.packageInfo, node, (neighbor: PackageInfo) => { // TODO: also use t2.kind
+                                this.solver.addForAllPackageNeighborsConstraint(t2.packageInfo, node, (neighbor: PackageInfo) => {
                                     if (dst)
                                         this.solver.addSubsetConstraint(this.solver.varProducer.packagePropVar(neighbor, prop), dst); // TODO: exclude AccessPathTokens?
                                     if (prop !== "prototype") {
@@ -768,7 +768,7 @@ export class Operations {
      * Creates a new FunctionToken that inherits from Function.prototype.
      */
     newFunctionToken(fun: Function): FunctionToken {
-        const t = this.a.canonicalizeToken(new FunctionToken(fun, this.moduleInfo));
+        const t = this.a.canonicalizeToken(new FunctionToken(fun));
         this.solver.addInherits(t, this.globalSpecialNatives.get(FUNCTION_PROTOTYPE)!);
         return t;
     }

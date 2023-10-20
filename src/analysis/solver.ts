@@ -282,9 +282,10 @@ export default class Solver {
      */
     private getListenerID(key: TokenListener, n: Node | Token): ListenerID {
         let id = (BigInt(key) << 16n);
-        if (n instanceof Token)
+        if (n instanceof Token) {
+            assert(n.hash !== undefined);
             id += BigInt(n.hash);
-        else
+        } else
             id += this.getNodeHash(n);
         const x = this.listeners.get(id);
         if (x) {
@@ -300,6 +301,7 @@ export default class Solver {
      * Provides a unique'ish ID for the given token and node.
      */
     private getAncestorListenerID(t: Token, n: Node): ListenerID {
+        assert(t.hash !== undefined);
         return BigInt(t.hash) + this.getNodeHash(n); // TODO: hash collision possible
     }
 
@@ -376,6 +378,7 @@ export default class Solver {
      * Enqueues a call to a token pair listener if it hasn't been done before.
      */
     private callTokenPairListener(id: ListenerID, listener: (t1: AllocationSiteToken, t2: FunctionToken | AccessPathToken) => void, t1: AllocationSiteToken, t2: FunctionToken | AccessPathToken) {
+        assert(t1.hash !== undefined && t2.hash !== undefined);
         const x = (BigInt(t1.hash) << 32n) + BigInt(t2.hash);
         const s = mapGetSet(this.fragmentState.listenersProcessed, id);
         if (!s.has(x)) {
