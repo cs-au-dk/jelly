@@ -402,7 +402,7 @@ export function invokeCallbackBound(kind: CallbackKind, p: NativeFunctionParams,
 
     const modelCall = (argVars: Array<ConstraintVar | undefined>, baseVar?: ConstraintVar, resultVar?: ConstraintVar) => {
         assert(ft instanceof FunctionToken);
-        p.op.callFunctionTokenBound(ft, baseVar, caller, argVars, resultVar, p.path, {native: true});
+        p.op.callFunctionTokenBound(ft, baseVar, caller, argVars, resultVar, false, p.path, {native: true});
     };
 
     // helper for constructing unique intermediate variables
@@ -629,7 +629,7 @@ export function invokeCallApplyBound(kind: CallApplyKind, p: NativeFunctionParam
     // TODO: SpreadElement? non-MemberExpression?
     const baseVar = isExpression(basearg) ? vp.expVar(basearg, p.path) : undefined;
     const resultVar = vp.expVar(p.path.node, p.path);
-    p.op.callFunctionTokenBound(ft, baseVar, caller, argVars, resultVar, p.path, {native: true});
+    p.op.callFunctionTokenBound(ft, baseVar, caller, argVars, resultVar, false, p.path, {native: true});
 }
 
 /**

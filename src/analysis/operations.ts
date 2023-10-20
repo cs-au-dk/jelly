@@ -173,7 +173,7 @@ export class Operations {
         this.solver.addForAllTokensConstraint(calleeVar, TokenListener.CALL_FUNCTION_CALLEE, path.node, (t: Token) => {
             const f = this.solver.fragmentState; // (don't use in callbacks)
             if (t instanceof FunctionToken) {
-                this.callFunctionTokenBound(t, baseVar, caller, argVars, resultVar, path);
+                this.callFunctionTokenBound(t, baseVar, caller, argVars, resultVar, isNew, path);
             } else if (t instanceof NativeObjectToken) {
                 f.registerCall(pars.node, this.moduleInfo, {native: true});
                 if (t.invoke && (!isNew || t.constr))
@@ -250,6 +250,7 @@ export class Operations {
         caller: FunctionInfo | ModuleInfo,
         argVars: Array<ConstraintVar | undefined>,
         resultVar: ConstraintVar | undefined,
+        isNew: boolean,
         path: CallNodePath,
         kind: {native?: boolean, accessor?: boolean, external?: boolean} = {},
     ) {
@@ -284,8 +285,8 @@ export class Operations {
                     this.solver.addSubsetConstraint(argVar, vp.objPropVar(argumentsToken!, String(i)));
             }
         }
-        // constraint: if E0 is a member expression E.m and t uses 'this', then ⟦E⟧ ⊆ ⟦this_f⟧
-        if (baseVar && f.functionsWithThis.has(t.fun)) // XXX: omit if isNew?
+        // constraint: if non-'new', E0 is a member expression E.m and t uses 'this', then ⟦E⟧ ⊆ ⟦this_f⟧
+        if (!isNew && baseVar && f.functionsWithThis.has(t.fun))
             // TODO: introduce special subset edge that only propagates FunctionToken and AllocationSiteToken?
             this.solver.addSubsetConstraint(baseVar, vp.thisVar(t.fun));
         // constraint: ...: ⟦ret_t⟧ ⊆ ⟦(new) E0(E1,...,En)⟧
