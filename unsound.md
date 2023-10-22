@@ -28,7 +28,6 @@
 - Node.js standard library (callbacks, events)
 
 
-- PrivateName
 - BindExpression (nonstandard)
 
 

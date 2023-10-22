@@ -12,6 +12,7 @@ import {
     identifier,
     isClassMethod,
     isClassPrivateMethod,
+    isClassPrivateProperty,
     isClassProperty,
     isIdentifier,
     isImportSpecifier,
@@ -134,17 +135,15 @@ export function preprocessAst(ast: File, file: string, module: ModuleInfo, globa
                 (n.loc as Location).module = module;
 
             // workarounds to match dyn.ts source locations
-            if (isClassMethod(n)) {
-                if (n.kind === "constructor") {
-                    // for constructors, use the class source location
-                    const cls = getClass(path);
-                    assert(cls);
-                    n.loc = cls.loc;
-                } else if (n.static) {
-                    // for static methods, use the identifier start location
-                    assert(n.loc && n.key.loc);
-                    n.loc.start = n.key.loc!.start;
-                }
+            if ((isClassMethod(n) || isClassPrivateMethod(n)) && n.kind === "constructor") {
+                // for constructors, use the class source location
+                const cls = getClass(path);
+                assert(cls);
+                n.loc = cls.loc;
+            } else if ((isClassMethod(n) || isClassPrivateMethod(n) || isClassPrivateProperty(n)) && n.static) {
+                // for static methods and properties, use the identifier start location
+                assert(n.loc && n.key.loc);
+                n.loc.start = n.key.loc!.start;
             }
 
             // add bindings in global scope for identifiers with missing binding

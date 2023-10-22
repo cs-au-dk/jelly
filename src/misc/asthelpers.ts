@@ -11,6 +11,7 @@ import {
     ImportDefaultSpecifier,
     ImportSpecifier,
     isCallExpression,
+    isClassPrivateMethod,
     isClassPrivateProperty,
     isExpression,
     isExpressionStatement,
@@ -23,6 +24,7 @@ import {
     isNumericLiteral,
     isOptionalMemberExpression,
     isParenthesizedExpression,
+    isPrivateName,
     isStringLiteral,
     JSXMemberExpression,
     MemberExpression,
@@ -49,6 +51,8 @@ export function getProperty(node: MemberExpression | OptionalMemberExpression | 
         return node.property.value;
     else if (isNumericLiteral(node.property))
         return node.property.value.toString();
+    else if (isPrivateName(node.property))
+        return `#${node.property.id.name}`;
     return undefined;
 }
 
@@ -57,9 +61,9 @@ export function getProperty(node: MemberExpression | OptionalMemberExpression | 
  * (See also getProperty above.)
  */
 export function getKey(node: ObjectProperty | ClassProperty | ClassAccessorProperty | ClassPrivateProperty | ObjectMethod | ClassMethod | ClassPrivateMethod): string | undefined {
-    if (isClassPrivateProperty(node))
-        return node.key.id.name;
-    if (isIdentifier(node.key) && !node.computed)
+    if (isClassPrivateProperty(node) || isClassPrivateMethod(node))
+        return `#${node.key.id.name}`;
+    else if (isIdentifier(node.key) && !node.computed)
         return node.key.name;
     else if (isStringLiteral(node.key))
         return node.key.value;

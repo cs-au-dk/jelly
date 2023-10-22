@@ -48,7 +48,7 @@ https://github.com/babel/babel/blob/master/packages/babel-parser/ast/spec.md
 ### Expressions (excluding literals, classes, etc.)
 
 - [X] Identifier
-- [ ] PrivateName (https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Classes/Private_class_fields)
+- [X] PrivateName
 - [X] ArrowFunctionExpression
 - [X] AssignmentExpression
 - [X] CallExpression
