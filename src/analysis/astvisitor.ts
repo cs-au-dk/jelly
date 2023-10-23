@@ -500,9 +500,9 @@ export function visit(ast: File, op: Operations) {
                     }
                 } else
                     f.warnUnsupported(path.node, "Dynamic property name"); // TODO: nontrivial computed property name
-                if (isClassProperty(path.node)) // dyn.ts treats class property initializers as functions
+                if (isClassProperty(path.node) || isClassPrivateProperty(path.node)) // dyn.ts treats class property initializers as functions
                     f.registerArtificialFunction(op.moduleInfo, path.node.key);
-            }
+            },
         },
 
         Method: { // ObjectMethod | ClassMethod | ClassPrivateMethod

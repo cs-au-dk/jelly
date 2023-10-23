@@ -141,7 +141,7 @@ function getIgnores(cg: CallGraph): Set<string> {
   * in cg2, and the number of functions in cg1 that are reachable in cg2.
   * Reachability in cg2 is computed from all application modules that are present in cg1.
   */
-function computeReachableFunctions(file2: string, cg1: CallGraph, cg2: CallGraph): [number, number, number] {
+function computeReachableFunctions(file2: string, cg1: CallGraph, cg2: CallGraph, ignores: Set<string>): [number, number, number] {
     const parser = new SourceLocationsToJSON(cg2.files);
     // find the module entry function for each file by looking for functions
     // that begin at position 1:1 and span the longest
@@ -155,7 +155,7 @@ function computeReachableFunctions(file2: string, cg1: CallGraph, cg2: CallGraph
             const prev = fileToModuleIndex[parsed.fileIndex]?.loc;
             if (prev === undefined || parsed.loc.end.line > prev.end.line ||
                 (parsed.loc.end.line === prev.end.line && parsed.loc.end.column >= prev.end.column))
-                fileToModuleIndex[parsed.fileIndex] = { index: Number(i), loc: parsed.loc };
+                fileToModuleIndex[parsed.fileIndex] = {index: Number(i), loc: parsed.loc};
         }
     }
 
@@ -168,7 +168,7 @@ function computeReachableFunctions(file2: string, cg1: CallGraph, cg2: CallGraph
                 Q.push(mi.index);
             else
                 // TODO: saveCallGraph shouldn't output files for modules with parse errors
-                logger.warn(`Unable to determine module function for ${file}`)
+                logger.warn(`Unable to determine module function for ${file}`);
         }
 
     // compute transitive closure from entries
@@ -195,6 +195,9 @@ function computeReachableFunctions(file2: string, cg1: CallGraph, cg2: CallGraph
     let dcgReach = 0, comReach = 0;
     for (const floc of Object.values(cg1.functions)) {
         const reploc = loc(floc, cg1, "Function").str;
+        if (ignores.has(reploc))
+            continue;
+
         dcgReach++;
 
         if (SCGreach.has(replocToIndex.get(reploc)!))
@@ -286,7 +289,7 @@ export function compareCallGraphs(
     const [foundCall2, totalCall2] = compareBothWays &&
         compareEdges(cg2.call2fun, cg1.call2fun, file2, file1, cg2, cg1, file1files!, "Call", "calls", ignores1) || [0, 0];
     // measure recall in terms of reachable functions
-    const [dcgReach, scgReach, comReach] = compareReachability && computeReachableFunctions(file2, cg1, cg2) || [0, 0, 0];
+    const [dcgReach, scgReach, comReach] = compareReachability && computeReachableFunctions(file2, cg1, cg2, ignores2) || [0, 0, 0];
 
     const formatFraction = (num: number, den: number) => `${num}/${den}${den === 0 ? "" : ` (${percent(num / den)})`}`;
     if (compareBothWays)
