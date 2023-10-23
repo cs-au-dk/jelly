@@ -319,13 +319,21 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
 
     /**
      * Property reads that may have empty result.
+     * Used by patchDynamics.
      */
     maybeEmptyPropertyReads: Array<{result: ConstraintVar, base: ConstraintVar, pck: PackageObjectToken, prop: string | undefined}> = [];
 
     /**
      * Dynamic property writes.
+     * Used by patchDynamics.
      */
     dynamicPropertyWrites: Set<ConstraintVar> = new Set;
+
+    /**
+     * Method calls that may have empty base.
+     * Used by patchMethodCalls.
+     */
+    readonly maybeEmptyMethodCalls: Map<Node, {baseVar: ConstraintVar, prop: string, calleeVar: ConstraintVar}> = new Map;
 
     constructor(s: Solver) {
         this.a = s.globalState;
@@ -376,6 +384,14 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
             else if (external)
                 this.externalCallLocations.add(n);
         }
+    }
+
+    /**
+     * Registers a method call.
+     */
+    registerMethodCall(node: Node, baseVar: ConstraintVar | undefined, prop: string | undefined, calleeVar: ConstraintVar | undefined) {
+        if (baseVar && prop !== undefined && calleeVar && options.patchMethodCalls)
+            this.maybeEmptyMethodCalls.set(node, {baseVar, prop, calleeVar});
     }
 
     /**

@@ -86,7 +86,7 @@ export function isParentExpressionStatement(path: NodePath): boolean { // TODO: 
 /**
  * Returns the base expression and property of the given method call, or undefined if not applicable.
  */
-export function getBaseAndProperty(path: CallNodePath): {base: Expression, property: MemberExpression["property"]} | undefined {
+export function getBaseAndProperty(path: CallNodePath): {base: Expression, property: string | undefined} | undefined {
     let p: NodePath | null = path.get("callee") as NodePath;
     while (isParenthesizedExpression(p.node))
         p = p.get("expression") as NodePath;
@@ -95,7 +95,7 @@ export function getBaseAndProperty(path: CallNodePath): {base: Expression, prope
     let base = p.node.object;
     if (!isExpression(base)) // excluding Super
         return undefined;
-    let property = p.node.property;
+    let property = getProperty(p.node);
     return {base, property};
 }
 

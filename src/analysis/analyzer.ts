@@ -3,7 +3,7 @@ import {resolve} from "path";
 import logger, {writeStdOutIfActive} from "../misc/logger";
 import Solver, {AbortedException} from "./solver";
 import Timer, {TimeoutException} from "../misc/timer";
-import {addAll, getMapHybridSetSize, mapMapSize, percent} from "../misc/util";
+import {getMapHybridSetSize, mapMapSize, percent} from "../misc/util";
 import {visit} from "./astvisitor";
 import {ModuleInfo, PackageInfo} from "./infos";
 import {options, resolveBaseDir} from "../options";
@@ -15,10 +15,10 @@ import {findEscapingObjects} from "./escaping";
 import {buildNatives} from "../natives/nativebuilder";
 import {AnalysisStateReporter} from "../output/analysisstatereporter";
 import {Operations} from "./operations";
-import {UnknownAccessPath} from "./accesspaths";
-import {Token} from "./tokens";
 import {preprocessAst} from "../parsing/extras";
 import {FragmentState} from "./fragmentstate";
+import {patchDynamics} from "../patching/patchdynamics";
+import {patchMethodCalls} from "../patching/patchmethodcalls";
 
 export async function analyzeFiles(files: Array<string>, solver: Solver) {
     const a = solver.globalState;
@@ -138,7 +138,12 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
 
                 // propagate tokens until fixpoint reached
                 await solver.propagate();
-                await patchDynamics(solver);
+
+                // patch heuristics
+                const p1 = patchDynamics(solver);
+                const p2 = patchMethodCalls(solver);
+                if (p1 || p2)
+                    await solver.propagate();
 
                 assert(a.pendingFiles.length === 0, "Unexpected module"); // (new modules shouldn't be discovered in the second phase)
                 solver.updateDiagnostics();
@@ -206,64 +211,5 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
                     logger.info(`Cycle elimination time: ${d.totalCycleEliminationTime}ms, runs: ${d.totalCycleEliminationRuns}, nodes removed: ${f.redirections.size}`);
             }
         }
-    }
-}
-
-/**
- * Patches empty object property constraint variables that may be affected by dynamic property writes.
- */
-async function patchDynamics(solver: Solver) {
-    if (!options.patchDynamics)
-        return;
-    const f = solver.fragmentState;
-    const dyns = new Set<Token>();
-    for (const v of f.dynamicPropertyWrites)
-        addAll(f.getTokens(f.getRepresentative(v)), dyns);
-    // constraint: for all E.p (or E[..]) where ⟦E.p⟧ (or ⟦E[..]⟧) is empty and ⟦E⟧ contains a token that is base of a dynamic property write
-    let count = 0;
-    const r: typeof f.maybeEmptyPropertyReads = [];
-    for (const e of f.maybeEmptyPropertyReads) {
-        const {result, base, pck/*, prop*/} = e;
-        const bs = f.getTokens(f.getRepresentative(base));
-        const [size] = f.getTokensSize(f.getRepresentative(result));
-        if (size === 0) {
-            let dpw = false;
-            for (const t of bs)
-                if (dyns.has(t)) {
-                    dpw = true; // base has a token that is base of a dynamic property write
-                    break;
-                }
-            if (dpw) {
-                if (logger.isDebugEnabled())
-                    logger.debug(`Empty object property read ${result} with dynamic write to base object ${base}`);
-
-                // constraint: ...: @Unknown ∈ ⟦E⟧ and k ∈ ⟦E.p⟧ (or ⟦E[..]⟧) where k is the package containing the property read operation
-                solver.addAccessPath(UnknownAccessPath.instance, base);
-                solver.addTokenConstraint(pck, result); // TODO: omit?
-
-                // TODO: enable extra patching for exports properties?
-                /*
-                // constraint: ...: ⟦%exports[m].p⟧ ⊆ ⟦E⟧ for each module m in the current package or a neighbor package
-                if (prop !== undefined)
-                    for (const p of [pck.packageInfo, ...f.packageNeighbors.get(pck.packageInfo) ?? []]) {
-                        for (const m of p.modules.values()) {
-                            const t = f.a.canonicalizeToken(new NativeObjectToken("exports", m));
-                            const v = f.getRepresentative(solver.varProducer.objPropVar(t, prop));
-                            if (f.vars.has(v))
-                                solver.addSubsetConstraint(v, result);
-                        }
-                    }
-                 */
-
-                count++;
-            } else
-                r.push(e); // keep only the property reads that are still empty
-        }
-    }
-    f.maybeEmptyPropertyReads = r;
-    if (count > 0) {
-        if (logger.isVerboseEnabled())
-            logger.verbose(`${count} empty object property read${count === 1 ? "" : "s"} patched, propagating again`);
-        await solver.propagate();
     }
 }

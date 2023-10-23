@@ -630,20 +630,28 @@ export function visit(ast: File, op: Operations) {
 
                     // constraint: ∀ functions w ∈ ⟦E⟧: ...
                     solver.addForAllTokensConstraint(eVar, TokenListener.EXTENDS, path.node, (w: Token) => {
-                        if (w instanceof FunctionToken) {
 
-                            // ... w ∈ ⟦ct.[[Prototype]]⟧ (allows inheritance of static properties)
-                            solver.addInherits(ct, w);
+                        // ... w ∈ ⟦ct.[[Prototype]]⟧ (allows inheritance of static properties)
+                        solver.addInherits(ct, w);
 
-                            // ... ∀ objects p ∈ ⟦w.prototype⟧: p ∈ ⟦ct.prototype.[[Prototype]]⟧ (allows inheritance of instance properties)
+                        if (w instanceof FunctionToken || w instanceof AccessPathToken) {
                             const pt = op.newPrototypeToken(constructor!);
-                            solver.addForAllTokensConstraint(solver.varProducer.objPropVar(w, "prototype"), TokenListener.INTERNAL_PROTO2, pt, (p: Token) => {
-                                if (isObjectPropertyVarObj(p)) // TODO: ignoring inheritance from access path tokens
-                                    solver.addInherits(pt, p);
-                            });
 
-                            // ... ⟦this_ct⟧ ⊆ ⟦this_w⟧
-                            solver.addSubsetConstraint(solver.varProducer.thisVar(constructor!), solver.varProducer.thisVar(w.fun));
+                            if (w instanceof FunctionToken) {
+
+                                // ... ∀ objects p ∈ ⟦w.prototype⟧: p ∈ ⟦ct.prototype.[[Prototype]]⟧ (allows inheritance of instance properties)
+                                solver.addForAllTokensConstraint(solver.varProducer.objPropVar(w, "prototype"), TokenListener.INTERNAL_PROTO2, pt, (p: Token) => {
+                                    solver.addInherits(pt, p);
+                                });
+
+                                // ... ⟦this_ct⟧ ⊆ ⟦this_w⟧
+                                solver.addSubsetConstraint(solver.varProducer.thisVar(constructor!), solver.varProducer.thisVar(w.fun));
+
+                            } else {
+
+                                const p = a.canonicalizeToken(new AccessPathToken(a.canonicalizeAccessPath(new PropertyAccessPath(eVar!, "prototype"))));
+                                solver.addInherits(pt, p);
+                            }
                         }
                     });
                 }
@@ -935,7 +943,7 @@ export function visit(ast: File, op: Operations) {
         const bp = getBaseAndProperty(path);
         const baseVar = bp ? op.expVar(bp.base, path) : undefined;
         const resultVar = vp.nodeVar(path.node);
-        op.callFunction(calleeVar, baseVar, path.node.arguments, resultVar, isNew, path);
+        op.callFunction(calleeVar, baseVar, bp?.property, path.node.arguments, resultVar, isNew, path);
     }
 
     /**

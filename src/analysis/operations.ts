@@ -140,18 +140,27 @@ export class Operations {
      * Models calling a function.
      * @param calleeVar constraint variable describing the callee, undefined if not applicable
      * @param baseVar constraint variable describing the method call base, undefined if not applicable
+     * @param prop method name, undefined if not a method call or name is dynamic
      * @param args arguments array of arguments
      * @param resultVar constraint variable describing the call result
      * @param isNew true if this is a 'new' call
      * @param path path of the call expression
      */
-    callFunction(calleeVar: ConstraintVar | undefined, baseVar: ConstraintVar | undefined, args: CallExpression["arguments"],
-                 resultVar: ConstraintVar, isNew: boolean, path: CallNodePath) {
+    callFunction(
+        calleeVar: ConstraintVar | undefined,
+        baseVar: ConstraintVar | undefined,
+        prop: string | undefined,
+        args: CallExpression["arguments"],
+        resultVar: ConstraintVar,
+        isNew: boolean,
+        path: CallNodePath
+    ) {
         const f = this.solver.fragmentState; // (don't use in callbacks)
         const caller = this.a.getEnclosingFunctionOrModule(path, this.moduleInfo);
 
         const pars = getAdjustedCallNodePath(path);
         f.registerCall(pars.node, this.moduleInfo);
+        f.registerMethodCall(path.node, baseVar, prop, calleeVar);
 
         // collect special information for pattern matcher
         if (isParentExpressionStatement(pars))
@@ -245,8 +254,7 @@ export class Operations {
 
                     // constraint: ∀ objects p ∈ ⟦t.prototype⟧: p ∈ ⟦q.[[Prototype]]⟧
                     this.solver.addForAllTokensConstraint(this.solver.varProducer.objPropVar(t, "prototype"), TokenListener.INTERNAL_PROTO, q, (p: Token) => {
-                        if (isObjectPropertyVarObj(p)) // TODO: ignoring inheritance from access path tokens
-                            this.solver.addInherits(q, p);
+                        this.solver.addInherits(q, p);
                     });
                 }
             } else {
@@ -255,7 +263,7 @@ export class Operations {
                 if (isNew && (t instanceof FunctionToken || t instanceof ClassToken)) {
 
                     // constraint: t ∈ ⟦new E0(E1,...,En)⟧ where t is the current PackageObjectToken
-                    this.solver.addTokenConstraint(this.packageObjectToken, resultVar); // TODO: use allocation-site abstraction for 'new'?
+                    this.solver.addTokenConstraint(this.packageObjectToken, resultVar);
                 }
             }
         });

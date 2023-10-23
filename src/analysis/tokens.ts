@@ -27,6 +27,12 @@ export class FunctionToken extends Token {
     toString() {
         return `Function[${locationToStringWithFileAndEnd(this.fun.loc, true)}]`;
     }
+
+    getPackageInfo(): PackageInfo {
+        const loc = this.fun.loc as Location;
+        assert(loc && loc.module);
+        return loc.module.packageInfo;
+    }
 }
 
 /**
@@ -72,7 +78,7 @@ export class ObjectToken extends AllocationSiteToken {
         super("Object", allocSite);
     }
 
-    getPackageInfo() {
+    getPackageInfo(): PackageInfo {
         const loc = this.allocSite.loc as Location;
         assert(loc && loc.module);
         return loc.module.packageInfo;

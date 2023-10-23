@@ -1122,6 +1122,7 @@ export default class Solver {
         addAll(s.functionsWithThis, f.functionsWithThis);
         f.artificialFunctions.push(...s.artificialFunctions);
         addAll(s.callLocations, f.callLocations);
+        setAll(s.maybeEmptyMethodCalls, f.maybeEmptyMethodCalls);
         addAll(s.nativeCallLocations, f.nativeCallLocations);
         addAll(s.externalCallLocations, f.externalCallLocations);
         addAll(s.callsWithUnusedResult, f.callsWithUnusedResult);
