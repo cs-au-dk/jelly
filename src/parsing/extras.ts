@@ -3,13 +3,17 @@ import {TemplateBuilder} from '@babel/template';
 import {
     addComment,
     blockStatement,
+    BlockStatement,
+    callExpression,
     ClassDeclaration,
     ClassExpression,
     ClassMethod,
     classMethod,
+    expressionStatement,
     File,
     Identifier,
     identifier,
+    isCallExpression,
     isClassMethod,
     isClassPrivateMethod,
     isClassPrivateProperty,
@@ -23,9 +27,14 @@ import {
     isObjectMethod,
     isObjectProperty,
     isOptionalMemberExpression,
+    isSuper,
     isTSExternalModuleReference,
     Node,
     Program,
+    restElement,
+    RestElement,
+    spreadElement,
+    super as _super,
     TSExportAssignment,
     TSImportEqualsDeclaration,
     variableDeclaration,
@@ -67,17 +76,38 @@ export function replaceTypeScriptImportExportAssignmentsAndAddConstructors({ tem
                 for (const b of path.node.body.body)
                     if ((isClassMethod(b) || isClassPrivateMethod(b)) && b.kind === "constructor")
                         return;
-                const b = blockStatement([]);
-                const c = classMethod("constructor", identifier("constructor"), [], b);  // FIXME: call super constructor?
-                addComment(b, "inner", "JELLY_DEFAULT");
+                let params: Array<Identifier | RestElement>, body: BlockStatement;
+                if (path.node.superClass) {
+                    params = [
+                        identifier("p1"),
+                        identifier("p2"),
+                        identifier("p3"),
+                        identifier("p4"),
+                        identifier("p5"),
+                        restElement(identifier("rest"))
+                    ];
+                    body = blockStatement([expressionStatement(callExpression(_super(), [
+                        identifier("p1"),
+                        identifier("p2"),
+                        identifier("p3"),
+                        identifier("p4"),
+                        identifier("p5"),
+                        spreadElement(identifier("rest"))
+                    ]))]);
+                } else {
+                    params = [];
+                    body = blockStatement([]);
+                }
+                const c = classMethod("constructor", identifier("constructor"), params, body);
+                addComment(body, "leading", "JELLY_DEFAULT");
                 path.get('body').unshiftContainer('body', c);
             }
         }
     };
 }
 
-export function isDummyConstructor(c: ClassMethod): boolean {
-    return c.kind === "constructor" && c.body.innerComments?.[0].value == "JELLY_DEFAULT";
+export function isDummyConstructor(c: ClassMethod | undefined): boolean {
+    return c !== undefined && c.kind === "constructor" && c.body.leadingComments?.[0].value == "JELLY_DEFAULT";
 }
 
 export const JELLY_NODE_ID = Symbol("JELLY_NODE_ID");
@@ -135,8 +165,10 @@ export function preprocessAst(ast: File, file: string, module: ModuleInfo, globa
                 (n.loc as Location).module = module;
 
             // workarounds to match dyn.ts source locations
-            if ((isClassMethod(n) || isClassPrivateMethod(n)) && n.kind === "constructor") {
-                // for constructors, use the class source location
+            if (((isClassMethod(n) || isClassPrivateMethod(n)) && n.kind === "constructor") ||
+                (isCallExpression(n) && isSuper(n.callee) && isDummyConstructor(path.findParent(p =>
+                    isClassMethod(p.node))?.node as ClassMethod | undefined))) {
+                // for constructors and artificial super calls, use the class source location
                 const cls = getClass(path);
                 assert(cls);
                 n.loc = cls.loc;
