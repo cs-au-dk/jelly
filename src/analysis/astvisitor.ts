@@ -29,7 +29,7 @@ import {
     isArrowFunctionExpression,
     isAssignmentExpression,
     isAssignmentPattern,
-    isClassAccessorProperty,
+    isClassAccessorProperty, isClassDeclaration,
     isClassExpression,
     isClassMethod,
     isClassPrivateMethod,
@@ -137,12 +137,14 @@ export function visit(ast: File, op: Operations) {
             if (options.newobj) {
 
                 const encl = path.findParent((p: NodePath) =>
-                    isFunction(p.node) || isStaticBlock(p.node) || isClassProperty(p.node) || isClassPrivateProperty(p.node)
+                    isFunctionDeclaration(p.node) || isFunctionExpression(p.node) || isObjectMethod(p.node) ||
+                    isClassMethod(p.node) || isClassPrivateMethod(p.node) ||
+                    isStaticBlock(p.node) || isClassProperty(p.node) || isClassPrivateProperty(p.node)
                 );
                 if (encl) {
                     if (isFunction(encl.node)) {
 
-                        // constraint: ⟦this_f⟧ ⊆ ⟦this⟧ where f is the enclosing function
+                        // constraint: ⟦this_f⟧ ⊆ ⟦this⟧ where f is the enclosing function (excluding arrow functions)
                         solver.addSubsetConstraint(vp.thisVar(encl.node), vp.nodeVar(path.node));
 
                     } else {
@@ -252,7 +254,7 @@ export function visit(ast: File, op: Operations) {
 
                 // record that a function/method/constructor/getter/setter has been reached, connect to its enclosing function or module
                 const fun = path.node;
-                let cls;
+                let cls: Class | undefined;
                 if (isClassMethod(fun) && fun.kind === "constructor")
                     cls = getClass(path);
                 const name = isFunctionDeclaration(path.node) || isFunctionExpression(path.node) ? path.node.id?.name :
@@ -281,6 +283,14 @@ export function visit(ast: File, op: Operations) {
                     const ft = op.newFunctionToken(path.node);
                     solver.addTokenConstraint(pt, vp.objPropVar(ft, "prototype"));
                     solver.addTokenConstraint(ft, vp.objPropVar(pt, "constructor"));
+
+                    // if constructor for non-abstract class, make sure there is an instance
+                    if (cls && !(isClassDeclaration(cls) && cls.abstract)) {
+                        const obj = op.newObjectToken(fun);
+                        const proto = op.newPrototypeToken(fun);
+                        solver.addTokenConstraint(obj, vp.thisVar(fun));
+                        solver.addInherits(obj, proto);
+                    }
                 }
 
                 if (fun.generator) {
