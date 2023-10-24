@@ -2,6 +2,7 @@
  * IDs for token listeners.
  */
 export enum TokenListener {
+    ANCESTORS,
     CALL_FUNCTION_CALLEE,
     CALL_FUNCTION_EXTERNAL,
     READ_PROPERTY_BASE,
@@ -12,8 +13,6 @@ export enum TokenListener {
     READ_PROPERTY_BASE_DYNAMIC,
     CLASS_FIELD,
     EXTENDS,
-    INTERNAL_PROTO,
-    INTERNAL_PROTO2,
     ASSIGN_MEMBER_BASE,
     ASSIGN_SETTER,
     ASSIGN_SETTER_THIS,

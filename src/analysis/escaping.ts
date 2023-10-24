@@ -5,6 +5,7 @@ import logger from "../misc/logger";
 import {isIdentifier} from "@babel/types";
 import Solver from "./solver";
 import {UnknownAccessPath} from "./accesspaths";
+import {isInternalProperty} from "../natives/ecmascript";
 
 /**
  * Finds the ObjectTokens that may be accessed from outside the module via exporting to or importing from other modules.
@@ -41,7 +42,8 @@ export function findEscapingObjects(m: ModuleInfo, solver: Solver): Set<ObjectTo
             w2.push(t);
         else if (t instanceof ObjectToken || (t instanceof NativeObjectToken && t.name === "exports"))
             for (const p of f.objectProperties.get(t) ?? [])
-                addToWorklist(f.varProducer.objPropVar(t, p));
+                if (!isInternalProperty(p))
+                    addToWorklist(f.varProducer.objPropVar(t, p));
     }
     visited.clear();
     for (const t of w2) {
@@ -77,11 +79,12 @@ export function findEscapingObjects(m: ModuleInfo, solver: Solver): Set<ObjectTo
         }
 
         // properties of escaping objects are escaping
-        for (const p of f.objectProperties.get(t) ?? []) {
-            const w = f.varProducer.objPropVar(t, p);
-            addToWorklist(w);
-            solver.addToken(theUnknownAccessPathToken, f.getRepresentative(w));
-        }
+        for (const p of f.objectProperties.get(t) ?? [])
+            if (!isInternalProperty(p)) {
+                const w = f.varProducer.objPropVar(t, p);
+                addToWorklist(w);
+                solver.addToken(theUnknownAccessPathToken, f.getRepresentative(w));
+            }
     }
 
     if (logger.isVerboseEnabled()) {

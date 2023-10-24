@@ -123,7 +123,7 @@ k1.a1();
 k1.a2();
 k1.a3.kk();
 k1.a4().a2();
-k1.w(); // TODO: __proto__
+k1.w();
 
 class E10 {
     static es = this;

@@ -272,10 +272,6 @@ export class AnalysisStateReporter {
             for (const t of ts)
                 logger.info(`    ${t}`);
         }
-        logger.info("Inheritance:");
-        for (const [t, as] of this.f.inherits)
-            for (const a of as)
-                logger.info(`  ${t} -> ${a}`);
     }
 
     /**

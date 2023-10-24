@@ -201,7 +201,6 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
                 logger.info(`Listeners (notifications) token: ${mapMapSize(f.tokenListeners)} (${d.tokenListenerNotifications}), ` +
                     `pair: ${mapMapSize(f.pairListeners1) + mapMapSize(f.pairListeners2)} (${d.pairListenerNotifications}), ` +
                     (options.readNeighbors ? `neighbor: ${mapMapSize(f.packageNeighborListeners)} (${d.packageNeighborListenerNotifications}), ` : "") +
-                    `ancestor: ${mapMapSize(f.ancestorListeners)} (${d.ancestorListenerNotifications}), ` +
                     `array: ${mapMapSize(f.arrayEntriesListeners)} (${d.arrayEntriesListenerNotifications}), ` +
                     `obj: ${mapMapSize(f.objectPropertiesListeners)} (${d.objectPropertiesListenerNotifications})`);
                 logger.info(`Canonicalize vars: ${a.canonicalConstraintVars.size} (${a.numberOfCanonicalizeVarCalls}), tokens: ${a.canonicalTokens.size} (${a.numberOfCanonicalizeTokenCalls}), access paths: ${a.canonicalAccessPaths.size} (${a.numberOfCanonicalizeAccessPathCalls})`);

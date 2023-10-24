@@ -21,6 +21,7 @@ import {
 import {NodePath} from "@babel/traverse";
 import {
     AccessorType,
+    AncestorsVar,
     ArgumentsVar,
     ConstraintVar,
     FunctionReturnVar,
@@ -30,7 +31,7 @@ import {
     ObjectPropertyVarObj,
     ThisVar
 } from "./constraintvars";
-import {ArrayToken, ObjectToken, PackageObjectToken} from "./tokens";
+import {ArrayToken, ObjectToken, PackageObjectToken, Token} from "./tokens";
 import {FilePath, Location} from "../misc/util";
 import {PackageInfo} from "./infos";
 import {GlobalState} from "./globalstate";
@@ -162,5 +163,13 @@ export class ConstraintVarProducer<RVT extends RepresentativeVar | MergeRepresen
     nodeVar(n: Node | undefined): NodeVar | undefined
     nodeVar(n: Node | undefined): NodeVar | undefined {
         return n !== undefined ? this.a.canonicalizeVar(new NodeVar(n)) : undefined;
+    }
+
+    ancestorsVar(t: Token): AncestorsVar {
+        if (t instanceof ObjectToken && this.f.widened.has(t))
+            t = this.a.canonicalizeToken(new PackageObjectToken(t.getPackageInfo()));
+        const v = this.a.canonicalizeVar(new AncestorsVar(t));
+        this.s.addToken(t, this.s.fragmentState.getRepresentative(v)); // ancestry is reflexive
+        return v;
     }
 }

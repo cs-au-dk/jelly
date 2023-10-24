@@ -19,6 +19,7 @@ import {ConstraintVar, FunctionReturnVar, ObjectPropertyVarObj} from "../analysi
 import {resolve} from "path";
 import {FunctionInfo, ModuleInfo} from "../analysis/infos";
 import assert from "assert";
+import {isInternalProperty} from "../natives/ecmascript";
 
 const MAX_ACCESS_PATHS = 10;
 
@@ -74,8 +75,9 @@ export function getAPIExported(f: FragmentState): Map<ObjectPropertyVarObj, Set<
 
             // look at object properties
             for (const prop of f.objectProperties.get(t) ?? [])
-                add(f.varProducer.objPropVar(t, prop),
-                    c.canonicalize(new PropertyAccessPathPattern(ap, [prop])));
+                if (!isInternalProperty(prop))
+                    add(f.varProducer.objPropVar(t, prop),
+                        c.canonicalize(new PropertyAccessPathPattern(ap, [prop])));
 
             // look at function returns
             if (t instanceof FunctionToken)

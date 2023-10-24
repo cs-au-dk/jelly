@@ -109,13 +109,6 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
 
     readonly reverseSubsetEdges: Map<RVT, Set<RVT>> = new Map; // (used by solver.redirect)
 
-    /**
-     * Inheritance relation. For each token, the map provides the tokens it may inherit from directly.
-     */
-    inherits: Map<Token, Set<Token>> = new Map;
-
-    reverseInherits: Map<Token, Set<Token>> = new Map;
-
     readonly arrayEntries: Map<ArrayToken, Set<string>> = new Map;
 
     readonly objectProperties: Map<ObjectPropertyVarObj, Set<string>> = new Map;
@@ -129,8 +122,6 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
     readonly listenersProcessed: Map<ListenerID, Set<Token | bigint>> = new Map;
 
     readonly packageNeighborListeners: Map<PackageInfo, Map<Node, (neighbor: PackageInfo) => void>> = new Map;
-
-    ancestorListeners: Map<Token, Map<Node, (descendant: Token) => void>> = new Map;
 
     readonly arrayEntriesListeners: Map<ArrayToken, Map<ListenerID, (prop: string) => void>> = new Map;
 
@@ -779,44 +770,6 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
         }
         this.numberOfTokens += added.length;
         return added;
-    }
-
-    /**
-     * Returns the tokens the given token inherits from (reflexively and transitively).
-     */
-    getAncestors(t: Token): Set<Token> {
-        const res = new Set<Token>();
-        res.add(t);
-        const w = [t];
-        while (w.length !== 0) {
-            const s = this.inherits.get(w.pop()!);
-            if (s)
-                for (const p of s)
-                    if (!res.has(p)) {
-                        res.add(p);
-                        w.push(p);
-                    }
-        }
-        return res;
-    }
-
-    /**
-     * Returns the tokens that inherit from the given token (reflexively and transitively).
-     */
-    getDescendants(t: Token): Set<Token> {
-        const res = new Set<Token>();
-        res.add(t);
-        const w = [t];
-        while (w.length !== 0) {
-            const s = this.reverseInherits.get(w.pop()!);
-            if (s)
-                for (const p of s)
-                    if (!res.has(p)) {
-                        res.add(p);
-                        w.push(p);
-                    }
-        }
-        return res;
     }
 
     /*

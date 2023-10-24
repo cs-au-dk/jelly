@@ -1,4 +1,4 @@
-import {Function, isIdentifier, Node} from "@babel/types";
+import {Class, Function, isIdentifier, Node} from "@babel/types";
 import {nodeToString, locationToStringWithFileAndEnd} from "../misc/util";
 import {
     AccessPathToken,
@@ -12,6 +12,24 @@ import {
 import {ModuleInfo, PackageInfo} from "./infos";
 import {IDENTIFIER_KIND} from "./astvisitor";
 import Solver from "./solver";
+import assert from "assert";
+
+function getTokenParent(obj: Token): Node | PackageInfo | ModuleInfo | undefined {
+    if (obj instanceof AllocationSiteToken)
+        return obj.allocSite;
+    else if (obj instanceof FunctionToken)
+        return obj.fun;
+    else if (obj instanceof NativeObjectToken)
+        return obj.moduleInfo;
+    else if (obj instanceof PackageObjectToken)
+        return obj.packageInfo;
+    else {
+        // ???
+        // obj satisfies AccessPathToken;
+        assert(obj instanceof AccessPathToken);
+        return undefined;
+    }
+}
 
 /**
  * A constraint variable.
@@ -95,12 +113,7 @@ export class ObjectPropertyVar extends ConstraintVar {
         return `${this.accessor === "get" ? "(get)" : this.accessor === "set" ? "(set)" : ""}${this.obj}.${this.prop}`;
     }
 
-    getParent() {
-        return this.obj instanceof AllocationSiteToken ? this.obj.allocSite :
-            this.obj instanceof FunctionToken ? this.obj.fun :
-                this.obj instanceof NativeObjectToken ? this.obj.moduleInfo :
-                    this.obj.packageInfo;
-    }
+    getParent() { return getTokenParent(this.obj); }
 }
 
 /**
@@ -158,6 +171,24 @@ export class ArgumentsVar extends ConstraintVar {
 }
 
 /**
+ * A constraint variable for the super-class of a class.
+ */
+export class SuperVar extends ConstraintVar {
+
+    constructor(readonly cl: Class) {
+        super();
+    }
+
+    toString() {
+        return `Super[${locationToStringWithFileAndEnd(this.cl.loc, true)}]`;
+    }
+
+    getParent(): Node {
+        return this.cl;
+    }
+}
+
+/**
  * A constraint variable for an intermediate result.
  */
 export class IntermediateVar extends ConstraintVar {
@@ -170,10 +201,24 @@ export class IntermediateVar extends ConstraintVar {
     }
 
     toString() {
-        return `#${this.label}[${locationToStringWithFileAndEnd(this.node.loc, true)}]`
+        return `#${this.label}[${locationToStringWithFileAndEnd(this.node.loc, true)}]`;
     }
 
     getParent(): Node {
         return this.node;
     }
+}
+
+
+export class AncestorsVar extends ConstraintVar {
+
+    constructor(readonly t: Token) {
+        super();
+    }
+
+    toString() {
+        return `Ancestors(${this.t})`;
+    }
+
+    getParent() { return getTokenParent(this.t); }
 }

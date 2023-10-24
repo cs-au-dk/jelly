@@ -29,7 +29,7 @@ import {TokenListener} from "../analysis/listeners";
 import assert from "assert";
 import {NodePath} from "@babel/traverse";
 import {Operations} from "../analysis/operations";
-import {AccessorType, ConstraintVar, IntermediateVar, ObjectPropertyVarObj, isObjectPropertyVarObj} from "../analysis/constraintvars";
+import {AccessorType, ConstraintVar, IntermediateVar, ObjectPropertyVarObj} from "../analysis/constraintvars";
 import {Location} from "../misc/util";
 
 /**
@@ -214,12 +214,12 @@ export function newObject(kind: ObjectKind, proto: NativeObjectToken | PackageOb
             kind === "Array" ? new ArrayToken(p.path.node) :
                 new AllocationSiteToken(kind, p.path.node));
     if (proto instanceof Token)
-        p.solver.addInherits(p.solver.fragmentState.maybeWidened(t), proto);
-    else
-        p.solver.addForAllTokensConstraint(p.op.expVar(proto, p.path), TokenListener.NATIVE_25, p.path.node, (pt: Token) => {
-            if (isObjectPropertyVarObj(pt))
-                p.solver.addInherits(p.solver.fragmentState.maybeWidened(t), pt);
-        });
+        p.solver.addInherits(t, proto);
+    else {
+        const pv = p.op.expVar(proto, p.path);
+        if (pv !== undefined)
+            p.solver.addInherits(t, pv);
+    }
     return t;
 }
 

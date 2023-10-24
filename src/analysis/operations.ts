@@ -254,9 +254,7 @@ export class Operations {
                     this.solver.addTokenConstraint(q, this.solver.varProducer.thisVar(t.fun));
 
                     // constraint: ∀ objects p ∈ ⟦t.prototype⟧: p ∈ ⟦q.[[Prototype]]⟧
-                    this.solver.addForAllTokensConstraint(this.solver.varProducer.objPropVar(t, "prototype"), TokenListener.INTERNAL_PROTO, q, (p: Token) => {
-                        this.solver.addInherits(this.solver.fragmentState.maybeWidened(q), p);
-                    });
+                    this.solver.addInherits(q, this.solver.varProducer.objPropVar(t, "prototype"));
                 }
             } else {
 

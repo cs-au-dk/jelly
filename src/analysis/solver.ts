@@ -1,4 +1,4 @@
-import {ConstraintVar, IntermediateVar, NodeVar, ObjectPropertyVarObj} from "./constraintvars";
+import {ConstraintVar, IntermediateVar, NodeVar, ObjectPropertyVarObj, isObjectPropertyVarObj} from "./constraintvars";
 import logger, {isTTY, writeStdOut} from "../misc/logger";
 import {AccessPathToken, AllocationSiteToken, ArrayToken, FunctionToken, ObjectToken, PackageObjectToken, Token} from "./tokens";
 import {GlobalState} from "./globalstate";
@@ -33,7 +33,7 @@ import {setImmediate} from "timers/promises";
 import {getMemoryUsage} from "../misc/memory";
 import {JELLY_NODE_ID} from "../parsing/extras";
 import AnalysisDiagnostics from "./diagnostics";
-import {ARRAY_UNKNOWN} from "../natives/ecmascript";
+import {ARRAY_UNKNOWN, INTERNAL_PROTOTYPE, isInternalProperty} from "../natives/ecmascript";
 
 export class AbortedException extends Error {}
 
@@ -53,7 +53,7 @@ export default class Solver {
 
     restored: Set<ConstraintVar> = new Set;
 
-    readonly listeners: Map<ListenerID, [TokenListener, Node | Token]> = new Map;
+    readonly listeners: Map<ListenerID, [TokenListener, Node | Token] | [Token, Node]> = new Map;
 
     diagnostics = new AnalysisDiagnostics;
 
@@ -73,7 +73,7 @@ export default class Solver {
         d.vars = f.getNumberOfVarsWithTokens();
         d.listeners = [
             f.tokenListeners, f.pairListeners1, f.pairListeners2, f.packageNeighborListeners,
-            f.ancestorListeners, f.arrayEntriesListeners, f.objectPropertiesListeners,
+            f.arrayEntriesListeners, f.objectPropertiesListeners,
         ].reduce((acc, l: Map<Object, Map<Object, Object>>) => acc + mapMapSize(l), 0);
         d.tokens = f.numberOfTokens;
         d.subsetEdges = f.numberOfSubsetEdges;
@@ -277,6 +277,16 @@ export default class Solver {
         return id;
     }
 
+    private checkListenerIDCollision(id: ListenerID, keys: [TokenListener, Node | Token] | [Token, Node]) {
+        const x = this.listeners.get(id);
+        if (x) {
+            if (x[0] !== keys[0] || x[1] !== keys[1])
+                logger.error("Error: Hash collision in getListenerID"); // TODO: hash collision possible
+
+        } else
+            this.listeners.set(id, keys);
+    }
+
     /**
      * Provides a unique'ish ID for the given key and node or token.
      */
@@ -287,13 +297,7 @@ export default class Solver {
             id += BigInt(n.hash);
         } else
             id += this.getNodeHash(n);
-        const x = this.listeners.get(id);
-        if (x) {
-            const [xk, xn] = x;
-            if (xk !== key || xn !== n)
-                logger.error("Error: Hash collision in getListenerID"); // TODO: hash collision possible
-        } else
-            this.listeners.set(id, [key, n]);
+        this.checkListenerIDCollision(id, [key, n]);
         return id;
     }
 
@@ -302,7 +306,9 @@ export default class Solver {
      */
     private getAncestorListenerID(t: Token, n: Node): ListenerID {
         assert(t.hash !== undefined);
-        return BigInt(t.hash) + this.getNodeHash(n); // TODO: hash collision possible
+        const id = BigInt(t.hash) + this.getNodeHash(n);
+        this.checkListenerIDCollision(id, [t, n]);
+        return id;
     }
 
     /**
@@ -316,8 +322,12 @@ export default class Solver {
         const vRep = f.getRepresentative(v);
         if (logger.isDebugEnabled())
             logger.debug(`Adding universally quantified constraint #${TokenListener[key]} to ${vRep} at ${n instanceof Token ? n : locationToStringWithFileAndEnd(n.loc)}`);
+        this.addForAllTokensConstraintPrivate(vRep, this.getListenerID(key, n), listener);
+    }
+
+    private addForAllTokensConstraintPrivate(vRep: RepresentativeVar, id: ListenerID, listener: (t: Token) => void) {
+        const f = this.fragmentState;
         const m = mapGetMap(f.tokenListeners, vRep);
-        const id = this.getListenerID(key, n);
         if (!m.has(id)) {
             // run listener on all existing tokens
             for (const t of f.getTokens(vRep))
@@ -455,84 +465,27 @@ export default class Solver {
     addForAllAncestorsConstraint(t: Token, n: Node, listener: (ancestor: Token) => void) {
         if (logger.isDebugEnabled())
             logger.debug(`Adding ancestors constraint to ${t} at ${nodeToString(n)}`);
-        this.addForAllAncestorsConstraintPrivate(t, n, listener);
+        this.addForAllTokensConstraintPrivate(
+            this.fragmentState.getRepresentative(this.varProducer.ancestorsVar(t)),
+            this.getAncestorListenerID(t, n),
+            listener,
+        );
     }
 
-    private addForAllAncestorsConstraintPrivate(t: Token, n: Node, listener: (ancestor: Token) => void) {
-        const f = this.fragmentState;
-        const m = mapGetMap(f.ancestorListeners, t);
-        if (!m.has(n)) {
-            // run listener on all existing ancestors
-            const id = this.getAncestorListenerID(t, n);
-            for (const a of f.getAncestors(t)) {
-                const p = mapGetSet(f.listenersProcessed, id);
-                if (!p.has(a)) {
-                    p.add(a);
-                    this.enqueueListenerCall([listener, a]);
-                    this.diagnostics.ancestorListenerNotifications++;
-                }
-            }
-            // register listener for future inheritance relations
-            m.set(n, listener);
-        }
-    }
-
-    /**
-     * Adds an inheritance relation.
-     * By default also notifies listeners.
+    /*
+     * Adds an inheritance relation and notifies listeners.
      */
-    addInherits(child: Token, parent: Token, propagate: boolean = true) {
+    addInherits(child: ObjectPropertyVarObj, parent: Token | ConstraintVar) {
         if (child === parent)
             return;
         const f = this.fragmentState;
-        const st = mapGetSet(f.inherits, child);
-        if (!st.has(parent)) {
-            if (logger.isDebugEnabled())
-                logger.debug(`Adding inheritance relation ${child} -> ${parent}`);
-            if (propagate) {
-                const ancestors = f.getAncestors(parent);
-                const descendants = f.getDescendants(child);
-
-                // flood fill graph from Q and return reachable nodes
-                function flood(Q: Token[], edges: Map<Token, Set<Token>>): Set<Token> {
-                    const res = new Set(Q);
-                    while (Q.length) {
-                        const tok = Q.pop()!;
-                        for (const j of edges.get(tok) ?? [])
-                            if (!res.has(j)) {
-                                res.add(j);
-                                Q.push(j);
-                            }
-                    }
-                    return res;
-                }
-
-                // collect descendants which already inherit from parent
-                // we don't need to notify them or any of their descendants
-                const optDes = flood([...descendants].filter((des) => f.inherits.get(des)!.has(parent)), f.reverseInherits);
-
-                // similar, but for ancestors
-                for (const anc of flood([...ancestors].filter((anc) => st.has(anc)), f.inherits))
-                    ancestors.delete(anc);
-
-                for (const des of descendants) if (!optDes.has(des)) {
-                    const ts = f.ancestorListeners.get(des);
-                    if (ts)
-                        for (const anc of ancestors)
-                            for (const [n, listener] of ts) {
-                                const id = this.getAncestorListenerID(des, n);
-                                const p = mapGetSet(f.listenersProcessed, id);
-                                if (!p.has(anc)) {
-                                    p.add(anc);
-                                    this.enqueueListenerCall([listener, anc]);
-                                    this.diagnostics.ancestorListenerNotifications++;
-                                }
-                            }
-                }
-            }
-            st.add(parent);
-            mapGetSet(f.reverseInherits, parent).add(child);
-        }
+        if (logger.isDebugEnabled())
+            logger.debug(`Adding inheritance relation ${child} -> ${parent}`);
+        const dst = f.getRepresentative(f.varProducer.objPropVar(child, INTERNAL_PROTOTYPE));
+        if (parent instanceof Token)
+            this.addToken(parent, dst);
+        else
+            this.addSubsetEdge(f.getRepresentative(parent), dst);
     }
 
     /**
@@ -626,7 +579,7 @@ export default class Solver {
         if (!m.has(id)) {
             const ps = f.objectProperties.get(t);
             if (ps)
-                for (const p of ps) {
+                for (const p of ps) if (!isInternalProperty(p)) {
                     this.enqueueListenerCall([listener, p]);
                     this.diagnostics.objectPropertiesListenerNotifications++;
                 }
@@ -646,7 +599,7 @@ export default class Solver {
             if (logger.isDebugEnabled())
                 logger.debug(`Adding object property ${a}.${prop}`);
             ps.add(prop);
-            if (propagate) {
+            if (propagate && !isInternalProperty(prop)) {
                 const ts = f.objectPropertiesListeners.get(a);
                 if (ts)
                     for (const listener of ts.values()) {
@@ -661,6 +614,12 @@ export default class Solver {
                     f.getRepresentative(f.varProducer.arrayAllVar(a)),
                     propagate,
                 );
+            if (prop === INTERNAL_PROTOTYPE)
+                // constraint: ∀ b ∈ ⟦a.__proto__⟧: Ancestors(b) ⊆ Ancestors(a)
+                this.addForAllTokensConstraint(f.varProducer.objPropVar(a, prop), TokenListener.ANCESTORS, a, (b: Token) => {
+                    if (isObjectPropertyVarObj(b)) // TODO: ignoring inheritance from access path tokens
+                        this.addSubsetConstraint(this.varProducer.ancestorsVar(b), this.varProducer.ancestorsVar(a));
+                });
         }
     }
 
@@ -1102,13 +1061,6 @@ export default class Solver {
             for (const n of ns)
                 this.addPackageNeighbor(k, n, propagate);
         mapMapSetAll(s.packageNeighborListeners, f.packageNeighborListeners);
-        // add new ancestor listeners and inheritance relations
-        for (const [t, m] of s.ancestorListeners)
-            for (const [n, listener] of m)
-                this.addForAllAncestorsConstraintPrivate(t, n, listener);
-        for (const [c, ps] of s.inherits)
-            for (const p of ps)
-                this.addInherits(c, p, propagate);
         // add remaining fragment state
         mapSetAddAll(s.requireGraph, f.requireGraph);
         mapSetAddAll(s.functionToFunction, f.functionToFunction);
