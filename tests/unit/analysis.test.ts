@@ -412,26 +412,24 @@ describe("tests/unit/analysis", () => {
         });
 
         test("Ancestor listener triggers for widened ancestor", async () => {
-            const {solver, a, f} = setup;
+            const {solver, a} = setup;
 
             const fn = jest.fn();
             solver.addForAllAncestorsConstraint(ot, param, fn);
 
-            expect(f.postponedListenerCalls, `Ancestor listener should be enqueued with ${ot}`, {showMatcherMessage: false}).
-                toEqual([[fn, ot]]);
             await solver.propagate();
+            expect(fn).toHaveBeenLastCalledWith(ot);
 
             const anc = a.canonicalizeToken(new ObjectToken(fun0));
             solver.addInherits(ot, anc);
 
-            expect(f.postponedListenerCalls, `Ancestor listener should be enqueued with ${anc}`, {showMatcherMessage: false}).
-                toEqual([[fn, anc]]);
             await solver.propagate();
+            expect(fn).toHaveBeenLastCalledWith(anc);
 
             widenObjects(new Set([anc]), solver);
 
-            expect(f.postponedListenerCalls, `Ancestor listener should be enqueued with ${pt}`, {showMatcherMessage: false}).
-                toEqual([[fn, pt]]);
+            await solver.propagate();
+            expect(fn).toHaveBeenLastCalledWith(pt);
         });
     });
 });
