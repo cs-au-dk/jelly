@@ -29,7 +29,8 @@ import {
     isArrowFunctionExpression,
     isAssignmentExpression,
     isAssignmentPattern,
-    isClassAccessorProperty, isClassDeclaration,
+    isClassAccessorProperty,
+    isClassDeclaration,
     isClassExpression,
     isClassMethod,
     isClassPrivateMethod,
@@ -463,30 +464,31 @@ export function visit(ast: File, op: Operations) {
 
                             // {..., p: E, ...} or class... {...; p = E; ...} (static or non-static, private or public)
                             const rightvar = op.expVar(path.node.value, path);
-                            if (isObjectProperty(path.node)) {
-                                // constraint: ⟦E⟧ ⊆ ⟦i.p⟧ where i is the object literal
-                                const dst = vp.objPropVar(op.newObjectToken(path.parentPath.node), key);
-                                solver.addSubsetConstraint(rightvar, dst);
-                            } else {
-                                const cls = getClass(path);
-                                assert(cls);
-                                const constr = class2constructor.get(cls);
-                                assert(constr);
-                                if (path.node.static) {
-                                    // constraint: ⟦E⟧ ⊆ ⟦c.p⟧ where c is the constructor function
-                                    const t = op.newFunctionToken(constr);
-                                    const dst = vp.objPropVar(t, key);
+                            if (rightvar)
+                                if (isObjectProperty(path.node)) {
+                                    // constraint: ⟦E⟧ ⊆ ⟦i.p⟧ where i is the object literal
+                                    const dst = vp.objPropVar(op.newObjectToken(path.parentPath.node), key);
                                     solver.addSubsetConstraint(rightvar, dst);
                                 } else {
-                                    // constraint: ∀ t ∈ ⟦this_c⟧: ⟦E⟧ ⊆ ⟦t.p⟧ where c is the constructor function
-                                    solver.addForAllTokensConstraint(vp.thisVar(constr), TokenListener.CLASS_FIELD, path.node, (t: Token) => {
-                                        if (isObjectPropertyVarObj(t)) {
-                                            const dst = vp.objPropVar(t, key);
-                                            solver.addSubsetConstraint(rightvar, dst);
-                                        }
-                                    });
+                                    const cls = getClass(path);
+                                    assert(cls);
+                                    const constr = class2constructor.get(cls);
+                                    assert(constr);
+                                    if (path.node.static) {
+                                        // constraint: ⟦E⟧ ⊆ ⟦c.p⟧ where c is the constructor function
+                                        const t = op.newFunctionToken(constr);
+                                        const dst = vp.objPropVar(t, key);
+                                        solver.addSubsetConstraint(rightvar, dst);
+                                    } else {
+                                        // constraint: ∀ t ∈ ⟦this_c⟧: ⟦E⟧ ⊆ ⟦t.p⟧ where c is the constructor function
+                                        solver.addForAllTokensConstraint(vp.thisVar(constr), TokenListener.CLASS_FIELD, path.node, (t: Token) => {
+                                            if (isObjectPropertyVarObj(t)) {
+                                                const dst = vp.objPropVar(t, key);
+                                                solver.addSubsetConstraint(rightvar, dst);
+                                            }
+                                        });
+                                    }
                                 }
-                            }
 
                         } else {
 

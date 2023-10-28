@@ -132,7 +132,6 @@ export function widenObjects(widened: Set<ObjectToken>, solver: Solver) {
         const listeners = f.ancestorListeners.get(t);
         if (listeners !== undefined) {
             f.ancestorListeners.delete(t);
-
             for (const [n, listener] of listeners)
                 solver.addForAllAncestorsConstraint(pt, n, listener);
         }

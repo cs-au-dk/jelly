@@ -322,7 +322,6 @@ export class Operations {
         }
         // constraint: if non-'new', E0 is a member expression E.m and t uses 'this', then ⟦E⟧ ⊆ ⟦this_f⟧
         if (!isNew && baseVar && f.functionsWithThis.has(t.fun))
-            // TODO: introduce special subset edge that only propagates FunctionToken and AllocationSiteToken?
             this.solver.addSubsetConstraint(baseVar, vp.thisVar(t.fun));
         // constraint: ...: ⟦ret_t⟧ ⊆ ⟦(new) E0(E1,...,En)⟧
         if (!isParentExpressionStatement(pars))
@@ -405,7 +404,7 @@ export class Operations {
                     }
                 });
 
-                // TODO: also model reads from "__proto__"
+                // TODO: model reads from "__proto__"
 
                 if (!options.newobj) {
                     if ((t instanceof FunctionToken || t instanceof ClassToken) && prop === "prototype") {
@@ -416,7 +415,7 @@ export class Operations {
                 }
             });
 
-        } else { // TODO: handle dynamic property reads?
+        } else {
 
             this.solver.fragmentState.registerEscapingFromModule(base); // unknown properties of the base object may escape
             this.solver.addAccessPath(UnknownAccessPath.instance, dst);
@@ -439,7 +438,6 @@ export class Operations {
 
             // TODO: PropertyAccessPaths for dynamic property reads?
         }
-        // TODO: special treatment for E.prototype? and other standard properties?
         // TODO: computed property assignments (with known prefix/suffix) (also handle PrivateName properties?)
         // TODO: warn at reads from ‘arguments.callee’
     }
@@ -454,7 +452,7 @@ export class Operations {
      * @param enclosing enclosing function/module of the AST node
      * @param escapeNode AST node for 'registerEscapingToExternal' (defaults to node)
      * @param ac describes the type of property that is written to
-     * @param invokeSetters if true, models invocation of setters (i.e. the [[Set]] internal method is modeled instead of [[DefineOwnPropery]])
+     * @param invokeSetters if true, models invocation of setters (i.e. the [[Set]] internal method is modeled instead of [[DefineOwnProperty]])
      */
     writeProperty(
         src: ConstraintVar | undefined, lVar: ConstraintVar | undefined, base: Token, prop: string,
@@ -476,7 +474,7 @@ export class Operations {
         };
 
         if (isObjectPropertyVarObj(base)) {
-            // FIXME: special treatment of writes to "prototype" and "__proto__"
+            // TODO: model writes to "__proto__"
 
             // constraint: ...: ⟦E2⟧ ⊆ ⟦base.p⟧
             if (src)
@@ -489,7 +487,7 @@ export class Operations {
                     this.solver.addForAllTokensConstraint(setter, TokenListener.ASSIGN_SETTER, node, writeToSetter);
                     this.solver.addForAllTokensConstraint(setter, TokenListener.ASSIGN_SETTER_THIS, base, bindSetterThis);
 
-                    // TODO: also obtain setters from ancestors of base
+                    // FIXME: also obtain setters from ancestors of base
                 }
 
             // values written to native object escape
@@ -639,8 +637,6 @@ export class Operations {
                     this.writeProperty(src, lVar, t, prop, dst, enclosing, path.node);
                     assignRequireExtensions(t);
                 });
-
-                // TODO: special treatment for E.prototype? and other standard properties?
 
             } else {
 
