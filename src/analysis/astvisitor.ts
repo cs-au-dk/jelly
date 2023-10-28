@@ -651,7 +651,7 @@ export function visit(ast: File, op: Operations) {
 
                                 // ... ∀ objects p ∈ ⟦w.prototype⟧: p ∈ ⟦ct.prototype.[[Prototype]]⟧ (allows inheritance of instance properties)
                                 solver.addForAllTokensConstraint(solver.varProducer.objPropVar(w, "prototype"), TokenListener.INTERNAL_PROTO2, pt, (p: Token) => {
-                                    solver.addInherits(pt, p);
+                                    solver.addInherits(pt, p); // (capture of pt is OK - prototype objects are not widened)
                                 });
 
                                 // ... ⟦this_ct⟧ ⊆ ⟦this_w⟧

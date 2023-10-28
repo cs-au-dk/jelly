@@ -209,18 +209,16 @@ export function returnArgument(arg: Node, p: NativeFunctionParams) {
  * Creates a new AllocationSiteToken with the given kind and prototype.
  */
 export function newObject(kind: ObjectKind, proto: NativeObjectToken | PackageObjectToken | Expression, p: NativeFunctionParams): AllocationSiteToken | PackageObjectToken {
-    let t: AllocationSiteToken | PackageObjectToken = p.solver.globalState.canonicalizeToken(
+    const t: AllocationSiteToken | PackageObjectToken = p.solver.globalState.canonicalizeToken(
         kind ==="Object" ? new ObjectToken(p.path.node) :
             kind === "Array" ? new ArrayToken(p.path.node) :
                 new AllocationSiteToken(kind, p.path.node));
-    if (t instanceof ObjectToken && p.solver.fragmentState.widened.has(t))
-        t = p.solver.globalState.canonicalizeToken(new PackageObjectToken(t.getPackageInfo(), kind));
     if (proto instanceof Token)
-        p.solver.addInherits(t, proto);
+        p.solver.addInherits(p.solver.fragmentState.maybeWidened(t), proto);
     else
         p.solver.addForAllTokensConstraint(p.op.expVar(proto, p.path), TokenListener.NATIVE_25, p.path.node, (pt: Token) => {
             if (isObjectPropertyVarObj(pt))
-                p.solver.addInherits(t, pt);
+                p.solver.addInherits(p.solver.fragmentState.maybeWidened(t), pt);
         });
     return t;
 }

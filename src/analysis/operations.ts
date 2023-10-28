@@ -254,7 +254,7 @@ export class Operations {
 
                     // constraint: ∀ objects p ∈ ⟦t.prototype⟧: p ∈ ⟦q.[[Prototype]]⟧
                     this.solver.addForAllTokensConstraint(this.solver.varProducer.objPropVar(t, "prototype"), TokenListener.INTERNAL_PROTO, q, (p: Token) => {
-                        this.solver.addInherits(q, p);
+                        this.solver.addInherits(this.solver.fragmentState.maybeWidened(q), p);
                     });
                 }
             } else {
@@ -355,7 +355,7 @@ export class Operations {
             const bindGetterThis = (baset: Token, t: Token) => {
                 if (t instanceof FunctionToken && t.fun.params.length === 0)
                     if (this.solver.fragmentState.functionsWithThis.has(t.fun))
-                        this.solver.addTokenConstraint(baset, this.solver.varProducer.thisVar(t.fun));
+                        this.solver.addTokenConstraint(this.solver.fragmentState.maybeWidened(baset), this.solver.varProducer.thisVar(t.fun));
             };
 
             // constraint: ∀ objects t ∈ ⟦E⟧: ...
@@ -472,7 +472,7 @@ export class Operations {
         const bindSetterThis = (t: Token) => {
             if (t instanceof FunctionToken && t.fun.params.length === 1)
                 if (this.solver.fragmentState.functionsWithThis.has(t.fun))
-                    this.solver.addTokenConstraint(base, this.solver.varProducer.thisVar(t.fun));
+                    this.solver.addTokenConstraint(this.solver.fragmentState.maybeWidened(base), this.solver.varProducer.thisVar(t.fun));
         };
 
         if (isObjectPropertyVarObj(base)) {

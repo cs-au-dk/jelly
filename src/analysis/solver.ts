@@ -520,7 +520,7 @@ export default class Solver {
                     if (ts)
                         for (const anc of ancestors)
                             for (const [n, listener] of ts) {
-                                const id = this.getAncestorListenerID(child, n);
+                                const id = this.getAncestorListenerID(des, n);
                                 const p = mapGetSet(f.listenersProcessed, id);
                                 if (!p.has(anc)) {
                                     p.add(anc);

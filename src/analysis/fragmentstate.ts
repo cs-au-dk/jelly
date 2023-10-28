@@ -818,4 +818,15 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
         }
         return res;
     }
+
+    /*
+     * If the provided token is an object token that has been widened, the corresponding package object token is returned.
+     * Otherwise the provided token is returned as is.
+     */
+    maybeWidened<T extends Token>(t: T): T | PackageObjectToken {
+        if (t instanceof ObjectToken && this.widened.has(t))
+            return this.a.canonicalizeToken(new PackageObjectToken(t.getPackageInfo(), t.kind));
+        else
+            return t;
+    }
 }

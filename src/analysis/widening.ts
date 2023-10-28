@@ -2,7 +2,7 @@ import Solver from "./solver";
 import {ObjectToken, PackageObjectToken, Token} from "./tokens";
 import logger from "../misc/logger";
 import {ConstraintVar, ObjectPropertyVar} from "./constraintvars";
-import {addAll, getOrSet, mapGetMap, mapGetSet} from "../misc/util";
+import {addAll, getOrSet, mapGetMap} from "../misc/util";
 import Timer from "../misc/timer";
 import {CallResultAccessPath, ComponentAccessPath, PropertyAccessPath} from "./accesspaths";
 import assert from "assert";
@@ -54,16 +54,6 @@ export function widenObjects(widened: Set<ObjectToken>, solver: Solver) {
             size += s.size;
         }
         return [res, size];
-    }
-
-    function widenTokenMapSetKeysValues(m: Map<Token, Set<Token>>): Map<Token, Set<Token>> {
-        const res: Map<Token, Set<Token>> = new Map;
-        for (const [v, qs] of m) {
-            const ws = mapGetSet(res, widenToken(v));
-            for (const q of qs)
-                ws.add(widenToken(q));
-        }
-        return res;
     }
 
     function widenTokenMapMapKeys<T extends Token, K, V>(m: Map<T, Map<K, V>>): Map<T | PackageObjectToken, Map<K, V>> {
@@ -121,13 +111,47 @@ export function widenObjects(widened: Set<ObjectToken>, solver: Solver) {
     [solver.unprocessedTokens, solver.diagnostics.unprocessedTokensSize] = widenTokenMapArrayValues(solver.unprocessedTokens);
     assert(solver.nodesWithNewEdges.size === 0);
     solver.replaceTokens(tokenMap);
-    f.ancestorListeners = widenTokenMapMapKeys(f.ancestorListeners);
-    // transfer ancestors from widened objects
-    for (const [t, pt] of tokenMap)
-        for (const anc of f.inherits.get(t) ?? [])
-            solver.addInherits(pt, anc);
-    f.inherits = widenTokenMapSetKeysValues(f.inherits);
-    f.reverseInherits = widenTokenMapSetKeysValues(f.reverseInherits);
+
+    // transfer ancestors from widened objects:
+    const inheritsCopy = new Map([...widened].map(t => [t, new Set(f.inherits.get(t) ?? [])]));
+    const revInheritsCopy = new Map([...widened].map(t => [t, new Set(f.reverseInherits.get(t) ?? [])]));
+    // clean up inheritance relation for widened tokens
+    for (const t of widened) {
+        for (const t2 of inheritsCopy.get(t)!)
+            f.reverseInherits.get(t2)!.delete(t);
+        for (const t2 of revInheritsCopy.get(t)!)
+            f.inherits.get(t2)!.delete(t);
+    }
+    for (const t of widened) {
+        f.inherits.delete(t);
+        f.reverseInherits.delete(t);
+    }
+
+    // transfer ancestor listeners
+    for (const [t, pt] of tokenMap) {
+        const listeners = f.ancestorListeners.get(t);
+        if (listeners !== undefined) {
+            f.ancestorListeners.delete(t);
+
+            for (const [n, listener] of listeners)
+                solver.addForAllAncestorsConstraint(pt, n, listener);
+        }
+    }
+
+    // trigger ancestor listeners with new inheritance relationships
+    for (const [t, pt] of tokenMap) {
+        for (const t2 of inheritsCopy.get(t)!) {
+            const t2w = widenToken(t2);
+            assert(!(t2w instanceof ObjectToken && f.widened.has(t2w)));
+            solver.addInherits(pt, t2w);
+        }
+        for (const t2 of revInheritsCopy.get(t)!) {
+            const t2w = widenToken(t2);
+            assert(!(t2w instanceof ObjectToken && f.widened.has(t2w)));
+            solver.addInherits(t2w, pt);
+        }
+    }
+
     f.objectPropertiesListeners = widenTokenMapMapKeys(f.objectPropertiesListeners);
     // transfer object properties from widened objects
     for (const [t, pt] of tokenMap) {

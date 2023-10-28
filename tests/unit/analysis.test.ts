@@ -395,5 +395,44 @@ describe("tests/unit/analysis", () => {
             expect(f.postponedListenerCalls, "Token listener should be enqueued", {showMatcherMessage: false}).
                 toContainEqual([fn, pt]);
         });
+
+        test("PackageObjectToken gets ancestor listeners", async () => {
+            const {solver, f} = setup;
+
+            const fn = jest.fn();
+            solver.addForAllAncestorsConstraint(ot, param, fn);
+
+            expect(f.postponedListenerCalls, `Ancestor listener should be enqueued with ${ot}`, {showMatcherMessage: false}).
+                toEqual([[fn, ot]]);
+            await solver.propagate();
+
+            widenObjects(new Set([ot]), solver);
+
+            expect(f.postponedListenerCalls, `Ancestor listener should be enqueued with ${pt}`, {showMatcherMessage: false}).
+                toEqual([[fn, pt]]);
+        });
+
+        test("Ancestor listener triggers for widened ancestor", async () => {
+            const {solver, a, f} = setup;
+
+            const fn = jest.fn();
+            solver.addForAllAncestorsConstraint(ot, param, fn);
+
+            expect(f.postponedListenerCalls, `Ancestor listener should be enqueued with ${ot}`, {showMatcherMessage: false}).
+                toEqual([[fn, ot]]);
+            await solver.propagate();
+
+            const anc = a.canonicalizeToken(new ObjectToken(fun0));
+            solver.addInherits(ot, anc);
+
+            expect(f.postponedListenerCalls, `Ancestor listener should be enqueued with ${anc}`, {showMatcherMessage: false}).
+                toEqual([[fn, anc]]);
+            await solver.propagate();
+
+            widenObjects(new Set([anc]), solver);
+
+            expect(f.postponedListenerCalls, `Ancestor listener should be enqueued with ${pt}`, {showMatcherMessage: false}).
+                toEqual([[fn, pt]]);
+        });
     });
 });
