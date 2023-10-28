@@ -1,10 +1,17 @@
 import {NodePath, PluginObj} from '@babel/core';
 import {TemplateBuilder} from '@babel/template';
 import {
+    addComment,
+    blockStatement,
+    ClassDeclaration,
+    ClassExpression,
+    ClassMethod,
+    classMethod,
     File,
     Identifier,
     identifier,
     isClassMethod,
+    isClassPrivateMethod,
     isClassProperty,
     isIdentifier,
     isImportSpecifier,
@@ -31,11 +38,11 @@ import {Location} from "../misc/util";
 import {ModuleInfo} from "../analysis/infos";
 
 /**
- * Replaces TypeScript "export =" and "import =" syntax.
+ * Replaces TypeScript "export =" and "import =" syntax and creates default constructors.
  * See https://babeljs.io/docs/en/babel-plugin-transform-typescript/#caveats
  * and https://www.typescriptlang.org/docs/handbook/modules.html#export--and-import--require
  */
-export function replaceTypeScriptImportExportAssignments({ template }: {template: TemplateBuilder<TSExportAssignment>}): PluginObj {
+export function replaceTypeScriptImportExportAssignmentsAndAddConstructors({ template }: {template: TemplateBuilder<TSExportAssignment>}): PluginObj {
     const moduleExportsDeclaration = template("module.exports = ASSIGNMENT;");
     const moduleImportsDeclaration = template("var ID = require(MODULE);");
     return {
@@ -54,9 +61,22 @@ export function replaceTypeScriptImportExportAssignments({ template }: {template
                     path.scope.registerDeclaration(path);
                 }
                 // TODO: handle other forms of TSImportEqualsDeclaration?
+            },
+            Class(path: NodePath<ClassExpression | ClassDeclaration>) {
+                for (const b of path.node.body.body)
+                    if ((isClassMethod(b) || isClassPrivateMethod(b)) && b.kind === "constructor")
+                        return;
+                const b = blockStatement([]);
+                const c = classMethod("constructor", identifier("constructor"), [], b);  // FIXME: call super constructor?
+                addComment(b, "inner", "JELLY_DEFAULT");
+                path.get('body').unshiftContainer('body', c);
             }
         }
     };
+}
+
+export function isDummyConstructor(c: ClassMethod): boolean {
+    return c.kind === "constructor" && c.body.innerComments?.[0].value == "JELLY_DEFAULT";
 }
 
 export const JELLY_NODE_ID = Symbol("JELLY_NODE_ID");

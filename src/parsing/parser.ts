@@ -2,7 +2,7 @@ import {File} from "@babel/types";
 import logger from "../misc/logger";
 import {transformFromAstSync} from "@babel/core";
 import {parse, ParserOptions} from "@babel/parser";
-import {replaceTypeScriptImportExportAssignments} from "./extras";
+import {replaceTypeScriptImportExportAssignmentsAndAddConstructors} from "./extras";
 import {FragmentState} from "../analysis/fragmentstate";
 
 /**
@@ -55,7 +55,7 @@ export function parseAndDesugar(str: string, file: string, f: FragmentState): Fi
     try {
         res = transformFromAstSync(originalAst, str, {
             plugins: [
-                replaceTypeScriptImportExportAssignments,
+                replaceTypeScriptImportExportAssignmentsAndAddConstructors,
                 ["@babel/plugin-transform-typescript", { onlyRemoveTypeImports: true }],
                 ["@babel/plugin-transform-template-literals", { loose: true }]
             ], // TODO: perform other transformations?

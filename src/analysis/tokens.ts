@@ -38,8 +38,10 @@ export class FunctionToken extends Token {
  *
  * PromiseResolve and PromiseReject represent the resolve and reject function arguments of promise executors,
  * using the same allocation site as the promise they belong to.
+ *
+ * Prototype represents prototype objects associated with functions.
  */
-export type ObjectKind = "Object" | "Array" | "Class" | "Map" | "Set" | "WeakMap" | "WeakSet" | "WeakRef" | "Iterator" | "RegExp" | "Date" | "Promise" | "PromiseResolve" | "PromiseReject" | "Error";
+export type ObjectKind = "Object" | "Array" | "Class" | "Map" | "Set" | "WeakMap" | "WeakSet" | "WeakRef" | "Iterator" | "RegExp" | "Date" | "Promise" | "PromiseResolve" | "PromiseReject" | "Error" | "Prototype"; // XXX: "Class" unused if options.newobj enabled
 
 /**
  * Token that represents objects with a specific allocation site.
@@ -53,7 +55,7 @@ export class AllocationSiteToken extends Token {
         super();
         assert(this instanceof ArrayToken || kind !== "Array", "AllocationSiteTokens of kind Array must be created using ArrayToken");
         assert(this instanceof ObjectToken || kind !== "Object", "AllocationSiteTokens of kind Object must be created using ObjectToken");
-        assert(this instanceof ClassToken || kind !== "Class", "AllocationSiteTokens of kind Class must be created using ClassToken");
+        assert(this instanceof PrototypeToken || kind !== "Prototype", "AllocationSiteTokens of kind Prototype must be created using PrototypeToken");
     }
 
     toString() {
@@ -78,6 +80,16 @@ export class ObjectToken extends AllocationSiteToken {
 }
 
 /**
+ * Token that represents prototype objects associated with a function.
+ */
+export class PrototypeToken extends AllocationSiteToken {
+
+    constructor(allocSite: Node) {
+        super("Prototype", allocSite);
+    }
+}
+
+/**
  * Token that represents arrays with a specific allocation site.
  */
 export class ArrayToken extends AllocationSiteToken {
@@ -90,7 +102,7 @@ export class ArrayToken extends AllocationSiteToken {
 /**
  * Token that represents classes with a specific allocation site.
  */
-export class ClassToken extends AllocationSiteToken {
+export class ClassToken extends AllocationSiteToken { // XXX: unused if options.newobj enabled
 
     constructor(allocSite: Node) {
         super("Class", allocSite);

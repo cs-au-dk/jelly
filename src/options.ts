@@ -66,7 +66,8 @@ export const options: {
     vulnerabilities: string | undefined,
     externalMatches: boolean,
     includePackages: Array<string> | undefined,
-    excludePackages: Array<string> | undefined
+    excludePackages: Array<string> | undefined,
+    newobj: boolean
 } = {
     callgraphHtml: undefined,
     dataflowHtml: undefined,
@@ -125,7 +126,8 @@ export const options: {
     vulnerabilities: undefined,
     externalMatches: false,
     includePackages: undefined,
-    excludePackages: undefined
+    excludePackages: undefined,
+    newobj: false
 };
 
 export function setOptions(opts: OptionValues & Partial<typeof options>) {

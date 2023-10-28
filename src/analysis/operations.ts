@@ -42,9 +42,16 @@ import {
     NativeObjectToken,
     ObjectToken,
     PackageObjectToken,
+    PrototypeToken,
     Token
 } from "./tokens";
-import {AccessorType, ConstraintVar, IntermediateVar, isObjectPropertyVarObj, NodeVar} from "./constraintvars";
+import {
+    AccessorType,
+    ConstraintVar,
+    IntermediateVar,
+    isObjectPropertyVarObj,
+    NodeVar
+} from "./constraintvars";
 import {
     CallResultAccessPath,
     IgnoredAccessPath,
@@ -225,11 +232,31 @@ export class Operations {
                 // TODO: if caller is MemberExpression with property 'apply', 'call' or 'bind', treat as call to the native function of that name (relevant for lodash/atomizer TAPIR benchmark)
             }
 
-            // if 'new' and function...
-            if (isNew && (t instanceof FunctionToken || t instanceof ClassToken)) {
+            if (options.newobj) {
+                // if 'new' and function...
+                if (isNew && t instanceof FunctionToken) {
 
-                // constraint: t ∈ ⟦new E0(E1,...,En)⟧ where t is the current PackageObjectToken
-                this.solver.addTokenConstraint(this.packageObjectToken, resultVar); // TODO: use allocation-site abstraction for 'new'?
+                    // constraint: q ∈ ⟦new E0(E1,...,En)⟧ where q is the instance object
+                    const q = this.newObjectToken(t.fun);
+                    this.solver.addTokenConstraint(q, resultVar);
+
+                    // ... q ∈ ⟦this_f⟧
+                    this.solver.addTokenConstraint(q, this.solver.varProducer.thisVar(t.fun));
+
+                    // constraint: ∀ objects p ∈ ⟦t.prototype⟧: p ∈ ⟦q.[[Prototype]]⟧
+                    this.solver.addForAllTokensConstraint(this.solver.varProducer.objPropVar(t, "prototype"), TokenListener.INTERNAL_PROTO, q, (p: Token) => {
+                        if (isObjectPropertyVarObj(p)) // TODO: ignoring inheritance from access path tokens
+                            this.solver.addInherits(q, p);
+                    });
+                }
+            } else {
+
+                // if 'new' and function...
+                if (isNew && (t instanceof FunctionToken || t instanceof ClassToken)) {
+
+                    // constraint: t ∈ ⟦new E0(E1,...,En)⟧ where t is the current PackageObjectToken
+                    this.solver.addTokenConstraint(this.packageObjectToken, resultVar); // TODO: use allocation-site abstraction for 'new'?
+                }
             }
         });
 
@@ -370,11 +397,14 @@ export class Operations {
                     }
                 });
 
-                if ((t instanceof FunctionToken || t instanceof ClassToken) && prop === "prototype") { // FIXME: also model reads from "__proto__"
+                // TODO: also model reads from "__proto__"
 
-                    // constraint: ... p="prototype" ∧ t is a function or class ⇒ k ∈ ⟦E.p⟧ where k represents the package
-                    if (dst)
-                        this.solver.addTokenConstraint(this.packageObjectToken, dst); // FIXME: use special prototype objects instead of PackageObjectToken!
+                if (!options.newobj) {
+                    if ((t instanceof FunctionToken || t instanceof ClassToken) && prop === "prototype") {
+                        // constraint: ... p="prototype" ∧ t is a function or class ⇒ k ∈ ⟦E.p⟧ where k represents the package
+                        if (dst)
+                            this.solver.addTokenConstraint(this.packageObjectToken, dst);
+                    }
                 }
             });
 
@@ -748,6 +778,15 @@ export class Operations {
     }
 
     /**
+     * Creates a new PrototypeToken that inherits from Function.prototype.
+     */
+    newPrototypeToken(fun: Function): PrototypeToken {
+        const t = this.a.canonicalizeToken(new PrototypeToken(fun));
+        this.solver.addInherits(t, this.globalSpecialNatives.get(FUNCTION_PROTOTYPE)!);
+        return t;
+    }
+
+    /**
      * Creates a new ArrayToken that inherits from Array.prototype.
      */
     newArrayToken(n: Node): ArrayToken {
@@ -759,7 +798,7 @@ export class Operations {
     /**
      * Creates a new ClassToken that inherits from Function.prototype.
      */
-    newClassToken(n: Node): ClassToken {
+    newClassToken(n: Node): ClassToken { // XXX: unused if options.newobj enabled
         const t = this.a.canonicalizeToken(new ClassToken(n));
         this.solver.addInherits(t, this.globalSpecialNatives.get(FUNCTION_PROTOTYPE)!);
         return t;
