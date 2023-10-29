@@ -4,6 +4,17 @@ import {ModuleInfo} from "../analysis/infos";
 import {CallGraph} from "../typings/callgraph";
 import logger from "./logger";
 
+export type SimpleLocation = {
+    start: {
+        line: number;
+        column: number;
+    };
+    end: {
+        line: number;
+        column: number;
+    };
+};
+
 /**
  * Source location with extra information.
  * 'module' is set if the location belongs to a specific module, and undefined for globals.
@@ -11,7 +22,12 @@ import logger from "./logger";
  * 'nodeIndex' is set by AST preprocessing at nodes with missing source location (see locationToString).
  * 'unbound' is set to true if this is a location for an artificially declared unbound identifier.
  */
-export type Location = SourceLocation & {module?: ModuleInfo, native?: string, nodeIndex?: number, unbound?: boolean};
+export type Location = SimpleLocation & {
+    module?: ModuleInfo;
+    native?: string;
+    nodeIndex?: number;
+    unbound?: boolean;
+};
 
 export type LocationJSON = string; // format: "<file index>:<start line>:<start column>:<end line>:<end column>"
 
@@ -102,7 +118,7 @@ export function locationContains(loc: Location | null | undefined, file: string,
 /**
  * Checks whether the first source location is within the second source location.
  */
-export function locationIn(loc1: SourceLocation, loc2: SourceLocation | undefined | null): boolean {
+export function locationIn(loc1: SimpleLocation, loc2: SimpleLocation | undefined | null): boolean {
     if (!loc2)
         return false;
     let start = loc2.start.line < loc1.start.line ||
@@ -328,7 +344,7 @@ export class SourceLocationsToJSON {
         return `${this.getFileIndex(loc.module ? loc.module.getPath() : loc.filename)}:${loc.start.line}:${loc.start.column + 1}:${loc.end.line}:${loc.end.column + 1}`;
     }
 
-    parseLocationJSON(loc: LocationJSON): { loc?: SourceLocation, fileIndex: number, file: string } {
+    parseLocationJSON(loc: LocationJSON): { loc?: SimpleLocation, fileIndex: number, file: string } {
         const [_, _fileIndex, startLine, startCol, endLine, endCol] = /^(\d+):(\d+|\?):(\d+|\?):(\d+|\?):(\d+|\?)/.exec(loc)!;
         const fileIndex = Number(_fileIndex);
         assert(fileIndex < this.files.length);
@@ -354,14 +370,14 @@ export class SourceLocationsToJSON {
 
 /*
  * Computes a mapping from calls to the function they are contained in.
- * The time complexity is linearithmic in the number of functions and calls.
+ * The time complexity is linear in the number of functions and calls.
  */
 export function mapCallsToFunctions(cg: CallGraph): Map<number, number> {
     const parser = new SourceLocationsToJSON(cg.files);
     const ret = new Map();
 
-    type SourceLocationWithIndex = SourceLocation & { index: number };
-    const byFile: Array<{ functions: SourceLocationWithIndex[], calls: SourceLocationWithIndex[] }> =
+    type LocationWithIndex = SimpleLocation & { index: number };
+    const byFile: Array<{ functions: LocationWithIndex[], calls: LocationWithIndex[] }> =
         Array.from(cg.files, () => ({ functions: [], calls: [] }));
 
     // group functions and calls by file
@@ -380,7 +396,7 @@ export function mapCallsToFunctions(cg: CallGraph): Map<number, number> {
 
     // orders source locations primarily in ascending order by start location
     // ties are broken first by descending order of end locations and then index.
-    function compareSL(a: SourceLocationWithIndex, b: SourceLocationWithIndex): number {
+    function compareSL(a: LocationWithIndex, b: LocationWithIndex): number {
         return compareLC(a.start, b.start) || -compareLC(a.end, b.end) || a.index - b.index;
     }
 

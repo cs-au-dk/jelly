@@ -1,5 +1,5 @@
 import logger from "../misc/logger";
-import {mapGetSet, locationToStringWithFileAndEnd, Location} from "../misc/util";
+import {mapGetSet, locationToStringWithFileAndEnd, Location, SimpleLocation} from "../misc/util";
 import {
     AbbreviatedPathPattern,
     AccessPathPattern,
@@ -8,7 +8,7 @@ import {
     ImportAccessPathPattern,
     PropertyAccessPathPattern
 } from "./patterns";
-import {isCallExpression, isNewExpression, isOptionalCallExpression, Node, SourceLocation} from "@babel/types";
+import {isCallExpression, isNewExpression, isOptionalCallExpression, Node} from "@babel/types";
 import {AccessPathPatternCanonicalizer} from "./patternparser";
 import {AccessPath} from "../analysis/accesspaths";
 import {FragmentState} from "../analysis/fragmentstate";
@@ -18,7 +18,7 @@ export type PatternType = "import" | "read" | "write" | "call" | "component";
 export type AccessPathPatternToNodes = Record<PatternType, Map<AccessPathPattern, Set<Node>>>;
 export type NodeToAccessPathPatterns = Record<PatternType, Map<Node, Set<AccessPathPattern>>>;
 export type AccessPathString = string;
-export type AccessPathPatternToLocations = Record<PatternType, Record<AccessPathString, Array<SourceLocation & {filename: string}>>>;
+export type AccessPathPatternToLocations = Record<PatternType, Record<AccessPathString, Array<SimpleLocation & {filename: string}>>>;
 
 /**
  * Finds the usage of the API of external modules.
@@ -167,9 +167,9 @@ export function reportAPIUsage(r1: AccessPathPatternToNodes, r2: NodeToAccessPat
 export function convertAPIUsageToJSON(r: AccessPathPatternToNodes): AccessPathPatternToLocations {
     const res: AccessPathPatternToLocations = {import: {}, read: {}, write: {}, call: {}, component: {}};
     for (const type of Object.getOwnPropertyNames(r) as Array<PatternType>) {
-        const t: Record<AccessPathString, Array<SourceLocation & {filename: string}>> = {};
+        const t: Record<AccessPathString, Array<SimpleLocation & {filename: string}>> = {};
         for (const [p, nodes] of r[type]) {
-            const a: Array<SourceLocation & {filename: string}> = [];
+            const a: Array<SimpleLocation & {filename: string}> = [];
             for (const n of nodes)
                 if (n.loc) {
                     const loc = n.loc as Location;

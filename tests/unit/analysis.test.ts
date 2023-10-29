@@ -1,5 +1,5 @@
 import assert from "assert";
-import {Node, blockStatement, functionExpression, identifier, traverse} from "@babel/types";
+import {Node, blockStatement, functionExpression, identifier, traverse, SourceLocation} from "@babel/types";
 import {UnknownAccessPath} from "../../src/analysis/accesspaths";
 import {ConstraintVar, IntermediateVar, ObjectPropertyVar} from "../../src/analysis/constraintvars";
 import {findEscapingObjects} from "../../src/analysis/escaping";
@@ -8,7 +8,6 @@ import Solver from "../../src/analysis/solver";
 import {AccessPathToken, FunctionToken, NativeObjectToken, ObjectToken, PackageObjectToken} from "../../src/analysis/tokens";
 import {options, resetOptions} from "../../src/options";
 import {JELLY_NODE_ID} from "../../src/parsing/extras";
-import {Location} from "../../src/misc/util";
 import {TokenListener} from "../../src/analysis/listeners";
 import {widenObjects} from "../../src/analysis/widening";
 
@@ -27,11 +26,11 @@ describe("tests/unit/analysis", () => {
         traverse(n, {
             enter(node: Node) {
                 (node as any)[JELLY_NODE_ID] ??= ++nextNodeID;
-                node.loc ??= <Location>{
+                node.loc ??= {
                     start: {line: nextNodeID, column: ++nextNodeID},
                     end: {line: nextNodeID, column: ++nextNodeID},
                     module: m,
-                };
+                } as unknown as SourceLocation;
             },
         });
         return n;

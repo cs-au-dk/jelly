@@ -1,4 +1,4 @@
-import {CallExpression, identifier, Identifier, NewExpression, OptionalCallExpression} from "@babel/types";
+import {CallExpression, identifier, Identifier, NewExpression, OptionalCallExpression, SourceLocation} from "@babel/types";
 import Solver from "../analysis/solver";
 import {NativeObjectToken} from "../analysis/tokens";
 import {ModuleInfo} from "../analysis/infos";
@@ -95,7 +95,7 @@ export function buildNatives(solver: Solver, moduleInfo: ModuleInfo): {globals: 
                 let id = solver.globalState.canonicalGlobals.get(name);
                 if (!id) {
                     id = identifier(name);
-                    id.loc = moduleSpecific ? moduleLoc : globalLoc;
+                    id.loc = (moduleSpecific ? moduleLoc : globalLoc) as SourceLocation; // ignoring filename, identifierName, start.index, end.index
                     if (!moduleSpecific)
                         solver.globalState.canonicalGlobals.set(name, id);
                 }

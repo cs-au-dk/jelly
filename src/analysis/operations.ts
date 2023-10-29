@@ -22,6 +22,7 @@ import {
     JSXNamespacedName,
     LVal,
     Node,
+    OptionalMemberExpression,
     ParenthesizedExpression
 } from "@babel/types";
 import {NodePath} from "@babel/traverse";
@@ -595,10 +596,10 @@ export class Operations {
     /**
      * Models an assignment from a constraint variable to an l-value.
      */
-    assign(src: ConstraintVar | undefined, dst: LVal | ParenthesizedExpression, path: NodePath) {
+    assign(src: ConstraintVar | undefined, dst: LVal | ParenthesizedExpression | OptionalMemberExpression, path: NodePath) {
         const vp = this.solver.varProducer; // (don't use in callbacks)
         while (isParenthesizedExpression(dst))
-            dst = dst.expression as LVal | ParenthesizedExpression; // for parenthesized expressions, use the inner expression (the definition of LVal in @babel/types misses ParenthesizedExpression)
+            dst = dst.expression as LVal | ParenthesizedExpression | OptionalMemberExpression; // for parenthesized expressions, use the inner expression (the definition of LVal in @babel/types misses ParenthesizedExpression)
         if (isIdentifier(dst)) {
 
             // X = E

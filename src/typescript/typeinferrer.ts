@@ -1,6 +1,5 @@
 import * as ts from 'typescript';
 import {SymbolFlags, TypeFlags} from 'typescript';
-import {SourceLocation} from "@babel/types";
 import logger, {writeStdOutIfActive} from "../misc/logger";
 import {
     FilePath,
@@ -8,7 +7,8 @@ import {
     LocationJSON,
     mapArrayAdd,
     SourceLocationsToJSON,
-    locationToStringWithFileAndEnd
+    locationToStringWithFileAndEnd,
+    SimpleLocation
 } from "../misc/util";
 import {dirname, resolve} from "path";
 import Timer from "../misc/timer";
@@ -19,7 +19,7 @@ import {options} from "../options";
 /**
  * Map from package name to locations of TypeScript AST nodes with a type from that package.
  */
-export type LibraryUsage = Map<string, Array<[SourceLocation & {filename: string}, ts.Type]>>;
+export type LibraryUsage = Map<string, Array<[SimpleLocation & {filename: string}, ts.Type]>>;
 
 export type LibraryUsageJSON = {
     files: Array<FilePath>,
@@ -84,7 +84,7 @@ export class TypeScriptTypeInferrer {
     /**
      * Returns the TypeScript type for the given TypeScript node, or undefined if not found.
      */
-    getTypeAtTSNode(node: ts.Node, loc: SourceLocation | string): ts.Type | undefined {
+    getTypeAtTSNode(node: ts.Node, loc: SimpleLocation | string): ts.Type | undefined {
         try {
             return this.checker.getTypeAtLocation(node);
         } catch (e) {
@@ -96,7 +96,7 @@ export class TypeScriptTypeInferrer {
     /**
      * Returns the TypeScript type for the given location (with filename), or undefined if not found.
      */
-    getType(loc: Location | SourceLocation): ts.Type | undefined {
+    getType(loc: Location | SimpleLocation): ts.Type | undefined {
         const file = "module" in loc && this.files.get(loc.module!.getPath());
         if (!file)
             return undefined;

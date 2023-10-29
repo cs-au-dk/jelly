@@ -33,6 +33,7 @@ import {
     Program,
     restElement,
     RestElement,
+    SourceLocation,
     spreadElement,
     super as _super,
     TSExportAssignment,
@@ -157,7 +158,7 @@ export function preprocessAst(ast: File, file: string, module: ModuleInfo, globa
                     assert(p.parentPath);
                     p = p.parentPath;
                 }
-                n.loc = {start: p?.node.loc?.start, end: p?.node.loc?.end, nodeIndex: (n as any)[JELLY_NODE_ID]} as Location; // see locationToString
+                n.loc = {start: p?.node.loc?.start, end: p?.node.loc?.end, nodeIndex: (n as any)[JELLY_NODE_ID]} as unknown as SourceLocation; // see locationToString
             }
 
             // set module (if not already set and not native)

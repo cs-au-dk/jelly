@@ -1,9 +1,8 @@
 import {readFileSync} from "fs";
 import {CallGraph} from "../typings/callgraph";
-import {LocationJSON, SourceLocationsToJSON, mapArrayAdd, mapCallsToFunctions, mapGetSet, percent} from "../misc/util";
+import {LocationJSON, SourceLocationsToJSON, mapArrayAdd, mapCallsToFunctions, mapGetSet, percent, SimpleLocation} from "../misc/util";
 import logger from "../misc/logger";
 import assert from "assert";
-import {SourceLocation} from "@babel/types";
 
 function compareStringArrays(as1: Array<string>, as2: Array<string>, file1: string, file2: string, kind: string): Set<string> {
     const s = new Set<string>(as2);
@@ -145,7 +144,7 @@ function computeReachableFunctions(file2: string, cg1: CallGraph, cg2: CallGraph
     const parser = new SourceLocationsToJSON(cg2.files);
     // find the module entry function for each file by looking for functions
     // that begin at position 1:1 and span the longest
-    const fileToModuleIndex: Array<{ index: number, loc: SourceLocation } | undefined> = new Array(cg2.files.length);
+    const fileToModuleIndex: Array<{ index: number, loc: SimpleLocation } | undefined> = new Array(cg2.files.length);
     const replocToIndex = new Map<string, number>();
     for (const [i, floc] of Object.entries(cg2.functions)) {
         replocToIndex.set(loc(floc, cg2, "Function").str, Number(i));
