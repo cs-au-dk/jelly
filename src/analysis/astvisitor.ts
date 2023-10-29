@@ -29,6 +29,7 @@ import {
     isArrowFunctionExpression,
     isAssignmentExpression,
     isAssignmentPattern,
+    isCallExpression,
     isClassAccessorProperty,
     isClassDeclaration,
     isClassExpression,
@@ -110,6 +111,7 @@ import {
 import {
     ASYNC_GENERATOR_PROTOTYPE_NEXT,
     GENERATOR_PROTOTYPE_NEXT,
+    INTERNAL_PROTOTYPE,
     PROMISE_FULFILLED_VALUES
 } from "../natives/ecmascript";
 import {Operations} from "./operations";
@@ -149,9 +151,9 @@ export function visit(ast: File, op: Operations) {
                         solver.addSubsetConstraint(vp.thisVar(encl.node), vp.nodeVar(path.node));
 
                     } else {
-                        const cl = encl.parentPath?.parentPath?.node as Class;
-                        assert(cl);
-                        const constr = class2constructor.get(cl);
+                        const cls = encl.parentPath?.parentPath?.node as Class;
+                        assert(cls);
+                        const constr = class2constructor.get(cls);
                         assert(constr);
 
                         if (isStaticBlock(encl.node) || ((isClassProperty(encl.node) || isClassPrivateProperty(encl.node)) && encl.node.static))
@@ -185,9 +187,39 @@ export function visit(ast: File, op: Operations) {
 
             // FIXME: the 'this' value in the computed static field names is the 'this' surrounding the class definition
 
-            // XXX: remove?
             // constraint: @Unknown ∈ ⟦this⟧
             solver.addAccessPath(UnknownAccessPath.instance, vp.nodeVar(path.node)); // TODO: omit this constraint in certain situations?
+        },
+
+        Super(path: NodePath<Super>) {
+
+            // super
+            const encl = path.findParent((p: NodePath) =>
+                isObjectMethod(p.node) || isClassMethod(p.node) || isClassPrivateMethod(p.node) ||
+                isStaticBlock(p.node) || isClassProperty(p.node) || isClassPrivateProperty(p.node)) as
+                NodePath<ObjectMethod | ClassMethod | ClassPrivateMethod | StaticBlock | ClassProperty | ClassPrivateProperty> | null;
+            assert(encl);
+            let src;
+            if (isObjectMethod(encl.node)) { // in object expression
+                // super ~ this.[[Prototype]]
+                src = op.newObjectToken(encl.parent);
+            } else {
+                const cls = getClass(path);
+                assert(cls);
+                const constr = class2constructor.get(cls);
+                assert(constr);
+                if (isCallExpression(path.parent) ||
+                    isStaticBlock(encl.node) ||
+                    ((isClassMethod(encl.node) || isClassPrivateMethod(encl.node) || isClassProperty(encl.node) || isClassPrivateProperty(encl.node)) &&
+                        encl.node.static)) { // in super-constructor call, static method, static field initializer or static block
+                    // super ~ ct.[[Prototype]] where ct is the constructor of the enclosing class
+                    src = op.newFunctionToken(constr);
+                } else { // in constructor or non-static method
+                    // super ~ pt.[[Prototype]] where pt is the prototype object of the constructor of the enclosing class
+                    src = op.newPrototypeToken(constr);
+                }
+            }
+            solver.addSubsetConstraint(vp.objPropVar(src, INTERNAL_PROTOTYPE), vp.nodeVar(path.node));
         },
 
         Identifier(path: NodePath<Identifier>) {
@@ -448,7 +480,7 @@ export function visit(ast: File, op: Operations) {
             }
         },
 
-        Property: { // ObjectProperty | ClassProperty | ClassAccessorProperty | ClassPrivateProperty
+        Property: {
             exit(path: NodePath<ObjectProperty | ClassProperty | ClassAccessorProperty | ClassPrivateProperty>) {
                 if (isPattern(path.parent))
                     return; // pattern properties are handled at assign
@@ -517,7 +549,7 @@ export function visit(ast: File, op: Operations) {
             },
         },
 
-        Method: { // ObjectMethod | ClassMethod | ClassPrivateMethod
+        Method: {
             exit(path: NodePath<ObjectMethod | ClassMethod | ClassPrivateMethod>) {
                 switch (path.node.kind) {
                     case "method":
@@ -603,21 +635,23 @@ export function visit(ast: File, op: Operations) {
             }
         },
 
-        Class(path: NodePath<ClassExpression | ClassDeclaration>) { // ClassExpression | ClassDeclaration
+        Class(path: NodePath<ClassExpression | ClassDeclaration>) {
+
+            let constructor: ClassMethod | undefined;
+            for (const b of path.node.body.body)
+                if (isClassMethod(b) && b.kind === "constructor") {
+                    constructor = b;
+                    break;
+                }
+            assert(constructor); // see extras.ts
+            class2constructor.set(path.node, constructor);
+
+            const exported = isExportDeclaration(path.parent);
 
             if (options.newobj) {
 
-                let constructor: ClassMethod | undefined;
-                for (const b of path.node.body.body)
-                    if (isClassMethod(b) && b.kind === "constructor") {
-                        constructor = b;
-                        break;
-                    }
-                assert(constructor); // see extras.ts
-                class2constructor.set(path.node, constructor);
                 const ct = op.newFunctionToken(constructor);
 
-                const exported = isExportDeclaration(path.parent);
                 if (isClassExpression(path.node) || exported) {
 
                     // class ... {...}
@@ -636,11 +670,8 @@ export function visit(ast: File, op: Operations) {
                 if (path.node.superClass) {
 
                     // class C extends E {...}
-                    // constraint: ⟦E⟧ ⊆ ⟦extends_c⟧ where c is the class
-                    const eVar = op.expVar(path.node.superClass, path);
-                    solver.addSubsetConstraint(eVar, vp.extendsVar(path.node));
-
                     // constraint: ∀ functions w ∈ ⟦E⟧: ...
+                    const eVar = op.expVar(path.node.superClass, path);
                     solver.addForAllTokensConstraint(eVar, TokenListener.EXTENDS, path.node, (w: Token) => {
 
                         // ... w ∈ ⟦ct.[[Prototype]]⟧ (allows inheritance of static properties)
@@ -667,20 +698,8 @@ export function visit(ast: File, op: Operations) {
                         }
                     });
                 }
+
             } else {
-
-                if (path.node.superClass) {
-
-                    // class C extends E {...}
-                    // constraint: ⟦E⟧ ⊆ ⟦extends_c⟧ where c is the class
-                    solver.addSubsetConstraint(op.expVar(path.node.superClass, path), vp.extendsVar(path.node)); // TODO: test class inheritance (see C11 in classes.js)
-                }
-
-                let constructor: ClassMethod | ClassPrivateMethod | undefined;
-                for (const b of path.node.body.body)
-                    if ((isClassMethod(b) || isClassPrivateMethod(b)) && b.kind === "constructor")
-                        constructor = b;
-                const exported = isExportDeclaration(path.parent);
                 if (constructor) {
                     if (isClassExpression(path.node) || exported) {
 
@@ -752,10 +771,6 @@ export function visit(ast: File, op: Operations) {
 
         CatchClause: {
             // TODO: CatchClause
-        },
-
-        Super(path: NodePath<Super>) {
-            f.warnUnsupported(path.node); // TODO: super
         },
 
         ImportDeclaration(path: NodePath<ImportDeclaration>) {

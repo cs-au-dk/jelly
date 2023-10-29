@@ -1,5 +1,4 @@
 import {
-    Class,
     Expression,
     Function,
     Identifier,
@@ -12,7 +11,6 @@ import {
     isNumericLiteral,
     isParenthesizedExpression,
     isStringLiteral,
-    isSuper,
     isUnaryExpression,
     isUpdateExpression,
     JSXIdentifier,
@@ -24,7 +22,6 @@ import {NodePath} from "@babel/traverse";
 import {
     AccessorType,
     ArgumentsVar,
-    ClassExtendsVar,
     ConstraintVar,
     FunctionReturnVar,
     IntermediateVar,
@@ -37,7 +34,6 @@ import {ArrayToken, ObjectToken, PackageObjectToken} from "./tokens";
 import {FilePath, Location} from "../misc/util";
 import {PackageInfo} from "./infos";
 import {GlobalState} from "./globalstate";
-import {getClass} from "../misc/asthelpers";
 import {FragmentState, MergeRepresentativeVar, RepresentativeVar} from "./fragmentstate";
 import assert from "assert";
 import Solver from "./solver";
@@ -74,14 +70,6 @@ export class ConstraintVarProducer<RVT extends RepresentativeVar | MergeRepresen
             isStringLiteral(exp) || // note: currently skipping string literals
             isUnaryExpression(exp) || isBinaryExpression(exp) || isUpdateExpression(exp))
             return undefined; // those expressions never evaluate to functions or objects and can safely be skipped
-        else if (isSuper(exp)) {
-            const cl = getClass(path);
-            if (!cl) {
-                this.f.warnUnsupported(exp, "Ignoring super in object expression"); // TODO: object expressions may have prototypes, e.g. __proto__
-                return undefined;
-            }
-            return this.extendsVar(cl);
-        }
         return this.nodeVar(exp); // other expressions are already canonical
     }
 
@@ -144,13 +132,6 @@ export class ConstraintVarProducer<RVT extends RepresentativeVar | MergeRepresen
      */
     returnVar(fun: Function): FunctionReturnVar {
         return this.a.canonicalizeVar(new FunctionReturnVar(fun));
-    }
-
-    /**
-     * Finds the constraint variable representing the super-class of the given class.
-     */
-    extendsVar(cl: Class): ClassExtendsVar {
-        return this.a.canonicalizeVar(new ClassExtendsVar(cl));
     }
 
     /**

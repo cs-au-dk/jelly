@@ -405,8 +405,6 @@ export class Operations {
                     }
                 });
 
-                // TODO: model reads from "__proto__"
-
                 if (!options.newobj) {
                     if ((t instanceof FunctionToken || t instanceof ClassToken) && prop === "prototype") {
                         // constraint: ... p="prototype" ∧ t is a function or class ⇒ k ∈ ⟦E.p⟧ where k represents the package
@@ -475,7 +473,6 @@ export class Operations {
         };
 
         if (isObjectPropertyVarObj(base)) {
-            // TODO: model writes to "__proto__"
 
             // constraint: ...: ⟦E2⟧ ⊆ ⟦base.p⟧
             if (src)

@@ -1,13 +1,4 @@
-import {
-    ArgumentsVar,
-    ClassExtendsVar,
-    ConstraintVar,
-    FunctionReturnVar,
-    IntermediateVar,
-    NodeVar,
-    ObjectPropertyVar,
-    ThisVar
-} from "../analysis/constraintvars";
+import {ArgumentsVar, ConstraintVar, FunctionReturnVar, IntermediateVar, NodeVar, ObjectPropertyVar, ThisVar} from "../analysis/constraintvars";
 import {codeFromLocation} from "../misc/files";
 import {SourceLocation} from "@babel/types";
 import {AllocationSiteToken, FunctionToken, Token} from "../analysis/tokens";
@@ -46,8 +37,6 @@ export function constraintVarToStringWithCode(v: ConstraintVar): string {
         return `${v.toString()}${codeFromLocation(getTokenLocation(v.obj)) === "-" ? "" : ` (Object is "${codeFromLocation(getTokenLocation(v.obj))}")`}`;
     else if (v instanceof ArgumentsVar || v instanceof FunctionReturnVar || v instanceof ThisVar)
         return `${v.toString()}${codeFromLocation(v.fun.loc) === "-" ? "" : ` (Function is "${codeFromLocation(v.fun.loc)}")`}`;
-    else if (v instanceof ClassExtendsVar)
-        return `${v.toString()}${codeFromLocation(v.cl.loc) === "-" ? "" : ` (Class is "${codeFromLocation(v.cl.loc)}")`}`;
     else
         return v.toString();
 }

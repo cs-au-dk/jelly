@@ -1,4 +1,4 @@
-import {Class, Function, isIdentifier, Node} from "@babel/types";
+import {Function, isIdentifier, Node} from "@babel/types";
 import {nodeToString, locationToStringWithFileAndEnd} from "../misc/util";
 import {
     AccessPathToken,
@@ -154,24 +154,6 @@ export class ArgumentsVar extends ConstraintVar {
 
     getParent(): Node {
         return this.fun;
-    }
-}
-
-/**
- * A constraint variable for the super-class of a class.
- */
-export class ClassExtendsVar extends ConstraintVar {
-
-    constructor(readonly cl: Class) {
-        super();
-    }
-
-    toString() {
-        return `Extends[${locationToStringWithFileAndEnd(this.cl.loc, true)}]`
-    }
-
-    getParent(): Node {
-        return this.cl;
     }
 }
 

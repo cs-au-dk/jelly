@@ -616,6 +616,18 @@ describe("tests/micro", () => {
         reachableTotal: 2,
     });
 
+    runTest("tests/micro", "super.js", {
+        options: {newobj: true},
+        soundness: "tests/micro/super.json",
+        functionInfos: 11,
+        moduleInfos: 1,
+        numberOfFunctionToFunctionEdges: 14,
+        oneCalleeCalls: 11,
+        funFound: 11,
+        callFound: 12,
+        reachableFound: 12,
+    });
+
     runTest("tests/micro", "match1.js", {
         options: {ignoreDependencies: true},
         patterns: ["tests/micro/match1-patterns.json"],
