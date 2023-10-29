@@ -1198,6 +1198,9 @@ export const ecmascriptModels: NativeModel = {
                     }
                 },
                 {
+                    name: "hasOwn"
+                },
+                {
                     name: "is"
                 },
                 {
