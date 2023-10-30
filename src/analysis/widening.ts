@@ -126,7 +126,7 @@ export function widenObjects(widened: Set<ObjectToken>, solver: Solver) {
     }
 
     // transfer token (ancestor) listeners on ancestor variables (that have widened tokens as keys)
-    // (we could do this in redirect, but maybe it's overkill?)
+    // (we could do this in redirect?)
     // this de-duplicates ancestor listeners on widened objects
     for (const [t, pt] of tokenMap) {
         const av = f.getRepresentative(a.canonicalizeVar(new AncestorsVar(t)));

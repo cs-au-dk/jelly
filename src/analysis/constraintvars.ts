@@ -24,8 +24,6 @@ function getTokenParent(obj: Token): Node | PackageInfo | ModuleInfo | undefined
     else if (obj instanceof PackageObjectToken)
         return obj.packageInfo;
     else {
-        // ???
-        // obj satisfies AccessPathToken;
         assert(obj instanceof AccessPathToken);
         return undefined;
     }
@@ -113,7 +111,9 @@ export class ObjectPropertyVar extends ConstraintVar {
         return `${this.accessor === "get" ? "(get)" : this.accessor === "set" ? "(set)" : ""}${this.obj}.${this.prop}`;
     }
 
-    getParent() { return getTokenParent(this.obj); }
+    getParent() {
+        return getTokenParent(this.obj);
+    }
 }
 
 /**
@@ -209,7 +209,9 @@ export class IntermediateVar extends ConstraintVar {
     }
 }
 
-
+/**
+ * A constraint variable for the ancestors in the prototype chain of a token.
+ */
 export class AncestorsVar extends ConstraintVar {
 
     constructor(readonly t: Token) {
@@ -220,5 +222,7 @@ export class AncestorsVar extends ConstraintVar {
         return `Ancestors(${this.t})`;
     }
 
-    getParent() { return getTokenParent(this.t); }
+    getParent() {
+        return getTokenParent(this.t);
+    }
 }

@@ -253,7 +253,7 @@ export class Operations {
                     // ... q ∈ ⟦this_f⟧
                     this.solver.addTokenConstraint(q, this.solver.varProducer.thisVar(t.fun));
 
-                    // constraint: ∀ objects p ∈ ⟦t.prototype⟧: p ∈ ⟦q.[[Prototype]]⟧
+                    // constraint: ⟦t.prototype⟧ ⊆ ⟦q.[[Prototype]]⟧
                     this.solver.addInherits(q, this.solver.varProducer.objPropVar(t, "prototype"));
                 }
             } else {

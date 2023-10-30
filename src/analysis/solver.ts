@@ -282,7 +282,6 @@ export default class Solver {
         if (x) {
             if (x[0] !== keys[0] || x[1] !== keys[1])
                 logger.error("Error: Hash collision in getListenerID"); // TODO: hash collision possible
-
         } else
             this.listeners.set(id, keys);
     }
@@ -579,10 +578,11 @@ export default class Solver {
         if (!m.has(id)) {
             const ps = f.objectProperties.get(t);
             if (ps)
-                for (const p of ps) if (!isInternalProperty(p)) {
-                    this.enqueueListenerCall([listener, p]);
-                    this.diagnostics.objectPropertiesListenerNotifications++;
-                }
+                for (const p of ps)
+                    if (!isInternalProperty(p)) {
+                        this.enqueueListenerCall([listener, p]);
+                        this.diagnostics.objectPropertiesListenerNotifications++;
+                    }
             return m;
         } else
             return false;

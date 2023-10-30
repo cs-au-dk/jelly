@@ -56,7 +56,8 @@ export const GENERATOR_PROTOTYPE_NEXT = "Generator.prototype.next";
 export const ASYNC_GENERATOR_PROTOTYPE_NEXT = "AsyncGenerator.prototype.next";
 export const PROMISE_PROTOTYPE = "Promise.prototype";
 
-export const INTERNAL_PROTOTYPE = "%[[Prototype]]"; // TODO: change to __proto__
+export const INTERNAL_PROTOTYPE = "__proto__";
+
 export const ARRAY_UNKNOWN = "%ARRAY_UNKNOWN";
 export const ARRAY_ALL = "%ARRAY_ALL";
 export const MAP_KEYS = "%MAP_KEYS";
@@ -72,8 +73,7 @@ export const PROMISE_REJECTED_VALUES = "%PROMISE_REJECTED_VALUES";
  * (As opposed to property names that arise from source code, the ECMAScript specification, or NodeJS.)
  */
 export function isInternalProperty(prop: string): boolean {
-    // TODO: return prop.startsWith("%") ?
-    return prop === INTERNAL_PROTOTYPE || prop === ARRAY_ALL;
+    return prop === ARRAY_ALL; // TODO: return prop.startsWith("%") ?
 }
 
 /*

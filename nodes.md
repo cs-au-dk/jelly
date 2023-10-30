@@ -85,7 +85,7 @@ https://github.com/babel/babel/blob/master/packages/babel-parser/ast/spec.md
   - [X] ClassPrivateProperty
   - [X] ClassProperty
   - [X] StaticBlock
-- [ ] Super (https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/super)
+- [X] Super
 
 ### Patterns, rest, spread
 

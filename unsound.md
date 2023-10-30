@@ -7,9 +7,6 @@
 - dynamic require/import
 
 
-- prototype inheritance, super, extends (partly modeled...)
-
-
 - ECMAScript standard library
   - Function.prototype.{apply,call,bind} (partly modeled...)
   - Object.{defineProperty, defineProperties, ...} (partly modeled...)

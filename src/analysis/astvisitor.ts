@@ -682,7 +682,7 @@ export function visit(ast: File, op: Operations) {
 
                             if (w instanceof FunctionToken) {
 
-                                // ... ∀ objects p ∈ ⟦w.prototype⟧: p ∈ ⟦ct.prototype.[[Prototype]]⟧ (allows inheritance of instance properties)
+                                // ... ⟦w.prototype⟧ ⊆ ⟦ct.prototype.[[Prototype]]⟧ (allows inheritance of instance properties)
                                 solver.addInherits(pt, solver.varProducer.objPropVar(w, "prototype"));
 
                                 // ... ⟦this_ct⟧ ⊆ ⟦this_w⟧
