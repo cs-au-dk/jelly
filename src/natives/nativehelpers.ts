@@ -16,6 +16,7 @@ import {
     ARRAY_PROTOTYPE,
     FUNCTION_PROTOTYPE,
     GENERATOR_PROTOTYPE_NEXT,
+    INTERNAL_PROTOTYPE,
     MAP_KEYS,
     MAP_VALUES,
     OBJECT_PROTOTYPE,
@@ -29,7 +30,7 @@ import {TokenListener} from "../analysis/listeners";
 import assert from "assert";
 import {NodePath} from "@babel/traverse";
 import {Operations} from "../analysis/operations";
-import {AccessorType, ConstraintVar, IntermediateVar, ObjectPropertyVarObj} from "../analysis/constraintvars";
+import {AccessorType, ConstraintVar, IntermediateVar, ObjectPropertyVarObj, isObjectPropertyVarObj} from "../analysis/constraintvars";
 import {Location} from "../misc/util";
 
 /**
@@ -897,6 +898,27 @@ export function returnPromiseIterator(kind: "all" | "allSettled" | "any" | "race
                 }
             });
         }
+    }
+}
+
+export function returnPrototypeOf(p: NativeFunctionParams) {
+    const arg = p.path.node.arguments[0], dst = p.solver.varProducer.expVar(p.path.node, p.path);
+    if (isExpression(arg) && !isParentExpressionStatement(p.path) && dst !== undefined) // TODO: non-Expression arguments?
+        p.solver.addForAllTokensConstraint(p.solver.varProducer.expVar(arg, p.path), TokenListener.NATIVE_12, p.path.node, (t: Token) => {
+            if (isObjectPropertyVarObj(t))
+                p.solver.addSubsetConstraint(p.solver.varProducer.objPropVar(t, INTERNAL_PROTOTYPE), dst);
+        });
+}
+
+export function setPrototypeOf(p: NativeFunctionParams) {
+    const [obj, prototype] = p.path.node.arguments;
+    if (isExpression(obj) && isExpression(prototype)) { // TODO: non-Expression arguments?
+        const pvar = p.op.solver.varProducer.expVar(prototype, p.path);
+        if (pvar)
+            p.solver.addForAllTokensConstraint(p.solver.varProducer.expVar(obj, p.path), TokenListener.NATIVE_14, p.path.node, (t: Token) => {
+                if (isObjectPropertyVarObj(t))
+                    p.solver.addInherits(t, pvar);
+            });
     }
 }
 

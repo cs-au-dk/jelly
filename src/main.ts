@@ -94,6 +94,7 @@ program
     .option("--compare-callgraphs", "compare two call graphs given as JSON files, no analysis")
     .option("--reachability", "compare reachability as an additional call graph comparison metric (use with -s or --compare-callgraphs)")
     .option("--newobj", "new object abstraction (experimental)")
+    .option("--proto", "model assignments to the __proto__ property")
     .usage("[options] [files]")
     .addHelpText("after",
         "\nAll modules reachable by require/import from the given files are included in the analysis\n" +

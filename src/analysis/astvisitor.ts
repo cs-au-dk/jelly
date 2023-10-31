@@ -219,7 +219,7 @@ export function visit(ast: File, op: Operations) {
                     src = op.newPrototypeToken(constr);
                 }
             }
-            solver.addSubsetConstraint(vp.objPropVar(src, INTERNAL_PROTOTYPE), vp.nodeVar(path.node));
+            solver.addSubsetConstraint(vp.objPropVar(src, INTERNAL_PROTOTYPE()), vp.nodeVar(path.node));
         },
 
         Identifier(path: NodePath<Identifier>) {

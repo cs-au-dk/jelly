@@ -23,6 +23,7 @@ import {
     returnIterator,
     returnPackageObject,
     returnPromiseIterator,
+    returnPrototypeOf,
     returnResolvedPromise,
     returnShuffledArray,
     returnShuffledInplace,
@@ -30,9 +31,10 @@ import {
     returnThisInPromise,
     returnThisProperty,
     returnToken,
+    setPrototypeOf,
     warnNativeUsed,
     widenArgument,
-    defineProperties
+    defineProperties,
 } from "./nativehelpers";
 import {PackageObjectToken} from "../analysis/tokens";
 import {isExpression, isNewExpression, isStringLiteral} from "@babel/types";
@@ -56,7 +58,7 @@ export const GENERATOR_PROTOTYPE_NEXT = "Generator.prototype.next";
 export const ASYNC_GENERATOR_PROTOTYPE_NEXT = "AsyncGenerator.prototype.next";
 export const PROMISE_PROTOTYPE = "Promise.prototype";
 
-export const INTERNAL_PROTOTYPE = "__proto__";
+export const INTERNAL_PROTOTYPE = () => options.proto ? "__proto__" : "%[[Prototype]]";
 
 export const ARRAY_UNKNOWN = "%ARRAY_UNKNOWN";
 export const ARRAY_ALL = "%ARRAY_ALL";
@@ -73,7 +75,7 @@ export const PROMISE_REJECTED_VALUES = "%PROMISE_REJECTED_VALUES";
  * (As opposed to property names that arise from source code, the ECMAScript specification, or NodeJS.)
  */
 export function isInternalProperty(prop: string): boolean {
-    return prop === ARRAY_ALL; // TODO: return prop.startsWith("%") ?
+    return prop === ARRAY_ALL || (prop === INTERNAL_PROTOTYPE() && !options.proto); // TODO: return prop.startsWith("%") ?
 }
 
 /*
@@ -1204,7 +1206,7 @@ export const ecmascriptModels: NativeModel = {
                 {
                     name: "getPrototypeOf",
                     invoke: (p: NativeFunctionParams) => {
-                        warnNativeUsed("Object.getPrototypeOf", p); // TODO
+                        returnPrototypeOf(p);
                     }
                 },
                 {
@@ -1237,7 +1239,7 @@ export const ecmascriptModels: NativeModel = {
                 {
                     name: "setPrototypeOf",
                     invoke: (p: NativeFunctionParams) => {
-                        warnNativeUsed("Object.setPrototypeOf", p); // TODO
+                        setPrototypeOf(p);
                     }
                 },
                 {

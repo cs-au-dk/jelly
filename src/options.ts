@@ -68,7 +68,8 @@ export const options: {
     externalMatches: boolean,
     includePackages: Array<string> | undefined,
     excludePackages: Array<string> | undefined,
-    newobj: boolean
+    newobj: boolean,
+    proto: boolean,
 } = {
     callgraphHtml: undefined,
     dataflowHtml: undefined,
@@ -129,7 +130,8 @@ export const options: {
     externalMatches: false,
     includePackages: undefined,
     excludePackages: undefined,
-    newobj: false
+    newobj: false,
+    proto: false,
 };
 
 export function setOptions(opts: OptionValues & Partial<typeof options>) {

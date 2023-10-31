@@ -480,7 +480,7 @@ export default class Solver {
         const f = this.fragmentState;
         if (logger.isDebugEnabled())
             logger.debug(`Adding inheritance relation ${child} -> ${parent}`);
-        const dst = f.getRepresentative(f.varProducer.objPropVar(child, INTERNAL_PROTOTYPE));
+        const dst = f.getRepresentative(f.varProducer.objPropVar(child, INTERNAL_PROTOTYPE()));
         if (parent instanceof Token)
             this.addToken(parent, dst);
         else
@@ -614,7 +614,7 @@ export default class Solver {
                     f.getRepresentative(f.varProducer.arrayAllVar(a)),
                     propagate,
                 );
-            if (prop === INTERNAL_PROTOTYPE)
+            if (prop === INTERNAL_PROTOTYPE())
                 // constraint: ∀ b ∈ ⟦a.__proto__⟧: Ancestors(b) ⊆ Ancestors(a)
                 this.addForAllTokensConstraint(f.varProducer.objPropVar(a, prop), TokenListener.ANCESTORS, a, (b: Token) => {
                     if (isObjectPropertyVarObj(b)) // TODO: ignoring inheritance from access path tokens

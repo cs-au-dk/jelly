@@ -4,7 +4,7 @@ jest.setTimeout(20000);
 
 describe("tests/helloworld", () => {
     runTest("tests/helloworld", "app.js", {
-        options: {callgraphExternal: false},
+        options: {callgraphExternal: false, proto: true},
         soundness: "tests/helloworld/app.json",
         functionInfos: 775,
         moduleInfos: 94,
