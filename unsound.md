@@ -4,7 +4,7 @@
   - MemberExpression, OptionalMemberExpression
   - ObjectProperty, ObjectMethod, ClassProperty, ClassMethod, ClassPrivateMethod, ClassAccessorProperty, ClassPrivateProperty
 
-- dynamic require/import
+- dynamic require/import (warnings)
 
 
 - ECMAScript standard library
@@ -41,3 +41,5 @@
 - user-defined iterators (standard iterators are supported)
 - symbols (incl. "well-known symbols" like [Symbol.iterator] used for iterables)
 - events
+- exceptions
+- implicit toString/ValueOf calls

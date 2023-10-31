@@ -12,25 +12,38 @@ function compareStringArrays(as1: Array<string>, as2: Array<string>, file1: stri
     return s;
 }
 
-// loc returns a canonical representation of a LocationJSON string that is suitable for matching
-// between call graphs collected from dynamic and static analysis
+/**
+ * Returns a canonical representation of a LocationJSON string that is suitable for matching
+ * between call graphs collected from dynamic and static analysis.
+ */
 function loc(str: LocationJSON, cg: CallGraph, kind: "Function" | "Call"): {str: string, file: string} {
     const parsed = new SourceLocationsToJSON(cg.files).parseLocationJSON(str);
     let rest;
-    if (!parsed.loc) rest = "?:?";
+    if (!parsed.loc)
+        rest = "?:?";
     else {
         // Functions: dyn.ts sometimes reports incorrect end locations for functions, so
         // we strip the end locations off of functions.
         // Calls: dyn.ts sometimes reports incorrect start source locations for call expressions
         // with parenthesized base expressions (see tests/micro/call-expressions.js).
         // since end locations are unique for call expressions we can solely rely on those for matching
-        const pos = kind === "Call"? parsed.loc.end : parsed.loc.start;
-        rest = `${pos.line}:${pos.column+1}`;
+        const pos = kind === "Call" ? parsed.loc.end : parsed.loc.start;
+        rest = `${pos.line}:${pos.column + 1}`;
     }
     return {str: `${parsed.file}:${rest}`, file: parsed.file};
 }
 
-function compareLocationObjects(o1: {[index: number]: string}, o2: {[index: number]: string}, file1: string, file2: string, cg1: CallGraph, cg2: CallGraph, file2files: Set<string>, kind: "Function" | "Call", ignores: Set<string>) {
+function compareLocationObjects(
+    o1: {[index: number]: string},
+    o2: {[index: number]: string},
+    file1: string,
+    file2: string,
+    cg1: CallGraph,
+    cg2: CallGraph,
+    file2files: Set<string>,
+    kind: "Function" | "Call",
+    ignores: Set<string>
+) {
     const s = new Set<string>();
     for (const loc2 of Object.values(o2))
         s.add(loc(loc2, cg2, kind).str);
@@ -51,7 +64,18 @@ function edge(from: string, to: string): string {
     return `${from} -> ${to}`;
 }
 
-function compareEdges(es1: Array<[number, number]>, es2: Array<[number, number]>, file1: string, file2: string, cg1: CallGraph, cg2: CallGraph, file2files: Set<string>, kind: "Function" | "Call", prop: "functions" | "calls", ignores: Set<string>): [number, number] {
+function compareEdges(
+    es1: Array<[number, number]>,
+    es2: Array<[number, number]>,
+    file1: string,
+    file2: string,
+    cg1: CallGraph,
+    cg2: CallGraph,
+    file2files: Set<string>,
+    kind: "Function" | "Call",
+    prop: "functions" | "calls",
+    ignores: Set<string>
+): [number, number] {
     const s = new Set<string>();
     for (const [i, j] of es2) {
         if (!cg2[prop][i])
@@ -134,7 +158,6 @@ function getIgnores(cg: CallGraph): Set<string> {
     return s;
 }
 
-
 /**
   * Returns the number of functions in cg1, the number of reachable functions
   * in cg2, and the number of functions in cg1 that are reachable in cg2.
@@ -148,7 +171,6 @@ function computeReachableFunctions(file2: string, cg1: CallGraph, cg2: CallGraph
     const replocToIndex = new Map<string, number>();
     for (const [i, floc] of Object.entries(cg2.functions)) {
         replocToIndex.set(loc(floc, cg2, "Function").str, Number(i));
-
         const parsed = parser.parseLocationJSON(floc);
         if (parsed.loc && parsed.loc.start.line === 1 && parsed.loc.start.column === 0) {
             const prev = fileToModuleIndex[parsed.fileIndex]?.loc;
@@ -177,7 +199,6 @@ function computeReachableFunctions(file2: string, cg1: CallGraph, cg2: CallGraph
     const SCGreach = new Set(Q);
     while (Q.length) {
         const i = Q.pop()!;
-
         for (const ni of funEdges.get(i) ?? [])
             if (!SCGreach.has(ni)) {
                 SCGreach.add(ni);
@@ -196,9 +217,7 @@ function computeReachableFunctions(file2: string, cg1: CallGraph, cg2: CallGraph
         const reploc = loc(floc, cg1, "Function").str;
         if (ignores.has(reploc))
             continue;
-
         dcgReach++;
-
         if (SCGreach.has(replocToIndex.get(reploc)!))
             comReach++;
         else
@@ -211,7 +230,6 @@ function computeReachableFunctions(file2: string, cg1: CallGraph, cg2: CallGraph
         const i = replocToIndex.get(aloc);
         if (i === undefined || !SCGreach.has(i))
             return;
-
         const bloc = loc(cg1.functions[b], cg1, "Function").str;
         const j = replocToIndex.get(bloc);
         if (j === undefined || !SCGreach.has(j))
@@ -226,10 +244,8 @@ function computeReachableFunctions(file2: string, cg1: CallGraph, cg2: CallGraph
         const af = callFunIdx.get(a);
         if (af === undefined)
             continue;
-
         const loc = cg1.calls[a];
         const i = loc.indexOf(":");
-
         checkEdge(af, b, "call", `${cg1.files[Number(loc.substring(0, i))]}:${loc.substring(i+1)}`);
     }
 

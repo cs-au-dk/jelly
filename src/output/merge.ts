@@ -22,7 +22,7 @@ export function merge(callgraphs: Array<CallGraph>): CallGraph {
   for (const cg of callgraphs) {
     if (cg.entries)
       for (const entry of cg.entries)
-        if (result.entries?.indexOf(entry) == -1)
+        if (result.entries?.indexOf(entry) === -1)
           result.entries.push(entry);
 
     const fileMap = new Map<number, number>(); // original ID to result ID
@@ -72,7 +72,7 @@ export function merge(callgraphs: Array<CallGraph>): CallGraph {
         const originalId = parseInt(originalIdStr);
         const call = translate(cg.calls[originalId]);
         let resultId = (result.calls as Array<string>).indexOf(call);
-        if (resultId == -1) {
+        if (resultId === -1) {
           resultId = (result.calls as Array<string>).length;
           (result.calls as Array<string>).push(call);
         }

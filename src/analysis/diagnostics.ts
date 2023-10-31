@@ -66,8 +66,6 @@ export default class AnalysisDiagnostics {
 
     packageNeighborListenerNotifications: number = 0;
 
-    ancestorListenerNotifications: number = 0;
-
     arrayEntriesListenerNotifications: number = 0;
 
     objectPropertiesListenerNotifications: number = 0;

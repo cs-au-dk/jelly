@@ -361,7 +361,7 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
     /**
      * Registers a call location.
      */
-    registerCall(n: Node, m: ModuleInfo, {native, external, accessor}: {native?: boolean, external?: boolean, accessor?: boolean} = {}) {
+    registerCall(n: Node, {native, external, accessor}: {native?: boolean, external?: boolean, accessor?: boolean} = {}) {
         if (accessor && !options.callgraphImplicit)
             return;
         if (!this.callLocations.has(n) ||

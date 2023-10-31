@@ -370,7 +370,7 @@ export class SourceLocationsToJSON {
 
 /*
  * Computes a mapping from calls to the function they are contained in.
- * The time complexity is linear in the number of functions and calls.
+ * The time complexity is linearithmic in the number of functions and calls.
  */
 export function mapCallsToFunctions(cg: CallGraph): Map<number, number> {
     const parser = new SourceLocationsToJSON(cg.files);

@@ -57,9 +57,11 @@ export function assignParameterToThisProperty(param: number, prop: string, p: Na
  */
 function assignExpressionToArrayValue(from: Expression, t: ArrayToken, p: NativeFunctionParams) {
     const argVar = p.solver.varProducer.expVar(from, p.path);
-    p.solver.addSubsetConstraint(argVar, p.solver.varProducer.arrayUnknownVar(t));
-    p.solver.addForAllArrayEntriesConstraint(t, TokenListener.NATIVE_13, from, (prop: string) =>
-        p.solver.addSubsetConstraint(argVar, p.solver.varProducer.objPropVar(t, prop)));
+    if (argVar) {
+        p.solver.addSubsetConstraint(argVar, p.solver.varProducer.arrayUnknownVar(t));
+        p.solver.addForAllArrayEntriesConstraint(t, TokenListener.NATIVE_13, from, (prop: string) =>
+            p.solver.addSubsetConstraint(argVar, p.solver.varProducer.objPropVar(t, prop)));
+    }
 }
 
 /**
@@ -906,7 +908,7 @@ export function returnPrototypeOf(p: NativeFunctionParams) {
     if (isExpression(arg) && !isParentExpressionStatement(p.path) && dst !== undefined) // TODO: non-Expression arguments?
         p.solver.addForAllTokensConstraint(p.solver.varProducer.expVar(arg, p.path), TokenListener.NATIVE_12, p.path.node, (t: Token) => {
             if (isObjectPropertyVarObj(t))
-                p.solver.addSubsetConstraint(p.solver.varProducer.objPropVar(t, INTERNAL_PROTOTYPE), dst);
+                p.solver.addSubsetConstraint(p.solver.varProducer.objPropVar(t, INTERNAL_PROTOTYPE()), dst);
         });
 }
 

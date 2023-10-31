@@ -160,7 +160,7 @@ export class Operations {
         const caller = this.a.getEnclosingFunctionOrModule(path, this.moduleInfo);
 
         const pars = getAdjustedCallNodePath(path);
-        f.registerCall(pars.node, this.moduleInfo);
+        f.registerCall(pars.node);
         f.registerMethodCall(path.node, baseVar, prop, calleeVar);
 
         // collect special information for pattern matcher
@@ -192,7 +192,7 @@ export class Operations {
             if (t instanceof FunctionToken) {
                 this.callFunctionTokenBound(t, baseVar, caller, argVars, resultVar, isNew, path);
             } else if (t instanceof NativeObjectToken) {
-                f.registerCall(pars.node, this.moduleInfo, {native: true});
+                f.registerCall(pars.node, {native: true});
                 if (t.invoke && (!isNew || t.constr))
                     t.invoke({
                         path,
@@ -214,7 +214,7 @@ export class Operations {
 
             } else if (t instanceof AccessPathToken) {
                 assert(calleeVar);
-                f.registerCall(pars.node, this.moduleInfo, {external: true});
+                f.registerCall(pars.node, {external: true});
                 f.registerEscapingFromModuleArguments(args, path);
 
                 // constraint: add CallResultAccessPath
@@ -223,15 +223,8 @@ export class Operations {
                 for (let i = 0; i < argVars.length; i++) {
                     const argVar = argVars[i];
                     if (argVar) {
-                        this.solver.addForAllTokensConstraint(argVar, TokenListener.CALL_FUNCTION_EXTERNAL, args[i], (at: Token) => {
-                            if (at instanceof FunctionToken) {
-                                // constraint: assign UnknownAccessPath to arguments to function arguments for external functions, also add (artificial) call edge
-                                this.solver.fragmentState.registerCallEdge(pars.node, caller, this.a.functionInfos.get(at.fun)!, {external: true});
-                                for (let j = 0; j < at.fun.params.length; j++)
-                                    if (isIdentifier(at.fun.params[j])) // TODO: non-identifier parameters?
-                                        this.solver.addAccessPath(UnknownAccessPath.instance, this.solver.varProducer.nodeVar(at.fun.params[j]));
-                            }
-                        });
+                        // constraint: assign UnknownAccessPath to arguments to function arguments for external functions, also add (artificial) call edge
+                        this.solver.addForAllTokensConstraint(argVar, TokenListener.CALL_FUNCTION_EXTERNAL, args[i], (at: Token) => this.invokeExternalCallback(at, pars.node, caller));
                         f.registerEscapingToExternal(argVar, args[i]);
                     } else if (isSpreadElement(args[i]))
                         f.warnUnsupported(args[i], "SpreadElement in arguments to external function"); // TODO: SpreadElement in arguments to external function
@@ -328,6 +321,20 @@ export class Operations {
     }
 
     /**
+     * Models callback for external function.
+     */
+    invokeExternalCallback(at: Token, node: Node, caller: ModuleInfo | FunctionInfo) {
+        if (at instanceof FunctionToken) {
+            const f = this.solver.fragmentState;
+            f.registerCall(node, {external: true});
+            f.registerCallEdge(node, caller, this.a.functionInfos.get(at.fun)!, {external: true});
+            for (let j = 0; j < at.fun.params.length; j++)
+                if (isIdentifier(at.fun.params[j])) // TODO: non-identifier parameters?
+                    this.solver.addAccessPath(UnknownAccessPath.instance, f.varProducer.nodeVar(at.fun.params[j]));
+        }
+    }
+
+    /**
      * Models reading a property of an object.
      * @param base constraint variable representing the base variable
      * @param prop property name, undefined if unknown
@@ -345,7 +352,7 @@ export class Operations {
                 if (t instanceof FunctionToken && t.fun.params.length === 0) {
                     if (dst)
                         this.solver.addSubsetConstraint(this.solver.varProducer.returnVar(t.fun), dst);
-                    this.solver.fragmentState.registerCall(node, this.moduleInfo, {accessor: true});
+                    this.solver.fragmentState.registerCall(node, {accessor: true});
                     this.solver.fragmentState.registerCallEdge(node, enclosing, this.a.functionInfos.get(t.fun)!, {accessor: true});
                 }
             };
@@ -459,7 +466,7 @@ export class Operations {
         const writeToSetter = (t: Token) => {
             if (t instanceof FunctionToken && t.fun.params.length === 1) {
                 this.solver.addSubsetConstraint(src, this.solver.varProducer.nodeVar(t.fun.params[0]));
-                this.solver.fragmentState.registerCall(node, this.moduleInfo, {accessor: true});
+                this.solver.fragmentState.registerCall(node, {accessor: true});
                 this.solver.fragmentState.registerCallEdge(node, enclosing, this.a.functionInfos.get(t.fun)!, {accessor: true});
             }
         };
@@ -617,12 +624,7 @@ export class Operations {
             const assignRequireExtensions = (t: Token) => {
                 if (t instanceof NativeObjectToken && t.name === "require.extensions")
                     // when a function is assigned to require.extensions, add an external call edge
-                    this.solver.addForAllTokensConstraint(src, TokenListener.ASSIGN_REQUIRE_EXTENSIONS, path.node, (t: Token) => {
-                        if (t instanceof FunctionToken) {
-                            this.solver.fragmentState.registerCall(dst, this.moduleInfo, {external: true});
-                            this.solver.fragmentState.registerCallEdge(dst, enclosing, this.a.functionInfos.get(t.fun)!, {external: true});
-                        }
-                    });
+                    this.solver.addForAllTokensConstraint(src, TokenListener.ASSIGN_REQUIRE_EXTENSIONS, path.node, (ft: Token) => this.invokeExternalCallback(ft, path.node, enclosing));
             };
 
             if (prop !== undefined) {

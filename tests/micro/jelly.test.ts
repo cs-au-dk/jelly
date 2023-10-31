@@ -60,6 +60,16 @@ describe("tests/micro", () => {
         oneCalleeCalls: 4,
     });
 
+    runTest("tests/micro", "accessors3.js", {
+        options: {newobj: true},
+        soundness: "tests/micro/accessors3.json",
+    });
+
+    runTest("tests/micro", "accessors4.js", {
+        options: {newobj: true},
+        numberOfFunctionToFunctionEdges: 6,
+    });
+
     runTest("tests/micro", "defineProperty.js", {
         soundness: "tests/micro/defineProperty.json",
         functionInfos: 10,
@@ -615,7 +625,7 @@ describe("tests/micro", () => {
     });
 
     runTest("tests/micro", "prototypes3.js", {
-        options: {newobj: true, patchDynamics: false},
+        options: {newobj: true, proto: true, patchDynamics: false},
         soundness: "tests/micro/prototypes3.json",
         functionInfos: 5,
         moduleInfos: 1,
