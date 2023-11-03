@@ -388,6 +388,34 @@ export class AnalysisStateReporter {
     }
 
     /**
+     * Returns the entry modules.
+     */
+    getEntryModules(): Set<ModuleInfo> {
+        return new Set(Array.from(this.a.moduleInfos.values()).filter(m => m.isEntry));
+    }
+
+    /**
+     * Returns the functions that are reachable from the given entries.
+     */
+    getReachableFunctions(entries: Set<FunctionInfo | ModuleInfo>): Set<FunctionInfo | ModuleInfo> {
+        const res = new Set<FunctionInfo | ModuleInfo>(entries);
+        const w = Array.from(entries);
+        while (w.length > 0) {
+            const f = w.pop()!;
+            for (const g of [...this.f.functionToFunction.get(f) ?? [], ...this.f.requireGraph.get(f) ?? []]) {
+                if (!res.has(g)) {
+                    res.add(g);
+                    w.push(g);
+                    if (logger.isVerboseEnabled())
+                        logger.verbose(`${g instanceof FunctionInfo ? "Function" : "Module"} ${g} is reachable`);
+                }
+
+            }
+        }
+        return res;
+    }
+
+    /**
      * Saves analysis diagnostics in JSON file.
      */
     saveDiagnostics(stats: AnalysisDiagnostics, file: string) {

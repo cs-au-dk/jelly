@@ -52,6 +52,8 @@ export default class AnalysisDiagnostics {
 
     functionsWithZeroCallers: number = 0; // set when analysis is completed
 
+    reachableFunctions: number = 0; // set when analysis is completed
+
     unprocessedTokensSize: number = 0;
 
     fixpointRound: number = 0;

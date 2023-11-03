@@ -184,13 +184,14 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
         d.externalOnlyCalls = r.getZeroButExternalCalleeCalls();
         d.nativeOrExternalCalls = r.getZeroButNativeOrExternalCalleeCalls();
         d.functionsWithZeroCallers = r.getZeroCallerFunctions().size;
+        d.reachableFunctions = r.getReachableFunctions(r.getEntryModules()).size;
         if (logger.isInfoEnabled()) {
             logger.info(`Analyzed packages: ${d.packages}, modules: ${d.modules}, functions: ${a.functionInfos.size}, code size: ${Math.ceil(d.codeSize / 1024)}KB`);
             logger.info(`Call edges function->function: ${f.numberOfFunctionToFunctionEdges}, call->function: ${f.numberOfCallToFunctionEdges}`);
             const n = d.totalCallSites - d.callsWithNoCallee - d.nativeOnlyCalls - d.externalOnlyCalls - d.nativeOrExternalCalls;
             logger.info(`Calls with unique callee: ${d.callsWithUniqueCallee}/${n}${n > 0 ? ` (${percent(d.callsWithUniqueCallee / n)})` : ""}` +
                 ` (excluding ${d.callsWithNoCallee} zero-callee, ${d.nativeOnlyCalls} native-only, ${d.externalOnlyCalls} external-only and ${d.nativeOrExternalCalls} native-or-external-only)`)
-            logger.info(`Functions with zero callers: ${r.getZeroCallerFunctions().size}/${a.functionInfos.size}`);
+            logger.info(`Functions with zero callers: ${d.functionsWithZeroCallers}/${a.functionInfos.size} (${percent(d.functionsWithZeroCallers / a.functionInfos.size)}), reachable functions: ${d.reachableFunctions}/${a.functionInfos.size} (${percent(d.reachableFunctions / a.functionInfos.size)})`);
             logger.info(`Analysis time: ${d.time}ms, memory usage: ${d.maxMemoryUsage}MB${!options.gc ? " (without --gc)" : ""}`);
             logger.info(`Analysis errors: ${d.errors}, warnings: ${d.warnings}${getMapHybridSetSize(f.warningsUnsupported) > 0 && !options.warningsUnsupported ? " (show all with --warnings-unsupported)" : ""}`);
             if (options.diagnostics) {
