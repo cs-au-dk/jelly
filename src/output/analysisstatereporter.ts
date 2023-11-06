@@ -81,7 +81,28 @@ export class AnalysisStateReporter {
             fs.writeSync(fd, `${first ? "" : ","}\n  ${JSON.stringify(relative(options.basedir, resolve(options.basedir, file)))}`);
             first = false;
         }
-        fs.writeSync(fd, `\n ],\n "files": [`);
+        fs.writeSync(fd, `\n ],\n`);
+        if (options.ignoreDependencies)
+            fs.writeSync(fd, ` "ignoreDependencies": true,\n`);
+        if (options.includePackages) {
+            fs.writeSync(fd, ` "included": [`);
+            first = true;
+            for (const name of options.includePackages) {
+                fs.writeSync(fd, `${first ? "" : ","}\n  ${JSON.stringify(name)}`);
+                first = false;
+            }
+            fs.writeSync(fd, `\n ],\n`);
+        }
+        if (options.excludePackages) {
+            fs.writeSync(fd, ` "excluded": [`);
+            first = true;
+            for (const name of options.excludePackages) {
+                fs.writeSync(fd, `${first ? "" : ","}\n  ${JSON.stringify(name)}`);
+                first = false;
+            }
+            fs.writeSync(fd, `\n ],\n`);
+        }
+        fs.writeSync(fd, ` "files": [`);
         const fileIndices = new Map<ModuleInfo, number>();
         first = true;
         for (const m of this.a.moduleInfos.values())
@@ -220,10 +241,12 @@ export class AnalysisStateReporter {
                     call2fun.push([callIndex, calleeIndex]);
                 }
         }
-
         return {
             time: new Date().toUTCString(),
             entries: ifiles.map(file => relative(options.basedir, resolve(options.basedir, file))),
+            ignoreDependencies: options.ignoreDependencies,
+            includePackages: options.includePackages,
+            excludePackages: options.excludePackages,
             files,
             functions,
             calls,

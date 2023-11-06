@@ -20,6 +20,21 @@ export type CallGraph = { // TODO: represent special call edges separately from 
     entries?: Array<string>,
 
     /**
+     * If set to true, only files listed in 'files' have been analyzed.
+     */
+    ignoreDependencies?: boolean,
+
+    /**
+     * Packages that have been selected for inclusion (default: all).
+     */
+    includePackages?: Array<string>,
+
+    /**
+     * Packages that have been selected for exclusion (default: none).
+     */
+    excludePackages?: Array<string>,
+
+    /**
      * Time stamp of creation.
      */
     time?: string,

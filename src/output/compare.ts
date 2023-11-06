@@ -1,15 +1,95 @@
 import {readFileSync} from "fs";
 import {CallGraph} from "../typings/callgraph";
-import {LocationJSON, SourceLocationsToJSON, mapArrayAdd, mapCallsToFunctions, mapGetSet, percent, SimpleLocation} from "../misc/util";
+import {LocationJSON, SourceLocationsToJSON, mapArrayAdd, mapCallsToFunctions, mapGetSet, percent, SimpleLocation, addAll} from "../misc/util";
 import logger from "../misc/logger";
 import assert from "assert";
 
-function compareStringArrays(as1: Array<string>, as2: Array<string>, file1: string, file2: string, kind: string): Set<string> {
+/*
+ * FileFilter creates a file filtering function based on one or two call graphs.
+ * The filter excludes files based on the 'ignoreDependencies', 'files', 'includePackages' and 'excludePackages'
+ * fields of the provided call graphs.
+ */
+class FileFilter {
+    readonly files: Set<string>;
+    private readonly ignoreDependencies: boolean;
+    private readonly incl: Set<string> | undefined;
+    private readonly excl: Set<string>;
+
+    constructor(cg1: CallGraph, cg2?: CallGraph) {
+        const intersect = <T>(a: Set<T>, b: Set<T>) => {
+            for (const x of a)
+                if (!b.has(x))
+                    a.delete(x);
+        };
+
+        // intersect files
+        this.files = new Set(cg1.files);
+        if (cg2?.files)
+            intersect(this.files, new Set(cg2.files));
+
+        // intersect includePackages
+        if (cg1.includePackages) {
+            this.incl = new Set(cg1.includePackages);
+            if (cg2?.includePackages)
+                intersect(this.incl, new Set(cg2.includePackages));
+        } else if (cg2?.includePackages)
+            this.incl = new Set(cg2.includePackages);
+
+        // union excludePackages
+        this.excl = new Set(cg1.excludePackages ?? []);
+        addAll(cg2?.excludePackages, this.excl);
+
+        this.ignoreDependencies = cg1.ignoreDependencies || cg2?.ignoreDependencies || false;
+    }
+
+    /**
+     * Checks whether the file belongs to one of the packages.
+     */
+    private static fileInPackages(file: string, pcks: Set<string>): boolean {
+        for (const pck of pcks)
+            if (file.includes(`node_modules/${pck}/`))
+                return true;
+        return false;
+    }
+
+    /**
+     * Returns whether the file is included.
+     */
+    isIncluded(file: string, msg: boolean) {
+        if (this.ignoreDependencies && !this.files.has(file)) {
+            if (msg)
+                logger.info(`Ignoring file ${file} (ignoring dependencies)`);
+            return false;
+        }
+        if (!file.includes("node_modules/"))
+            return true;
+        if (this.incl && !FileFilter.fileInPackages(file, this.incl)) {
+            if (msg)
+                logger.info(`Ignoring file ${file} (not in included package)`);
+            return false;
+        }
+        if (this.excl.size && FileFilter.fileInPackages(file, this.excl)) {
+            if (msg)
+                logger.info(`Ignoring file ${file} (in excluded package)`);
+            return false;
+        }
+        return true;
+    }
+}
+
+function compareFileArrays(as1: Array<string>, cg2: CallGraph, file1: string, file2: string): FileFilter {
+    const filter = new FileFilter(cg2);
+    for (const e of as1)
+        if (!filter.files.has(e) && filter.isIncluded(e, true))
+            logger.warn(`File ${e} found in ${file1}, missing in ${file2}`);
+    return filter;
+}
+
+function compareEntryArrays(as1: Array<string>, as2: Array<string>, file1: string, file2: string) {
     const s = new Set<string>(as2);
     for (const e of as1)
         if (!s.has(e))
-            logger.warn(`${kind} ${e} found in ${file1}, missing in ${file2}`);
-    return s;
+            logger.warn(`Entry ${e} found in ${file1}, missing in ${file2}`);
 }
 
 /**
@@ -40,9 +120,9 @@ function compareLocationObjects(
     file2: string,
     cg1: CallGraph,
     cg2: CallGraph,
-    file2files: Set<string>,
     kind: "Function" | "Call",
-    ignores: Set<string>
+    ignores: Set<string>,
+    filter: FileFilter,
 ) {
     const s = new Set<string>();
     for (const loc2 of Object.values(o2))
@@ -53,8 +133,8 @@ function compareLocationObjects(
             logger.debug(`Ignoring ${q}`);
             continue;
         }
-        if (!s.has(q)) {
-            const extra = !file2files.has(f) ? ` (file ${f} missing)` : "";
+        if (!s.has(q) && filter.isIncluded(f, false)) {
+            const extra = !filter.files.has(f) ? ` (file ${f} missing)` : "";
             logger.warn(`${kind} ${q} found in ${file1}, missing in ${file2}${extra}`);
         }
     }
@@ -71,11 +151,11 @@ function compareEdges(
     file2: string,
     cg1: CallGraph,
     cg2: CallGraph,
-    file2files: Set<string>,
     kind: "Function" | "Call",
     prop: "functions" | "calls",
-    ignores: Set<string>
-): [number, number] {
+    ignores: Set<string>,
+    filter: FileFilter,
+): [number, number, number] {
     const s = new Set<string>();
     for (const [i, j] of es2) {
         if (!cg2[prop][i])
@@ -86,7 +166,7 @@ function compareEdges(
         const to = loc((cg2.functions)[j], cg2, "Function").str;
         s.add(edge(from, to));
     }
-    let found = 0, missed = 0;
+    let found = 0, missed = 0, ignored = 0;
     for (const [i, j] of es1) { // TODO: assuming no duplicate pairs
         if (!cg1[prop][i])
             assert.fail(`cg1["${prop}"][${i}] is undefined`);
@@ -100,22 +180,38 @@ function compareEdges(
         }
         const e = edge(from, to);
         if (!s.has(e)) {
-            const extra = !file2files.has(ff) ? ` (file ${ff} missing)` : !file2files.has(ft) ? ` (file ${ft} missing)` : "";
-            logger.info(`${kind}->function edge ${e} found in ${file1}, missing in ${file2}${extra}`);
-            missed++;
+            if (filter.isIncluded(ff, false) &&
+                filter.isIncluded(ft, false)) {
+                const extra = !filter.files.has(ff) ? ` (file ${ff} missing)` : !filter.files.has(ft) ? ` (file ${ft} missing)` : "";
+                logger.info(`${kind}->function edge ${e} found in ${file1}, missing in ${file2}${extra}`);
+                missed++;
+            } else
+                ignored++;
         } else
             found++;
     }
-    return [found, found + missed];
+    return [found, found + missed, ignored];
 }
 
 // https://manu.sridharan.net/files/ICSE-2013-Approximate.pdf
 // https://github.com/asgerf/callgraphjs/blob/master/evaluate.js
-function compareCallSiteEdges(cg1: CallGraph, cg2: CallGraph, ignores1: Set<string>, ignores2: Set<string>): {precision: number, recall: number} {
+function compareCallSiteEdges(
+    cg1: CallGraph,
+    cg2: CallGraph,
+    ignores1: Set<string>,
+    ignores2: Set<string>,
+): {precision: number, recall: number} {
+    const filter = new FileFilter(cg1, cg2);
+    const floc = (s: string, cg: CallGraph, kind: "Call" | "Function") => {
+        const {str, file} = loc(s, cg, kind);
+        return filter.isIncluded(file, false) ? str : undefined;
+    };
     const e1 = new Map<string, Set<string>>();
     for (const [c, f] of cg1.call2fun) {
-        const from = loc(cg1.calls[c], cg1, "Call").str;
-        const to = loc(cg1.functions[f], cg1, "Function").str;
+        const from = floc(cg1.calls[c], cg1, "Call");
+        const to = floc(cg1.functions[f], cg1, "Function");
+        if (!from || !to)
+            continue;
         if (ignores2.has(to)) {
             logger.debug(`Ignoring ${from} -> ${to}`);
             continue;
@@ -124,8 +220,10 @@ function compareCallSiteEdges(cg1: CallGraph, cg2: CallGraph, ignores1: Set<stri
     }
     const e2 = new Map<string, Set<string>>();
     for (const [c, f] of cg2.call2fun) {
-        const from = loc(cg2.calls[c], cg2, "Call").str;
-        const to = loc(cg2.functions[f], cg2, "Function").str;
+        const from = floc(cg2.calls[c], cg2, "Call");
+        const to = floc(cg2.functions[f], cg2, "Function");
+        if (!from || !to)
+            continue;
         if (ignores1.has(to)) {
             logger.debug(`Ignoring ${from} -> ${to}`);
             continue;
@@ -134,15 +232,11 @@ function compareCallSiteEdges(cg1: CallGraph, cg2: CallGraph, ignores1: Set<stri
     }
     const ps = [];
     const rs = [];
-    for (const c of Object.values(cg1.calls)) {
-        const from = loc(c, cg1, "Call").str;
-        const s1 = e1.get(from);
-        if (s1) {
-            const s2 = e2.get(from) ?? new Set;
-            const pos = Array.from(s1).reduce((acc, f) => acc + (s2.has(f) ? 1 : 0), 0);
-            ps.push(s2.size > 0 ? pos / s2.size : 1);
-            rs.push(pos / s1.size);
-        }
+    for (const [from, s1] of e1) {
+        const s2 = e2.get(from) ?? new Set;
+        const pos = Array.from(s1).reduce((acc, f) => acc + (s2.has(f) ? 1 : 0), 0);
+        ps.push(s2.size > 0 ? pos / s2.size : 1);
+        rs.push(pos / s1.size);
     }
     function avg(xs: Array<number>): number {
         return xs.reduce((acc, x) => acc + x, 0) / (xs.length || 1);
@@ -161,9 +255,15 @@ function getIgnores(cg: CallGraph): Set<string> {
 /**
   * Returns the number of functions in cg1, the number of reachable functions
   * in cg2, and the number of functions in cg1 that are reachable in cg2.
-  * Reachability in cg2 is computed from all application modules in cg2.
+  * Reachability in cg2 is computed from all application modules that are present in cg1.
   */
-function computeReachableFunctions(file2: string, cg1: CallGraph, cg2: CallGraph, ignores: Set<string>): [number, number, number] {
+function computeReachableFunctions(
+    file2: string,
+    cg1: CallGraph,
+    cg2: CallGraph,
+    ignores: Set<string>,
+    filter: FileFilter,
+): [number, number, number] {
     const parser = new SourceLocationsToJSON(cg2.files);
     // find the module entry function for each file by looking for functions
     // that begin at position 1:1 and span the longest
@@ -214,8 +314,8 @@ function computeReachableFunctions(file2: string, cg1: CallGraph, cg2: CallGraph
 
     let dcgReach = 0, comReach = 0;
     for (const floc of Object.values(cg1.functions)) {
-        const reploc = loc(floc, cg1, "Function").str;
-        if (ignores.has(reploc))
+        const {str: reploc, file} = loc(floc, cg1, "Function");
+        if (ignores.has(reploc) || !filter.isIncluded(file, false))
             continue;
         dcgReach++;
         if (SCGreach.has(replocToIndex.get(reploc)!))
@@ -226,11 +326,13 @@ function computeReachableFunctions(file2: string, cg1: CallGraph, cg2: CallGraph
 
     // report edges from cg1 where only the source is reachable
     function checkEdge(a: number, b: number, kind: "function" | "call" = "function", rloc?: string) {
-        const aloc = loc(cg1.functions[a], cg1, "Function").str;
+        const {str: aloc, file: file1} = loc(cg1.functions[a], cg1, "Function");
         const i = replocToIndex.get(aloc);
-        if (i === undefined || !SCGreach.has(i))
+        if (i === undefined || !SCGreach.has(i) || !filter.isIncluded(file1, false))
             return;
-        const bloc = loc(cg1.functions[b], cg1, "Function").str;
+        const {str: bloc, file: file2} = loc(cg1.functions[b], cg1, "Function");
+        if (!filter.isIncluded(file2, false))
+            return;
         const j = replocToIndex.get(bloc);
         if (j === undefined || !SCGreach.has(j))
             logger.info(`Missed ${kind}->function edge ${rloc ?? aloc} -> ${bloc} could increase reachability recall`);
@@ -265,7 +367,7 @@ function computeReachableFunctions(file2: string, cg1: CallGraph, cg2: CallGraph
 export function compareCallGraphs(
     file1: string, file2: string, cg2?: CallGraph,
     compareBothWays: boolean = true,
-    compareReachability: boolean = false
+    compareReachability: boolean = false,
 ): {
     // number of actual function->function call edges matched
     fun2funFound: number,
@@ -283,30 +385,34 @@ export function compareCallGraphs(
     logger.info(`Comparing ${file1} and ${file2}`);
     const cg1 = JSON.parse(readFileSync(file1, "utf8")) as CallGraph;
     cg2 ??= JSON.parse(readFileSync(file2, "utf8")) as CallGraph;
-    compareStringArrays(cg1.entries ?? [], cg2.entries ?? [], file1, file2, "Entry");
+    compareEntryArrays(cg1.entries ?? [], cg2.entries ?? [], file1, file2);
     if (compareBothWays)
-        compareStringArrays(cg2.entries ?? [], cg1.entries ?? [], file2, file1, "Entry");
-    const file2files = compareStringArrays(cg1.files, cg2.files, file1, file2, "File");
-    const file1files = compareBothWays && compareStringArrays(cg2.files, cg1.files, file2, file1, "File") || undefined;
+        compareEntryArrays(cg2.entries ?? [], cg1.entries ?? [], file2, file1);
+    const filter2  = compareFileArrays(cg1.files, cg2, file1, file2);
+    const filter1 = compareBothWays && compareFileArrays(cg2.files, cg1, file2, file1) || undefined;
     const ignores1 = getIgnores(cg1);
     const ignores2 = getIgnores(cg2);
-    compareLocationObjects(cg1.functions, cg2.functions, file1, file2, cg1, cg2, file2files, "Function", ignores2);
+    compareLocationObjects(cg1.functions, cg2.functions, file1, file2, cg1, cg2, "Function", ignores2, filter2);
     if (compareBothWays)
-        compareLocationObjects(cg2.functions, cg1.functions, file2, file1, cg2, cg1, file1files!, "Function", ignores1);
-    compareLocationObjects(cg1.calls, cg2.calls, file1, file2, cg1, cg2, file2files, "Call", ignores2);
+        compareLocationObjects(cg2.functions, cg1.functions, file2, file1, cg2, cg1, "Function", ignores1, filter1!);
+    compareLocationObjects(cg1.calls, cg2.calls, file1, file2, cg1, cg2, "Call", ignores2, filter2);
     if (compareBothWays)
-        compareLocationObjects(cg2.calls, cg1.calls, file2, file1, cg2, cg1, file1files!, "Call", ignores1);
+        compareLocationObjects(cg2.calls, cg1.calls, file2, file1, cg2, cg1, "Call", ignores1, filter1!);
     // measure precision/recall in terms of individual call edges
-    const [foundFun1, totalFun1] = compareEdges(cg1.fun2fun, cg2.fun2fun, file1, file2, cg1, cg2, file2files, "Function", "functions", ignores2);
-    const [foundFun2, totalFun2] = compareBothWays &&
-        compareEdges(cg2.fun2fun, cg1.fun2fun, file2, file1, cg2, cg1, file1files!, "Function", "functions", ignores1) || [0, 0];
-    const [foundCall1, totalCall1] = compareEdges(cg1.call2fun, cg2.call2fun, file1, file2, cg1, cg2, file2files, "Call", "calls", ignores2);
-    const [foundCall2, totalCall2] = compareBothWays &&
-        compareEdges(cg2.call2fun, cg1.call2fun, file2, file1, cg2, cg1, file1files!, "Call", "calls", ignores1) || [0, 0];
+    const [foundFun1, totalFun1, ignoredFun1] = compareEdges(cg1.fun2fun, cg2.fun2fun, file1, file2, cg1, cg2, "Function", "functions", ignores2, filter2);
+    const [foundFun2, totalFun2, ignoredFun2] = compareBothWays &&
+        compareEdges(cg2.fun2fun, cg1.fun2fun, file2, file1, cg2, cg1, "Function", "functions", ignores1, filter1!) || [0, 0, 0];
+    const [foundCall1, totalCall1, ignoredCall1] = compareEdges(cg1.call2fun, cg2.call2fun, file1, file2, cg1, cg2, "Call", "calls", ignores2, filter2);
+    const [foundCall2, totalCall2, ignoredCall2] = compareBothWays &&
+        compareEdges(cg2.call2fun, cg1.call2fun, file2, file1, cg2, cg1, "Call", "calls", ignores1, filter1!) || [0, 0, 0];
     // measure recall in terms of reachable functions
-    const [dcgReach, scgReach, comReach] = compareReachability && computeReachableFunctions(file2, cg1, cg2, ignores2) || [0, 0, 0];
+    const [dcgReach, scgReach, comReach] = compareReachability && computeReachableFunctions(file2, cg1, cg2, ignores2, filter2) || [0, 0, 0];
 
     const formatFraction = (num: number, den: number) => `${num}/${den}${den === 0 ? "" : ` (${percent(num / den)})`}`;
+    if (ignoredFun1 > 0 || ignoredCall1 > 0)
+        logger.info(`Ignored in ${file1}: ${ignoredFun1} functions, ${ignoredCall1} calls`);
+    if (ignoredFun2 > 0 || ignoredCall2 > 0)
+        logger.info(`Ignored in ${file2}: ${ignoredFun2} functions, ${ignoredCall2} calls`);
     if (compareBothWays)
         logger.info(`Function->function edges in ${file2} that are also in ${file1}: ${formatFraction(foundFun2, totalFun2)}`);
     logger.info(`Function->function edges in ${file1} that are also in ${file2}: ${formatFraction(foundFun1, totalFun1)}`);
@@ -317,8 +423,8 @@ export function compareCallGraphs(
     logger.info(`Per-call average precision: ${percent(precision)}, recall: ${percent(recall)}`);
     if (compareReachability) {
         if (compareBothWays)
-            logger.info(`Reachable functions in ${file2} that are also in ${file1}: ${formatFraction(comReach, scgReach)}`);
-        logger.info(`Functions in ${file1} that are reachable in ${file2}: ${formatFraction(comReach, dcgReach)}`);
+            logger.info(`Reachable functions and modules in ${file2} that are also in ${file1}: ${formatFraction(comReach, scgReach)}`);
+        logger.info(`Functions and modules in ${file1} that are reachable in ${file2}: ${formatFraction(comReach, dcgReach)}`);
     }
 
     return {
