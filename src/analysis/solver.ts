@@ -81,6 +81,8 @@ export default class Solver {
         d.callToFunctionEdges = f.numberOfCallToFunctionEdges;
         d.uniqueTokens = a.canonicalTokens.size;
         d.maxMemoryUsage = Math.max(d.maxMemoryUsage, getMemoryUsage());
+        d.unhandledDynamicPropertyWrites = f.unhandledDynamicPropertyWrites.size;
+        d.unhandledDynamicPropertyReads = f.unhandledDynamicPropertyReads.size;
     }
 
     /**

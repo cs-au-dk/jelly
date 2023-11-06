@@ -83,4 +83,8 @@ export default class AnalysisDiagnostics {
     totalListenerCallTime: number = 0;
     
     totalWideningTime: number = 0;
+
+    unhandledDynamicPropertyWrites: number = 0;
+
+    unhandledDynamicPropertyReads: number = 0;
 }

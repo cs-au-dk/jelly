@@ -127,11 +127,6 @@ export class GlobalState {
     numberOfCanonicalizeAccessPathCalls = 0;
 
     /**
-     * Dynamic analysis time.
-     */
-    dynamicAnalysisTime: number = 0;
-
-    /**
      * Vulnerability information, only used if options.vulnerabilities is set.
      */
     vulnerabilities: VulnerabilityDetector | undefined; // TODO: move to FragmentState?

@@ -2,6 +2,10 @@ export type IID = number;
 
 export type GIID = string;
 
+export type LiteralKind =
+    "StringLiteral" | "BooleanLiteral" | "NumericLiteral" | "FunctionLiteral" | "ObjectLiteral" |
+    "UndefinedLiteral" | "NullLiteral" | "BigIntLiteral" | "RegExpLiteral" | "ArrayLiteral";
+
 export interface SourceCodePointer {
   line: number;
   column: number;
@@ -91,7 +95,8 @@ export interface JalangiAnalysis {
   literal?(
       iid: IID,
       val: any,
-      hasGetterSetter: boolean
+      hasGetterSetter: boolean,
+      kind: LiteralKind
   ): { result: any } | void;
 
   forObject?(
