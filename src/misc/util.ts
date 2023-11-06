@@ -401,14 +401,36 @@ export function mapCallsToFunctions(cg: CallGraph): Map<number, number> {
     }
 
     for (const [i, {functions, calls}] of byFile.entries()) {
+        if (functions.length === 0) {
+            logger.error(`Call graph contains file ${cg.files[i]} without functions`);
+            continue;
+        }
+
         functions.sort(compareSL);
         calls.sort(compareSL);
+
+        const synthModFun = functions[0];
+        if (synthModFun.start.line !== 1 || synthModFun.start.column !== 0) {
+            logger.error(`No synthetic module function for file ${cg.files[i]}\nFunctions:`);
+            for (const f of functions) {
+                const fs = parser.makeLocString({...f, filename: cg.files[i]});
+                logger.error(`\t${fs}`);
+            }
+            continue;
+        }
 
         // sweep over functions and calls simultaneously, maintaining a stack of functions
         const stack = [];
         let funIndex = 0;
 
         for (const call of calls) {
+            if (!locationIn(call, synthModFun)) {
+                const cs = parser.makeLocString({...call, filename: cg.files[i]});
+                const fs = parser.makeLocString({...synthModFun, filename: cg.files[i]});
+                logger.error(`Call ${cs} is outside module function (${fs})`);
+                continue;
+            }
+
             // remove functions that ended before the call starts
             while (stack.length && compareLC(stack[stack.length-1]!.end, call.start) <= 0)
                 stack.pop();
@@ -420,7 +442,7 @@ export function mapCallsToFunctions(cg: CallGraph): Map<number, number> {
                 // the synthetic module function. requiring that calls are stricly before functions
                 // is required due to how functions sometimes have incorrect start positions in the
                 // dynamic analysis
-                if (cmp < 0 || (cmp === 0 && fun.start.line == 1 && fun.start.column === 0)) {
+                if (cmp < 0 || (cmp === 0 && fun.start.line === 1 && fun.start.column === 0)) {
                     funIndex++;
 
                     if (compareLC(fun.end, call.start) > 0)

@@ -255,7 +255,7 @@ function getIgnores(cg: CallGraph): Set<string> {
 /**
   * Returns the number of functions in cg1, the number of reachable functions
   * in cg2, and the number of functions in cg1 that are reachable in cg2.
-  * Reachability in cg2 is computed from all application modules that are present in cg1.
+  * Reachability in cg2 is computed from all application modules in cg2.
   */
 function computeReachableFunctions(
     file2: string,
