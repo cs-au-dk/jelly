@@ -160,7 +160,6 @@ export class ConstraintVarProducer<RVT extends RepresentativeVar | MergeRepresen
      * Finds the constraint variable representing the given AST node (or undefined).
      */
     nodeVar(n: Node): NodeVar
-    nodeVar(n: Node | undefined): NodeVar | undefined
     nodeVar(n: Node | undefined): NodeVar | undefined {
         return n !== undefined ? this.a.canonicalizeVar(new NodeVar(n)) : undefined;
     }

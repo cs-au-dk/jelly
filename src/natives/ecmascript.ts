@@ -104,8 +104,6 @@ export const ecmascriptModels: NativeModel = {
         p.solver.addInherits(p.globalSpecialNatives.get(ERROR_PROTOTYPE)!, p.globalSpecialNatives.get(OBJECT_PROTOTYPE)!);
         p.solver.addInherits(p.globalSpecialNatives.get(FUNCTION_PROTOTYPE)!, p.globalSpecialNatives.get(OBJECT_PROTOTYPE)!);
         p.solver.addInherits(p.globalSpecialNatives.get(PROMISE_PROTOTYPE)!, p.globalSpecialNatives.get(OBJECT_PROTOTYPE)!);
-        // TODO: all ObjectToken objects should also inherit from Object.prototype and Array.prototype?
-        // TODO: all FunctionToken objects should also inherit from Function.prototype?
         // TODO: all NativeObjectToken objects and AccessPathToken objects should also inherit from Object.prototype, Array.prototype and Function.prototype?
     },
     variables: [
@@ -641,7 +639,7 @@ export const ecmascriptModels: NativeModel = {
                     name: "message"
                 },
                 {
-                    name: "name"
+                    name: "name" // FIXME: should be Error.prototype.name
                 }
             ],
             methods: [

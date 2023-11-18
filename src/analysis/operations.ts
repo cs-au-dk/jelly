@@ -200,7 +200,8 @@ export class Operations {
                         op: this,
                         moduleInfo: this.moduleInfo,
                         moduleSpecialNatives: this.moduleSpecialNatives,
-                        globalSpecialNatives: this.globalSpecialNatives});
+                        globalSpecialNatives: this.globalSpecialNatives
+                    });
 
                 if (t.name === "require" && args.length >= 1) {
 
@@ -224,7 +225,8 @@ export class Operations {
                     const argVar = argVars[i];
                     if (argVar) {
                         // constraint: assign UnknownAccessPath to arguments to function arguments for external functions, also add (artificial) call edge
-                        this.solver.addForAllTokensConstraint(argVar, TokenListener.CALL_FUNCTION_EXTERNAL, args[i], (at: Token) => this.invokeExternalCallback(at, pars.node, caller));
+                        this.solver.addForAllTokensConstraint(argVar, TokenListener.CALL_FUNCTION_EXTERNAL, args[i], (at: Token) =>
+                            this.invokeExternalCallback(at, pars.node, caller));
                         f.registerEscapingToExternal(argVar, args[i]);
                     } else if (isSpreadElement(args[i]))
                         f.warnUnsupported(args[i], "SpreadElement in arguments to external function"); // TODO: SpreadElement in arguments to external function
@@ -624,7 +626,8 @@ export class Operations {
             const assignRequireExtensions = (t: Token) => {
                 if (t instanceof NativeObjectToken && t.name === "require.extensions")
                     // when a function is assigned to require.extensions, add an external call edge
-                    this.solver.addForAllTokensConstraint(src, TokenListener.ASSIGN_REQUIRE_EXTENSIONS, path.node, (ft: Token) => this.invokeExternalCallback(ft, path.node, enclosing));
+                    this.solver.addForAllTokensConstraint(src, TokenListener.ASSIGN_REQUIRE_EXTENSIONS, path.node, (ft: Token) =>
+                        this.invokeExternalCallback(ft, path.node, enclosing));
             };
 
             if (prop !== undefined) {
