@@ -466,11 +466,12 @@ export default class Solver {
     addForAllAncestorsConstraint(t: Token, n: Node, listener: (ancestor: Token) => void) {
         if (logger.isDebugEnabled())
             logger.debug(`Adding ancestors constraint to ${t} at ${nodeToString(n)}`);
+        const id = this.getAncestorListenerID(t, n);
         this.addForAllTokensConstraintPrivate(
             this.fragmentState.getRepresentative(this.varProducer.ancestorsVar(t)),
-            this.getAncestorListenerID(t, n),
-            listener,
+            id, listener,
         );
+        this.callTokenListener(id, listener, t); // ancestry is reflexive
     }
 
     /*
@@ -616,12 +617,15 @@ export default class Solver {
                     f.getRepresentative(f.varProducer.arrayAllVar(a)),
                     propagate,
                 );
-            if (prop === INTERNAL_PROTOTYPE())
+            if (prop === INTERNAL_PROTOTYPE()) {
                 // constraint: ∀ b ∈ ⟦a.__proto__⟧: Ancestors(b) ⊆ Ancestors(a)
-                this.addForAllTokensConstraint(f.varProducer.objPropVar(a, prop), TokenListener.ANCESTORS, a, (b: Token) => {
+                const pVar = f.varProducer.objPropVar(a, prop);
+                this.addSubsetConstraint(pVar, f.varProducer.ancestorsVar(a));
+                this.addForAllTokensConstraint(pVar, TokenListener.ANCESTORS, a, (b: Token) => {
                     if (isObjectPropertyVarObj(b)) // TODO: ignoring inheritance from access path tokens
                         this.addSubsetConstraint(this.varProducer.ancestorsVar(b), this.varProducer.ancestorsVar(a));
                 });
+            }
         }
     }
 

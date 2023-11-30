@@ -167,8 +167,6 @@ export class ConstraintVarProducer<RVT extends RepresentativeVar | MergeRepresen
     ancestorsVar(t: Token): AncestorsVar {
         if (t instanceof ObjectToken && this.f.widened.has(t))
             t = this.a.canonicalizeToken(new PackageObjectToken(t.getPackageInfo()));
-        const v = this.a.canonicalizeVar(new AncestorsVar(t));
-        this.s.addToken(t, this.s.fragmentState.getRepresentative(v)); // ancestry is reflexive
-        return v;
+        return this.a.canonicalizeVar(new AncestorsVar(t));
     }
 }
