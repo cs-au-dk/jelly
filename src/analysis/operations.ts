@@ -369,7 +369,7 @@ export class Operations {
             this.solver.addForAllTokensConstraint(base, TokenListener.READ_PROPERTY_BASE, node, (t: Token) => {
 
                 // constraint: ... ∀ ancestors t2 of t: ...
-                this.solver.addForAllAncestorsConstraint(t, node, (t2: Token) => {
+                this.solver.addForAllAncestorsConstraint(t, TokenListener.READ_ANCESTORS, node, (t2: Token) => {
                     if (t2 instanceof AllocationSiteToken || t2 instanceof FunctionToken || t2 instanceof NativeObjectToken || t2 instanceof PackageObjectToken) {
 
                         // constraint: ... ⟦t2.p⟧ ⊆ ⟦E.p⟧
@@ -487,12 +487,16 @@ export class Operations {
 
             if (invokeSetters)
                 if (!(base instanceof NativeObjectToken) && prop !== "prototype") {
-                    // constraint: ...: ∀ functions t2 ∈ ⟦(set)base.p⟧: ⟦E2⟧ ⊆ ⟦x⟧ where x is the parameter of t2
-                    const setter = this.solver.varProducer.objPropVar(base, prop, "set");
-                    this.solver.addForAllTokensConstraint(setter, TokenListener.ASSIGN_SETTER, node, writeToSetter);
-                    this.solver.addForAllTokensConstraint(setter, TokenListener.ASSIGN_SETTER_THIS, base, bindSetterThis);
 
-                    // FIXME: also obtain setters from ancestors of base
+                    // constraint: ... ∀ ancestors anc of base: ...
+                    this.solver.addForAllAncestorsConstraint(base, TokenListener.ASSIGN_ANCESTORS, node, (anc: Token) => {
+                        if (isObjectPropertyVarObj(anc)) {
+                            // constraint: ...: ∀ functions t2 ∈ ⟦(set)anc.p⟧: ⟦E2⟧ ⊆ ⟦x⟧ where x is the parameter of t2
+                            const setter = this.solver.varProducer.objPropVar(anc, prop, "set");
+                            this.solver.addForAllTokensConstraint(setter, TokenListener.ASSIGN_SETTER, node, writeToSetter);
+                            this.solver.addForAllTokensConstraint(setter, TokenListener.ASSIGN_SETTER_THIS, base, bindSetterThis);
+                        }
+                    });
                 }
 
             // values written to native object escape

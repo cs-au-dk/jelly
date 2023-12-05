@@ -399,7 +399,7 @@ describe("tests/unit/analysis", () => {
             const {solver, f} = setup;
 
             const fn = jest.fn();
-            solver.addForAllAncestorsConstraint(ot, param, fn);
+            solver.addForAllAncestorsConstraint(ot, TokenListener.ASSIGN_ANCESTORS, param, fn);
 
             expect(f.postponedListenerCalls, `Ancestor listener should be enqueued with ${ot}`, {showMatcherMessage: false}).
                 toEqual([[fn, ot]]);
@@ -415,7 +415,7 @@ describe("tests/unit/analysis", () => {
             const {solver, a} = setup;
 
             const fn = jest.fn();
-            solver.addForAllAncestorsConstraint(ot, param, fn);
+            solver.addForAllAncestorsConstraint(ot, TokenListener.READ_ANCESTORS, param, fn);
 
             await solver.propagate();
             expect(fn).toHaveBeenLastCalledWith(ot);

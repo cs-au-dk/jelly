@@ -37,6 +37,8 @@ import {ARRAY_UNKNOWN, INTERNAL_PROTOTYPE, isInternalProperty} from "../natives/
 
 export class AbortedException extends Error {}
 
+type ListenerKey = [TokenListener, Node | Token] | [TokenListener.READ_ANCESTORS | TokenListener.ASSIGN_ANCESTORS, Token, Node];
+
 export default class Solver {
 
     readonly globalState: GlobalState = new GlobalState;
@@ -53,7 +55,7 @@ export default class Solver {
 
     restored: Set<ConstraintVar> = new Set;
 
-    readonly listeners: Map<ListenerID, [TokenListener, Node | Token] | [Token, Node]> = new Map;
+    readonly listeners: Map<ListenerID, ListenerKey> = new Map;
 
     diagnostics = new AnalysisDiagnostics;
 
@@ -279,10 +281,10 @@ export default class Solver {
         return id;
     }
 
-    private checkListenerIDCollision(id: ListenerID, keys: [TokenListener, Node | Token] | [Token, Node]) {
+    private checkListenerIDCollision(id: ListenerID, keys: ListenerKey) {
         const x = this.listeners.get(id);
         if (x) {
-            if (x[0] !== keys[0] || x[1] !== keys[1])
+            if (x[0] !== keys[0] || x[1] !== keys[1] || x[2] !== keys[2])
                 logger.error("Error: Hash collision in getListenerID"); // TODO: hash collision possible
         } else
             this.listeners.set(id, keys);
@@ -303,12 +305,12 @@ export default class Solver {
     }
 
     /**
-     * Provides a unique'ish ID for the given token and node.
+     * Provides a unique'ish ID for the given key, token and node.
      */
-    private getAncestorListenerID(t: Token, n: Node): ListenerID {
+    private getAncestorListenerID(key: TokenListener.READ_ANCESTORS | TokenListener.ASSIGN_ANCESTORS, t: Token, n: Node): ListenerID {
         assert(t.hash !== undefined);
-        const id = BigInt(t.hash) + this.getNodeHash(n);
-        this.checkListenerIDCollision(id, [t, n]);
+        const id = (BigInt(key) << 16n) + BigInt(t.hash) + this.getNodeHash(n);
+        this.checkListenerIDCollision(id, [key, t, n]);
         return id;
     }
 
@@ -461,12 +463,12 @@ export default class Solver {
 
     /**
      * Adds a quantified constraint for all ancestors (reflexive and transitive) of the given token.
-     * The token and the node must together uniquely determine the function.
+     * The key, the token and the node must together uniquely determine the function.
      */
-    addForAllAncestorsConstraint(t: Token, n: Node, listener: (ancestor: Token) => void) {
+    addForAllAncestorsConstraint(t: Token, key: TokenListener.READ_ANCESTORS | TokenListener.ASSIGN_ANCESTORS, n: Node, listener: (ancestor: Token) => void) {
         if (logger.isDebugEnabled())
             logger.debug(`Adding ancestors constraint to ${t} at ${nodeToString(n)}`);
-        const id = this.getAncestorListenerID(t, n);
+        const id = this.getAncestorListenerID(key, t, n);
         this.addForAllTokensConstraintPrivate(
             this.fragmentState.getRepresentative(this.varProducer.ancestorsVar(t)),
             id, listener,

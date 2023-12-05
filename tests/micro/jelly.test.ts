@@ -70,6 +70,14 @@ describe("tests/micro", () => {
         numberOfFunctionToFunctionEdges: 6,
     });
 
+    runTest("tests/micro", "accessors5.js", {
+        options: {newobj: true},
+        soundness: "tests/micro/accessors5.json",
+        functionInfos: 2,
+        oneCalleeCalls: 2,
+        reachableTotal: 3,
+    });
+
     runTest("tests/micro", "defineProperty.js", {
         soundness: "tests/micro/defineProperty.json",
         functionInfos: 10,
