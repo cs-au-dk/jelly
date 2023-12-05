@@ -5,7 +5,7 @@ import Solver, {AbortedException} from "./solver";
 import Timer, {TimeoutException} from "../misc/timer";
 import {getMapHybridSetSize, mapMapSize, percent} from "../misc/util";
 import {visit} from "./astvisitor";
-import {ModuleInfo, PackageInfo} from "./infos";
+import {FunctionInfo, ModuleInfo, PackageInfo} from "./infos";
 import {options, resolveBaseDir} from "../options";
 import assert from "assert";
 import {widenObjects} from "./widening";
@@ -184,7 +184,7 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
         d.externalOnlyCalls = r.getZeroButExternalCalleeCalls();
         d.nativeOrExternalCalls = r.getZeroButNativeOrExternalCalleeCalls();
         d.functionsWithZeroCallers = r.getZeroCallerFunctions().size;
-        d.reachableFunctions = r.getReachableFunctions(r.getEntryModules()).size;
+        d.reachableFunctions = Array.from(r.getReachableModulesAndFunctions(r.getEntryModules())).filter(r => r instanceof FunctionInfo).length;
         if (logger.isInfoEnabled()) {
             logger.info(`Analyzed packages: ${d.packages}, modules: ${d.modules}, functions: ${a.functionInfos.size}, code size: ${Math.ceil(d.codeSize / 1024)}KB`);
             logger.info(`Call edges function->function: ${f.numberOfFunctionToFunctionEdges}, call->function: ${f.numberOfCallToFunctionEdges}`);

@@ -424,9 +424,9 @@ export class AnalysisStateReporter {
     }
 
     /**
-     * Returns the functions that are reachable from the given entries.
+     * Returns the modules and functions that are reachable from the given entries.
      */
-    getReachableFunctions(entries: Set<FunctionInfo | ModuleInfo>): Set<FunctionInfo | ModuleInfo> {
+    getReachableModulesAndFunctions(entries: Set<FunctionInfo | ModuleInfo>): Set<FunctionInfo | ModuleInfo> {
         const res = new Set<FunctionInfo | ModuleInfo>(entries);
         const w = Array.from(entries);
         while (w.length > 0) {
