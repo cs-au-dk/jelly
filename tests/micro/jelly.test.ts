@@ -9,10 +9,10 @@ describe("tests/micro", () => {
         moduleInfos: 1,
         numberOfFunctionToFunctionEdges: 39,
         oneCalleeCalls: 41,
-        funTotal: 30,
-        callTotal: 36,
-        reachableFound: 25,
-        reachableTotal: 26,
+        funTotal: 34,
+        callTotal: 40,
+        reachableFound: 30,
+        reachableTotal: 31,
     });
 
     runTest("tests/micro", "classes2.js", {
@@ -22,9 +22,9 @@ describe("tests/micro", () => {
         moduleInfos: 1,
         numberOfFunctionToFunctionEdges: 35,
         oneCalleeCalls: 45,
-        funTotal: 30,
-        callTotal: 40,
-        reachableTotal: 32,
+        funTotal: 33,
+        callTotal: 43,
+        reachableTotal: 35,
     });
 
     runTest("tests/micro", "private.js", {
@@ -325,9 +325,9 @@ describe("tests/micro", () => {
         moduleInfos: 1,
         numberOfFunctionToFunctionEdges: 27,
         oneCalleeCalls: 15,
-        funTotal: 24,
-        callTotal: 24,
-        reachableTotal: 24,
+        funTotal: 25,
+        callTotal: 25,
+        reachableTotal: 25,
     });
 
     runTest("tests/micro", "arguments.js", {
@@ -621,7 +621,7 @@ describe("tests/micro", () => {
         moduleInfos: 1,
         numberOfFunctionToFunctionEdges: 2,
         oneCalleeCalls: 2,
-        reachableTotal: 2,
+        reachableTotal: 3,
     });
 
     runTest("tests/micro", "prototypes3.js", {

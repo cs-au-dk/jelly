@@ -116,7 +116,7 @@ import {
 } from "../natives/ecmascript";
 import {Operations} from "./operations";
 import {TokenListener} from "./listeners";
-import {isDummyConstructor, JELLY_NODE_ID} from "../parsing/extras";
+import {JELLY_NODE_ID} from "../parsing/extras";
 
 export const IDENTIFIER_KIND = Symbol();
 
@@ -659,9 +659,6 @@ export function visit(ast: File, op: Operations) {
                     if (!isParentExpressionStatement(path) || exported)
                         solver.addTokenConstraint(ct, vp.nodeVar(path.node));
                 }
-
-                if (isDummyConstructor(constructor)) // no explicit constructor (dyn.ts records a call to an implicit constructor)
-                    f.registerArtificialFunction(op.moduleInfo, path.node); // XXX: no longer needed?
 
                 // constraint: ct ∈ ⟦C⟧ where ct is the constructor function
                 if (path.node.id)
