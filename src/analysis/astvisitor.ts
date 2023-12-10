@@ -311,11 +311,14 @@ export function visit(ast: File, op: Operations) {
                 }
 
                 if (options.newobj) {
-                    // create prototype object
-                    const pt = op.newPrototypeToken(path.node);
-                    const ft = op.newFunctionToken(path.node);
-                    solver.addTokenConstraint(pt, vp.objPropVar(ft, "prototype"));
-                    solver.addTokenConstraint(ft, vp.objPropVar(pt, "constructor"));
+
+                    if (isFunctionDeclaration(path.node) || isFunctionExpression(path.node) || isClassMethod(path.node) || isClassPrivateMethod(path.node)) {
+                        // create prototype object
+                        const pt = op.newPrototypeToken(path.node);
+                        const ft = op.newFunctionToken(path.node);
+                        solver.addTokenConstraint(pt, vp.objPropVar(ft, "prototype"));
+                        solver.addTokenConstraint(ft, vp.objPropVar(pt, "constructor"));
+                    }
 
                     // if constructor for non-abstract class, make sure there is an instance
                     if (cls && !(isClassDeclaration(cls) && cls.abstract)) {
