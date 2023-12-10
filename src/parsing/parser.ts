@@ -56,7 +56,10 @@ export function parseAndDesugar(str: string, file: string, f: FragmentState): Fi
         res = transformFromAstSync(originalAst, str, {
             plugins: [
                 replaceTypeScriptImportExportAssignmentsAndAddConstructors,
-                ["@babel/plugin-transform-typescript", { onlyRemoveTypeImports: true }],
+                ["@babel/plugin-transform-typescript", {
+                    onlyRemoveTypeImports: true,
+                    allowDeclareFields: true
+                }],
                 ["@babel/plugin-transform-template-literals", { loose: true }]
             ], // TODO: perform other transformations?
             cwd: __dirname,
