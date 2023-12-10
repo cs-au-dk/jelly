@@ -64,7 +64,7 @@ import Solver from "./solver";
 import {GlobalState} from "./globalstate";
 import {DummyModuleInfo, FunctionInfo, ModuleInfo, normalizeModuleName, PackageInfo} from "./infos";
 import logger from "../misc/logger";
-import {builtinModules} from "../natives/nodejs";
+import {isBuiltInModule} from "../natives/nodejs";
 import {requireResolve} from "../misc/files";
 import {options} from "../options";
 import {FilePath, getOrSet, isArrayIndex, Location, locationToStringWithFile} from "../misc/util";
@@ -540,7 +540,7 @@ export class Operations {
         const f = this.solver.fragmentState; // (don't use in callbacks)
         const reexport = isExportDeclaration(path.node);
         let m: ModuleInfo | DummyModuleInfo | undefined;
-        if (builtinModules.has(str) || (str.startsWith("node:") && builtinModules.has(str.substring(5)))) {
+        if (isBuiltInModule(str)) {
 
             if (!reexport) {
                 // standard library module: model with UnknownAccessPath

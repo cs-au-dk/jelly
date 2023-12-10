@@ -213,7 +213,7 @@ export default class Solver {
      * Reports diagnostics periodically (only if print progress is enabled, stdout is tty, and log level is "info").
      */
     private printDiagnostics() {
-        if (options.printProgress && options.tty && isTTY && logger.level === "info") {
+        if (options.printProgress && options.tty && isTTY && !options.logfile && logger.level === "info") {
             const d = new Date().getTime();
             if (d > this.diagnostics.lastPrintDiagnosticsTime + 100) { // only report every 100ms
                 this.diagnostics.lastPrintDiagnosticsTime = d;

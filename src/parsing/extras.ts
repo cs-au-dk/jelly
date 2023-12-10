@@ -101,14 +101,14 @@ export function replaceTypeScriptImportExportAssignmentsAndAddConstructors({ tem
                 }
                 const c = classMethod("constructor", identifier("constructor"), params, body);
                 addComment(body, "leading", "JELLY_DEFAULT");
-                path.get('body').unshiftContainer('body', c);
+                path.get("body").unshiftContainer("body", c);
             }
         }
     };
 }
 
-export function isDummyConstructor(c: ClassMethod | undefined): boolean {
-    return c !== undefined && c.kind === "constructor" && c.body.leadingComments?.[0].value == "JELLY_DEFAULT";
+export function isDummyConstructor(c: Node | undefined): boolean {
+    return isClassMethod(c) && c.kind === "constructor" && c.body.leadingComments?.[0].value == "JELLY_DEFAULT";
 }
 
 export const JELLY_NODE_ID = Symbol("JELLY_NODE_ID");

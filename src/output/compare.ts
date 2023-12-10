@@ -253,10 +253,10 @@ function getIgnores(cg: CallGraph): Set<string> {
 }
 
 /**
-  * Returns the number of functions in cg1, the number of reachable functions
-  * in cg2, and the number of functions in cg1 that are reachable in cg2.
-  * Reachability in cg2 is computed from all application modules in cg2.
-  */
+ * Returns the number of functions in cg1, the number of reachable functions
+ * in cg2, and the number of functions in cg1 that are reachable in cg2.
+ * Reachability in cg2 is computed from all application modules in cg2.
+ */
 function computeReachableFunctions(
     file2: string,
     cg1: CallGraph,
@@ -348,7 +348,7 @@ function computeReachableFunctions(
             continue;
         const loc = cg1.calls[a];
         const i = loc.indexOf(":");
-        checkEdge(af, b, "call", `${cg1.files[Number(loc.substring(0, i))]}:${loc.substring(i+1)}`);
+        checkEdge(af, b, "call", `${cg1.files[Number(loc.substring(0, i))]}:${loc.substring(i + 1)}`);
     }
 
     return [dcgReach, SCGreach.size, comReach];
@@ -388,7 +388,7 @@ export function compareCallGraphs(
     compareEntryArrays(cg1.entries ?? [], cg2.entries ?? [], file1, file2);
     if (compareBothWays)
         compareEntryArrays(cg2.entries ?? [], cg1.entries ?? [], file2, file1);
-    const filter2  = compareFileArrays(cg1.files, cg2, file1, file2);
+    const filter2 = compareFileArrays(cg1.files, cg2, file1, file2);
     const filter1 = compareBothWays && compareFileArrays(cg2.files, cg1, file2, file1) || undefined;
     const ignores1 = getIgnores(cg1);
     const ignores2 = getIgnores(cg2);
@@ -401,10 +401,10 @@ export function compareCallGraphs(
     // measure precision/recall in terms of individual call edges
     const [foundFun1, totalFun1, ignoredFun1] = compareEdges(cg1.fun2fun, cg2.fun2fun, file1, file2, cg1, cg2, "Function", "functions", ignores2, filter2);
     const [foundFun2, totalFun2, ignoredFun2] = compareBothWays &&
-        compareEdges(cg2.fun2fun, cg1.fun2fun, file2, file1, cg2, cg1, "Function", "functions", ignores1, filter1!) || [0, 0, 0];
+    compareEdges(cg2.fun2fun, cg1.fun2fun, file2, file1, cg2, cg1, "Function", "functions", ignores1, filter1!) || [0, 0, 0];
     const [foundCall1, totalCall1, ignoredCall1] = compareEdges(cg1.call2fun, cg2.call2fun, file1, file2, cg1, cg2, "Call", "calls", ignores2, filter2);
     const [foundCall2, totalCall2, ignoredCall2] = compareBothWays &&
-        compareEdges(cg2.call2fun, cg1.call2fun, file2, file1, cg2, cg1, "Call", "calls", ignores1, filter1!) || [0, 0, 0];
+    compareEdges(cg2.call2fun, cg1.call2fun, file2, file1, cg2, cg1, "Call", "calls", ignores1, filter1!) || [0, 0, 0];
     // measure recall in terms of reachable functions
     const [dcgReach, scgReach, comReach] = compareReachability && computeReachableFunctions(file2, cg1, cg2, ignores2, filter2) || [0, 0, 0];
 

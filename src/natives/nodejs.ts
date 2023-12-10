@@ -7,6 +7,10 @@ import {NativeObjectToken} from "../analysis/tokens";
  */
 export const builtinModules = new Set(module.builtinModules);
 
+export function isBuiltInModule(str: string): boolean {
+    return builtinModules.has(str) || (str.startsWith("node:") && builtinModules.has(str.substring(5)));
+}
+
 /*
  * Models of Node.js standard built-in objects.
  * See https://nodejs.org/api/ and https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/node.

@@ -27,7 +27,7 @@ export const isTTY = process.stdout.isTTY;
 const logger = winston.createLogger({
     level: "info",
     format: winston.format.printf(({level, message}) =>
-        isTTY && options?.tty ? colors[level] + message + RESET + CLEAR : message),
+        isTTY && options?.tty && !options.logfile ? colors[level] + message + RESET + CLEAR : message),
     transports: new winston.transports.Console({
         stderrLevels: [] // change to ["error"] to direct error messages to stderr
     })
@@ -53,6 +53,6 @@ export function writeStdOut(s: string) {
 }
 
 export function writeStdOutIfActive(s: string) {
-    if (options.printProgress && options.tty && isTTY && logger.level === "info")
+    if (options.printProgress && options.tty && !options.loglevel && isTTY && logger.level === "info")
         writeStdOut(s);
 }

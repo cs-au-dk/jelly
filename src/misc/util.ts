@@ -168,10 +168,6 @@ export function getOrSet<K, V>(m: Map<K, V> | WeakMap<any, V>, k: K, v: () => V)
     return r;
 }
 
-export function arrayToString(a: Array<any>, sep: string): string {
-    return a.length === 0 ? "-" : sep + a.join(sep);
-}
-
 export function mapMapSize<K1, K2, V>(m: Map<K1, Map<K2, V>>): number {
     let c = 0;
     for (const n of m.values())
@@ -275,15 +271,6 @@ export function getMapHybridSetSize<K, V>(m: Map<K, V | Set<V>>): number {
         else
             c++;
     return c;
-}
-
-export function forEachMapHybridSet<K, V>(m: Map<K, V | Set<V>>, f: (k: K, v: V) => void) {
-    for (const [k, v] of m)
-        if (v instanceof Set)
-            for (const t of v)
-                f(k, t);
-        else
-            f(k, v);
 }
 
 /**

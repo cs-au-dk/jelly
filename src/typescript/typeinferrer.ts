@@ -42,7 +42,7 @@ export class TypeScriptTypeInferrer {
     /**
      * Parses and infers types for the given files (and reachable files).
      */
-    constructor(files: string[]) {
+    constructor(files: Array<string>) {
         writeStdOutIfActive("Parsing as TypeScript...");
         logger.info("Parsing as TypeScript");
         const tsconfig = ts.findConfigFile(options.basedir, ts.sys.fileExists);

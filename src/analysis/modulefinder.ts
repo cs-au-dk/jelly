@@ -12,7 +12,7 @@ import {FilePath, locationToStringWithFile} from "../misc/util";
 import traverse, {NodePath} from "@babel/traverse";
 import logger from "../misc/logger";
 import {options} from "../options";
-import {builtinModules} from "../natives/nodejs";
+import {isBuiltInModule} from "../natives/nodejs";
 import {requireResolve} from "../misc/files";
 import {ModuleInfo} from "./infos";
 import {FragmentState} from "./fragmentstate";
@@ -23,7 +23,7 @@ import {FragmentState} from "./fragmentstate";
 export function findModules(ast: File, file: FilePath, f: FragmentState, moduleInfo: ModuleInfo) {
 
     function requireModule(str: string, path: NodePath) { // see requireModule in operations.ts
-        if (!(builtinModules.has(str) || (str.startsWith("node:") && builtinModules.has(str.substring(5)))))
+        if (!isBuiltInModule(str))
             try {
                 const filepath = requireResolve(str, file, path.node, f);
                 if (filepath)
