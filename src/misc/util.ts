@@ -346,8 +346,8 @@ export class SourceLocationsToJSON {
 
         return {
             loc: {
-                start: { line: Number(startLine), column: Number(startCol)-1 },
-                end: { line: Number(endLine), column: Number(endCol)-1 },
+                start: {line: Number(startLine), column: Number(startCol)-1},
+                end: {line: Number(endLine), column: Number(endCol)-1},
             },
             fileIndex,
             file: this.files[fileIndex],
@@ -365,7 +365,7 @@ export function mapCallsToFunctions(cg: CallGraph): Map<number, number> {
 
     type LocationWithIndex = SimpleLocation & { index: number };
     const byFile: Array<{ functions: LocationWithIndex[], calls: LocationWithIndex[] }> =
-        Array.from(cg.files, () => ({ functions: [], calls: [] }));
+        Array.from(cg.files, () => ({functions: [], calls: []}));
 
     // group functions and calls by file
     for (const kind of ["functions", "calls"] as const)
@@ -396,14 +396,11 @@ export function mapCallsToFunctions(cg: CallGraph): Map<number, number> {
         functions.sort(compareSL);
         calls.sort(compareSL);
 
-        const synthModFun = functions[0];
+        let synthModFun: LocationWithIndex | undefined = functions[0];
         if (synthModFun.start.line !== 1 || synthModFun.start.column !== 0) {
-            logger.error(`No synthetic module function for file ${cg.files[i]}\nFunctions:`);
-            for (const f of functions) {
-                const fs = parser.makeLocString({...f, filename: cg.files[i]});
-                logger.error(`\t${fs}`);
-            }
-            continue;
+            const funs = functions.map(f => parser.makeLocString({...f, filename: cg.files[i]})).join("\n\t");
+            logger.warn(`No synthetic module function for file ${cg.files[i]}\nFunctions:\n\t${funs}`);
+            synthModFun = undefined;
         }
 
         // sweep over functions and calls simultaneously, maintaining a stack of functions
@@ -411,7 +408,7 @@ export function mapCallsToFunctions(cg: CallGraph): Map<number, number> {
         let funIndex = 0;
 
         for (const call of calls) {
-            if (!locationIn(call, synthModFun)) {
+            if (synthModFun && !locationIn(call, synthModFun)) {
                 const cs = parser.makeLocString({...call, filename: cg.files[i]});
                 const fs = parser.makeLocString({...synthModFun, filename: cg.files[i]});
                 logger.error(`Call ${cs} is outside module function (${fs})`);
@@ -438,9 +435,12 @@ export function mapCallsToFunctions(cg: CallGraph): Map<number, number> {
                     break;
             }
 
-            assert(stack.length);
-            const fun = stack[stack.length-1];
+            if (stack.length === 0) {
+                logger.error(`No function surrounding call ${parser.makeLocString({...call, filename: cg.files[i]})}!`);
+                continue;
+            }
 
+            const fun = stack[stack.length-1];
             if (!locationIn(call, fun)) {
                 // this should not happen!
                 // one case has been observed where the same file is loaded multiple times in the dynamic
