@@ -1,15 +1,5 @@
-import module from "module";
 import {NativeFunctionParams, NativeModel, NativeModelParams} from "./nativebuilder";
 import {NativeObjectToken} from "../analysis/tokens";
-
-/**
- * Names of Node.js built-in modules.
- */
-export const builtinModules = new Set(module.builtinModules);
-
-export function isBuiltInModule(str: string): boolean {
-    return builtinModules.has(str) || (str.startsWith("node:") && builtinModules.has(str.substring(5)));
-}
 
 /*
  * Models of Node.js standard built-in objects.

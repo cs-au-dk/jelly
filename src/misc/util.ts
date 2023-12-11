@@ -161,7 +161,7 @@ export function getOrSet<K, V>(m: Map<K, V> , k: K, v: () => V): V
 export function getOrSet<K extends object, V>(m: WeakMap<K, V>, k: K, v: () => V): V
 export function getOrSet<K, V>(m: Map<K, V> | WeakMap<any, V>, k: K, v: () => V): V {
     let r = m.get(k);
-    if (!r) {
+    if (r === undefined) {
         r = v();
         m.set(k, r);
     }

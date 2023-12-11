@@ -80,7 +80,7 @@ program
     .option("--zeros", "report calls with zero callees and functions with zero callers")
     .option("--exclude-entries <glob...>", "files to exclude when specifying entry directories")
     .option("--tracked-modules <glob...>", "modules to track usage of (default: empty unless using -p, -v or --api-usage)")
-    .option("--external-matches", "enable pattern matches from external code (default: false unless using -v)")
+    .option("--external-matches", "enable pattern matches from external code")
     .option("--no-callgraph-implicit", "omit implicit calls in call graph") // TODO: not yet including implicit valueOf/toString calls
     .option("--no-callgraph-native", "omit native calls in call graph") // TODO: not yet including the native functions themselves, only callbacks from native functions
     .option("--no-callgraph-require", "omit module loading in call graph") // TODO: currently works only for modules that are resolved successfully (and included even if --ignore-dependencies is used)?

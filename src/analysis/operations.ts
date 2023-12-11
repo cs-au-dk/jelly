@@ -64,7 +64,6 @@ import Solver from "./solver";
 import {GlobalState} from "./globalstate";
 import {DummyModuleInfo, FunctionInfo, ModuleInfo, normalizeModuleName, PackageInfo} from "./infos";
 import logger from "../misc/logger";
-import {isBuiltInModule} from "../natives/nodejs";
 import {requireResolve} from "../misc/files";
 import {options} from "../options";
 import {FilePath, getOrSet, isArrayIndex, Location, locationToStringWithFile} from "../misc/util";
@@ -84,6 +83,7 @@ import {CallNodePath, SpecialNativeObjects} from "../natives/nativebuilder";
 import {TokenListener} from "./listeners";
 import micromatch from "micromatch";
 import {callPromiseResolve} from "../natives/nativehelpers";
+import Module from "module";
 
 /**
  * Models of core JavaScript operations used by astvisitor and nativehelpers.
@@ -540,7 +540,7 @@ export class Operations {
         const f = this.solver.fragmentState; // (don't use in callbacks)
         const reexport = isExportDeclaration(path.node);
         let m: ModuleInfo | DummyModuleInfo | undefined;
-        if (isBuiltInModule(str)) {
+        if (Module.isBuiltin(str)) {
 
             if (!reexport) {
                 // standard library module: model with UnknownAccessPath

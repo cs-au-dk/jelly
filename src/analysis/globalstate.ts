@@ -262,8 +262,8 @@ export class GlobalState {
             const pt = this.moduleInfosByPath.get(tofile)!.packageInfo;
             if (pf !== pt && !pf.directDependencies.has(pt)) {
                 pf.directDependencies.add(pt);
-                if (logger.isVerboseEnabled())
-                    logger.verbose(`Package ${pf} depends on ${pt}`);
+                if (logger.isDebugEnabled())
+                    logger.debug(`Package ${pf} depends on ${pt}`);
             }
         }
         return moduleInfo;

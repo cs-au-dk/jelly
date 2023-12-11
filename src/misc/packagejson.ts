@@ -44,7 +44,7 @@ export function findPackageJson(file: FilePath): {packageJson: FilePath, dir: Fi
         if (doesDirContainPackageJsonForNpmPackage(dir))
             return {packageJson: resolve(dir, "package.json"), dir};
         const d = dirname(dir);
-        if (d === dir || (options.basedir && !d.startsWith(dirname(options.basedir))))
+        if (d === dir || (options.basedir && !d.startsWith(options.basedir)))
             return undefined;
         dir = d;
     }

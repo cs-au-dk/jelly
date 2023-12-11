@@ -142,8 +142,6 @@ export function setOptions(opts: OptionValues & Partial<typeof options>) {
     }
     if (options.apiUsage)
         options.ignoreDependencies = true;
-    if (options.vulnerabilities)
-        options.externalMatches = true;
 }
 
 /**

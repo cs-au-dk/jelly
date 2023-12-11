@@ -53,6 +53,6 @@ export function writeStdOut(s: string) {
 }
 
 export function writeStdOutIfActive(s: string) {
-    if (options.printProgress && options.tty && !options.loglevel && isTTY && logger.level === "info")
+    if (options.printProgress && options.tty && !options.logfile && isTTY && logger.level === "info")
         writeStdOut(s);
 }

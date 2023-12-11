@@ -1,5 +1,5 @@
 import {closeSync, existsSync, lstatSync, openSync, readdirSync, readFileSync, readSync, writeSync} from "fs";
-import {basename, dirname, extname, relative, resolve} from "path";
+import {basename, extname, relative, resolve} from "path";
 import module from "module";
 import {options} from "../options";
 import micromatch from "micromatch";
@@ -129,7 +129,7 @@ export function requireResolve(str: string, file: FilePath, node: Node, f: Fragm
         if (!filepath)
             throw e;
     }
-    if (!filepath.startsWith(dirname(options.basedir))) {
+    if (!filepath.startsWith(options.basedir)) {
         const msg = `Found module at ${filepath}, but not in basedir`;
         logger.debug(msg);
         throw new Error(msg);
