@@ -92,98 +92,131 @@ function compareEntryArrays(as1: Array<string>, as2: Array<string>, file1: strin
             logger.warn(`Entry ${e} found in ${file1}, missing in ${file2}`);
 }
 
+// Functions: dyn.ts sometimes reports incorrect end locations for functions.
+// Example in tests/micro/classes.js: synthetic function for f8 initializer ends on line 29 (in dynamic call graph)
+// Example in tests/mochatest/require-hook.js: function on line 2 ends on column 117 instead of 116
+// Unfortunately we also have trouble matching functions based on their start locations, as babel does not
+// always include location information for some tokens that are part of the function declaration
+// (brackets in ["foo"]() { ... }).
+// Calls: dyn.ts sometimes reports incorrect start source locations for call expressions
+// with parenthesized base expressions (see tests/micro/call-expressions.js).
+// Due to these issues we try to match functions and calls on both their start and end locations.
+
 /**
  * Returns a canonical representation of a LocationJSON string that is suitable for matching
  * between call graphs collected from dynamic and static analysis.
  */
-function loc(str: LocationJSON, cg: CallGraph, kind: "Function" | "Call"): {str: string, file: string} {
+function loc(str: LocationJSON, cg: CallGraph): {start: string, end: string, file: string} {
     const parsed = new SourceLocationsToJSON(cg.files).parseLocationJSON(str);
-    let rest;
-    if (!parsed.loc)
-        rest = "?:?";
-    else {
-        // Functions: dyn.ts sometimes reports incorrect end locations for functions, so
-        // we strip the end locations off of functions.
-        // Calls: dyn.ts sometimes reports incorrect start source locations for call expressions
-        // with parenthesized base expressions (see tests/micro/call-expressions.js).
-        // since end locations are unique for call expressions we can solely rely on those for matching
-        const pos = kind === "Call" ? parsed.loc.end : parsed.loc.start;
-        rest = `${pos.line}:${pos.column + 1}`;
+    let start = "?:?", end = "?:?";
+    if (parsed.loc) {
+        start = `${parsed.loc.start.line}:${parsed.loc.start.column + 1}`;
+        end = `${parsed.loc.end.line}:${parsed.loc.end.column + 1}`;
     }
-    return {str: `${parsed.file}:${rest}`, file: parsed.file};
+    return {start: `${parsed.file}:${start}`, end: `${parsed.file}:${end}`, file: parsed.file};
+}
+
+/*
+ * Computes bidirectional mappings from locations in cg1 to locations in cg2 and vice versa.
+ * A mapping from loc a in cg1 to loc b in cg2 is added if a and b have equal start _or_ end locations.
+ */
+function matchLocationObjects(
+    cg1: CallGraph,
+    cg2: CallGraph,
+    prop: "functions" | "calls",
+    ignores: Set<string>,
+): [Map<number, Set<number>>, Map<number, Set<number>>] {
+    const starts = new Map<string, Array<number>>();
+    const ends = new Map<string, Array<number>>();
+    for (const [i, rawloc] of Object.entries(cg1[prop])) {
+        const {start, end} = loc(rawloc, cg1);
+        if (prop === "functions" && ignores.has(start)) {
+            logger.debug(`Ignoring ${start}`);
+            continue;
+        }
+        mapArrayAdd(start, Number(i), starts);
+        mapArrayAdd(end, Number(i), ends);
+    }
+
+    const aToB = new Map<number, Set<number>>();
+    const bToA = new Map<number, Set<number>>();
+
+    for (const [j, rawloc] of Object.entries(cg2[prop])) {
+        const {start, end} = loc(rawloc, cg2);
+        if (prop === "functions" && ignores.has(start)) {
+            logger.debug(`Ignoring ${start}`);
+            continue;
+        }
+
+        const is = new Set([...starts.get(start) ?? [], ...ends.get(end) ?? []]);
+        if (!is.size)
+            continue;
+
+        const jn = Number(j);
+        bToA.set(jn, is);
+        for (const i of is) mapGetSet(aToB, i).add(jn);
+    }
+
+    return [aToB, bToA];
 }
 
 function compareLocationObjects(
-    o1: {[index: number]: string},
-    o2: {[index: number]: string},
+    match: Map<number, unknown>,
+    cg: CallGraph,
     file1: string,
     file2: string,
-    cg1: CallGraph,
-    cg2: CallGraph,
     kind: "Function" | "Call",
     ignores: Set<string>,
     filter: FileFilter,
 ) {
-    const s = new Set<string>();
-    for (const loc2 of Object.values(o2))
-        s.add(loc(loc2, cg2, kind).str);
-    for (const loc1 of Object.values(o1)) {
-        const {str: q, file: f} = loc(loc1, cg1, kind);
-        if (ignores.has(q)) {
-            logger.debug(`Ignoring ${q}`);
-            continue;
-        }
-        if (!s.has(q) && filter.isIncluded(f, false)) {
+    for (const [i, rawloc] of Object.entries(kind === "Function" ? cg.functions : cg.calls)) {
+        const {start: q, file: f} = loc(rawloc, cg);
+        if (!match.has(Number(i)) && (kind !== "Function" || !ignores.has(q))) {
             const extra = !filter.files.has(f) ? ` (file ${f} missing)` : "";
             logger.warn(`${kind} ${q} found in ${file1}, missing in ${file2}${extra}`);
         }
     }
 }
 
-function edge(from: string, to: string): string {
-    return `${from} -> ${to}`;
-}
-
 function compareEdges(
-    es1: Array<[number, number]>,
-    es2: Array<[number, number]>,
     file1: string,
     file2: string,
     cg1: CallGraph,
     cg2: CallGraph,
     kind: "Function" | "Call",
-    prop: "functions" | "calls",
+    matchCalls: Map<number, Set<number>>,
+    matchFuns: Map<number, Set<number>>,
     ignores: Set<string>,
     filter: FileFilter,
 ): [number, number, number] {
+    const sourceProp = kind === "Function" ? "functions" : "calls";
+    const edgesProp = kind === "Function" ? "fun2fun" : "call2fun";
     const s = new Set<string>();
-    for (const [i, j] of es2) {
-        if (!cg2[prop][i])
-            assert.fail(`cg2["${prop}"][${i}] is undefined`);
-        if (!(cg2.functions)[j])
+    for (const [i, j] of cg2[edgesProp]) {
+        if (!cg2[sourceProp][i])
+            assert.fail(`cg2.${sourceProp}[${i}] is undefined`);
+        if (!cg2.functions[j])
             assert.fail(`cg2.functions[${j}] is undefined`);
-        const from = loc(cg2[prop][i], cg2, kind).str;
-        const to = loc((cg2.functions)[j], cg2, "Function").str;
-        s.add(edge(from, to));
+        s.add(`${i} -> ${j}`);
     }
     let found = 0, missed = 0, ignored = 0;
-    for (const [i, j] of es1) { // TODO: assuming no duplicate pairs
-        if (!cg1[prop][i])
-            assert.fail(`cg1["${prop}"][${i}] is undefined`);
-        if (!(cg1.functions)[j])
+    for (const [i, j] of cg1[edgesProp]) { // TODO: assuming no duplicate pairs
+        if (!cg1[sourceProp][i])
+            assert.fail(`cg1.${sourceProp}[${i}] is undefined`);
+        if (!cg1.functions[j])
             assert.fail(`cg1.functions[${j}] is undefined`);
-        const {str: from, file: ff} = loc(cg1[prop][i], cg1, kind);
-        const {str: to, file: ft} = loc((cg1.functions)[j], cg1, "Function");
-        if (ignores.has(from) || ignores.has(to)) {
+        const {start: fstart, end: from, file: ff} = loc(cg1[sourceProp][i], cg1);
+        const {start: tstart, end: to, file: ft} = loc(cg1.functions[j], cg1);
+        if (kind === "Function" && ignores.has(fstart) || ignores.has(tstart)) {
             logger.debug(`Ignoring ${from} -> ${to}`);
             continue;
         }
-        const e = edge(from, to);
-        if (!s.has(e)) {
+        const i2s = Array.from(matchCalls.get(i) ?? []), j2s = Array.from(matchFuns.get(j) ?? []);
+        if (!i2s.flatMap(i2 => j2s.map(j2 => `${i2} -> ${j2}`)).some(e => s.has(e))) {
             if (filter.isIncluded(ff, false) &&
                 filter.isIncluded(ft, false)) {
                 const extra = !filter.files.has(ff) ? ` (file ${ff} missing)` : !filter.files.has(ft) ? ` (file ${ft} missing)` : "";
-                logger.info(`${kind}->function edge ${e} found in ${file1}, missing in ${file2}${extra}`);
+                logger.info(`${kind}->function edge ${fstart} -> ${tstart} found in ${file1}, missing in ${file2}${extra}`);
                 missed++;
             } else
                 ignored++;
@@ -193,62 +226,56 @@ function compareEdges(
     return [found, found + missed, ignored];
 }
 
-// https://manu.sridharan.net/files/ICSE-2013-Approximate.pdf
-// https://github.com/asgerf/callgraphjs/blob/master/evaluate.js
+/*
+ * Returns the precision and recall of call->function edges in cg1 compared to cg2.
+ * The values are averaged over all call sites in cg1.
+ * Sources:
+ * - https://manu.sridharan.net/files/ICSE-2013-Approximate.pdf
+ * - https://github.com/asgerf/callgraphjs/blob/master/evaluate.js
+ */
 function compareCallSiteEdges(
     cg1: CallGraph,
     cg2: CallGraph,
-    ignores1: Set<string>,
-    ignores2: Set<string>,
+    call2ToCall1: Map<number, Set<number>>,
+    fun2ToFun1: Map<number, Set<number>>,
+    ignores: Set<string>,
 ): {precision: number, recall: number} {
     const filter = new FileFilter(cg1, cg2);
-    const floc = (s: string, cg: CallGraph, kind: "Call" | "Function") => {
-        const {str, file} = loc(s, cg, kind);
-        return filter.isIncluded(file, false) ? str : undefined;
-    };
-    const e1 = new Map<string, Set<string>>();
+    const floc = (s: string, cg: CallGraph) => filter.isIncluded(loc(s, cg).file, false);
+    const e1 = new Map<number, Set<number>>();
     for (const [c, f] of cg1.call2fun) {
-        const from = floc(cg1.calls[c], cg1, "Call");
-        const to = floc(cg1.functions[f], cg1, "Function");
-        if (!from || !to)
+        if (!floc(cg1.calls[c], cg1) || !floc(cg1.functions[f], cg1))
             continue;
-        if (ignores2.has(to)) {
-            logger.debug(`Ignoring ${from} -> ${to}`);
+        if (ignores.has(loc(cg1.functions[f], cg1).start)) {
+            // logger.debug(`Ignoring ${from} -> ${to}`);
             continue;
         }
-        mapGetSet(e1, from).add(to);
+        mapGetSet(e1, c).add(f);
     }
-    const e2 = new Map<string, Set<string>>();
+    const e2 = new Map<number, Set<number>>();
     for (const [c, f] of cg2.call2fun) {
-        const from = floc(cg2.calls[c], cg2, "Call");
-        const to = floc(cg2.functions[f], cg2, "Function");
-        if (!from || !to)
+        if (!floc(cg2.calls[c], cg2) || !floc(cg2.functions[f], cg2))
             continue;
-        if (ignores1.has(to)) {
-            logger.debug(`Ignoring ${from} -> ${to}`);
-            continue;
-        }
-        mapGetSet(e2, from).add(to);
+        for (const i of call2ToCall1.get(c) ?? [])
+            for (const j of fun2ToFun1.get(f) ?? [])
+                mapGetSet(e2, i).add(j);
     }
-    const ps = [];
-    const rs = [];
+    const ps = [], rs = [];
     for (const [from, s1] of e1) {
         const s2 = e2.get(from) ?? new Set;
         const pos = Array.from(s1).reduce((acc, f) => acc + (s2.has(f) ? 1 : 0), 0);
         ps.push(s2.size > 0 ? pos / s2.size : 1);
         rs.push(pos / s1.size);
     }
-    function avg(xs: Array<number>): number {
-        return xs.reduce((acc, x) => acc + x, 0) / (xs.length || 1);
-    }
+    const avg = (xs: Array<number>) => xs.reduce((acc, x) => acc + x, 0) / (xs.length || 1);
     return {precision: avg(ps), recall: avg(rs)};
 }
 
-function getIgnores(cg: CallGraph): Set<string> {
+function getIgnores(...cgs: CallGraph[]): Set<string> {
     const s = new Set<string>();
-    if (cg.ignore)
-        for (const p of cg.ignore)
-            s.add(loc(p, cg, "Function").str);
+    for (const cg of cgs)
+        for (const p of cg.ignore ?? [])
+            s.add(loc(p, cg).start);
     return s;
 }
 
@@ -261,6 +288,7 @@ function computeReachableFunctions(
     file2: string,
     cg1: CallGraph,
     cg2: CallGraph,
+    fun1ToFun2: Map<number, Set<number>>,
     ignores: Set<string>,
     filter: FileFilter,
 ): [number, number, number] {
@@ -268,9 +296,7 @@ function computeReachableFunctions(
     // find the module entry function for each file by looking for functions
     // that begin at position 1:1 and span the longest
     const fileToModuleIndex: Array<{ index: number, loc: SimpleLocation } | undefined> = new Array(cg2.files.length);
-    const replocToIndex = new Map<string, number>();
     for (const [i, floc] of Object.entries(cg2.functions)) {
-        replocToIndex.set(loc(floc, cg2, "Function").str, Number(i));
         const parsed = parser.parseLocationJSON(floc);
         if (parsed.loc && parsed.loc.start.line === 1 && parsed.loc.start.column === 0) {
             const prev = fileToModuleIndex[parsed.fileIndex]?.loc;
@@ -309,32 +335,30 @@ function computeReachableFunctions(
     if (logger.isDebugEnabled()) {
         logger.debug("Statically reachable functions:");
         for (const i of SCGreach)
-            logger.debug(`\t${loc(cg2.functions[i], cg2, "Function").str}`);
+            logger.debug(`\t${loc(cg2.functions[i], cg2).end}`);
     }
 
     let dcgReach = 0, comReach = 0;
-    for (const floc of Object.values(cg1.functions)) {
-        const {str: reploc, file} = loc(floc, cg1, "Function");
-        if (ignores.has(reploc) || !filter.isIncluded(file, false))
+    for (const [i, rawloc] of Object.entries(cg1.functions)) {
+        const {start, file} = loc(rawloc, cg1);
+        if (ignores.has(start) || !filter.isIncluded(file, false))
             continue;
         dcgReach++;
-        if (SCGreach.has(replocToIndex.get(reploc)!))
+        if (Array.from(fun1ToFun2.get(Number(i)) ?? []).some(j => SCGreach.has(j)))
             comReach++;
         else
-            logger.info(`Function ${reploc} is unreachable in ${file2}`);
+            logger.info(`Function ${start} is unreachable in ${file2}`);
     }
 
     // report edges from cg1 where only the source is reachable
     function checkEdge(a: number, b: number, kind: "function" | "call" = "function", rloc?: string) {
-        const {str: aloc, file: file1} = loc(cg1.functions[a], cg1, "Function");
-        const i = replocToIndex.get(aloc);
-        if (i === undefined || !SCGreach.has(i) || !filter.isIncluded(file1, false))
+        const {start: aloc, file: file1} = loc(cg1.functions[a], cg1);
+        if (ignores.has(aloc) || !filter.isIncluded(file1, false) ||
+                !Array.from(fun1ToFun2.get(a) ?? []).some(f => SCGreach.has(f)))
             return;
-        const {str: bloc, file: file2} = loc(cg1.functions[b], cg1, "Function");
-        if (!filter.isIncluded(file2, false))
-            return;
-        const j = replocToIndex.get(bloc);
-        if (j === undefined || !SCGreach.has(j))
+        const {start: bloc, file: file2} = loc(cg1.functions[b], cg1);
+        if (!ignores.has(bloc) && filter.isIncluded(file2, false) &&
+                !Array.from(fun1ToFun2.get(b) ?? []).some(f => SCGreach.has(f)))
             logger.info(`Missed ${kind}->function edge ${rloc ?? aloc} -> ${bloc} could increase reachability recall`);
     }
 
@@ -346,9 +370,8 @@ function computeReachableFunctions(
         const af = callFunIdx.get(a);
         if (af === undefined)
             continue;
-        const loc = cg1.calls[a];
-        const i = loc.indexOf(":");
-        checkEdge(af, b, "call", `${cg1.files[Number(loc.substring(0, i))]}:${loc.substring(i + 1)}`);
+        const {start} = loc(cg1.calls[a], cg1);
+        checkEdge(af, b, "call", start);
     }
 
     return [dcgReach, SCGreach.size, comReach];
@@ -390,23 +413,24 @@ export function compareCallGraphs(
         compareEntryArrays(cg2.entries ?? [], cg1.entries ?? [], file2, file1);
     const filter2 = compareFileArrays(cg1.files, cg2, file1, file2);
     const filter1 = compareBothWays && compareFileArrays(cg2.files, cg1, file2, file1) || undefined;
-    const ignores1 = getIgnores(cg1);
-    const ignores2 = getIgnores(cg2);
-    compareLocationObjects(cg1.functions, cg2.functions, file1, file2, cg1, cg2, "Function", ignores2, filter2);
+    const ignores = getIgnores(cg1, cg2);
+    const [fun1ToFun2, fun2ToFun1] = matchLocationObjects(cg1, cg2, "functions", ignores);
+    compareLocationObjects(fun1ToFun2, cg1, file1, file2, "Function", ignores, filter2);
     if (compareBothWays)
-        compareLocationObjects(cg2.functions, cg1.functions, file2, file1, cg2, cg1, "Function", ignores1, filter1!);
-    compareLocationObjects(cg1.calls, cg2.calls, file1, file2, cg1, cg2, "Call", ignores2, filter2);
+        compareLocationObjects(fun2ToFun1, cg2, file2, file1, "Function", ignores, filter1!);
+    const [call1ToCall2, call2ToCall1] = matchLocationObjects(cg1, cg2, "calls", ignores);
+    compareLocationObjects(call1ToCall2, cg1, file1, file2, "Call", ignores, filter2);
     if (compareBothWays)
-        compareLocationObjects(cg2.calls, cg1.calls, file2, file1, cg2, cg1, "Call", ignores1, filter1!);
+        compareLocationObjects(call2ToCall1, cg2, file2, file1, "Call", ignores, filter1!);
     // measure precision/recall in terms of individual call edges
-    const [foundFun1, totalFun1, ignoredFun1] = compareEdges(cg1.fun2fun, cg2.fun2fun, file1, file2, cg1, cg2, "Function", "functions", ignores2, filter2);
+    const [foundFun1, totalFun1, ignoredFun1] = compareEdges(file1, file2, cg1, cg2, "Function", fun1ToFun2, fun1ToFun2, ignores, filter2);
     const [foundFun2, totalFun2, ignoredFun2] = compareBothWays &&
-    compareEdges(cg2.fun2fun, cg1.fun2fun, file2, file1, cg2, cg1, "Function", "functions", ignores1, filter1!) || [0, 0, 0];
-    const [foundCall1, totalCall1, ignoredCall1] = compareEdges(cg1.call2fun, cg2.call2fun, file1, file2, cg1, cg2, "Call", "calls", ignores2, filter2);
+        compareEdges(file2, file1, cg2, cg1, "Function", fun2ToFun1, fun2ToFun1, ignores, filter1!) || [0, 0, 0];
+    const [foundCall1, totalCall1, ignoredCall1] = compareEdges(file1, file2, cg1, cg2, "Call", call1ToCall2, fun1ToFun2, ignores, filter2);
     const [foundCall2, totalCall2, ignoredCall2] = compareBothWays &&
-    compareEdges(cg2.call2fun, cg1.call2fun, file2, file1, cg2, cg1, "Call", "calls", ignores1, filter1!) || [0, 0, 0];
+        compareEdges(file2, file1, cg2, cg1, "Call", call2ToCall1, fun2ToFun1, ignores, filter1!) || [0, 0, 0];
     // measure recall in terms of reachable functions
-    const [dcgReach, scgReach, comReach] = compareReachability && computeReachableFunctions(file2, cg1, cg2, ignores2, filter2) || [0, 0, 0];
+    const [dcgReach, scgReach, comReach] = compareReachability && computeReachableFunctions(file2, cg1, cg2, fun1ToFun2, ignores, filter2) || [0, 0, 0];
 
     const formatFraction = (num: number, den: number) => `${num}/${den}${den === 0 ? "" : ` (${percent(num / den)})`}`;
     if (ignoredFun1 > 0 || ignoredCall1 > 0)
@@ -419,7 +443,7 @@ export function compareCallGraphs(
     if (compareBothWays)
         logger.info(`Call->function edges in ${file2} that are also in ${file1}: ${formatFraction(foundCall2, totalCall2)}`);
     logger.info(`Call->function edges in ${file1} that are also in ${file2}: ${formatFraction(foundCall1, totalCall1)}`);
-    const {precision, recall} = compareCallSiteEdges(cg1, cg2, ignores1, ignores2);
+    const {precision, recall} = compareCallSiteEdges(cg1, cg2, call2ToCall1, fun2ToFun1, ignores);
     logger.info(`Per-call average precision: ${percent(precision)}, recall: ${percent(recall)}`);
     if (compareReachability) {
         if (compareBothWays)
