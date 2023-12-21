@@ -34,7 +34,7 @@ import {CallGraph} from "./typings/callgraph";
 program
     .name("jelly")
     .version(VERSION)
-    .addHelpText("before", "Copyright (C) 2023 Anders Møller\n")
+    .addHelpText("before", "Copyright (C) 2024 Anders Møller\n")
     .option("-b, --basedir <directory>", "base directory for files to analyze (default: auto-detect)")
     .option("-f, --logfile <file>", "log to file (default: log to stdout)")
     .option("-l, --loglevel <level>", "log level (debug/verbose/info/warn/error)", "info")

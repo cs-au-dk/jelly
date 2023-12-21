@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     apt-get autoremove -y && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
-ARG NODE_VERSION=18.17.1
+ARG NODE_VERSION=20.9.0
 ARG NODE_PACKAGE=node-v${NODE_VERSION}-linux
 RUN arch="$(dpkg --print-architecture)"; \
         case "$arch" in \

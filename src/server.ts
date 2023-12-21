@@ -57,7 +57,7 @@ const VERSION = require("../package.json").version;
 program
     .name("jelly-server")
     .version(VERSION)
-    .addHelpText("before", "Copyright (C) 2023 Anders Møller\n")
+    .addHelpText("before", "Copyright (C) 2024 Anders Møller\n")
     .option("-f, --logfile <file>", "log file (default: $TMP/jelly-PID.log)")
     .option("-l, --loglevel <level>", "analysis log level (info/warn/error)", "error")
     .option("-r, --loglevel-server <level>", "server log level (verbose/info/error)", "info")
