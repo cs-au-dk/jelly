@@ -337,80 +337,25 @@ export class Operations {
     }
 
     /**
-     * Models reading a property of an object.
+     * Models reading a property of all objects in a constraint variable.
      * @param base constraint variable representing the base variable
      * @param prop property name, undefined if unknown
      * @param dst constraint variable for the result, or undefined if not applicable
      * @param node AST node where the operation occurs (used for constraint keys etc.)
      * @param enclosing enclosing function/module of the AST node
+     * @param extrakey is included as the str parameter when computing listener IDs
      */
-    readProperty(base: ConstraintVar | undefined, prop: string | undefined, dst: ConstraintVar | undefined, node: Node, enclosing: FunctionInfo | ModuleInfo) {
+    readProperty(base: ConstraintVar | undefined, prop: string | undefined, dst: ConstraintVar | undefined, node: Node, enclosing: FunctionInfo | ModuleInfo, extrakey = "") {
         this.solver.collectPropertyRead(dst, base, this.packageObjectToken, prop);
 
         // expression E.p or E["p"] or E[i]
         if (prop !== undefined) {
 
-            const readFromGetter = (t: Token) => {
-                if (t instanceof FunctionToken && t.fun.params.length === 0) {
-                    if (dst)
-                        this.solver.addSubsetConstraint(this.solver.varProducer.returnVar(t.fun), dst);
-                    this.solver.fragmentState.registerCall(node, {accessor: true});
-                    this.solver.fragmentState.registerCallEdge(node, enclosing, this.a.functionInfos.get(t.fun)!, {accessor: true});
-                }
-            };
-
-            const bindGetterThis = (baset: Token, t: Token) => {
-                if (t instanceof FunctionToken && t.fun.params.length === 0)
-                    if (this.solver.fragmentState.functionsWithThis.has(t.fun))
-                        this.solver.addTokenConstraint(this.solver.fragmentState.maybeWidened(baset), this.solver.varProducer.thisVar(t.fun));
-            };
-
             // constraint: ∀ objects t ∈ ⟦E⟧: ...
             this.solver.addForAllTokensConstraint(base, TokenListener.READ_PROPERTY_BASE, node, (t: Token) => {
 
                 // constraint: ... ∀ ancestors t2 of t: ...
-                this.solver.addForAllAncestorsConstraint(t, TokenListener.READ_ANCESTORS, node, (t2: Token) => {
-                    if (t2 instanceof AllocationSiteToken || t2 instanceof FunctionToken || t2 instanceof NativeObjectToken || t2 instanceof PackageObjectToken) {
-
-                        // constraint: ... ⟦t2.p⟧ ⊆ ⟦E.p⟧
-                        if (dst)
-                            this.solver.addSubsetConstraint(this.solver.varProducer.objPropVar(t2, prop), dst); // TODO: exclude AccessPathTokens?
-
-                        // constraint: ... ∀ functions t3 ∈ ⟦(get)t2.p⟧: ⟦ret_t3⟧ ⊆ ⟦E.p⟧ (unless NativeObjectToken or "prototype")
-                        if (!(t2 instanceof NativeObjectToken) && prop !== "prototype") {
-                            const getter = this.solver.varProducer.objPropVar(t2, prop, "get");
-                            this.solver.addForAllTokensConstraint(getter, TokenListener.READ_PROPERTY_GETTER, node, (t3: Token) => readFromGetter(t3));
-                            this.solver.addForAllTokensConstraint(getter, TokenListener.READ_PROPERTY_GETTER_THIS, t, (t3: Token) => bindGetterThis(t, t3));
-                        }
-
-                        if (t2 instanceof PackageObjectToken && t2.kind === "Object") {
-                            // TODO: also reading from neighbor packages if t2 is a PackageObjectToken...
-                            if (options.readNeighbors)
-                                this.solver.addForAllPackageNeighborsConstraint(t2.packageInfo, node, (neighbor: PackageInfo) => {
-                                    if (dst)
-                                        this.solver.addSubsetConstraint(this.solver.varProducer.packagePropVar(neighbor, prop), dst); // TODO: exclude AccessPathTokens?
-                                    if (prop !== "prototype") {
-                                        const nt = this.a.canonicalizeToken(new PackageObjectToken(neighbor));
-                                        const getter = this.solver.varProducer.packagePropVar(neighbor, prop, "get");
-                                        this.solver.addForAllTokensConstraint(getter, TokenListener.READ_PROPERTY_GETTER2, node, (t3: Token) => readFromGetter(t3));
-                                        this.solver.addForAllTokensConstraint(getter, TokenListener.READ_PROPERTY_GETTER_THIS2, nt, (t3: Token) => bindGetterThis(nt, t3));
-                                    }
-                                });
-
-                        } else if (t2 instanceof ArrayToken) {
-                            if (isArrayIndex(prop)) {
-
-                                // constraint: ... ⟦t2.*⟧ ⊆ ⟦E.p⟧
-                                this.solver.addSubsetConstraint(this.solver.varProducer.arrayUnknownVar(t2), dst);
-                            }
-                        }
-
-                    } else if (base && t2 instanceof AccessPathToken) {
-
-                        // constraint: ... if t2 is access path, @E.p ∈ ⟦E.p⟧
-                        this.solver.addAccessPath(new PropertyAccessPath(base, prop), this.solver.varProducer.nodeVar(node), t2.ap);
-                    }
-                });
+                this.solver.addForAllAncestorsConstraint(t, TokenListener.READ_ANCESTORS, node, extrakey, (t2: Token) => this.readPropertyBound(t2, base!, prop, dst, node, enclosing, extrakey, t));
 
                 if (!options.newobj) {
                     if ((t instanceof FunctionToken || t instanceof ClassToken) && prop === "prototype") {
@@ -419,7 +364,7 @@ export class Operations {
                             this.solver.addTokenConstraint(this.packageObjectToken, dst);
                     }
                 }
-            });
+            }, extrakey);
 
         } else {
 
@@ -440,12 +385,83 @@ export class Operations {
                         if (logger.isInfoEnabled())
                             this.solver.fragmentState.registerUnhandledDynamicPropertyRead(node);
                     }
-                });
+                }, extrakey);
 
             // TODO: PropertyAccessPaths for dynamic property reads?
         }
         // TODO: computed property assignments (with known prefix/suffix) (also handle PrivateName properties?)
         // TODO: warn at reads from ‘arguments.callee’
+    }
+
+    /**
+     * Models reading a property of an object.
+     * @param t token to read from
+     * @param base constraint variable representing the base variable
+     * @param prop property name
+     * @param dst constraint variable for the result, or undefined if not applicable
+     * @param node AST node where the operation occurs (used for constraint keys etc.)
+     * @param enclosing enclosing function/module of the AST node
+     * @param extrakey is included as the str parameter when computing listener IDs
+     * @param thist token to use for 'this' when invoking getters
+     */
+    readPropertyBound(
+        t: Token, base: ConstraintVar, prop: string, dst: ConstraintVar | undefined,
+        node: Node, enclosing: FunctionInfo | ModuleInfo, extrakey: string, thist: Token = t,
+    ) {
+        if (isObjectPropertyVarObj(t)) {
+            const readFromGetter = (t: Token) => {
+                if (t instanceof FunctionToken && t.fun.params.length === 0) {
+                    if (dst)
+                        this.solver.addSubsetConstraint(this.solver.varProducer.returnVar(t.fun), dst);
+                    this.solver.fragmentState.registerCall(node, {accessor: true});
+                    this.solver.fragmentState.registerCallEdge(node, enclosing, this.a.functionInfos.get(t.fun)!, {accessor: true});
+                }
+            };
+
+            const bindGetterThis = (baset: Token, t: Token) => {
+                if (t instanceof FunctionToken && t.fun.params.length === 0)
+                    if (this.solver.fragmentState.functionsWithThis.has(t.fun))
+                        this.solver.addTokenConstraint(this.solver.fragmentState.maybeWidened(baset), this.solver.varProducer.thisVar(t.fun));
+            };
+
+            // constraint: ... ⟦t.p⟧ ⊆ ⟦E.p⟧
+            if (dst)
+                this.solver.addSubsetConstraint(this.solver.varProducer.objPropVar(t, prop), dst); // TODO: exclude AccessPathTokens?
+
+            // constraint: ... ∀ functions t3 ∈ ⟦(get)t.p⟧: ⟦ret_t3⟧ ⊆ ⟦E.p⟧ (unless NativeObjectToken or "prototype")
+            if (!(t instanceof NativeObjectToken) && prop !== "prototype") {
+                const getter = this.solver.varProducer.objPropVar(t, prop, "get");
+                this.solver.addForAllTokensConstraint(getter, TokenListener.READ_PROPERTY_GETTER, node, (t3: Token) => readFromGetter(t3), extrakey);
+                this.solver.addForAllTokensConstraint(getter, TokenListener.READ_PROPERTY_GETTER_THIS, thist, (t3: Token) => bindGetterThis(thist, t3));
+            }
+
+            if (t instanceof PackageObjectToken && t.kind === "Object") {
+                // TODO: also reading from neighbor packages if t is a PackageObjectToken...
+                if (options.readNeighbors)
+                    this.solver.addForAllPackageNeighborsConstraint(t.packageInfo, node, extrakey, (neighbor: PackageInfo) => {
+                        if (dst)
+                            this.solver.addSubsetConstraint(this.solver.varProducer.packagePropVar(neighbor, prop), dst); // TODO: exclude AccessPathTokens?
+                        if (prop !== "prototype") {
+                            const nt = this.a.canonicalizeToken(new PackageObjectToken(neighbor));
+                            const getter = this.solver.varProducer.packagePropVar(neighbor, prop, "get");
+                            this.solver.addForAllTokensConstraint(getter, TokenListener.READ_PROPERTY_GETTER2, node, (t3: Token) => readFromGetter(t3), extrakey);
+                            this.solver.addForAllTokensConstraint(getter, TokenListener.READ_PROPERTY_GETTER_THIS2, nt, (t3: Token) => bindGetterThis(nt, t3));
+                        }
+                    });
+
+            } else if (t instanceof ArrayToken) {
+                if (isArrayIndex(prop)) {
+
+                    // constraint: ... ⟦t.*⟧ ⊆ ⟦E.p⟧
+                    this.solver.addSubsetConstraint(this.solver.varProducer.arrayUnknownVar(t), dst);
+                }
+            }
+
+        } else if (t instanceof AccessPathToken) {
+
+            // constraint: ... if t is access path, @E.p ∈ ⟦E.p⟧
+            this.solver.addAccessPath(new PropertyAccessPath(base, prop), this.solver.varProducer.nodeVar(node), t.ap);
+        }
     }
 
     /**
@@ -459,6 +475,7 @@ export class Operations {
      * @param escapeNode AST node for 'registerEscapingToExternal' (defaults to node)
      * @param ac describes the type of property that is written to
      * @param invokeSetters if true, models invocation of setters (i.e. the [[Set]] internal method is modeled instead of [[DefineOwnProperty]])
+     * @param extrakey is included as the str parameter when computing listener IDs
      */
     writeProperty(
         src: ConstraintVar | undefined, lVar: ConstraintVar | undefined, base: Token, prop: string,
@@ -489,11 +506,11 @@ export class Operations {
                 if (!(base instanceof NativeObjectToken) && prop !== "prototype") {
 
                     // constraint: ... ∀ ancestors anc of base: ...
-                    this.solver.addForAllAncestorsConstraint(base, TokenListener.ASSIGN_ANCESTORS, node, (anc: Token) => {
+                    this.solver.addForAllAncestorsConstraint(base, TokenListener.ASSIGN_ANCESTORS, node, prop, (anc: Token) => {
                         if (isObjectPropertyVarObj(anc)) {
                             // constraint: ...: ∀ functions t2 ∈ ⟦(set)anc.p⟧: ⟦E2⟧ ⊆ ⟦x⟧ where x is the parameter of t2
                             const setter = this.solver.varProducer.objPropVar(anc, prop, "set");
-                            this.solver.addForAllTokensConstraint(setter, TokenListener.ASSIGN_SETTER, node, writeToSetter);
+                            this.solver.addForAllTokensConstraint(setter, TokenListener.ASSIGN_SETTER, node, writeToSetter, prop);
                             this.solver.addForAllTokensConstraint(setter, TokenListener.ASSIGN_SETTER_THIS, base, bindSetterThis);
                         }
                     });

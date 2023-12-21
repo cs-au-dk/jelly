@@ -110,6 +110,22 @@ describe("tests/micro", () => {
         reachableTotal: 3,
     });
 
+    runTest("tests/micro", "assign1.js", {
+        soundness: "tests/micro/assign1.json",
+        functionInfos: 3,
+        moduleInfos: 1,
+        numberOfFunctionToFunctionEdges: 3,
+        oneCalleeCalls: 3,
+    });
+
+    runTest("tests/micro", "assign2.js", {
+        soundness: "tests/micro/assign2.json",
+        functionInfos: 4,
+        moduleInfos: 1,
+        numberOfFunctionToFunctionEdges: 4,
+        oneCalleeCalls: 1,
+    });
+
     runTest("tests/micro", "eval.js", {
         soundness: "tests/micro/eval.json",
         functionInfos: 3,

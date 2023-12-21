@@ -8,6 +8,7 @@ import {CallResultAccessPath, ComponentAccessPath, PropertyAccessPath} from "./a
 import assert from "assert";
 import {INTERNAL_PROTOTYPE} from "../natives/ecmascript";
 import {TokenListener} from "./listeners";
+import {isNode} from "@babel/types";
 
 // TODO: OK to assume that all tokens in widened belong to the current fragment?
 // TODO: measure effect of widening...
@@ -125,11 +126,11 @@ export function widenObjects(widened: Set<ObjectToken>, solver: Solver) {
         const m = f.tokenListeners.get(av);
         if (m !== undefined)
             for (const [id, listener] of m) {
-                const [tid, t2, n] = solver.listeners.get(id)!;
+                const [tid, t2, n, s] = solver.listeners.get(id)!;
                 if ((tid === TokenListener.READ_ANCESTORS || tid == TokenListener.ASSIGN_ANCESTORS) && t === t2) {
                     m.delete(id);
-                    assert(n);
-                    solver.addForAllAncestorsConstraint(pt, tid, n, listener);
+                    assert(isNode(n) && s !== undefined);
+                    solver.addForAllAncestorsConstraint(pt, tid, n, s, listener);
                 }
             }
         if (f.objectProperties.get(t)?.has(INTERNAL_PROTOTYPE())) {
@@ -138,14 +139,14 @@ export function widenObjects(widened: Set<ObjectToken>, solver: Solver) {
             const m = f.tokenListeners.get(av);
             if (m !== undefined)
                 for (const [id, listener] of m) {
-                    const [tid, t2, n] = solver.listeners.get(id)!;
+                    const [tid, t2, s, n] = solver.listeners.get(id)!;
                     if (t === t2) {
-                        assert(n === undefined &&
+                        assert(typeof s === "string" && n === undefined &&
                             // these are the only TokenListener keys that are used with ObjectTokens.
                             // TODO: we could probably guarantee this statically with types
                             [TokenListener.ANCESTORS, TokenListener.READ_PROPERTY_GETTER_THIS, TokenListener.ASSIGN_SETTER_THIS].includes(tid));
                         m.delete(id);
-                        solver.addForAllTokensConstraint(f.varProducer.objPropVar(pt, INTERNAL_PROTOTYPE), tid, pt, listener);
+                        solver.addForAllTokensConstraint(f.varProducer.objPropVar(pt, INTERNAL_PROTOTYPE()), tid, pt, listener, s);
                     }
                 }
         }

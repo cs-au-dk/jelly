@@ -35,6 +35,7 @@ import {
     warnNativeUsed,
     widenArgument,
     defineProperties,
+    assignProperties,
 } from "./nativehelpers";
 import {PackageObjectToken} from "../analysis/tokens";
 import {isExpression, isNewExpression, isStringLiteral} from "@babel/types";
@@ -1085,11 +1086,15 @@ export const ecmascriptModels: NativeModel = {
                 {
                     name: "assign",
                     invoke: (p: NativeFunctionParams) => {
-                        for (let i = 1; i < p.path.node.arguments.length; i++)
-                            widenArgument(p.path.node.arguments[i], p);
-                        if (p.path.node.arguments.length >= 1)
-                            returnArgument(p.path.node.arguments[0], p);
-                        returnPackageObject(p);
+                        const args = p.path.node.arguments;
+                        if (args.length >= 1) {
+                            if (!isExpression(args[0]))
+                                warnNativeUsed("Object.assign", p, "with non-expression as target");
+                            else {
+                                returnArgument(args[0], p);
+                                assignProperties(args[0], args.slice(1), p);
+                            }
+                        }
                     }
                 },
                 {
@@ -1158,7 +1163,7 @@ export const ecmascriptModels: NativeModel = {
                             return;
                         }
 
-                        const ivars = prepareDefineProperty("Object.defineProperty", args[1].value, p.op.expVar(args[2], p.path), args as any, p);
+                        const ivars = prepareDefineProperty("Object.defineProperty", args[1].value, p.op.expVar(args[2], p.path), p);
                         defineProperties(args[0], TokenListener.NATIVE_OBJECT_DEFINE_PROPERTY, ivars, p);
                     }
                 },

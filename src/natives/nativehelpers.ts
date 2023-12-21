@@ -924,6 +924,56 @@ export function setPrototypeOf(p: NativeFunctionParams) {
     }
 }
 
+/**
+ * Models the behavior of Object.assign
+ */
+export function assignProperties(target: Expression, sources: Array<Node>, p: NativeFunctionParams) {
+    const tVar = p.op.expVar(target, p.path);
+    if (!tVar)
+        return;
+
+    const sVars = [];
+    for (const src of sources) {
+        if (isExpression(src)) { // TODO: non-Expression arguments?
+            const sVar = p.op.expVar(src, p.path);
+            if (sVar)
+                sVars.push(sVar);
+        } else
+            warnNativeUsed("Object.assign", p, "with non-expression source");
+    }
+
+    if (sVars.length === 0)
+        return;
+    let sVar = sVars[0];
+    if (sVars.length > 1) {
+        // collect all source objects in an intermediate variable
+        sVar = p.solver.varProducer.intermediateVar(p.path.node, "Object.assign");
+        for (const sVar2 of sVars)
+            p.solver.addSubsetConstraint(sVar2, sVar);
+    }
+
+    const node = p.path.node;
+    const enclosing = p.solver.globalState.getEnclosingFunctionOrModule(p.path, p.moduleInfo);
+    p.solver.addForAllTokensConstraint(sVar, TokenListener.NATIVE_ASSIGN_PROPERTIES, node, (s: Token) => {
+        if (isObjectPropertyVarObj(s))
+            p.solver.addForAllObjectPropertiesConstraint(s, TokenListener.NATIVE_ASSIGN_PROPERTIES2, node, (prop: string) => {
+                const iVar = p.solver.varProducer.intermediateVar(node, `Object.assign: ${prop}`);
+                p.op.readPropertyBound(s, sVar, prop, iVar, node, enclosing, prop);
+
+                p.solver.addForAllTokensConstraint(tVar, TokenListener.NATIVE_ASSIGN_PROPERTIES3, node, (t: Token) => {
+                    p.op.writeProperty(iVar, tVar, t, prop, node, enclosing, node, "normal", true);
+                }, prop);
+            });
+    });
+
+    // the above code does the following:
+    // ∀ objects s ∈ sVar, ∀ props p of s: p ∈ Props ∧ V_p ← ReadProperty[s, p]
+    // ∀ objects t ∈ tVar, ∀ p ∈ Props: WriteProperty[t, p, V_p]
+    // ReadProperty and WriteProperty create one additional listener per object and property pair (for invoking getters and setters)
+    // This can likely be reduced to one listener per property by collecting all getters (or setters, resp.) into an intermediate
+    // variable before setting up the listener that invokes matching functions, but it requires more work
+}
+
 type PreparedDefineProperty = {
     prop: string,
     ac: AccessorType,
@@ -935,27 +985,21 @@ type PreparedDefineProperty = {
  * that can be assigned (via subset edges) to properties of objects.
  * @param name the name of the native function that is modeled
  * @param prop the property name associated with the property descriptor
- * @param descriptor expression for the property descriptor object
- * @param nodes 3 unique AST nodes to attach property reads to
+ * @param descriptor constraint variable for the property descriptor object
  */
 export function prepareDefineProperty(
     name: "Object.defineProperty" | "Object.defineProperties" | "Object.create",
     prop: string,
     descriptor: ConstraintVar | undefined,
-    nodes: [Node, Node, Node],
     p: NativeFunctionParams,
 ): Array<PreparedDefineProperty> {
     if (!descriptor)
         return [];
 
-    // FIXME: we want to read 3 properties from the descriptor object at the same AST node.
-    // this is not possible as the (constraintvar, listenerID, AST node) tuple needs to be
-    // unique for each readProperty operation.
-    // as a hacky work-around the caller must supply 3 unique AST nodes
     const enclosing = p.solver.globalState.getEnclosingFunctionOrModule(p.path, p.moduleInfo);
-    return (["value", "get", "set"] as const).map((descriptorProp, i) => {
+    return (["value", "get", "set"] as const).map(descriptorProp => {
         const ivar = p.solver.varProducer.intermediateVar(p.path.node, `${name} (${prop}.${descriptorProp})`);
-        p.op.readProperty(descriptor, descriptorProp, ivar, nodes[i], enclosing);
+        p.op.readProperty(descriptor, descriptorProp, ivar, p.path.node, enclosing, ivar.label);
         return {prop, ac: descriptorProp === "value"? "normal" : descriptorProp, ivar};
     });
 }
@@ -966,7 +1010,6 @@ export function prepareDefineProperty(
  * properties of objects.
  * @param name the name of the native function that is modeled
  * @param props AST node of the object literal containing property descriptors
- * @param nodes see above
  */
 export function prepareDefineProperties(
     name: "Object.defineProperties" | "Object.create",
@@ -999,7 +1042,7 @@ export function prepareDefineProperties(
         }
 
         const dvar = p.solver.varProducer.objPropVar(pobj, key);
-        return prepareDefineProperty(name, key, dvar, [oprop, oprop.key, oprop.value], p);
+        return prepareDefineProperty(name, key, dvar, p);
     });
 }
 
