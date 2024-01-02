@@ -333,6 +333,7 @@ export class Operations {
             for (let j = 0; j < at.fun.params.length; j++)
                 if (isIdentifier(at.fun.params[j])) // TODO: non-identifier parameters?
                     this.solver.addAccessPath(UnknownAccessPath.instance, f.varProducer.nodeVar(at.fun.params[j]));
+            // TODO: handle 'this' under --newobj?
         }
     }
 
@@ -475,7 +476,6 @@ export class Operations {
      * @param escapeNode AST node for 'registerEscapingToExternal' (defaults to node)
      * @param ac describes the type of property that is written to
      * @param invokeSetters if true, models invocation of setters (i.e. the [[Set]] internal method is modeled instead of [[DefineOwnProperty]])
-     * @param extrakey is included as the str parameter when computing listener IDs
      */
     writeProperty(
         src: ConstraintVar | undefined, lVar: ConstraintVar | undefined, base: Token, prop: string,

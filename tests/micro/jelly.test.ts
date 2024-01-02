@@ -270,6 +270,19 @@ describe("tests/micro", () => {
         });
     });
 
+    describe.each([false, true])("newobj=%p", (newobj: boolean) => {
+        const expected = newobj ? 0 : 1;
+        runTest("tests/micro", "client-this.js", {
+            options: {ignoreDependencies: true, newobj},
+            soundness: "tests/micro/client-this.json",
+            // TODO: make this work with newobj
+            funFound: expected,
+            callFound: expected,
+            callTotal: 1,
+            reachableFound: 3+expected,
+        });
+    });
+
     runTest("tests/micro", "arrays.js", {
         soundness: "tests/micro/arrays.json",
         functionInfos: 4,
@@ -665,6 +678,18 @@ describe("tests/micro", () => {
         moduleInfos: 1,
         numberOfFunctionToFunctionEdges: 15,
         oneCalleeCalls: 12,
+    });
+
+    runTest("tests/micro", "dpr-this.js", {
+        options: {newobj: true},
+        soundness: "tests/micro/dpr-this.json",
+        funTotal: 4,
+        // TODO: patch dynamics heuristic does not kick in for dynamic property reads
+        // on 'this', as 'this' always contains the @Unknown access path which
+        // propagates to `this[...]`.
+        callFound: 3,
+        callTotal: 4,
+        reachableTotal: 5,
     });
 
     runTest("tests/micro", "match1.js", {
