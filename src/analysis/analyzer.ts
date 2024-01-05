@@ -178,6 +178,7 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
         const f = solver.fragmentState; // current fragment (not final if aborted due to timeout)
         const r = new AnalysisStateReporter(f);
         d.callsWithUniqueCallee = r.getOneCalleeCalls();
+        d.callsWithMultipleCallees = r.getMultipleCalleeCalls();
         d.totalCallSites = f.callLocations.size;
         d.callsWithNoCallee = r.getZeroCalleeCalls().size;
         d.nativeOnlyCalls = r.getZeroButNativeCalleeCalls();
@@ -190,6 +191,7 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
             logger.info(`Call edges function->function: ${f.numberOfFunctionToFunctionEdges}, call->function: ${f.numberOfCallToFunctionEdges}`);
             const n = d.totalCallSites - d.callsWithNoCallee - d.nativeOnlyCalls - d.externalOnlyCalls - d.nativeOrExternalCalls;
             logger.info(`Calls with unique callee: ${d.callsWithUniqueCallee}/${n}${n > 0 ? ` (${percent(d.callsWithUniqueCallee / n)})` : ""}` +
+                `, multiple callees: ${d.callsWithMultipleCallees}/${n}${n > 0 ? ` (${percent(d.callsWithMultipleCallees / n)})` : ""}` +
                 ` (excluding ${d.callsWithNoCallee} zero-callee, ${d.nativeOnlyCalls} native-only, ${d.externalOnlyCalls} external-only and ${d.nativeOrExternalCalls} native-or-external-only)`)
             logger.info(`Functions with zero callers: ${d.functionsWithZeroCallers}/${a.functionInfos.size}${a.functionInfos.size > 0 ? ` (${percent(d.functionsWithZeroCallers / a.functionInfos.size)})` : ""}, ` +
                 `reachable functions: ${d.reachableFunctions}/${a.functionInfos.size}${a.functionInfos.size > 0 ? ` (${percent(d.reachableFunctions / a.functionInfos.size)})` : ""}`);

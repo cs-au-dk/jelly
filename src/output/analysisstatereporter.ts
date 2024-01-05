@@ -399,6 +399,22 @@ export class AnalysisStateReporter {
     }
 
     /**
+     * Returns the number of call sites that have multiple callees.
+     */
+
+    getMultipleCalleeCalls() {
+        let multipleCalleeCalls = 0;
+        for (const callLoc of this.f.callLocations) {
+            const funInfo = this.f.callToFunction.get(callLoc);
+            if (funInfo) {
+                if (funInfo.size > 1)
+                    multipleCalleeCalls++;
+            }
+        }
+        return multipleCalleeCalls;
+    }
+
+    /**
      * Returns the functions that have zero callers.
      */
     getZeroCallerFunctions(): Set<FunctionInfo> {

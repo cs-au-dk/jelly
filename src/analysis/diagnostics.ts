@@ -42,6 +42,8 @@ export default class AnalysisDiagnostics {
 
     callsWithUniqueCallee: number = 0; // set when analysis is completed
 
+    callsWithMultipleCallees: number = 0; //set when analysis is completed
+
     callsWithNoCallee: number = 0; // set when analysis is completed
 
     nativeOnlyCalls: number = 0; // set when analysis is completed
