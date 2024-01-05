@@ -6,13 +6,13 @@ import {options} from "../options";
 import logger from "../misc/logger";
 
 const host = ts.createCompilerHost({});
+
 const parseConfigHost: ts.ParseConfigHost = {
     fileExists: host.fileExists,
     readDirectory: ts.sys.readDirectory,
     readFile: host.readFile,
     useCaseSensitiveFileNames: host.useCaseSensitiveFileNames(),
 };
-
 
 /**
  * Resolves module names using the TypeScript compiler.

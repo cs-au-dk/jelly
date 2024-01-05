@@ -59,7 +59,7 @@ function* expandRec(path: string, sub: boolean): Generator<string> {
             logger.debug(`Skipping directory ${path}`);
     } else if (stat.isFile() && !path.endsWith(".d.ts") &&
         (!inNodeModules || !(path.endsWith(".min.js") || path.endsWith(".bundle.js"))) &&
-        (path.endsWith(".js") || path.endsWith(".jsx") || path.endsWith(".es") || path.endsWith(".mjs") || path.endsWith(".cjs") || path.endsWith(".ts") || path.endsWith(".tsx")
+        (path.endsWith(".js") || path.endsWith(".jsx") || path.endsWith(".es") || path.endsWith(".mjs") || path.endsWith(".cjs") || path.endsWith(".ts") || path.endsWith(".tsx") || path.endsWith(".mts") || path.endsWith(".cts")
             || isShebang(path)))
         yield relative(options.basedir, path);
     else
@@ -134,7 +134,7 @@ export function requireResolve(str: string, file: FilePath, node: Node, f: Fragm
         logger.debug(msg);
         throw new Error(msg);
     }
-    if (filepath.endsWith(".d.ts") || ![".js", ".jsx", ".es", ".mjs", ".cjs", ".ts", ".tsx"].includes(extname(filepath))) {
+    if (filepath.endsWith(".d.ts") || ![".js", ".jsx", ".es", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts"].includes(extname(filepath))) {
         f.warn(`Module '${filepath}' has unrecognized extension, skipping it`, node);
         return undefined;
     }
