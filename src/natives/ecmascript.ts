@@ -1375,8 +1375,75 @@ export const ecmascriptModels: NativeModel = {
             // TODO
         },
         {
-            name: "Reflect"
-            // TODO
+            name: "Reflect",
+            staticMethods: [
+                {
+                    name: "apply",
+                    invoke: (p: NativeFunctionParams) => {
+                        warnNativeUsed("Reflect.apply", p); // TODO
+                    }
+                },
+                {
+                    name: "construct",
+                    invoke: (p: NativeFunctionParams) => {
+                        warnNativeUsed("Reflect.construct", p); // TODO
+                    }
+                },
+                {
+                    name: "defineProperty",
+                    invoke: (p: NativeFunctionParams) => {
+                        warnNativeUsed("Reflect.defineProperty", p); // TODO
+                    }
+                },
+                {
+                    name: "deleteProperty"
+                },
+                {
+                    name: "get",
+                    invoke: (p: NativeFunctionParams) => {
+                        warnNativeUsed("Reflect.get", p); // TODO
+                    }
+                },
+                {
+                    name: "getOwnPropertyDescriptor",
+                    invoke: (p: NativeFunctionParams) => {
+                        warnNativeUsed("Reflect.getOwnPropertyDescriptor", p); // TODO
+                    }
+                },
+                {
+                    name: "getPrototypeOf",
+                    invoke: (p: NativeFunctionParams) => {
+                        warnNativeUsed("Reflect.getPrototypeOf", p); // TODO
+                    }
+                },
+                {
+                    name: "has"
+                },
+                {
+                    name: "isExtensible"
+                },
+                {
+                    name: "ownKeys",
+                    invoke: (p: NativeFunctionParams) => {
+                        warnNativeUsed("Reflect.ownKeys", p); // TODO
+                    }
+                },
+                {
+                    name: "preventExtensions"
+                },
+                {
+                    name: "set",
+                    invoke: (p: NativeFunctionParams) => {
+                        warnNativeUsed("Reflect.set", p); // TODO
+                    }
+                },
+                {
+                    name: "setPrototypeOf",
+                    invoke: (p: NativeFunctionParams) => {
+                        warnNativeUsed("Reflect.setPrototypeOf", p); // TODO
+                    }
+                },
+            ]
         },
         {
             name: "RegExp",
