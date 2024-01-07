@@ -27,6 +27,18 @@ describe("tests/micro", () => {
         reachableTotal: 35,
     });
 
+    runTest("tests/micro", "classes3.js", {
+        options: {newobj: true},
+        soundness: "tests/micro/classes3.json",
+        functionInfos: 3,
+        moduleInfos: 1,
+        numberOfFunctionToFunctionEdges: 3,
+        oneCalleeCalls: 3,
+        funTotal: 2,
+        callTotal: 2,
+        reachableTotal: 4,
+    });
+
     runTest("tests/micro", "private.js", {
         options: {newobj: true},
         soundness: "tests/micro/private.json",
