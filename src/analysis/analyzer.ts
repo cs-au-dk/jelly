@@ -108,6 +108,8 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
 
                     solver.updateDiagnostics();
                 }
+
+                ast.tokens = undefined; // tokens are no longer needed, allow GC
             }
 
             if (!options.modulesOnly) {

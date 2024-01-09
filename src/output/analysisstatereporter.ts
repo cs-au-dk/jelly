@@ -169,11 +169,11 @@ export class AnalysisStateReporter {
         }
         fs.writeSync(fd, `${first ? "" : "\n "}],\n "ignore": [`);
         first = true;
-        for (const [m, n] of this.f.artificialFunctions) {
+        for (const [m, loc] of this.f.artificialFunctions) {
             const fileIndex = fileIndices.get(m);
             if (fileIndex === undefined)
                 assert.fail(`File index not found for ${m}`);
-            fs.writeSync(fd, `${first ? "" : ","}\n  ${JSON.stringify(this.makeLocStr(fileIndex, n.loc))}`);
+            fs.writeSync(fd, `${first ? "" : ","}\n  ${JSON.stringify(this.makeLocStr(fileIndex, loc))}`);
             first = false;
         }
         fs.writeSync(fd, `${first ? "" : "\n "}]\n}\n`);
@@ -252,11 +252,11 @@ export class AnalysisStateReporter {
             calls,
             fun2fun,
             call2fun,
-            ignore: this.f.artificialFunctions.map(([m, n]) => {
+            ignore: this.f.artificialFunctions.map(([m, loc]) => {
                 const fileIndex = fileIndices.get(m);
                 if (fileIndex === undefined)
                     assert.fail(`File index not found for ${m}`);
-                return this.makeLocStr(fileIndex, n.loc);
+                return this.makeLocStr(fileIndex, loc);
             }),
         };
     }

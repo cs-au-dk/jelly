@@ -18,7 +18,8 @@ import {
     JSXIdentifier,
     NewExpression,
     Node,
-    OptionalCallExpression
+    OptionalCallExpression,
+    SourceLocation,
 } from "@babel/types";
 import assert from "assert";
 import {mapGetSet, locationToStringWithFile, locationToStringWithFileAndEnd, addMapHybridSet} from "../misc/util";
@@ -182,7 +183,7 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
      * Source code locations that correspond to the start of artificial functions in dyn.ts.
      * Such functions are ignored during soundness testing.
      */
-    readonly artificialFunctions: Array<[ModuleInfo, Node]> = [];
+    readonly artificialFunctions: Array<[ModuleInfo, SourceLocation]> = [];
 
     /**
      * Source locations of all calls (including accessor calls).
@@ -462,8 +463,9 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
     /**
      * Registers a function that may be ignored in output from dyn.ts.
      */
-    registerArtificialFunction(m: ModuleInfo, n: Node) {
-        this.artificialFunctions.push([m, n]);
+    registerArtificialFunction(m: ModuleInfo, sl: Node["loc"]) {
+        if (sl)
+            this.artificialFunctions.push([m, sl]);
     }
 
     /**

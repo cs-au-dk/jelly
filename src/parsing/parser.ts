@@ -28,12 +28,13 @@ export function parseAndDesugar(str: string, file: string, f: FragmentState): Fi
             attachComment: false,
             createParenthesizedExpressions: true,
             sourceType: "unambiguous",
+            tokens: true, // required for locations of artificial initializers for static computed class properties
             plugins: [
                 "typescript",
                 "exportDefaultFrom", // https://github.com/leebyron/ecmascript-export-default-from
                 ["decorators", { decoratorsBeforeExport: false }] // TODO: decorators?
             ]
-        }
+        };
         try {
             originalAst = parse(str, options);
         } catch (e) { // 'jsx' conflicts with TypeScript legacy cast syntax, see https://babeljs.io/docs/en/babel-plugin-transform-typescript/

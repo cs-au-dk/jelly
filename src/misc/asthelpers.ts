@@ -1,3 +1,5 @@
+import {BabelFile} from "@babel/core";
+import {NodePath} from "@babel/traverse";
 import {
     CallExpression,
     Class,
@@ -29,14 +31,19 @@ import {
     JSXMemberExpression,
     MemberExpression,
     NewExpression,
+    Node,
     ObjectMethod,
     ObjectProperty,
     OptionalCallExpression,
     OptionalMemberExpression,
-    StringLiteral
+    Property,
+    SourceLocation,
+    StringLiteral,
 } from "@babel/types";
-import {NodePath} from "@babel/traverse";
+import assert from "assert";
 import {CallNodePath} from "../natives/nativebuilder";
+import {FragmentState} from "../analysis/fragmentstate";
+import {Location} from "./util";
 
 /**
  * Finds the property name of a property access, returns undefined if dynamic and not literal string or number.
@@ -92,10 +99,10 @@ export function getBaseAndProperty(path: CallNodePath): {base: Expression, prope
         p = p.get("expression") as NodePath;
     if (!(isMemberExpression(p.node) || isOptionalMemberExpression(p.node)))
         return undefined;
-    let base = p.node.object;
+    const base = p.node.object;
     if (!isExpression(base)) // excluding Super
         return undefined;
-    let property = getProperty(p.node);
+    const property = getProperty(p.node);
     return {base, property};
 }
 
@@ -163,4 +170,37 @@ export function isInTryBlockOrBranch(path: NodePath): boolean {
         }
     } while (p);
     return false;
+}
+
+export function registerArtificialClassPropertyInitializer(f: FragmentState, path: NodePath<Property>) {
+    if (!path.isClassProperty() && !path.isClassPrivateProperty())
+        return;
+
+    // dyn.ts treats class property initializers as functions
+    let sl: Node["loc"];
+    if (path.isClassPrivateProperty() || !path.node.computed)
+        sl = path.node.key.loc;
+    else if (!path.node.static)
+        sl = path.node.loc;
+    else {
+        // static & computed class property
+        // find the location of the bracket between the static keyword and the key
+        const tokens = (path.hub as unknown as {file: BabelFile}).
+            file.ast.tokens as Array<{start: number, loc: SourceLocation, type: any}>;
+        const keyStart = path.node.key.start;
+        assert(tokens && typeof keyStart === "number");
+        let lo = 0;
+        for (let hi = tokens.length; lo < hi;) {
+            const mid = (lo + hi) >>> 1;
+            if (tokens[mid].start >= keyStart)
+                hi = mid;
+            else
+                lo = mid + 1;
+        }
+        assert(lo >= 1 && tokens[lo].start === keyStart && tokens[lo-1].type.label === "[");
+        sl = tokens[lo-1].loc;
+    }
+    const m = (path.node.loc as Location).module;
+    assert(m);
+    f.registerArtificialFunction(m, sl);
 }

@@ -106,7 +106,8 @@ import {
     getImportName,
     getKey,
     getProperty,
-    isParentExpressionStatement
+    isParentExpressionStatement,
+    registerArtificialClassPropertyInitializer,
 } from "../misc/asthelpers";
 import {
     ASYNC_GENERATOR_PROTOTYPE_NEXT,
@@ -547,8 +548,7 @@ export function visit(ast: File, op: Operations) {
                     }
                 } else
                     f.warnUnsupported(path.node, "Dynamic property name"); // TODO: nontrivial computed property name
-                if (isClassProperty(path.node) || isClassPrivateProperty(path.node)) // dyn.ts treats class property initializers as functions
-                    f.registerArtificialFunction(op.moduleInfo, path.node.key);
+                registerArtificialClassPropertyInitializer(f, path);
             },
         },
 
@@ -710,7 +710,7 @@ export function visit(ast: File, op: Operations) {
                             solver.addTokenConstraint(op.newFunctionToken(constructor), vp.nodeVar(path.node));
                     }
                 } else // no explicit constructor (dyn.ts records a call to an implicit constructor)
-                    f.registerArtificialFunction(op.moduleInfo, path.node);
+                    f.registerArtificialFunction(op.moduleInfo, path.node.loc);
 
                 // class ... {...}
                 // constraint: c ∈ ⟦class ... {...}⟧ where c is the ClassToken
@@ -761,7 +761,7 @@ export function visit(ast: File, op: Operations) {
         },
 
         StaticBlock(path: NodePath<StaticBlock>) {
-            f.registerArtificialFunction(op.moduleInfo, path.node); // dyn.ts treats static blocks as functions
+            f.registerArtificialFunction(op.moduleInfo, path.node.loc); // dyn.ts treats static blocks as functions
         },
 
         ThrowStatement: {
