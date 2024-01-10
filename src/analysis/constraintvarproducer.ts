@@ -31,7 +31,7 @@ import {
     ObjectPropertyVarObj,
     ThisVar
 } from "./constraintvars";
-import {ArrayToken, ObjectToken, PackageObjectToken, Token} from "./tokens";
+import {ArrayToken, ObjectToken, PackageObjectToken} from "./tokens";
 import {FilePath, Location} from "../misc/util";
 import {PackageInfo} from "./infos";
 import {GlobalState} from "./globalstate";
@@ -164,7 +164,7 @@ export class ConstraintVarProducer<RVT extends RepresentativeVar | MergeRepresen
         return n !== undefined ? this.a.canonicalizeVar(new NodeVar(n)) : undefined;
     }
 
-    ancestorsVar(t: Token): AncestorsVar {
+    ancestorsVar(t: ObjectPropertyVarObj): AncestorsVar {
         if (t instanceof ObjectToken && this.f.widened.has(t))
             t = this.a.canonicalizeToken(new PackageObjectToken(t.getPackageInfo()));
         return this.a.canonicalizeVar(new AncestorsVar(t));

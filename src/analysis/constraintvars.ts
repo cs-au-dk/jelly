@@ -196,7 +196,7 @@ export class IntermediateVar extends ConstraintVar {
  */
 export class AncestorsVar extends ConstraintVar {
 
-    constructor(readonly t: Token) {
+    constructor(readonly t: ObjectPropertyVarObj) {
         super();
     }
 

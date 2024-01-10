@@ -480,11 +480,12 @@ export default class Solver {
         if (logger.isDebugEnabled())
             logger.debug(`Adding ancestors constraint to ${t} at ${nodeToString(n)}`);
         const id = this.getAncestorListenerID(key, t, n, s);
-        this.addForAllTokensConstraintPrivate(
-            this.fragmentState.getRepresentative(this.varProducer.ancestorsVar(t)),
-            id, listener,
-        );
         this.callTokenListener(id, listener, t); // ancestry is reflexive
+        if (isObjectPropertyVarObj(t))
+            this.addForAllTokensConstraintPrivate(
+                this.fragmentState.getRepresentative(this.varProducer.ancestorsVar(t)),
+                id, listener,
+            );
     }
 
     /*
@@ -631,12 +632,13 @@ export default class Solver {
                     propagate,
                 );
             if (prop === INTERNAL_PROTOTYPE()) {
-                // constraint: ∀ b ∈ ⟦a.__proto__⟧: Ancestors(b) ⊆ Ancestors(a)
-                const pVar = f.varProducer.objPropVar(a, prop);
-                this.addSubsetConstraint(pVar, f.varProducer.ancestorsVar(a));
-                this.addForAllTokensConstraint(pVar, TokenListener.ANCESTORS, a, (b: Token) => {
-                    if (isObjectPropertyVarObj(b)) // TODO: ignoring inheritance from access path tokens
-                        this.addSubsetConstraint(this.varProducer.ancestorsVar(b), this.varProducer.ancestorsVar(a));
+                // constraint: ∀ b ∈ ⟦a.__proto__⟧: {b} ∪ Ancestors(b) ⊆ Ancestors(a)
+                this.addForAllTokensConstraint(f.varProducer.objPropVar(a, prop), TokenListener.ANCESTORS, a, (b: Token) => {
+                    if (isObjectPropertyVarObj(b)) { // TODO: ignoring inheritance from access path tokens
+                        const aVar = this.varProducer.ancestorsVar(a);
+                        this.addTokenConstraint(b, aVar);
+                        this.addSubsetConstraint(this.varProducer.ancestorsVar(b), aVar);
+                    }
                 });
             }
         }
