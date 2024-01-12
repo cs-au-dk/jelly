@@ -97,7 +97,7 @@ import logger from "../misc/logger";
 import {locationToStringWithFile, mapArrayAdd} from "../misc/util";
 import assert from "assert";
 import {options} from "../options";
-import {ComponentAccessPath, PropertyAccessPath, UnknownAccessPath} from "./accesspaths";
+import {ComponentAccessPath, PropertyAccessPath} from "./accesspaths";
 import {ConstraintVar, isObjectPropertyVarObj} from "./constraintvars";
 import {
     getBaseAndProperty,
@@ -187,9 +187,6 @@ export function visit(ast: File, op: Operations) {
             }
 
             // FIXME: the 'this' value in the computed static field names is the 'this' surrounding the class definition
-
-            // constraint: @Unknown ∈ ⟦this⟧
-            solver.addAccessPath(UnknownAccessPath.instance, vp.nodeVar(path.node)); // TODO: omit this constraint in certain situations?
         },
 
         Super(path: NodePath<Super>) {

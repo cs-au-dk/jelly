@@ -191,6 +191,7 @@ describe("tests/unit/analysis", () => {
         test("module.exports = function", () => {
             const {solver, a, f, getTokens} = setup;
 
+            f.functionsWithThis.add(fun1);
             solver.addTokenConstraint(a.canonicalizeToken(new FunctionToken(fun1)), vExports);
             expect([...f.vars]).toContain(vExports);
 
@@ -198,6 +199,7 @@ describe("tests/unit/analysis", () => {
             expect(escaping.size).toBe(0);
 
             expect(getTokens(f.varProducer.nodeVar(param))).toContain(tUnknown);
+            expect(getTokens(f.varProducer.thisVar(fun1))).toContain(tUnknown);
         });
 
         test("maybeEscapingFromModule(function)", () => {

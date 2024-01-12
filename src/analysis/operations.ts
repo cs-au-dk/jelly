@@ -333,6 +333,8 @@ export class Operations {
             for (let j = 0; j < at.fun.params.length; j++)
                 if (isIdentifier(at.fun.params[j])) // TODO: non-identifier parameters?
                     this.solver.addAccessPath(UnknownAccessPath.instance, f.varProducer.nodeVar(at.fun.params[j]));
+            if (f.functionsWithThis.has(at.fun))
+                this.solver.addAccessPath(UnknownAccessPath.instance, f.varProducer.thisVar(at.fun));
             // TODO: handle 'this' under --newobj?
         }
     }
