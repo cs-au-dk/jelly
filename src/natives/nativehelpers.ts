@@ -925,7 +925,7 @@ export function setPrototypeOf(p: NativeFunctionParams) {
 }
 
 /**
- * Models the behavior of Object.assign
+ * Models the behavior of Object.assign.
  */
 export function assignProperties(target: Expression, sources: Array<Node>, p: NativeFunctionParams) {
     const tVar = p.op.expVar(target, p.path);
@@ -958,8 +958,8 @@ export function assignProperties(target: Expression, sources: Array<Node>, p: Na
         if (isObjectPropertyVarObj(s))
             p.solver.addForAllObjectPropertiesConstraint(s, TokenListener.NATIVE_ASSIGN_PROPERTIES2, node, (prop: string) => {
                 const iVar = p.solver.varProducer.intermediateVar(node, `Object.assign: ${prop}`);
-                p.op.readPropertyBound(s, sVar, prop, iVar, node, enclosing, prop);
-
+                if (isObjectPropertyVarObj(s))
+                    p.op.readPropertyBound(s, prop, iVar, node, enclosing, prop);
                 p.solver.addForAllTokensConstraint(tVar, TokenListener.NATIVE_ASSIGN_PROPERTIES3, node, (t: Token) => {
                     p.op.writeProperty(iVar, tVar, t, prop, node, enclosing, node, "normal", true);
                 }, prop);
@@ -980,12 +980,13 @@ type PreparedDefineProperty = {
     ivar: IntermediateVar
 };
 
-/*
+/**
  * Reads values from a property descriptor into intermediate constraint variables
  * that can be assigned (via subset edges) to properties of objects.
  * @param name the name of the native function that is modeled
  * @param prop the property name associated with the property descriptor
  * @param descriptor constraint variable for the property descriptor object
+ * @param p NativeFunctionParams
  */
 export function prepareDefineProperty(
     name: "Object.defineProperty" | "Object.defineProperties" | "Object.create",
@@ -1004,12 +1005,13 @@ export function prepareDefineProperty(
     });
 }
 
-/*
+/**
  * Reads values from an object literal containing property descriptors as values into
  * intermediate constraint variables that can be assigned (via subset edges) to
  * properties of objects.
  * @param name the name of the native function that is modeled
  * @param props AST node of the object literal containing property descriptors
+ * @param p NativeFunctionParams
  */
 export function prepareDefineProperties(
     name: "Object.defineProperties" | "Object.create",
@@ -1046,11 +1048,12 @@ export function prepareDefineProperties(
     });
 }
 
-/*
+/**
  * Assigns values collected from property descriptors to the objects in the given constraint variable.
  * @param obj the object token or the expression that holds objects that properties should be written to
  * @param key TokenListener to use for the constraint
  * @param ivars prepared values from property descriptors
+ * @param p NativeFunctionParams
  */
 export function defineProperties(
     obj: Expression | ObjectPropertyVarObj,
