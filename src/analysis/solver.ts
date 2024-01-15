@@ -475,17 +475,16 @@ export default class Solver {
      * Adds a quantified constraint for all ancestors (reflexive and transitive) of the given token.
      * The key, the token, the node and the string must together uniquely determine the function.
      */
-    addForAllAncestorsConstraint(t: Token, key: TokenListener.READ_ANCESTORS | TokenListener.ASSIGN_ANCESTORS,
+    addForAllAncestorsConstraint(t: ObjectPropertyVarObj, key: TokenListener.READ_ANCESTORS | TokenListener.ASSIGN_ANCESTORS,
                                  n: Node, s: string, listener: (ancestor: Token) => void) {
         if (logger.isDebugEnabled())
             logger.debug(`Adding ancestors constraint to ${t} at ${nodeToString(n)}`);
         const id = this.getAncestorListenerID(key, t, n, s);
         this.callTokenListener(id, listener, t); // ancestry is reflexive
-        if (isObjectPropertyVarObj(t))
-            this.addForAllTokensConstraintPrivate(
-                this.fragmentState.getRepresentative(this.varProducer.ancestorsVar(t)),
-                id, listener,
-            );
+        this.addForAllTokensConstraintPrivate(
+            this.fragmentState.getRepresentative(this.varProducer.ancestorsVar(t)),
+            id, listener,
+        );
     }
 
     /*

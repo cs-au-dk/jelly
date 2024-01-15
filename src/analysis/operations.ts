@@ -510,12 +510,11 @@ export class Operations {
 
                     // constraint: ... ∀ ancestors anc of base: ...
                     this.solver.addForAllAncestorsConstraint(base, TokenListener.ASSIGN_ANCESTORS, node, prop, (anc: Token) => {
-                        if (isObjectPropertyVarObj(anc)) {
-                            // constraint: ...: ∀ functions t2 ∈ ⟦(set)anc.p⟧: ⟦E2⟧ ⊆ ⟦x⟧ where x is the parameter of t2
-                            const setter = this.solver.varProducer.objPropVar(anc, prop, "set");
-                            this.solver.addForAllTokensConstraint(setter, TokenListener.ASSIGN_SETTER, node, writeToSetter, prop);
-                            this.solver.addForAllTokensConstraint(setter, TokenListener.ASSIGN_SETTER_THIS, base, bindSetterThis);
-                        }
+                        assert(isObjectPropertyVarObj(anc));
+                        // constraint: ...: ∀ functions t2 ∈ ⟦(set)anc.p⟧: ⟦E2⟧ ⊆ ⟦x⟧ where x is the parameter of t2
+                        const setter = this.solver.varProducer.objPropVar(anc, prop, "set");
+                        this.solver.addForAllTokensConstraint(setter, TokenListener.ASSIGN_SETTER, node, writeToSetter, prop);
+                        this.solver.addForAllTokensConstraint(setter, TokenListener.ASSIGN_SETTER_THIS, base, bindSetterThis);
                     });
                 }
 
