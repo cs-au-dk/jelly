@@ -84,47 +84,51 @@ export function tapirPatternMatch(tapirPatterns: Array<PatternWrapper | Semantic
                 }
                 matches += ms.length;
                 if (expected)
-                    forEachMatch: for (const m of ms) {
+                    for (const m of ms) {
+                        let anyMatch = false;
                         for (const q of expected) {
-                            let c1, c2, c3;
                             // noinspection CommaExpressionJS
                             if (("classification" in q ? q.classification : q.semanticPatchId) === tpId && m.exp.loc && "module" in m.exp.loc && (m.exp.loc as Location).module?.getPath().endsWith(q.file) &&
                                 ("semanticPatchVersion" in q && "version" in tp ? q.semanticPatchVersion === tp.version : true) &&
                                 ("lineNumber" in q ? q.lineNumber === m.exp.loc?.start.line :
-                                        (c1 = q.loc.indexOf(":"), q.loc.substring(0, c1) === m.exp.loc?.start.line.toString() &&
-                                        (c2 = q.loc.indexOf(":", c1 + 1), c3 = q.loc.indexOf(":", c2 + 1), q.loc.substring(c2 + 1, c3) === m.exp.loc?.end.line.toString()))
-// TODO: Babel parser tab width is apparently hardwired to 1, unfortunately
-//                                        q.loc === `${exp.loc?.start.line}:${exp.loc?.start.column}:${exp.loc?.end.line}:${exp.loc?.end.column}`
+                                    new RegExp(`^${m.exp.loc?.start.line}:\\d+:${m.exp.loc?.end.line}:\\d+$`).test(q.loc)
+                                    // TODO: Babel parser tab width is apparently hardwired to 1, unfortunately
+                                    // q.loc === `${exp.loc?.start.line}:${exp.loc?.start.column}:${exp.loc?.end.line}:${exp.loc?.end.column}`
                                 )) {
-                                let confidence;
-                                if ("highConfidence" in q) {
-                                    if (q.highConfidence === isHigh(m)) {
-                                        confidence = `expected ${isHigh(m) ? "high" : "low"}`;
-                                        if (q.highConfidence)
-                                            expectedHigh++;
-                                        else
-                                            expectedLow++;
-                                    } else if (q.highConfidence) {
-                                        confidence = "unexpected low";
-                                        unexpectedLow++;
-                                    } else {
-                                        confidence = "unexpected high";
-                                        unexpectedHigh++;
+                                anyMatch = true;
+                                const qi = expectedRemaining.indexOf(q);
+                                if (qi !== -1) {
+                                    expectedRemaining.splice(qi, 1);
+                                    let confidence;
+                                    if ("highConfidence" in q) {
+                                        if (q.highConfidence === isHigh(m)) {
+                                            confidence = `expected ${isHigh(m) ? "high" : "low"}`;
+                                            if (q.highConfidence)
+                                                expectedHigh++;
+                                            else
+                                                expectedLow++;
+                                        } else if (q.highConfidence) {
+                                            confidence = "unexpected low";
+                                            unexpectedLow++;
+                                        } else {
+                                            confidence = "unexpected high";
+                                            unexpectedHigh++;
+                                        }
                                     }
+                                    const tapirFalsePositive = isTapirFalsePositive(q);
+                                    logger.info(`Expected match for pattern #${tpId}${tpVersion} at ${q.file}:${"lineNumber" in q ? q.lineNumber : q.loc}` +
+                                        (confidence ? ` (confidence: ${confidence})` : "") +
+                                        (tapirFalsePositive ? " (TAPIR false positive)" : ""));
+                                    if (tapirFalsePositive)
+                                        matchesTapirFalsePositives++;
+                                    expectedMatches++;
                                 }
-                                const tapirFalsePositive = isTapirFalsePositive(q);
-                                logger.info(`Expected match for pattern #${tpId}${tpVersion} at ${q.file}:${"lineNumber" in q ? q.lineNumber : q.loc}` +
-                                    (confidence ? ` (confidence: ${confidence})` : "") +
-                                    (tapirFalsePositive ? " (TAPIR false positive)" : ""));
-                                if (tapirFalsePositive)
-                                    matchesTapirFalsePositives++;
-                                expectedMatches++;
-                                expectedRemaining.splice(expectedRemaining.indexOf(q), 1);
-                                continue forEachMatch;
                             }
                         }
-                        logger.warn(`Unexpected match for pattern #${tpId}${tpVersion} at ${locationToStringWithFileAndEnd(m.exp.loc)} (confidence: ${isHigh(m) ? "high" : "low"})`);
-                        unexpectedMatches++;
+                        if (!anyMatch) {
+                            logger.warn(`Unexpected match for pattern #${tpId}${tpVersion} at ${locationToStringWithFileAndEnd(m.exp.loc)} (confidence: ${isHigh(m) ? "high" : "low"})`);
+                            unexpectedMatches++;
+                        }
                     }
             } else
                 logger.info(`Skipping pattern #${tpId}${tpVersion} due to parse error`);
