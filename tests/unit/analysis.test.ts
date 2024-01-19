@@ -10,11 +10,13 @@ import {options, resetOptions} from "../../src/options";
 import {JELLY_NODE_ID} from "../../src/parsing/extras";
 import {TokenListener} from "../../src/analysis/listeners";
 import {widenObjects} from "../../src/analysis/widening";
+import {patchDynamics} from "../../src/patching/patchdynamics";
+import "../../src/testing/compare";
 
 describe("tests/unit/analysis", () => {
     beforeAll(() => {
         resetOptions();
-        options.cycleElimination = true;
+        assert(options.cycleElimination);
     });
 
     const p = new PackageInfo("fake", undefined, undefined, "node_modules/fake", true);
@@ -466,6 +468,52 @@ describe("tests/unit/analysis", () => {
 
             await solver.propagate();
             expect(fn).toHaveBeenLastCalledWith(pt);
+        });
+    });
+
+    describe("patch dynamics", () => {
+        beforeAll(() => assert(options.patchDynamics));
+
+        test("cycle elimination", () => {
+            const {solver: solver1} = getSolver();
+            const {solver: solver2} = getSolver();
+
+            const fun = (solver: Solver, doCycleElimination: boolean) => {
+                // Set up the solver with two distinct empty property reads.
+                // The result variables of the reads are in a subset cycle.
+                // Both base variables contain the same token, which has been
+                // subject to a dynamic property write.
+                // If doCycleElimination is true, the two result variables are
+                // merged. This should not affect the result of the analysis!
+                const a = solver.globalState;
+                const ot = a.canonicalizeToken(new ObjectToken(param));
+                const pt = a.canonicalizeToken(new PackageObjectToken(p));
+
+                const f = solver.fragmentState;
+                const [base1, base2, res1, res2] = "base1 base2 res1 res2".split(" ").map(s => solver.fragmentState.varProducer.intermediateVar(param, s));
+                solver.addSubsetConstraint(res1, res2);
+                solver.addSubsetConstraint(res2, res1);
+                if (doCycleElimination) {
+                    assert(f.isRepresentative(res1) && f.isRepresentative(res2));
+                    solver.redirect(res1, res2);
+                }
+
+                solver.collectPropertyRead(res1, base1, pt, "A");
+                solver.collectPropertyRead(res2, base2, pt, "A");
+                solver.collectDynamicPropertyWrite(base1);
+                solver.addTokenConstraint(ot, base1);
+                solver.addTokenConstraint(ot, base2);
+
+                expect(patchDynamics(solver)).toBeTruthy();
+            };
+
+            fun(solver1, true);
+            fun(solver2, false);
+
+            // TODO: remove cast
+            // requires 'import {expect} from "@jest/globals";', but that breaks multi-arg expect
+            // from 'jest-expect-message'
+            (expect(solver2) as any).toMatchAnalysisResults(solver1);
         });
     });
 });
