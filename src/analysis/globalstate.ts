@@ -1,7 +1,7 @@
 import {Class, Function, Identifier, Node} from "@babel/types";
 import {FilePath, getOrSet, Location, locationToString, strHash} from "../misc/util";
-import {ConstraintVar, NodeVar} from "./constraintvars";
-import {Token} from "./tokens";
+import {AncestorsVar, ConstraintVar, FunctionReturnVar, NodeVar, ObjectPropertyVarObj, ThisVar} from "./constraintvars";
+import {AccessPathToken, NativeObjectToken, Token} from "./tokens";
 import {getPackageJsonInfo, PackageJsonInfo} from "../misc/packagejson";
 import {AccessPath, IgnoredAccessPath, UnknownAccessPath} from "./accesspaths";
 import Timer from "../misc/timer";
@@ -25,6 +25,12 @@ export class GlobalState {
      */
     readonly canonicalConstraintVars: Map<string, ConstraintVar> = new Map;
 
+    private canonicalAncestorVars: Map<ObjectPropertyVarObj, AncestorsVar> = new Map;
+
+    private canonicalReturnVar: Map<Function, FunctionReturnVar> = new Map;
+
+    private canonicalThisVar: Map<Function, ThisVar> = new Map;
+
     /**
      * Map from AST node to canonical NodeVar object.
      */
@@ -34,6 +40,12 @@ export class GlobalState {
      * Map from token string hash to canonical Token object.
      */
     readonly canonicalTokens: Map<string, Token> = new Map;
+
+    private canonicalUnknownAccessPathToken: AccessPathToken | undefined;
+
+    private canonicalIgnoredAccessPathToken: AccessPathToken | undefined;
+
+    private canonicalNativeObjectTokens: Map<string, NativeObjectToken> = new Map;
 
     /**
      * Map from access path string hash to canonical AccessPath object.
@@ -140,17 +152,38 @@ export class GlobalState {
      * Returns the canonical representative of the given constraint variable (possibly the given one).
      */
     canonicalizeVar<T extends ConstraintVar>(v: T): T {
-        this.numberOfCanonicalizeVarCalls++;
         if (v instanceof NodeVar)
             return getOrSet(this.canonicalNodeVars, v.node, () => v) as unknown as T;
-        else
-            return getOrSet(this.canonicalConstraintVars, v.toString(), () => v) as T;
+        else if (v instanceof AncestorsVar)
+            return getOrSet(this.canonicalAncestorVars, v.t, () => v) as unknown as T;
+        else if (v instanceof FunctionReturnVar)
+            return getOrSet(this.canonicalReturnVar, v.fun, () => v) as unknown as T;
+        else if (v instanceof ThisVar)
+            return getOrSet(this.canonicalThisVar, v.fun, () => v) as unknown as T;
+        this.numberOfCanonicalizeVarCalls++;
+        return getOrSet(this.canonicalConstraintVars, v.toString(), () => v) as T;
     }
 
     /**
      * Returns the canonical representative of the given token (possibly the given one).
      */
     canonicalizeToken<T extends Token>(t: T): T {
+        if (t instanceof AccessPathToken) {
+            if (t.ap === UnknownAccessPath.instance) {
+                t.hash = strHash(t.toString());
+                this.canonicalUnknownAccessPathToken ??= t;
+                return this.canonicalUnknownAccessPathToken as unknown as T;
+            }
+            if (t.ap === IgnoredAccessPath.instance) {
+                t.hash = strHash(t.toString());
+                this.canonicalIgnoredAccessPathToken ??= t;
+                return this.canonicalIgnoredAccessPathToken as unknown as T;
+            }
+        } else if (t instanceof NativeObjectToken && !t.moduleInfo)
+            return getOrSet(this.canonicalNativeObjectTokens, t.name, () => {
+                t.hash = strHash(t.toString());
+                return t;
+            }) as any;
         this.numberOfCanonicalizeTokenCalls++;
         const s = t.toString();
         t.hash = strHash(s);
@@ -161,9 +194,9 @@ export class GlobalState {
      * Returns the canonical representative of the given access path (possibly the given one).
      */
     canonicalizeAccessPath<T extends AccessPath>(t: T): T {
-        this.numberOfCanonicalizeAccessPathCalls++;
         if (t === IgnoredAccessPath.instance || t === UnknownAccessPath.instance)
             return t;
+        this.numberOfCanonicalizeAccessPathCalls++;
         return getOrSet(this.canonicalAccessPaths, t.toString(), () => t) as T;
     }
 
