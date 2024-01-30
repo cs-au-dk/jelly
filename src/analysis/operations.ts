@@ -199,7 +199,7 @@ export class Operations {
             } else if (baseVar)
                 // call with @Unknown already happens when prop is undefined, so we only need to register
                 // the property read for patching if the property is known
-                f.maybeEmptyPropertyReads.push({typ: "call", base: baseVar, prop, node: path.node});
+                f.maybeEmptyPropertyReads.push({typ: "call", base: baseVar, prop, node: p.node});
 
             // TODO: this is very similar to Operations.readProperty - refactor?
             // constraint: ∀ objects t ∈ ⟦E0⟧: ...
@@ -208,12 +208,12 @@ export class Operations {
 
                 if (prop !== undefined) {
                     if (isObjectPropertyVarObj(t)) {
-                        callees = this.solver.varProducer.nodeTokenVar(path.node, t);
+                        callees = this.solver.varProducer.nodeTokenVar(p.node, t);
 
                         // constraint: ... ∀ ancestors t2 of t: ...
-                        this.solver.addForAllAncestorsConstraint(t, TokenListener.CALL_FUNCTION_ANCESTORS, path.node, "", (t2: Token) => {
+                        this.solver.addForAllAncestorsConstraint(t, TokenListener.CALL_FUNCTION_ANCESTORS, p.node, "", (t2: Token) => {
                             // we must parameterize by t because it identifies dst (callees)
-                            this.readPropertyBound(t2, prop, callees, path.node, caller, {t}, t);
+                            this.readPropertyBound(t2, prop, callees, p.node, caller, {t}, t);
                         });
 
                     } else {
