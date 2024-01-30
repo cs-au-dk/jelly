@@ -798,6 +798,12 @@ describe("tests/micro", () => {
         });
     });
 
+    runTest("tests/micro", "promises2.js", {
+        soundness: "tests/micro/promises2.json",
+        functionInfos: 5,
+        oneCalleeCalls: 7,
+    });
+
     runTest("tests/micro", "promiseall.js", {
         options: {callgraphNative: false},
         soundness: "tests/micro/promiseall.json",

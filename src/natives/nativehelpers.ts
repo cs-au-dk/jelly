@@ -704,7 +704,7 @@ export function callPromiseResolve(t: AllocationSiteToken, args: CallExpression[
             switch (t.kind) {
                 case "PromiseResolve":
                     // for all argument values...
-                    op.solver.addForAllTokensConstraint(arg, TokenListener.CALL_PROMISE_RESOLVE, path.node, (vt: Token) => {
+                    op.solver.addForAllTokensConstraint(arg, TokenListener.CALL_PROMISE_RESOLVE, {n: path.node, t: promise}, (vt: Token) => {
                         const vp = op.solver.varProducer;
                         if (vt instanceof AllocationSiteToken && vt.kind === "Promise") {
                             // argument is a promise, transfer its values to the current promise
