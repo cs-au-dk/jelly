@@ -170,13 +170,17 @@ export class GlobalState {
     canonicalizeToken<T extends Token>(t: T): T {
         if (t instanceof AccessPathToken) {
             if (t.ap === UnknownAccessPath.instance) {
-                t.hash = strHash(t.toString());
-                this.canonicalUnknownAccessPathToken ??= t;
+                if (!this.canonicalUnknownAccessPathToken) {
+                    t.hash = strHash(t.toString());
+                    this.canonicalUnknownAccessPathToken = t;
+                }
                 return this.canonicalUnknownAccessPathToken as unknown as T;
             }
             if (t.ap === IgnoredAccessPath.instance) {
-                t.hash = strHash(t.toString());
-                this.canonicalIgnoredAccessPathToken ??= t;
+                if (!this.canonicalIgnoredAccessPathToken) {
+                    t.hash = strHash(t.toString());
+                    this.canonicalIgnoredAccessPathToken = t;
+                }
                 return this.canonicalIgnoredAccessPathToken as unknown as T;
             }
         } else if (t instanceof NativeObjectToken && !t.moduleInfo)
@@ -186,8 +190,7 @@ export class GlobalState {
             }) as any;
         this.numberOfCanonicalizeTokenCalls++;
         const s = t.toString();
-        t.hash = strHash(s);
-        return getOrSet(this.canonicalTokens, s, () => t) as T;
+        return getOrSet(this.canonicalTokens, s, () => (t.hash = strHash(s), t)) as T;
     }
 
     /**
