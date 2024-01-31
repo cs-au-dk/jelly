@@ -1,4 +1,4 @@
-import {ConstraintVar, ObjectPropertyVarObj, isObjectPropertyVarObj} from "./constraintvars";
+import {ConstraintVar, ObjectPropertyVar, ObjectPropertyVarObj, isObjectPropertyVarObj} from "./constraintvars";
 import {
     AccessPathToken,
     ArrayToken,
@@ -22,7 +22,7 @@ import {
     SourceLocation,
 } from "@babel/types";
 import assert from "assert";
-import {mapGetSet, locationToStringWithFile, locationToStringWithFileAndEnd, addMapHybridSet, addAll} from "../misc/util";
+import {mapGetSet, locationToStringWithFile, locationToStringWithFileAndEnd, addMapHybridSet, addAll, mapGetMap} from "../misc/util";
 import {AccessPath, CallResultAccessPath, ComponentAccessPath, ModuleAccessPath, PropertyAccessPath} from "./accesspaths";
 import {options} from "../options";
 import logger from "../misc/logger";
@@ -796,30 +796,53 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
      * Adds call edges for getters of collected property read operations.
      */
     resolveGetterCalls() {
+        // collect getters for each property
+        const getters = new Map<string, Map<ObjectPropertyVarObj, Set<FunctionToken>>>();
+        const add = (prop: string, obj: ObjectPropertyVarObj, ts: Iterable<Token>) => {
+            obj = this.maybeWidened(obj);
+            if (obj instanceof NativeObjectToken)
+                return;
+
+            const gs = [...ts].filter(t => t instanceof FunctionToken && t.fun.params.length === 0);
+            if (gs.length === 0)
+                return;
+
+            addAll(gs, mapGetSet(mapGetMap(getters, prop), obj));
+        };
+        for (const [v, ts] of this.tokens)
+            if (v instanceof ObjectPropertyVar && v.accessor === "get")
+                add(v.prop, v.obj, ts instanceof Token ? [ts] : ts);
+        for (const v of this.redirections.keys())
+            if (v instanceof ObjectPropertyVar && v.accessor === "get") {
+                const [n, ts] = this.getTokensSize(this.getRepresentative(v));
+                if (n > 0)
+                    add(v.prop, v.obj, ts);
+            }
+
         for (const {base, prop, node, enclosing} of this.propertyReads) {
-            const ts = new Set<ObjectPropertyVarObj>(); // ancestors to look up getters in
+            const gs = getters.get(prop);
+            if (!gs)
+                continue;
+
+            const ts = new Set<ObjectPropertyVarObj>(); // objects to look up getters for
             for (const t of this.getTokens(this.getRepresentative(base)))
                 if (isObjectPropertyVarObj(t)) {
                     ts.add(t);
                     addAll(this.getTokens(this.getRepresentative(this.varProducer.ancestorsVar(t))), ts);
+
+                    // mirror logic from readPropertyBound...
+                    if (t instanceof PackageObjectToken && t.kind === "Object")
+                        for (const n of this.packageNeighbors.get(t.packageInfo) ?? [])
+                            ts.add(this.a.canonicalizeToken(new PackageObjectToken(n, "Object")));
                 }
 
-            const addCalls = (v: ConstraintVar) => {
-                for (const ft of this.getTokens(this.getRepresentative(v)))
-                    if (ft instanceof FunctionToken && ft.fun.params.length === 0) {
+            for (const t of ts) {
+                const fts = gs.get(t);
+                if (fts)
+                    for (const ft of fts) {
                         this.registerCall(node, {accessor: true});
                         this.registerCallEdge(node, enclosing, this.a.functionInfos.get(ft.fun)!, {accessor: true});
                     }
-            };
-
-            for (const t of ts) {
-                // mirror logic from readPropertyBound...
-                if (!(t instanceof NativeObjectToken))
-                    addCalls(this.varProducer.objPropVar(t, prop, "get"));
-
-                if (options.readNeighbors && t instanceof PackageObjectToken && t.kind === "Object")
-                    for (const n of this.packageNeighbors.get(t.packageInfo) ?? [])
-                        addCalls(this.varProducer.objPropVar(this.a.canonicalizeToken(new PackageObjectToken(n, "Object")), prop, "get"));
             }
         }
 
