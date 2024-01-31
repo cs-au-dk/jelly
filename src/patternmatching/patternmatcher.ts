@@ -178,7 +178,7 @@ export class PatternMatcher {
      * Finds the AST nodes that match the given access path pattern, together with the associated access paths.
      */
     private findAccessPathPatternMatches(p: AccessPathPattern, moduleFilter?: ModuleFilter, write?: boolean): AccessPathPatternMatches {
-        let cache = write ? this.writeExpressionCache : this.expressionCache;
+        const cache = write ? this.writeExpressionCache : this.expressionCache;
         let res = cache.get(p);
         if (!res) {
             const high = new Map, low = new Map;
@@ -205,7 +205,7 @@ export class PatternMatcher {
                     for (const [r, {bp, sub}] of q) // r is a property read (or call) expression where the base (or caller) matches the sub-pattern, bp is the access path created at that expression, sub is the constraint variable for the sub-expression
                         if (!exclude || !exclude.has(r) || !exclude.get(r)!.has(bp)) {
                             if (logger.isDebugEnabled())
-                                logger.debug(`Match ${bp} (sub: ${ap}) at ${nodeToString(r)} (confidence: ${level})`)
+                                logger.debug(`Match ${bp} (sub: ${ap}) at ${nodeToString(r)} (confidence: ${level})`);
                             mapGetSet(tmp, r).add(bp);
                             subvs.set(r, sub);
                         }
@@ -282,7 +282,7 @@ export class PatternMatcher {
                     for (const n of esc)
                         if (!write || (isAssignmentExpression(n) && (isMemberExpression(n.left) || isOptionalMemberExpression(n.left))))
                             mapGetSet(res!.low, n).add(ap);
-            }
+            };
 
             if (p instanceof ImportAccessPathPattern) {
                 let globMatches = this.findGlobMatches(p.glob);
@@ -339,7 +339,7 @@ export class PatternMatcher {
                             addAll(aps, mapGetSet(res[level], n));
                 for (const sub of subs)
                     for (const [n, aps] of sub.low)
-                        deleteAll(aps.values(), mapGetSet(high, n))
+                        deleteAll(aps.values(), mapGetSet(high, n));
             } else if (p instanceof ExclusionAccessPathPattern) {
                 const included = this.findAccessPathPatternMatches(p.include, moduleFilter);
                 const excluded = this.findAccessPathPatternMatches(p.exclude, moduleFilter);
@@ -689,11 +689,11 @@ export function generateQuestion(u: Uncertainty): string | undefined {
     } else if (u.type === "numArg") {
         const prefix = "Is the call supplied with ";
         if (u.numMinArgs === undefined)
-            return `${prefix}at most ${u.numMaxArgs} argument${u.numMaxArgs === 1 ? "" : "s"}?`
+            return `${prefix}at most ${u.numMaxArgs} argument${u.numMaxArgs === 1 ? "" : "s"}?`;
         else if (u.numMaxArgs === undefined)
-            return `${prefix}at least ${u.numMinArgs} argument${u.numMinArgs === 1 ? "" : "s"}?`
+            return `${prefix}at least ${u.numMinArgs} argument${u.numMinArgs === 1 ? "" : "s"}?`;
         else if (u.numMinArgs === u.numMaxArgs)
-            return `${prefix}exactly ${u.numMinArgs} argument${u.numMinArgs === 1 ? "" : "s"}?`
+            return `${prefix}exactly ${u.numMinArgs} argument${u.numMinArgs === 1 ? "" : "s"}?`;
         else
             return `Is the call supplied with at least ${u.numMinArgs} and at most ${u.numMaxArgs} arguments?`;
     } else

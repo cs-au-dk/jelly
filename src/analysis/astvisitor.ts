@@ -407,7 +407,7 @@ export function visit(ast: File, op: Operations) {
             exit(path: NodePath<NewExpression>) {
 
                 // new E0(E1,...)
-                op.callFunction(path)
+                op.callFunction(path);
             }
         },
 

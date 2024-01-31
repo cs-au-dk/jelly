@@ -348,12 +348,12 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
             (!native || options.callgraphNative) &&
             (!external || options.callgraphExternal)) {
             // register function->function
-            let fs = mapGetSet(this.functionToFunction, from);
+            const fs = mapGetSet(this.functionToFunction, from);
             if (!fs.has(to))
                 this.numberOfFunctionToFunctionEdges++;
             fs.add(to);
             // register call->function
-            let cs = mapGetSet(this.callToFunction, call);
+            const cs = mapGetSet(this.callToFunction, call);
             if (!cs.has(to)) {
                 this.numberOfCallToFunctionEdges++;
                 if (logger.isVerboseEnabled())

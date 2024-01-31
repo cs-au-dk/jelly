@@ -198,12 +198,12 @@ J$.addAnalysis({ // TODO: super calls not detected (see tests/micro/classes.js)
     /**
      * Before function or constructor call.
      */
-    invokeFunPre: function(iid: IID, f: Function, _base: Object, _args: any[], _isConstructor: boolean, _isMethod: boolean, _functionIid: IID, _functionSid: IID) {
+    invokeFunPre: function(iid: IID, f: Function, _base: unknown, _args: any[], _isConstructor: boolean, _isMethod: boolean, _functionIid: IID, _functionSid: IID) {
         // console.log(`invokeFunPre ${f.name} from ${iid && J$.iidToLocation(iid)}`);
 
         const callerInApp = inAppStack.length > 0 && inAppStack[inAppStack.length - 1];
         if (callerInApp && typeof f === "function") {
-            const callerIid = funLocStack[funLocStack.length - 1]!
+            const callerIid = funLocStack[funLocStack.length - 1]!;
             const callerInfo = iidToInfo.get(callerIid)!;
             if (!callerInfo.ignored)
                 registerCall(iid, callerInfo, f);

@@ -297,7 +297,7 @@ export class Type {
     }
 
     static makeSimpleType(simpleType: SimpleType, functionArgs?: number | undefined): Type {
-        return new Type(simpleType, functionArgs, undefined, undefined)
+        return new Type(simpleType, functionArgs, undefined, undefined);
     }
 
     static makeValueType(valueType: ValueType): Type {

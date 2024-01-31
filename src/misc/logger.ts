@@ -20,7 +20,7 @@ const colors: {
     info: DEFAULT,
     verbose: GREEN,
     debug: CYAN,
-}
+};
 
 export const isTTY = process.stdout.isTTY;
 

@@ -128,7 +128,7 @@ export function parseDetectionPattern(pattern: string, c: AccessPathPatternCanon
                 } else {
                     let prop;
                     [prop, pos] = parseProp(pos);
-                    props.push(prop)
+                    props.push(prop);
                 }
                 p = c.canonicalize(new PropertyAccessPathPattern(p, props));
             } else if (pattern[pos] === "(" && pattern[pos + 1] === ")") {
@@ -278,7 +278,7 @@ export function parseDetectionPattern(pattern: string, c: AccessPathPatternCanon
 
     function parseTypes(start: number): [Array<Type>, number] {
         let pos = start;
-        let types: Array<Type> = [];
+        const types: Array<Type> = [];
         if (pattern[pos] === "{" && ++pos) {
             do {
                 let typ;
@@ -346,7 +346,7 @@ export function parseDetectionPattern(pattern: string, c: AccessPathPatternCanon
         res = new ImportDetectionPattern(p, onlyDefault);
     } else if (([b, pos] = parseOptionalKeyword(pos, "read")) && b) {
         let notInvoked;
-        [notInvoked, pos] = parseOptionalKeyword(pos, "o")
+        [notInvoked, pos] = parseOptionalKeyword(pos, "o");
         pos = parseSpace(pos, false);
         [p, pos] = parseAccessPathPattern(pos);
         if (!(p instanceof PropertyAccessPathPattern))
@@ -368,8 +368,8 @@ export function parseDetectionPattern(pattern: string, c: AccessPathPatternCanon
         [onlyWhenUsedAsPromise, pos] = parseOptionalKeyword(pos, "promise");
         [onlyNonNewCalls, pos] = parseOptionalKeyword(pos, "notnew");
         pos = parseSpace(pos, false);
-        [p, pos] = parseAccessPathPattern(pos)
-        let filters: Array<Filter> = [];
+        [p, pos] = parseAccessPathPattern(pos);
+        const filters: Array<Filter> = [];
         while (pos < pattern.length) {
             let filter;
             [filter, pos] = parseFilter(pos);

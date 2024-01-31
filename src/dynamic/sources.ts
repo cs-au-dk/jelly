@@ -11,7 +11,7 @@ const TEST_PACKAGES = [
 
 // jest and istanbul use helper packages, for instance jest-mock.
 // (?:-[^/]+)? optionally matches a dash followed by non-slash characters.
-const testRegexp = new RegExp(`\\bnode_modules/(?:${TEST_PACKAGES.join('|')}|(?:jest|istanbul)(?:-[^/]+)?)/`);
+const testRegexp = new RegExp(`\\bnode_modules/(?:${TEST_PACKAGES.join("|")}|(?:jest|istanbul)(?:-[^/]+)?)/`);
 
 /**
  * Tests whether the path points to a file inside a test package.

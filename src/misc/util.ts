@@ -121,9 +121,9 @@ export function locationContains(loc: Location | null | undefined, file: string,
 export function locationIn(loc1: SimpleLocation, loc2: SimpleLocation | undefined | null): boolean {
     if (!loc2)
         return false;
-    let start = loc2.start.line < loc1.start.line ||
+    const start = loc2.start.line < loc1.start.line ||
         (loc2.start.line === loc1.start.line && loc2.start.column <= loc1.start.column);
-    let end = loc1.end.line < loc2.end.line ||
+    const end = loc1.end.line < loc2.end.line ||
         (loc1.end.line === loc2.end.line && loc1.end.column <= loc2.end.column);
     return start && end;
 }

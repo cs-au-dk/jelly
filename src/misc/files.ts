@@ -72,7 +72,7 @@ function* expandRec(path: string, sub: boolean): Generator<string> {
 function isShebang(path: string): boolean { // TODO: doesn't work with hacks like https://sambal.org/2014/02/passing-options-node-shebang-line/
     const fd = openSync(path, 'r');
     const buf = Buffer.alloc(256);
-    readSync(fd, buf, 0, buf.length, 0)
+    readSync(fd, buf, 0, buf.length, 0);
     closeSync(fd);
     const str = buf.toString('utf8');
     return str.startsWith("#!") && str.substring(0, str.indexOf("\n")).includes("node");
@@ -190,15 +190,15 @@ const codeCache: Map<SourceLocationStr, string> = new Map<SourceLocationStr, str
 export function codeFromLocation(loc: Location | null | undefined): string {
     if (!loc)
         return "-";
-    let locStr = locationToStringWithFileAndEnd(loc, true);
+    const locStr = locationToStringWithFileAndEnd(loc, true);
     let content = codeCache.get(locStr);
     if (!content) {
         content = "";
         if (loc && loc.module) {
-            let fileContent = readFileSync(loc.module.getPath()).toString().split(/\r?\n/);
+            const fileContent = readFileSync(loc.module.getPath()).toString().split(/\r?\n/);
             let startRecord = false;
             for (let i = loc.start.line; i <= loc.end.line; i++) {
-                let currLine = fileContent[i - 1];
+                const currLine = fileContent[i - 1];
                 for (let j = 0; j < currLine.length; j++) {
                     if (i === loc.start.line && loc.start.column === j)
                         startRecord = true;
@@ -226,7 +226,7 @@ export function writeStreamedStringify(value: any,
                                        fd: number,
                                        replacer?: ((key: string, value: any) => any) | (number | string)[] | null,
                                        space?: string | number) {
-    stringify(value, (chunk : string | undefined) => {
+    stringify(value, (chunk: string | undefined) => {
         if (chunk)
             writeSync(fd, chunk);
     }, replacer, space);

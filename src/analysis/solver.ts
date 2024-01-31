@@ -76,7 +76,7 @@ export default class Solver {
         d.listeners = [
             f.tokenListeners, f.packageNeighborListeners,
             f.arrayEntriesListeners, f.objectPropertiesListeners,
-        ].reduce((acc, l: Map<Object, Map<Object, Object>>) => acc + mapMapSize(l), 0);
+        ].reduce((acc, l: Map<unknown, Map<unknown, unknown>>) => acc + mapMapSize(l), 0);
         d.tokens = f.numberOfTokens;
         d.subsetEdges = f.numberOfSubsetEdges;
         d.functionToFunctionEdges = f.numberOfFunctionToFunctionEdges;
@@ -734,7 +734,7 @@ export default class Solver {
             // propagate new tokens to successors
             const f = this.fragmentState;
             assert(f.vars.has(v));
-            let s = f.subsetEdges.get(v);
+            const s = f.subsetEdges.get(v);
             if (s) {
                 for (const to of s)
                     this.addTokens(ts, to);
@@ -776,7 +776,7 @@ export default class Solver {
             if (logger.isVerboseEnabled())
                 logger.verbose(`Fixpoint round: ${round} (call edges: ${f.numberOfFunctionToFunctionEdges}, vars: ${f.getNumberOfVarsWithTokens()}, tokens: ${f.numberOfTokens}, subsets: ${f.numberOfSubsetEdges})`);
             if (options.maxRounds !== undefined && round > options.maxRounds) {
-                f.warn(`Fixpoint round limit reached, aborting propagation`);
+                f.warn("Fixpoint round limit reached, aborting propagation");
                 this.diagnostics.roundLimitReached++;
                 this.diagnostics.unprocessedTokensSize = 0;
                 this.unprocessedTokens.clear();
@@ -845,8 +845,8 @@ export default class Solver {
                 const calls = Array.from(f.postponedListenerCalls);
                 f.postponedListenerCalls.length = 0;
                 let count = 0;
-                for (const [fun, args] of calls) {
-                    (fun as Function).apply(undefined, Array.isArray(args) ? args : [args]);
+                for (const [fun, arg] of calls) {
+                    fun(arg as any);
                     if (++count % 100 === 0) {
                         f.a.timeoutTimer.checkTimeout();
                         this.printDiagnostics();

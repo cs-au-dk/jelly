@@ -125,7 +125,7 @@ async function main() {
 
     if (options.compareCallgraphs) {
         if (program.args.length !== 2) {
-            logger.error(`Error: Option --compare-callgraphs expects two files`);
+            logger.error("Error: Option --compare-callgraphs expects two files");
             process.exitCode = -1;
             return;
         }
@@ -134,7 +134,7 @@ async function main() {
     }
 
     if (options.patterns && options.vulnerabilities) { // TODO: also check this in server.ts
-        logger.error(`Error: Options --patterns and --vulnerabilities cannot be used together`); // pattern match confidence computation requires relevant libraries to be external
+        logger.error("Error: Options --patterns and --vulnerabilities cannot be used together"); // pattern match confidence computation requires relevant libraries to be external
         process.exitCode = -1;
         return;
     }
@@ -157,7 +157,7 @@ async function main() {
         const graalHome = options.graalHome || process.env.GRAAL_HOME;
         const node = graalHome ? path.resolve(graalHome, "bin/node") : "node";
         if (!options.skipGraalTest) {
-            logger.info("Testing graal-nodejs")
+            logger.info("Testing graal-nodejs");
             const t = spawnSync(node, ["-e", "process.exit(typeof Graal === 'object' ? 0 : -1)"]);
             if (t.status === null) {
                 logger.error(`Error: Unable to execute ${node}`);
@@ -284,7 +284,7 @@ async function main() {
             if (options.typescript)
                 typer = new TypeScriptTypeInferrer(files);
 
-            let vr: VulnerabilityResults = {};
+            const vr: VulnerabilityResults = {};
             if (vulnerabilityDetector) {
                 vr.package = vulnerabilityDetector.findPackagesThatMayDependOnVulnerablePackages(f);
                 vr.module = vulnerabilityDetector.findModulesThatMayDependOnVulnerableModules(f);

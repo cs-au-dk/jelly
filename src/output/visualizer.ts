@@ -329,7 +329,7 @@ function getVisualizerDataFlowGraphs(f: FragmentState): VisualizerGraphs {
     const res: VisualizerGraphs = {graphs: []};
     for (const p of f.a.packageInfos.values()) {
         // make a graph for each package
-        let maxLocalVariableCount = 1, maxLocalModuleTokenCount = 1
+        let maxLocalVariableCount = 1, maxLocalModuleTokenCount = 1;
         const e = new Elements();
         const vars = new Set<ConstraintVar>();
         for (const [v, , size] of f.getAllVarsAndTokens())
