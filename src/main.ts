@@ -34,7 +34,7 @@ import {CallGraph} from "./typings/callgraph";
 program
     .name("jelly")
     .version(VERSION)
-    .addHelpText("before", "Copyright (C) 2024 Anders Møller\n")
+    .addHelpText("before", "Copyright (C) 2023-2024 Anders Møller & Oskar Haarklou Veileborg\n")
     .option("-b, --basedir <directory>", "base directory for files to analyze (default: auto-detect)")
     .option("-f, --logfile <file>", "log to file (default: log to stdout)")
     .option("-l, --loglevel <level>", "log level (debug/verbose/info/warn/error)", "info")
@@ -104,7 +104,7 @@ program
         "If specifying directories instead of files, the files in the directories and their\n" +
         "subdirectories are used as entry points.\n" +
         "The special argument -- indicates end of options, typically after multi-argument options.\n" +
-        `Memory limit is ${getMemoryLimit()}MB.${PKG ? "" : " Change with, for example: NODE_OPTIONS=--max-old-space-size=4096"}`)
+        `Memory limit is ${getMemoryLimit()}MB.${PKG ? "" : " Change with, for example: NODE_OPTIONS=--max-old-space-size=8192"}`)
     .action(main)
     .showHelpAfterError()
     .parse();
