@@ -391,9 +391,6 @@ export class AnalysisStateReporter {
             if (cs)
                 if (cs.size === 1)
                     r++;
-                else if (cs.size > 1)
-                    if (logger.isDebugEnabled())
-                        logger.debug(`Call with multiple callees at ${locationToStringWithFile(c.loc)}: ${cs.size}`);
         }
         return r;
     }
@@ -401,17 +398,19 @@ export class AnalysisStateReporter {
     /**
      * Returns the number of call sites that have multiple callees.
      */
-
     getMultipleCalleeCalls() {
-        let multipleCalleeCalls = 0;
-        for (const callLoc of this.f.callLocations) {
-            const funInfo = this.f.callToFunction.get(callLoc);
-            if (funInfo) {
-                if (funInfo.size > 1)
-                    multipleCalleeCalls++;
+        let r = 0;
+        for (const c of this.f.callLocations) {
+            const cs = this.f.callToFunction.get(c);
+            if (cs) {
+                if (cs.size > 1) {
+                    r++;
+                    if (logger.isDebugEnabled())
+                        logger.debug(`Call with multiple callees at ${locationToStringWithFile(c.loc)}: ${cs.size}`);
+                }
             }
         }
-        return multipleCalleeCalls;
+        return r;
     }
 
     /**

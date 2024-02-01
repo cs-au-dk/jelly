@@ -63,7 +63,7 @@ Viewing `cg.html` in a browser:
 
 To set the heap limit, prefix commands by, for example:
 ```bash
-NODE_OPTIONS=--max-old-space-size=4096
+NODE_OPTIONS=--max-old-space-size=8192
 ```
 
 Note that analyzing with all dependencies (i.e., not using `--ignore-dependencies`) can take a long time.

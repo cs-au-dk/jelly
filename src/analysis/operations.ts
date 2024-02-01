@@ -247,11 +247,13 @@ export class Operations {
     }
 
     callFunctionBound(
-        base: ObjectPropertyVarObj | undefined, t: Token,
+        base: ObjectPropertyVarObj | undefined,
+        t: Token,
         calleeVar: ConstraintVar | undefined,
         argVars: Array<ConstraintVar | undefined>,
         resultVar: ConstraintVar | undefined,
-        strings: Array<string>, path: CallNodePath,
+        strings: Array<string>,
+        path: CallNodePath,
     ) {
         const f = this.solver.fragmentState; // (don't use in callbacks)
         const caller = this.a.getEnclosingFunctionOrModule(path, this.moduleInfo);
@@ -263,7 +265,6 @@ export class Operations {
         if (t instanceof FunctionToken)
             this.callFunctionTokenBound(t, base, caller, argVars, resultVar, isNew, path);
         else if (t instanceof NativeObjectToken) {
-            const pars = getAdjustedCallNodePath(path);
             f.registerCall(pars.node, {native: true});
             if (t.invoke && (!isNew || t.constr))
                 t.invoke({
