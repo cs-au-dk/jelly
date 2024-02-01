@@ -3,7 +3,6 @@ import {runTest} from "../../src/testing/runtest";
 describe("tests/micro", () => {
 
     runTest("tests/micro", "classes.js", {
-        options: {newobj: true},
         soundness: "tests/micro/classes.json",
         functionInfos: 45,
         moduleInfos: 1,
@@ -16,7 +15,7 @@ describe("tests/micro", () => {
     });
 
     runTest("tests/micro", "classes2.js", {
-        options: {newobj: true, proto: true},
+        options: {proto: true},
         soundness: "tests/micro/classes2.json",
         functionInfos: 34,
         moduleInfos: 1,
@@ -28,7 +27,6 @@ describe("tests/micro", () => {
     });
 
     runTest("tests/micro", "classes3.js", {
-        options: {newobj: true},
         soundness: "tests/micro/classes3.json",
         functionInfos: 3,
         moduleInfos: 1,
@@ -40,7 +38,6 @@ describe("tests/micro", () => {
     });
 
     runTest("tests/micro", "private.js", {
-        options: {newobj: true},
         soundness: "tests/micro/private.json",
         functionInfos: 6,
         moduleInfos: 1,
@@ -73,17 +70,14 @@ describe("tests/micro", () => {
     });
 
     runTest("tests/micro", "accessors3.js", {
-        options: {newobj: true},
         soundness: "tests/micro/accessors3.json",
     });
 
     runTest("tests/micro", "accessors4.js", {
-        options: {newobj: true},
         numberOfFunctionToFunctionEdges: 6,
     });
 
     runTest("tests/micro", "accessors5.js", {
-        options: {newobj: true},
         soundness: "tests/micro/accessors5.json",
         functionInfos: 2,
         oneCalleeCalls: 2,
@@ -282,10 +276,10 @@ describe("tests/micro", () => {
         });
     });
 
-    describe.each([false, true])("newobj=%p", (newobj: boolean) => {
-        const expected = newobj ? 0 : 1;
+    describe.each([false, true])("oldobj=%p", (oldobj: boolean) => {
+        const expected = oldobj ? 1 : 0;
         runTest("tests/micro", "client-this.js", {
-            options: {ignoreDependencies: true, newobj},
+            options: {ignoreDependencies: true, oldobj: oldobj},
             soundness: "tests/micro/client-this.json",
             // TODO: make this work with newobj
             funFound: expected,
@@ -368,7 +362,6 @@ describe("tests/micro", () => {
     });
 
     runTest("tests/micro", "generators.js", {
-        options: {newobj: true},
         soundness: "tests/micro/generators.json",
         functionInfos: 24,
         moduleInfos: 1,
@@ -658,7 +651,6 @@ describe("tests/micro", () => {
 
 
     runTest("tests/micro", "prototypes.js", {
-        options: {newobj: true},
         soundness: "tests/micro/prototypes.json",
         functionInfos: 2,
         moduleInfos: 1,
@@ -667,7 +659,6 @@ describe("tests/micro", () => {
     });
 
     runTest("tests/micro", "prototypes2.js", {
-        options: {newobj: true},
         soundness: "tests/micro/prototypes2.json",
         functionInfos: 2,
         moduleInfos: 1,
@@ -677,7 +668,7 @@ describe("tests/micro", () => {
     });
 
     runTest("tests/micro", "prototypes3.js", {
-        options: {newobj: true, proto: true, patchDynamics: false},
+        options: {proto: true, patchDynamics: false},
         soundness: "tests/micro/prototypes3.json",
         functionInfos: 5,
         moduleInfos: 1,
@@ -687,7 +678,7 @@ describe("tests/micro", () => {
     });
 
     runTest("tests/micro", "super.js", {
-        options: {newobj: true, proto: true},
+        options: {proto: true},
         soundness: "tests/micro/super.json",
         functionInfos: 11,
         moduleInfos: 1,
@@ -696,7 +687,6 @@ describe("tests/micro", () => {
     });
 
     runTest("tests/micro", "dpr-this.js", {
-        options: {newobj: true},
         soundness: "tests/micro/dpr-this.json",
         // TODO: patch dynamics heuristic does not kick in for dynamic property reads
         // on 'this', as 'this' always contains the @Unknown access path which
@@ -710,13 +700,13 @@ describe("tests/micro", () => {
     });
 
     runTest("tests/micro", "match1.js", {
-        options: {ignoreDependencies: true},
+        options: {oldobj: true, widening: true, readNeighbors: true, ignoreDependencies: true},
         patterns: ["tests/micro/match1-patterns.json"],
         matches: {total: 1},
     });
 
     runTest("tests/micro", "match2.js", {
-        options: {ignoreDependencies: true},
+        options: {patchDynamics: true, ignoreDependencies: true},
         patterns: ["tests/micro/match2-patterns.json"],
         matches: {total: 1},
     });
@@ -758,7 +748,7 @@ describe("tests/micro", () => {
     });
 
     runTest("tests/micro", "match9.ts",  {
-        options: {ignoreDependencies: true},
+        options: {oldobj: true, widening: true, readNeighbors: true, ignoreDependencies: true},
         patterns: ["tests/micro/match9-patterns.json"],
         matches: {total: 1, low: 0},
     });

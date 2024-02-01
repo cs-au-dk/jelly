@@ -139,7 +139,7 @@ export function visit(ast: File, op: Operations) {
             // this
             f.registerThis(path);
 
-            if (options.newobj) {
+            if (!options.oldobj) {
 
                 const encl = path.findParent((p: NodePath) =>
                     isFunctionDeclaration(p.node) || isFunctionExpression(p.node) || isObjectMethod(p.node) ||
@@ -309,7 +309,7 @@ export function visit(ast: File, op: Operations) {
                         op.assign(paramVar, param, path);
                 }
 
-                if (options.newobj) {
+                if (!options.oldobj) {
 
                     if (isFunctionDeclaration(path.node) || isFunctionExpression(path.node) || isClassMethod(path.node) || isClassPrivateMethod(path.node)) {
                         // create prototype object
@@ -494,7 +494,7 @@ export function visit(ast: File, op: Operations) {
                         if (!isExpression(path.node.value))
                             assert.fail(`Unexpected Property value type ${path.node.value?.type} at ${locationToStringWithFile(path.node.loc)}`);
 
-                        if (options.newobj) {
+                        if (!options.oldobj) {
 
                             // {..., p: E, ...} or class... {...; p = E; ...} (static or non-static, private or public)
                             const rightvar = op.expVar(path.node.value, path);
@@ -559,7 +559,7 @@ export function visit(ast: File, op: Operations) {
                         const key = getKey(path.node);
                         if (key) {
 
-                            if (options.newobj) {
+                            if (!options.oldobj) {
 
                                 // [class C...] {... p(..) {...} ...}  (static or non-static, private or public)
                                 const t = op.newFunctionToken(path.node);
@@ -649,7 +649,7 @@ export function visit(ast: File, op: Operations) {
 
             const exported = isExportDeclaration(path.parent);
 
-            if (options.newobj) {
+            if (!options.oldobj) {
 
                 const ct = op.newFunctionToken(constructor);
 

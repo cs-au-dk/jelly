@@ -23,9 +23,9 @@ import {patchDynamics} from "../../src/patching/patchdynamics";
 import "../../src/testing/compare";
 
 describe("tests/unit/analysis", () => {
-    beforeAll(() => {
+    beforeEach(() => {
         resetOptions();
-        assert(options.cycleElimination);
+        options.cycleElimination = true;
     });
 
     const p = new PackageInfo("fake", undefined, undefined, "node_modules/fake", true);
@@ -472,9 +472,8 @@ describe("tests/unit/analysis", () => {
     });
 
     describe("patch dynamics", () => {
-        beforeAll(() => assert(options.patchDynamics));
-
         test("cycle elimination", () => {
+            options.patchDynamics = true;
             const {solver: solver1} = getSolver();
             const {solver: solver2} = getSolver();
 

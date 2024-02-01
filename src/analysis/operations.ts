@@ -312,7 +312,7 @@ export class Operations {
             // TODO: if caller is MemberExpression with property 'apply', 'call' or 'bind', treat as call to the native function of that name (relevant for lodash/atomizer TAPIR benchmark)
         }
 
-        if (options.newobj) {
+        if (!options.oldobj) {
             // if 'new' and function...
             if (isNew && t instanceof FunctionToken) {
 
@@ -432,7 +432,7 @@ export class Operations {
 
                     this.solver.addSubsetConstraint(this.readPropertyFromChain(t, prop), dst);
 
-                    if (!options.newobj) {
+                    if (options.oldobj) {
                         if ((t instanceof FunctionToken || t instanceof ClassToken) && prop === "prototype") {
                             // constraint: ... p="prototype" ∧ t is a function or class ⇒ k ∈ ⟦E.p⟧ where k represents the package
                             if (dst)
