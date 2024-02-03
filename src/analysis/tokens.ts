@@ -24,14 +24,8 @@ export class FunctionToken extends Token {
         super();
     }
 
-    toString() {
+    toString(): string {
         return `Function[${locationToStringWithFileAndEnd(this.fun.loc, true)}]`;
-    }
-
-    getPackageInfo(): PackageInfo {
-        const loc = this.fun.loc as Location;
-        assert(loc && loc.module);
-        return loc.module.packageInfo;
     }
 }
 
@@ -64,7 +58,7 @@ export class AllocationSiteToken extends Token {
         assert(this instanceof PrototypeToken || kind !== "Prototype", "AllocationSiteTokens of kind Prototype must be created using PrototypeToken");
     }
 
-    toString() {
+    toString(): string {
         return `${this.kind}[${locationToStringWithFileAndEnd(this.allocSite.loc, true)}]`;
     }
 }
@@ -129,7 +123,7 @@ export class NativeObjectToken extends Token {
         super();
     }
 
-    toString() {
+    toString(): string {
         return `%${this.name}${this.moduleInfo ? `[${this.moduleInfo}]` : ""}`;
     }
 }
@@ -146,7 +140,7 @@ export class PackageObjectToken extends Token {
         super();
     }
 
-    toString() {
+    toString(): string {
         return `*${this.kind === "Object" ? "" : `(${this.kind})`}[${this.packageInfo}]`;
     }
 }

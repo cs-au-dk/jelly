@@ -384,7 +384,7 @@ export class AnalysisStateReporter {
     /**
      * Returns the number of call sites that have exactly one callee.
      */
-    getOneCalleeCalls() {
+    getOneCalleeCalls(): number {
         let r = 0;
         for (const c of this.f.callLocations) {
             const cs = this.f.callToFunction.get(c);
@@ -398,7 +398,7 @@ export class AnalysisStateReporter {
     /**
      * Returns the number of call sites that have multiple callees.
      */
-    getMultipleCalleeCalls() {
+    getMultipleCalleeCalls(): number {
         let r = 0;
         for (const c of this.f.callLocations) {
             const cs = this.f.callToFunction.get(c);

@@ -82,7 +82,7 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
     /**
      * Constraint variable producer.
      */
-    readonly varProducer;
+    readonly varProducer: ConstraintVarProducer<RVT>;
 
     /**
      * The current analysis solution.
@@ -117,7 +117,7 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
 
     readonly tokenListeners: Map<RVT, Map<ListenerID, (t: Token) => void>> = new Map;
 
-    readonly listenersProcessed: Map<ListenerID, Set<Token | bigint>> = new Map;
+    readonly listenersProcessed: Map<ListenerID, Set<Token>> = new Map;
 
     readonly packageNeighborListeners: Map<PackageInfo, Map<ListenerID, (neighbor: PackageInfo) => void>> = new Map;
 
@@ -679,7 +679,7 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
     /**
      * Returns the number of constraint variables with tokens.
      */
-    getNumberOfVarsWithTokens() {
+    getNumberOfVarsWithTokens(): number {
         return this.tokens.size;
     }
 
@@ -705,13 +705,6 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
             if (vs.size > c)
                 c = vs.size;
         return c;
-    }
-
-    /**
-     * Checks whether the given variable has tokens.
-     */
-    hasVar(v: RVT) {
-        return this.tokens.has(v);
     }
 
     /**

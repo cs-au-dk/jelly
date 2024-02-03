@@ -34,6 +34,7 @@ import {getMemoryUsage} from "../misc/memory";
 import {JELLY_NODE_ID} from "../parsing/extras";
 import AnalysisDiagnostics from "./diagnostics";
 import {ARRAY_UNKNOWN, INTERNAL_PROTOTYPE, isInternalProperty} from "../natives/ecmascript";
+import {ConstraintVarProducer} from "./constraintvarproducer";
 
 export class AbortedException extends Error {}
 
@@ -45,7 +46,7 @@ export default class Solver {
 
     fragmentState: FragmentState = new FragmentState(this);
 
-    get varProducer() {
+    get varProducer(): ConstraintVarProducer {
         return this.fragmentState.varProducer;
     }
 
@@ -596,6 +597,7 @@ export default class Solver {
      * @param pck the current package object token
      * @param prop the property name
      * @param node the AST node for the property read operation
+     * @param enclosing enclosing function or module
      */
     collectPropertyRead(
         typ: "read" | "call", result: ConstraintVar | undefined, base: ConstraintVar | undefined,

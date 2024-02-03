@@ -112,7 +112,7 @@ export class FunctionInfo {
         readonly moduleInfo: ModuleInfo // module containing this function
     ) {}
 
-    toString() {
+    toString(): string {
         return `${this.moduleInfo}:${locationToString(this.node.loc)}:${this.name ?? "<anonymous>"}`;
     }
 }
