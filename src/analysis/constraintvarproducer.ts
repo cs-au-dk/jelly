@@ -100,6 +100,7 @@ export class ConstraintVarProducer<RVT extends RepresentativeVar | MergeRepresen
 
     /**
      * Finds the constraint variable for a named object property.
+     * The (obj, prop) pair is registered on the provided solver instance and listener calls may be enqueued.
      */
     objPropVar(obj: ObjectPropertyVarObj, prop: string, accessor: AccessorType = "normal"): ObjectPropertyVar {
         if (obj instanceof ObjectToken && this.f.widened.has(obj))

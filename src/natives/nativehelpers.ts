@@ -120,9 +120,10 @@ export function returnShuffledArray(p: NativeFunctionParams): ArrayToken | undef
     if (!isParentExpressionStatement(p.path) && p.base) {
         const res = newArray(p);
         returnToken(res, p);
-        const resVar = p.solver.varProducer.arrayUnknownVar(res);
-        if (p.base instanceof ArrayToken)
+        if (p.base instanceof ArrayToken) {
+            const resVar = p.solver.varProducer.arrayUnknownVar(res);
             p.solver.addSubsetConstraint(p.solver.varProducer.arrayAllVar(p.base), resVar);
+        }
         return res;
     } else
         return undefined;
@@ -565,13 +566,16 @@ export function invokeCallApplyBound(kind: CallApplyKind, p: NativeFunctionParam
                             }
                         });
 
-                        const unk = p.solver.varProducer.arrayUnknownVar(t);
-                        if (escapes)
+                        if (escapes) {
+                            const unk = p.solver.varProducer.arrayUnknownVar(t);
                             p.solver.fragmentState.registerEscapingFromModule(unk);
+                        }
 
                         for (const param of ft.fun.params)
-                            if (isIdentifier(param)) // TODO: non-Identifier parameters?
+                            if (isIdentifier(param)) { // TODO: non-Identifier parameters?
+                                const unk = p.solver.varProducer.arrayUnknownVar(t);
                                 p.solver.addSubsetConstraint(unk, p.solver.varProducer.nodeVar(param));
+                            }
                     }
                 });
             }
@@ -666,10 +670,11 @@ export function assignBaseArrayValueToArray(t: ArrayToken, p: NativeFunctionPara
  */
 export function assignBaseArrayArrayValueToArray(t: ArrayToken, p: NativeFunctionParams) {
     if (p.base instanceof ArrayToken) {
-        const dst = p.solver.varProducer.arrayUnknownVar(t);
-        p.solver.addForAllTokensConstraint(p.solver.varProducer.arrayAllVar(p.base), TokenListener.NATIVE_11, p.path.node, (t: Token) => {
-            if (t instanceof ArrayToken)
-                p.solver.addSubsetConstraint(p.solver.varProducer.arrayAllVar(t), dst);
+        p.solver.addForAllTokensConstraint(p.solver.varProducer.arrayAllVar(p.base), TokenListener.NATIVE_11, {n: p.path.node, t}, (t2: Token) => {
+            if (t2 instanceof ArrayToken) {
+                const dst = p.solver.varProducer.arrayUnknownVar(t);
+                p.solver.addSubsetConstraint(p.solver.varProducer.arrayAllVar(t2), dst);
+            }
         });
     }
 }

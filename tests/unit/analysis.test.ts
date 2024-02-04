@@ -393,8 +393,8 @@ describe("tests/unit/analysis", () => {
             const ot2 = a.canonicalizeToken(new ObjectToken(fun1));
             const fn1 = jest.fn();
             const fn2 = jest.fn();
-            solver.addForAllObjectPropertiesConstraint(ot1, TokenListener.NATIVE_1, param, fn1);
-            solver.addForAllObjectPropertiesConstraint(ot2, TokenListener.NATIVE_2, param, fn2);
+            solver.addForAllObjectPropertiesConstraint(ot1, TokenListener.NATIVE_8, param, fn1);
+            solver.addForAllObjectPropertiesConstraint(ot2, TokenListener.NATIVE_11, param, fn2);
 
             solver.addObjectProperty(ot, "A");
 
