@@ -551,7 +551,7 @@ export class AnalysisStateReporter {
      * Reports the kinds of constraint variables and the number of occurrences for each kind.
      */
     reportVariableKinds() {
-        const varsWithListeners = new Set<ConstraintVar>([...this.f.tokenListeners.keys(), ...this.f.pairListeners1.keys(), ...this.f.pairListeners2.keys()]);
+        const varsWithListeners = this.f.tokenListeners;
         const counts = new Map<string, number>();
         const withListenersCounts = new Map<string, number>();
         const srcCounts = new Map<string, number>();

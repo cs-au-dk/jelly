@@ -1,7 +1,6 @@
 import {ConstraintVar, ObjectPropertyVarObj} from "./constraintvars";
 import {
     AccessPathToken,
-    AllocationSiteToken,
     ArrayToken,
     FunctionToken,
     ObjectToken,
@@ -30,6 +29,7 @@ import {NodePath} from "@babel/traverse";
 import {GlobalState} from "./globalstate";
 import {ConstraintVarProducer} from "./constraintvarproducer";
 import Solver from "./solver";
+import {MaybeEmptyPropertyRead} from "../patching/patchdynamics";
 
 export type ListenerID = bigint;
 
@@ -116,10 +116,6 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
 
     readonly tokenListeners: Map<RVT, Map<ListenerID, (t: Token) => void>> = new Map;
 
-    readonly pairListeners1: Map<RVT, Map<ListenerID, [ConstraintVar, (t1: AllocationSiteToken, t2: FunctionToken | AccessPathToken) => void]>> = new Map;
-
-    readonly pairListeners2: Map<RVT, Map<ListenerID, [ConstraintVar, (t1: AllocationSiteToken, t2: FunctionToken | AccessPathToken) => void]>> = new Map;
-
     readonly listenersProcessed: Map<ListenerID, Set<Token | bigint>> = new Map;
 
     readonly packageNeighborListeners: Map<PackageInfo, Map<ListenerID, (neighbor: PackageInfo) => void>> = new Map;
@@ -130,7 +126,11 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
 
     readonly packageNeighbors: Map<PackageInfo, Set<PackageInfo>> = new Map;
 
-    readonly postponedListenerCalls: Array<[(t: Token) => void, Token] | [(t1: AllocationSiteToken, t2: FunctionToken | AccessPathToken) => void, [AllocationSiteToken, FunctionToken | AccessPathToken]] | [(neighbor: PackageInfo) => void, PackageInfo] | [(prop: string) => void, string]> = [];
+    readonly postponedListenerCalls: Array<
+        [(t: Token) => void, Token] |
+        [(neighbor: PackageInfo) => void, PackageInfo] |
+        [(prop: string) => void, string]
+    > = [];
 
     /**
      * Map that provides for each function/module the set of modules being required.
@@ -224,10 +224,10 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
     readonly invokedExpressions: Set<Node> = new Set;
 
     /**
-     * Constraint variables that represent expressions whose values may escape to other modules.
+     * Token values and constraint variables that represent expressions whose values may escape to other modules.
      * Includes arguments to functions from other modules.
      */
-    readonly maybeEscapingFromModule: Set<ConstraintVar> = new Set;
+    readonly maybeEscapingFromModule: Set<Token | ConstraintVar> = new Set;
 
     /**
      * Object tokens that have been widened.
@@ -313,7 +313,7 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
      * Property reads that may have empty result.
      * Used by patchDynamics.
      */
-    maybeEmptyPropertyReads: Array<{result: ConstraintVar, base: ConstraintVar, pck: PackageObjectToken, prop: string | undefined}> = [];
+    maybeEmptyPropertyReads: Array<MaybeEmptyPropertyRead> = [];
 
     /**
      * Dynamic property writes.
@@ -425,9 +425,9 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
     }
 
     /**
-     * Registers that values of the expression represented by the given constraint variable may escape to other modules.
+     * Registers that the token or values of the expression represented by the given constraint variable may escape to other modules.
      */
-    registerEscapingFromModule(v: ConstraintVar | undefined) {
+    registerEscapingFromModule(v: Token | ConstraintVar | undefined) {
         if (v)
             this.maybeEscapingFromModule.add(v);
     }

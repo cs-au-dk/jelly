@@ -8,7 +8,7 @@ describe("tests/helloworld", () => {
         soundness: "tests/helloworld/app.json",
         functionInfos: 775,
         moduleInfos: 94,
-        numberOfFunctionToFunctionEdges: 1449,
+        numberOfFunctionToFunctionEdges: 1447,
         oneCalleeCalls: 915,
         funFound: 130,
         funTotal: 138,

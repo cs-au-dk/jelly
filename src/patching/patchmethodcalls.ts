@@ -8,10 +8,10 @@ import {AccessPathToken, FunctionToken, NativeObjectToken, PackageObjectToken, T
 const IGNORED = new Set([ // method names on String, RegExp and Number, currently ignored
     "charAt", "charCodeAt", "codePointAt", "concat", "endsWith", "includes", "indexOf", "lastIndexOf",
     "localeCompare", "match", "matchAll", "normalize", "padEnd", "padStart", "repeat", "replace", "replaceAll",
-    "search", "slice", "split", "startsWith", "substring", "toLocaleLowerCase", "toLocaleUpperCase", "toLowerCase",
+    "search", "slice", "split", "startsWith", "substr", "substring", "toLocaleLowerCase", "toLocaleUpperCase", "toLowerCase",
     "toString", "toUpperCase", "trim", "trimEnd", "trimStart", "valueOf", "test", "exec",
     "toExponential", "toFixed","toLocaleString", "toPrecision",
-    "write" // TODO: add models for console methods, then remove "write" from this list
+    "write", // TODO: add models for console methods, then remove "write" from this list
 ]);
 
 const PATCH_LIMIT = 25; // TODO: test different values
@@ -30,46 +30,44 @@ export function patchMethodCalls(solver: Solver): boolean {
             mapGetArray(m, v.prop).push(v);
     let patched = 0, failed = 0;
     const cache = new Map<string, Map<Token, ObjectPropertyVar>>();
-    for (const [node, c] of f.maybeEmptyMethodCalls) {
-        if (IGNORED.has(c.prop))
+    for (const [node, {prop, baseVar, calleeVar}] of f.maybeEmptyMethodCalls) {
+        if (IGNORED.has(prop))
             continue;
-        const ts = f.getTokens(f.getRepresentative(c.baseVar));
+        const ts = f.getTokens(f.getRepresentative(baseVar));
         let empty = true;
         for (const t of ts)
             if (!(t instanceof AccessPathToken)) {
                 empty = false;
                 break;
             }
-        let any = false;
         if (empty) {
-            const vs = m.get(c.prop);
+            let any = false;
+            const vs = m.get(prop);
             if (vs) {
                 const pck = (node.loc as Location)?.module?.packageInfo;
                 if (pck) {
-                    const tokens = getOrSet(cache, c.prop, () => {
+                    const tokens = getOrSet(cache, prop, () => {
                         const ts = new Map<Token, ObjectPropertyVar>();
                         build:
-                            for (const v of vs)
-                                for (const t of f.getTokens(f.getRepresentative(v))) {
-                                    if ((t instanceof FunctionToken || t instanceof AccessPathToken) && !ts.has(t)) {
-                                        if (ts.size === PATCH_LIMIT) {
-                                            ts.clear();
-                                            break build;
-                                        }
-                                        ts.set(t, v);
+                        for (const v of vs)
+                            for (const t of f.getTokens(f.getRepresentative(v))) {
+                                if ((t instanceof FunctionToken || t instanceof AccessPathToken) && !ts.has(t)) {
+                                    if (ts.size === PATCH_LIMIT) {
+                                        ts.clear();
+                                        break build;
                                     }
+                                    ts.set(t, v);
                                 }
+                            }
                         return ts;
                     });
-                    let first = true;
-                    for (const [t, v] of tokens) {
-                        if (first) {
-                            log(() => `Call to method named '${c.prop}' with empty base at ${locationToStringWithFileAndEnd(node.loc)}`);
-                            first = false;
-                        }
-                        log(() => `  Adding ${t} from ${v}`);
-                        solver.addTokenConstraint(t, c.calleeVar);
+                    if (tokens.size) {
+                        log(() => `Call to method named '${prop}' with empty base at ${locationToStringWithFileAndEnd(node.loc)}`);
                         any = true;
+                        for (const [t, v] of tokens) {
+                            log(() => `  Adding ${t} from ${v}`);
+                            solver.addTokenConstraint(t, calleeVar);
+                        }
                     }
                 }
             }
@@ -77,7 +75,7 @@ export function patchMethodCalls(solver: Solver): boolean {
                 patched++;
             else {
                 failed++;
-                log(() => `Unable to patch call to method named '${c.prop}' with empty base at ${locationToStringWithFileAndEnd(node.loc)}`);
+                log(() => `Unable to patch call to method named '${prop}' with empty base at ${locationToStringWithFileAndEnd(node.loc)}`);
             }
         }
     }

@@ -205,7 +205,6 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
                     logger.info(`Fixpoint round limit reached: ${d.roundLimitReached} time${d.roundLimitReached !== 1 ? "s" : ""}`);
                 logger.info(`Constraint vars: ${f.getNumberOfVarsWithTokens()} (${f.vars.size}), tokens: ${f.numberOfTokens}, subset edges: ${f.numberOfSubsetEdges}, max tokens: ${f.getLargestTokenSetSize()}, max subset out: ${f.getLargestSubsetEdgeOutDegree()}, redirections: ${f.redirections.size}`);
                 logger.info(`Listeners (notifications) token: ${mapMapSize(f.tokenListeners)} (${d.tokenListenerNotifications}), ` +
-                    `pair: ${mapMapSize(f.pairListeners1) + mapMapSize(f.pairListeners2)} (${d.pairListenerNotifications}), ` +
                     (options.readNeighbors ? `neighbor: ${mapMapSize(f.packageNeighborListeners)} (${d.packageNeighborListenerNotifications}), ` : "") +
                     `array: ${mapMapSize(f.arrayEntriesListeners)} (${d.arrayEntriesListenerNotifications}), ` +
                     `obj: ${mapMapSize(f.objectPropertiesListeners)} (${d.objectPropertiesListenerNotifications})`);

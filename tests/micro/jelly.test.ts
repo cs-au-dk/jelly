@@ -515,6 +515,11 @@ describe("tests/micro", () => {
         reachableTotal: 4,
     });
 
+    runTest("tests/micro", "receiver-callee-mixup.js", {
+        soundness: "tests/micro/receiver-callee-mixup.json",
+        oneCalleeCalls: 2,
+    });
+
     runTest("tests/micro", "templateliterals.js", {
         soundness: "tests/micro/templateliterals.json",
         functionInfos: 5,

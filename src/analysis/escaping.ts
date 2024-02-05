@@ -37,8 +37,8 @@ export function findEscapingObjects(m: ModuleInfo, solver: Solver): Set<ObjectTo
      * Adds the tokens of the given constraint variable to the worklist if not already visited.
      * Note: PackageObjectTokens, AccessPathTokens and (most) NativeObjectTokens are ignored.
      */
-    function addToWorklist(v: ConstraintVar) {
-        for (const t of f.getTokens(f.getRepresentative(v)))
+    function addToWorklist(v: Token | ConstraintVar) {
+        for (const t of v instanceof Token ? [v] : f.getTokens(f.getRepresentative(v)))
             if ((t instanceof AllocationSiteToken || t instanceof FunctionToken || (t instanceof NativeObjectToken && t.name === "exports")) && !visited.has(t)) {
                 worklist.push(t);
                 visited.add(t);

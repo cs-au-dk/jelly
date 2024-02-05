@@ -100,12 +100,12 @@ import {options} from "../options";
 import {ComponentAccessPath, PropertyAccessPath} from "./accesspaths";
 import {ConstraintVar, isObjectPropertyVarObj} from "./constraintvars";
 import {
-    getBaseAndProperty,
     getClass,
     getExportName,
     getImportName,
     getKey,
     getProperty,
+    isCalleeExpression,
     isParentExpressionStatement,
     registerArtificialClassPropertyInitializer,
 } from "../misc/asthelpers";
@@ -391,7 +391,7 @@ export function visit(ast: File, op: Operations) {
             exit(path: NodePath<CallExpression>) {
 
                 // E0(E1,...)
-                visitCallOrNew(false, path);
+                op.callFunction(path);
             }
         },
 
@@ -399,7 +399,7 @@ export function visit(ast: File, op: Operations) {
             exit(path: NodePath<OptionalCallExpression>) {
 
                 // E?.E0(E1,...)
-                visitCallOrNew(false, path);
+                op.callFunction(path);
             }
         },
 
@@ -407,7 +407,7 @@ export function visit(ast: File, op: Operations) {
             exit(path: NodePath<NewExpression>) {
 
                 // new E0(E1,...)
-                visitCallOrNew(true, path);
+                op.callFunction(path)
             }
         },
 
@@ -961,22 +961,13 @@ export function visit(ast: File, op: Operations) {
     });
 
     /**
-     * Visits a CallExpression, OptionalCallExpression, or NewExpression.
-     */
-    function visitCallOrNew(isNew: boolean, path: NodePath<CallExpression | OptionalCallExpression | NewExpression>) {
-        const calleeVar = isExpression(path.node.callee) ? op.expVar(path.node.callee, path) : undefined;
-        const bp = getBaseAndProperty(path);
-        const baseVar = bp ? op.expVar(bp.base, path) : undefined;
-        const resultVar = vp.nodeVar(path.node);
-        op.callFunction(calleeVar, baseVar, bp?.property, path.node.arguments, resultVar, isNew, path);
-    }
-
-    /**
      * Visits a MemberExpression or OptionalMemberExpression.
      */
     function visitMemberExpression(path: NodePath<MemberExpression | OptionalMemberExpression | JSXMemberExpression>) {
         if (isAssignmentExpression(path.parent) && path.parent.left === path.node)
             return; // don't treat left-hand-sides of assignments as expressions
+        if (isCalleeExpression(path))
+            return; // don't perform a property read for method calls
 
         op.readProperty(op.expVar(path.node.object, path), getProperty(path.node), isParentExpressionStatement(path) ? undefined : vp.nodeVar(path.node), path.node, a.getEnclosingFunctionOrModule(path, op.moduleInfo));
     }

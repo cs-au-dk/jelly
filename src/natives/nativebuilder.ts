@@ -9,6 +9,7 @@ import {options} from "../options";
 import logger from "../misc/logger";
 import {Operations} from "../analysis/operations";
 import {Location} from "../misc/util";
+import {ObjectPropertyVarObj} from "../analysis/constraintvars";
 
 export type CallNodePath = NodePath<CallExpression | OptionalCallExpression | NewExpression>;
 
@@ -20,6 +21,7 @@ export type NativeModelParams = {
 };
 
 export type NativeFunctionParams = NativeModelParams & {
+    base: ObjectPropertyVarObj | undefined,
     op: Operations,
     path: CallNodePath
 };

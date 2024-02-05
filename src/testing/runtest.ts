@@ -178,8 +178,7 @@ export function runTest(basedir: string,
                             check(es);
                         }
 
-                    for (const ds of [f.tokenListeners, f.pairListeners1, f.pairListeners2])
-                        check(ds);
+                    check(f.tokenListeners);
 
                     for (const v of f.redirections.keys())
                         assert(!f.vars.has(v as RepresentativeVar));

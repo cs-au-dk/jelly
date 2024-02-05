@@ -1,5 +1,4 @@
 import {
-    CallExpression,
     Expression,
     Function,
     isArrayPattern,
@@ -7,7 +6,6 @@ import {
     isExportDeclaration,
     isExpression,
     isIdentifier,
-    isImport,
     isLVal,
     isMemberExpression,
     isObjectPattern,
@@ -50,6 +48,7 @@ import {
     AccessorType,
     ConstraintVar,
     IntermediateVar,
+    ObjectPropertyVarObj,
     isObjectPropertyVarObj,
     NodeVar
 } from "./constraintvars";
@@ -60,7 +59,7 @@ import {
     PropertyAccessPath,
     UnknownAccessPath
 } from "./accesspaths";
-import Solver from "./solver";
+import Solver, {ListenerKey} from "./solver";
 import {GlobalState} from "./globalstate";
 import {DummyModuleInfo, FunctionInfo, ModuleInfo, normalizeModuleName, PackageInfo} from "./infos";
 import logger from "../misc/logger";
@@ -139,29 +138,16 @@ export class Operations {
 
     /**
      * Models calling a function.
-     * @param calleeVar constraint variable describing the callee, undefined if not applicable
-     * @param baseVar constraint variable describing the method call base, undefined if not applicable
-     * @param prop method name, undefined if not a method call or name is dynamic
-     * @param args arguments array of arguments
-     * @param resultVar constraint variable describing the call result
-     * @param isNew true if this is a 'new' call
      * @param path path of the call expression
      */
-    callFunction(
-        calleeVar: ConstraintVar | undefined,
-        baseVar: ConstraintVar | undefined,
-        prop: string | undefined,
-        args: CallExpression["arguments"],
-        resultVar: ConstraintVar,
-        isNew: boolean,
-        path: CallNodePath
-    ) {
+    callFunction(path: CallNodePath) {
         const f = this.solver.fragmentState; // (don't use in callbacks)
+        const vp = this.solver.varProducer; // (don't use in callbacks)
+
         const caller = this.a.getEnclosingFunctionOrModule(path, this.moduleInfo);
 
         const pars = getAdjustedCallNodePath(path);
         f.registerCall(pars.node);
-        f.registerMethodCall(path.node, baseVar, prop, calleeVar);
 
         // collect special information for pattern matcher
         if (isParentExpressionStatement(pars))
@@ -170,13 +156,8 @@ export class Operations {
             f.registerCallWithResultMaybeUsedAsPromise(path.node);
         f.registerInvokedExpression(path.node.callee);
 
-        function* getStrings(exp: Expression | any): Iterable<string> {
-            if (isStringLiteral(exp))
-                yield exp.value;
-            else // TODO: currently supporting only string literals at 'require' and 'import'
-                f.warnUnsupported(path.node, "Unhandled 'require'");
-        }
-
+        const resultVar = vp.nodeVar(path.node);
+        const args = path.node.arguments;
         const argVars = args.map(arg => {
             if (isExpression(arg))
                 return this.expVar(arg, path);
@@ -185,87 +166,87 @@ export class Operations {
             return undefined;
         });
 
+        let p = path.get("callee");
+        while (p.isParenthesizedExpression())
+            p = p.get("expression");
+
+        const calleeVar = isExpression(p.node) ? this.expVar(p.node, p) : undefined;
+
+        const handleCall = (base: ObjectPropertyVarObj | undefined, t: Token) => {
+            this.callFunctionBound(base, t, calleeVar, argVars, resultVar, strings, path);
+        };
+
         // expression E0(E1,...,En) or new E0(E1,...,En)
         // constraint: ∀ functions t ∈ ⟦E0⟧: ...
-        this.solver.addForAllTokensConstraint(calleeVar, TokenListener.CALL_FUNCTION_CALLEE, path.node, (t: Token) => {
-            const f = this.solver.fragmentState; // (don't use in callbacks)
-            if (t instanceof FunctionToken) {
-                this.callFunctionTokenBound(t, baseVar, caller, argVars, resultVar, isNew, path);
-            } else if (t instanceof NativeObjectToken) {
-                f.registerCall(pars.node, {native: true});
-                if (t.invoke && (!isNew || t.constr))
-                    t.invoke({
-                        path,
-                        solver: this.solver,
-                        op: this,
-                        moduleInfo: this.moduleInfo,
-                        moduleSpecialNatives: this.moduleSpecialNatives,
-                        globalSpecialNatives: this.globalSpecialNatives
-                    });
+        this.solver.addForAllTokensConstraint(calleeVar, TokenListener.CALL_FUNCTION_CALLEE, path.node, (t: Token) => handleCall(undefined, t));
+        // this looks odd for method calls (E0.p(E1,...,En)), but ⟦E0.p⟧ is empty for method calls
+        // (see the special case for visitMemberExpression in astvisitor.ts)
+        // the constraint is used for method calls when:
+        // - the property is unknown
+        // - the property is known and an access path is found in the base variable (a derived access path is added to calleeVar)
+        // - calls are patched by --patch-method-calls
 
-                if (t.name === "require" && args.length >= 1) {
+        if (p.isMemberExpression() || p.isOptionalMemberExpression()) {
+            // expression E0.p(E1,...,En) or new E0.p(E1,...,En)
+            const baseVar = this.expVar(p.node.object, p);
+            const prop = getProperty(p.node);
 
-                    // require(...)
-                    for (const str of getStrings(args[0]))
-                        this.requireModule(str, resultVar, path);
+            f.registerMethodCall(path.node, baseVar, prop, calleeVar);
+
+            if (prop === undefined) {
+                this.solver.fragmentState.registerEscapingFromModule(baseVar); // unknown properties of the base object may escape
+                this.solver.addAccessPath(UnknownAccessPath.instance, calleeVar);
+            } else if (baseVar)
+                // call with @Unknown already happens when prop is undefined, so we only need to register
+                // the property read for patching if the property is known
+                f.maybeEmptyPropertyReads.push({typ: "call", base: baseVar, prop, node: path.node});
+
+            // TODO: this is very similar to Operations.readProperty - refactor?
+            // constraint: ∀ objects t ∈ ⟦E0⟧: ...
+            this.solver.addForAllTokensConstraint(baseVar, TokenListener.CALL_FUNCTION_BASE, path.node, (t: Token) => {
+                let callees: ConstraintVar | undefined;
+
+                if (prop !== undefined) {
+                    if (isObjectPropertyVarObj(t)) {
+                        callees = this.solver.varProducer.nodeTokenVar(path.node, t);
+
+                        // constraint: ... ∀ ancestors t2 of t: ...
+                        this.solver.addForAllAncestorsConstraint(t, TokenListener.CALL_FUNCTION_ANCESTORS, path.node, "", (t2: Token) => {
+                            // we must parameterize by t because it identifies dst (callees)
+                            this.readPropertyBound(t2, prop, callees, path.node, caller, {t}, t);
+                        });
+
+                    } else {
+                        assert(t instanceof AccessPathToken && calleeVar);
+
+                        // constraint: ... if t is access path, @E0.p ∈ ⟦E0.p⟧
+                        this.solver.addAccessPath(new PropertyAccessPath(baseVar!, prop), calleeVar, t.ap);
+                    }
+                } else if (t instanceof ArrayToken)
+                    // TODO: ignoring reads from prototype chain
+                    // TODO: assuming dynamic reads from arrays only read array indices
+                    callees = this.solver.varProducer.arrayAllVar(t);
+                else if (!(t instanceof AccessPathToken)) {
+                    // TODO: warn about unhandled dynamic method call?
                 }
 
-            } else if (t instanceof AllocationSiteToken && (t.kind === "PromiseResolve" || t.kind === "PromiseReject") && !isNew) {
-                callPromiseResolve(t, args, path, this);
-
-            } else if (t instanceof AccessPathToken) {
-                assert(calleeVar);
-                f.registerCall(pars.node, {external: true});
-                f.registerEscapingFromModuleArguments(args, path);
-
-                // constraint: add CallResultAccessPath
-                this.solver.addAccessPath(new CallResultAccessPath(calleeVar), resultVar, t.ap);
-
-                for (let i = 0; i < argVars.length; i++) {
-                    const argVar = argVars[i];
-                    if (argVar) {
-                        // constraint: assign UnknownAccessPath to arguments to function arguments for external functions, also add (artificial) call edge
-                        this.solver.addForAllTokensConstraint(argVar, TokenListener.CALL_FUNCTION_EXTERNAL, args[i], (at: Token) =>
-                            this.invokeExternalCallback(at, pars.node, caller));
-                        f.registerEscapingToExternal(argVar, args[i]);
-                    } else if (isSpreadElement(args[i]))
-                        f.warnUnsupported(args[i], "SpreadElement in arguments to external function"); // TODO: SpreadElement in arguments to external function
+                if (callees) {
+                    assert(isObjectPropertyVarObj(t));
+                    // the node parameter is required as it defines the argument variables, result variable,
+                    // and various implicit parameters of native calls
+                    this.solver.addForAllTokensConstraint(callees, TokenListener.CALL_FUNCTION_CALLEE, {n: path.node, t},
+                                                          (ft: Token) => handleCall(t, ft));
                 }
-                // TODO: also add arguments (and everything reachable from them) to escaping?
-                // TODO: also add UnknownAccessPath to properties of object arguments for external functions? (see also TODO at AssignmentExpression)
-
-                // TODO: if caller is MemberExpression with property 'apply', 'call' or 'bind', treat as call to the native function of that name (relevant for lodash/atomizer TAPIR benchmark)
-            }
-
-            if (options.newobj) {
-                // if 'new' and function...
-                if (isNew && t instanceof FunctionToken) {
-
-                    // constraint: q ∈ ⟦new E0(E1,...,En)⟧ where q is the instance object
-                    const q = this.newObjectToken(t.fun);
-                    this.solver.addTokenConstraint(q, resultVar);
-
-                    // ... q ∈ ⟦this_f⟧
-                    this.solver.addTokenConstraint(q, this.solver.varProducer.thisVar(t.fun));
-
-                    // constraint: ⟦t.prototype⟧ ⊆ ⟦q.[[Prototype]]⟧
-                    this.solver.addInherits(q, this.solver.varProducer.objPropVar(t, "prototype"));
-                }
-            } else {
-
-                // if 'new' and function...
-                if (isNew && (t instanceof FunctionToken || t instanceof ClassToken)) {
-
-                    // constraint: t ∈ ⟦new E0(E1,...,En)⟧ where t is the current PackageObjectToken
-                    this.solver.addTokenConstraint(this.packageObjectToken, resultVar);
-                }
-            }
-        });
+            });
+        }
+        const strings = args.length >= 1 && isStringLiteral(args[0]) ? [args[0].value] : []; // TODO: currently supporting only string literals at 'require' and 'impor
 
         // 'import' expression
-        if (calleeVar instanceof NodeVar && isImport(calleeVar.node) && args.length >= 1) {
+        if (path.get("callee").isImport() && args.length >= 1) {
             const v = this.a.canonicalizeVar(new IntermediateVar(path.node, "import"));
-            for (const str of getStrings(args[0]))
+            if (strings.length === 0)
+                f.warnUnsupported(p.node, "Unhandled 'import'");
+            for (const str of strings)
                 this.requireModule(str, v, path);
             const promise = this.newPromiseToken(path.node);
             this.solver.addTokenConstraint(promise, this.expVar(path.node, path));
@@ -273,50 +254,148 @@ export class Operations {
         }
     }
 
+    callFunctionBound(
+        base: ObjectPropertyVarObj | undefined, t: Token,
+        calleeVar: ConstraintVar | undefined,
+        argVars: Array<ConstraintVar | undefined>,
+        resultVar: ConstraintVar | undefined,
+        strings: Array<string>, path: CallNodePath,
+    ) {
+        const f = this.solver.fragmentState; // (don't use in callbacks)
+        const caller = this.a.getEnclosingFunctionOrModule(path, this.moduleInfo);
+        const pars = getAdjustedCallNodePath(path);
+        const args = path.node.arguments;
+        const isNew = path.isNewExpression();
+        if (base)
+            base = f.maybeWidened(base);
+        if (t instanceof FunctionToken)
+            this.callFunctionTokenBound(t, base, caller, argVars, resultVar, isNew, path);
+        else if (t instanceof NativeObjectToken) {
+            const pars = getAdjustedCallNodePath(path);
+            f.registerCall(pars.node, {native: true});
+            if (t.invoke && (!isNew || t.constr))
+                t.invoke({
+                    base,
+                    path,
+                    solver: this.solver,
+                    op: this,
+                    moduleInfo: this.moduleInfo,
+                    moduleSpecialNatives: this.moduleSpecialNatives,
+                    globalSpecialNatives: this.globalSpecialNatives,
+                });
+
+            if (t.name === "require") {
+
+                // require(...)
+                if (strings.length === 0)
+                    f.warnUnsupported(path.node, "Unhandled 'require'");
+                for (const str of strings)
+                    this.requireModule(str, resultVar, path);
+            }
+
+        } else if (t instanceof AllocationSiteToken && (t.kind === "PromiseResolve" || t.kind === "PromiseReject") && !isNew) {
+            callPromiseResolve(t, path.node.arguments, path, this);
+
+        } else if (t instanceof AccessPathToken) {
+            f.registerCall(pars.node, {external: true});
+            f.registerEscapingFromModuleArguments(args, path);
+
+            // constraint: add CallResultAccessPath
+            assert(calleeVar);
+            this.solver.addAccessPath(new CallResultAccessPath(calleeVar), resultVar, t.ap);
+
+            for (let i = 0; i < argVars.length; i++) {
+                const argVar = argVars[i];
+                if (argVar) {
+                    // constraint: assign UnknownAccessPath to arguments to function arguments for external functions, also add (artificial) call edge
+                    this.solver.addForAllTokensConstraint(argVar, TokenListener.CALL_FUNCTION_EXTERNAL, args[i], (at: Token) =>
+                        this.invokeExternalCallback(at, pars.node, caller));
+                    f.registerEscapingToExternal(argVar, args[i]);
+                } else if (isSpreadElement(args[i]))
+                    f.warnUnsupported(args[i], "SpreadElement in arguments to external function"); // TODO: SpreadElement in arguments to external function
+            }
+            // TODO: also add arguments (and everything reachable from them) to escaping?
+            // TODO: also add UnknownAccessPath to properties of object arguments for external functions? (see also TODO at AssignmentExpression)
+
+            // TODO: if caller is MemberExpression with property 'apply', 'call' or 'bind', treat as call to the native function of that name (relevant for lodash/atomizer TAPIR benchmark)
+        }
+
+        if (options.newobj) {
+            // if 'new' and function...
+            if (isNew && t instanceof FunctionToken) {
+
+                // constraint: q ∈ ⟦new E0(E1,...,En)⟧ where q is the instance object
+                const q = this.newObjectToken(t.fun);
+                this.solver.addTokenConstraint(q, resultVar);
+
+                // ... q ∈ ⟦this_f⟧
+                this.solver.addTokenConstraint(q, this.solver.varProducer.thisVar(t.fun));
+
+                // constraint: ⟦t.prototype⟧ ⊆ ⟦q.[[Prototype]]⟧
+                this.solver.addInherits(q, this.solver.varProducer.objPropVar(t, "prototype"));
+            }
+        } else {
+
+            // if 'new' and function...
+            if (isNew && (t instanceof FunctionToken || t instanceof ClassToken)) {
+
+                // constraint: t ∈ ⟦new E0(E1,...,En)⟧ where t is the current PackageObjectToken
+                this.solver.addTokenConstraint(this.packageObjectToken, resultVar);
+            }
+        }
+    }
+
     callFunctionTokenBound(
         t: FunctionToken,
-        baseVar: ConstraintVar | undefined,
+        base: ConstraintVar | ObjectPropertyVarObj | undefined,
         caller: FunctionInfo | ModuleInfo,
-        argVars: Array<ConstraintVar | undefined>,
+        args: Array<Token | ConstraintVar | undefined>,
         resultVar: ConstraintVar | undefined,
         isNew: boolean,
         path: CallNodePath,
         kind: {native?: boolean, accessor?: boolean, external?: boolean} = {},
     ) {
+        // helper function for adding a token or subset constraint
+        const addInclusionConstraint = (from: Token | ConstraintVar, to: ConstraintVar) => {
+            if (from instanceof Token)
+                this.solver.addTokenConstraint(from, to);
+            else
+                this.solver.addSubsetConstraint(from, to);
+        };
+
         const f = this.solver.fragmentState; // (don't use in callbacks)
         const vp = f.varProducer;
         const pars = getAdjustedCallNodePath(path);
         f.registerCallEdge(pars.node, caller, this.a.functionInfos.get(t.fun)!, kind);
         if ((t.fun.loc as Location).module !== this.moduleInfo)
-            for (const argVar of argVars)
-                f.registerEscapingFromModule(argVar);
+            for (const arg of args)
+                f.registerEscapingFromModule(arg);
         const hasArguments = f.functionsWithArguments.has(t.fun);
         const argumentsToken = hasArguments ? this.a.canonicalizeToken(new ArrayToken(t.fun.body)) : undefined;
-        for (let i = 0; i < argVars.length; i++) {
-            const argVar = argVars[i];
+        for (const [i, arg] of args.entries()) {
             // constraint: ...: ⟦Ei⟧ ⊆ ⟦Xi⟧ for each argument/parameter i (Xi may be a pattern)
-            if (argVar) {
+            if (arg) {
                 if (i < t.fun.params.length) {
                     const param = t.fun.params[i];
                     if (isRestElement(param)) {
                         // read the remaining arguments into a fresh array
-                        const rest = argVars.slice(i);
+                        const rest = args.slice(i);
                         const t = this.newArrayToken(param);
-                        for (const [i, argVar] of rest.entries())
-                            if (argVar) // TODO: SpreadElement in arguments (warning emitted below)
-                                this.solver.addSubsetConstraint(argVar, vp.objPropVar(t, String(i)));
+                        for (const [i, arg] of rest.entries())
+                            if (arg) // TODO: SpreadElement in arguments (warning emitted below)
+                                addInclusionConstraint(arg, vp.objPropVar(t, String(i)));
                         this.solver.addTokenConstraint(t, vp.nodeVar(param));
                     } else
-                        this.solver.addSubsetConstraint(argVar, vp.nodeVar(param));
+                        addInclusionConstraint(arg, vp.nodeVar(param));
                 }
                 // constraint ...: ⟦Ei⟧ ⊆ ⟦t_arguments[i]⟧ for each argument i if the function uses 'arguments'
                 if (hasArguments)
-                    this.solver.addSubsetConstraint(argVar, vp.objPropVar(argumentsToken!, String(i)));
+                    addInclusionConstraint(arg, vp.objPropVar(argumentsToken!, String(i)));
             }
         }
         // constraint: if non-'new', E0 is a member expression E.m and t uses 'this', then ⟦E⟧ ⊆ ⟦this_f⟧
-        if (!isNew && baseVar && f.functionsWithThis.has(t.fun))
-            this.solver.addSubsetConstraint(baseVar, vp.thisVar(t.fun));
+        if (!isNew && base && f.functionsWithThis.has(t.fun))
+            addInclusionConstraint(base, vp.thisVar(t.fun));
         // constraint: ...: ⟦ret_t⟧ ⊆ ⟦(new) E0(E1,...,En)⟧
         if (!isParentExpressionStatement(pars))
             this.solver.addSubsetConstraint(vp.returnVar(t.fun), resultVar);
@@ -350,16 +429,19 @@ export class Operations {
      */
     readProperty(base: ConstraintVar | undefined, prop: string | undefined, dst: ConstraintVar | undefined, node: Node, enclosing: FunctionInfo | ModuleInfo, extrakey = "") {
         this.solver.collectPropertyRead(dst, base, this.packageObjectToken, prop);
+        const lopts = {n: node, s: extrakey};
 
         // expression E.p or E["p"] or E[i]
         if (prop !== undefined) {
 
             // constraint: ∀ objects t ∈ ⟦E⟧: ...
-            this.solver.addForAllTokensConstraint(base, TokenListener.READ_PROPERTY_BASE, node, (t: Token) => {
+            this.solver.addForAllTokensConstraint(base, TokenListener.READ_PROPERTY_BASE, lopts, (t: Token) => {
                 if (isObjectPropertyVarObj(t)) {
 
                     // constraint: ... ∀ ancestors t2 of t: ...
-                    this.solver.addForAllAncestorsConstraint(t, TokenListener.READ_ANCESTORS, node, extrakey, (t2: Token) => this.readPropertyBound(t2, prop, dst, node, enclosing, extrakey, t));
+                    this.solver.addForAllAncestorsConstraint(t, TokenListener.READ_ANCESTORS, node, extrakey, (t2: Token) => {
+                        this.readPropertyBound(t2, prop, dst, node, enclosing, extrakey ? {s: extrakey} : undefined, t);
+                    });
 
                     if (!options.newobj) {
                         if ((t instanceof FunctionToken || t instanceof ClassToken) && prop === "prototype") {
@@ -375,7 +457,7 @@ export class Operations {
                     this.solver.addAccessPath(new PropertyAccessPath(base!, prop), this.solver.varProducer.nodeVar(node), t.ap);
 
                 }
-            }, extrakey);
+            });
         } else {
 
             this.solver.fragmentState.registerEscapingFromModule(base); // unknown properties of the base object may escape
@@ -383,7 +465,7 @@ export class Operations {
 
             // constraint: ∀ arrays t ∈ ⟦E⟧: ...
             if (dst)
-                this.solver.addForAllTokensConstraint(base, TokenListener.READ_PROPERTY_BASE_DYNAMIC, node, (t: Token) => {
+                this.solver.addForAllTokensConstraint(base, TokenListener.READ_PROPERTY_BASE_DYNAMIC, lopts, (t: Token) => {
                     if (t instanceof ArrayToken) {
 
                         // constraint: ...: ⟦t.p⟧ ⊆ ⟦E[i]⟧ where p is a property of t
@@ -395,7 +477,7 @@ export class Operations {
                         if (logger.isInfoEnabled())
                             this.solver.fragmentState.registerUnhandledDynamicPropertyRead(node);
                     }
-                }, extrakey);
+                });
 
             // TODO: PropertyAccessPaths for dynamic property reads?
         }
@@ -410,12 +492,12 @@ export class Operations {
      * @param dst constraint variable for the result, or undefined if not applicable
      * @param node AST node where the operation occurs (used for constraint keys etc.)
      * @param enclosing enclosing function/module of the AST node
-     * @param extrakey is included as the str parameter when computing listener IDs
+     * @param extrakey is included in the listener key when computing listener IDs
      * @param thist token to use for 'this' when invoking getters
      */
     readPropertyBound(
-        t: Token, prop: string, dst: ConstraintVar | undefined,
-        node: Node, enclosing: FunctionInfo | ModuleInfo, extrakey: string, thist: Token = t,
+        t: Token, prop: string, dst: ConstraintVar | undefined, node: Node,
+        enclosing: FunctionInfo | ModuleInfo, extrakey: Omit<ListenerKey, "l" | "n"> = {}, thist: Token = t,
     ) {
         assert(isObjectPropertyVarObj(t));
 
@@ -441,21 +523,25 @@ export class Operations {
         // constraint: ... ∀ functions t3 ∈ ⟦(get)t.p⟧: ⟦ret_t3⟧ ⊆ ⟦E.p⟧ (unless NativeObjectToken or "prototype")
         if (!(t instanceof NativeObjectToken) && prop !== "prototype") {
             const getter = this.solver.varProducer.objPropVar(t, prop, "get");
-            this.solver.addForAllTokensConstraint(getter, TokenListener.READ_PROPERTY_GETTER, node, (t3: Token) => readFromGetter(t3), extrakey);
-            this.solver.addForAllTokensConstraint(getter, TokenListener.READ_PROPERTY_GETTER_THIS, thist, (t3: Token) => bindGetterThis(thist, t3));
+            this.solver.addForAllTokensConstraint(getter, TokenListener.READ_PROPERTY_GETTER, {n: node, ...extrakey},
+                                                  (t3: Token) => readFromGetter(t3));
+            this.solver.addForAllTokensConstraint(getter, TokenListener.READ_PROPERTY_GETTER_THIS, {t: thist},
+                                                  (t3: Token) => bindGetterThis(thist, t3));
         }
 
         if (t instanceof PackageObjectToken && t.kind === "Object") {
             // TODO: also reading from neighbor packages if t is a PackageObjectToken...
             if (options.readNeighbors)
-                this.solver.addForAllPackageNeighborsConstraint(t.packageInfo, node, extrakey, (neighbor: PackageInfo) => {
+                this.solver.addForAllPackageNeighborsConstraint(t.packageInfo, {n: node, ...extrakey}, (neighbor: PackageInfo) => {
                     if (dst)
                         this.solver.addSubsetConstraint(this.solver.varProducer.packagePropVar(neighbor, prop), dst); // TODO: exclude AccessPathTokens?
                     if (prop !== "prototype") {
                         const nt = this.a.canonicalizeToken(new PackageObjectToken(neighbor));
                         const getter = this.solver.varProducer.packagePropVar(neighbor, prop, "get");
-                        this.solver.addForAllTokensConstraint(getter, TokenListener.READ_PROPERTY_GETTER2, node, (t3: Token) => readFromGetter(t3), extrakey);
-                        this.solver.addForAllTokensConstraint(getter, TokenListener.READ_PROPERTY_GETTER_THIS2, nt, (t3: Token) => bindGetterThis(nt, t3));
+                        this.solver.addForAllTokensConstraint(getter, TokenListener.READ_PROPERTY_GETTER2, {n: node, ...extrakey},
+                                                              (t3: Token) => readFromGetter(t3));
+                        this.solver.addForAllTokensConstraint(getter, TokenListener.READ_PROPERTY_GETTER_THIS2, {t: nt},
+                                                              (t3: Token) => bindGetterThis(nt, t3));
                     }
                 });
 
@@ -513,8 +599,8 @@ export class Operations {
                         assert(isObjectPropertyVarObj(anc));
                         // constraint: ...: ∀ functions t2 ∈ ⟦(set)anc.p⟧: ⟦E2⟧ ⊆ ⟦x⟧ where x is the parameter of t2
                         const setter = this.solver.varProducer.objPropVar(anc, prop, "set");
-                        this.solver.addForAllTokensConstraint(setter, TokenListener.ASSIGN_SETTER, node, writeToSetter, prop);
-                        this.solver.addForAllTokensConstraint(setter, TokenListener.ASSIGN_SETTER_THIS, base, bindSetterThis);
+                        this.solver.addForAllTokensConstraint(setter, TokenListener.ASSIGN_SETTER, {n: node, s: prop}, writeToSetter);
+                        this.solver.addForAllTokensConstraint(setter, TokenListener.ASSIGN_SETTER_THIS, {t: base}, bindSetterThis);
                     });
                 }
 

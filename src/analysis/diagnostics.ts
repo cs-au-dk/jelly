@@ -66,8 +66,6 @@ export default class AnalysisDiagnostics {
 
     tokenListenerNotifications: number = 0;
 
-    pairListenerNotifications: number = 0;
-
     packageNeighborListenerNotifications: number = 0;
 
     arrayEntriesListenerNotifications: number = 0;

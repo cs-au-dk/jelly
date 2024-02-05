@@ -90,6 +90,17 @@ export function isParentExpressionStatement(path: NodePath): boolean { // TODO: 
     return p !== null && isExpressionStatement(p.node);
 }
 
+function isCallNodePath(path: NodePath, opts?: object): path is CallNodePath {
+    return path.isCallExpression(opts) || path.isOptionalCallExpression(opts) || path.isNewExpression(opts);
+}
+
+export function isCalleeExpression(path: NodePath): boolean {
+    const parent = path.parentPath;
+    if (parent?.isParenthesizedExpression())
+        return isCalleeExpression(parent);
+    return parent !== null && isCallNodePath(parent, {callee: path.node});
+}
+
 /**
  * Returns the base expression and property of the given method call, or undefined if not applicable.
  */

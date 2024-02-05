@@ -208,3 +208,24 @@ export class AncestorsVar extends ConstraintVar {
         return getTokenParent(this.t);
     }
 }
+
+/**
+ * A constraint variable for a node & token pair.
+ * They are used to hold callees of method calls for a specific receiver token.
+ */
+export class NodeTokenVar extends ConstraintVar {
+    constructor(
+        readonly node: Node,
+        readonly t: ObjectPropertyVarObj,
+    ) {
+        super();
+    }
+
+    toString(): string {
+        return `NodeToken[${this.t} at ${locationToStringWithFileAndEnd(this.node.loc, true)}]`;
+    }
+
+    getParent(): Node {
+        return this.node;
+    }
+}

@@ -1277,9 +1277,8 @@ export const ecmascriptModels: NativeModel = {
             name: "Promise",
             invoke: (p: NativeFunctionParams) => {
                 if (isNewExpression(p.path.node)) {
-                    const promise = newObject("Promise", p.globalSpecialNatives.get(PROMISE_PROTOTYPE)!, p);
-                    callPromiseExecutor(promise, p);
-                    returnToken(promise, p);
+                    callPromiseExecutor(p);
+                    returnToken(newObject("Promise", p.globalSpecialNatives.get(PROMISE_PROTOTYPE)!, p), p);
                 }
             },
             staticMethods: [

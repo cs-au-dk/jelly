@@ -26,6 +26,7 @@ import {
     ConstraintVar,
     FunctionReturnVar,
     IntermediateVar,
+    NodeTokenVar,
     NodeVar,
     ObjectPropertyVar,
     ObjectPropertyVarObj,
@@ -168,5 +169,11 @@ export class ConstraintVarProducer<RVT extends RepresentativeVar | MergeRepresen
         if (t instanceof ObjectToken && this.f.widened.has(t))
             t = this.a.canonicalizeToken(new PackageObjectToken(t.getPackageInfo()));
         return this.a.canonicalizeVar(new AncestorsVar(t));
+    }
+
+    nodeTokenVar(node: Node, t: ObjectPropertyVarObj): NodeTokenVar {
+        if (t instanceof ObjectToken && this.f.widened.has(t))
+            t = this.a.canonicalizeToken(new PackageObjectToken(t.getPackageInfo()));
+        return this.a.canonicalizeVar(new NodeTokenVar(node, t));
     }
 }

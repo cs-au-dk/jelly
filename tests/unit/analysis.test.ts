@@ -1,11 +1,11 @@
 import assert from "assert";
 import {Node, blockStatement, functionExpression, identifier, traverse, SourceLocation} from "@babel/types";
 import {UnknownAccessPath} from "../../src/analysis/accesspaths";
-import {ConstraintVar, IntermediateVar, ObjectPropertyVar} from "../../src/analysis/constraintvars";
+import {ConstraintVar, IntermediateVar, ObjectPropertyVar, isObjectPropertyVarObj} from "../../src/analysis/constraintvars";
 import {findEscapingObjects} from "../../src/analysis/escaping";
 import {ModuleInfo, PackageInfo} from "../../src/analysis/infos";
 import Solver from "../../src/analysis/solver";
-import {AccessPathToken, FunctionToken, NativeObjectToken, ObjectToken, PackageObjectToken} from "../../src/analysis/tokens";
+import {AccessPathToken, FunctionToken, NativeObjectToken, ObjectToken, PackageObjectToken, Token} from "../../src/analysis/tokens";
 import {options, resetOptions} from "../../src/options";
 import {JELLY_NODE_ID} from "../../src/parsing/extras";
 import {TokenListener} from "../../src/analysis/listeners";
@@ -118,44 +118,6 @@ describe("tests/unit/analysis", () => {
             const keys = [...f.subsetEdges.keys()];
             expect(keys).not.toContain(vA);
             expect(keys).not.toContain(vB);
-        });
-
-        test("pair listener 1", () => {
-            const {solver, a, f, redirect} = setup;
-
-            const at = a.canonicalizeToken(new ObjectToken(param));
-            const ft = a.canonicalizeToken(new FunctionToken(fun0));
-            expect(at).not.toBe(ft);
-
-            const fn = jest.fn();
-            solver.addForAllTokenPairsConstraint(vA, vB, TokenListener.AWAIT, param, "", fn);
-            redirect(vB, vRep1);
-            solver.addTokenConstraint(ft, vB);
-            solver.addSubsetConstraint(vA, vRep2);
-            solver.addTokenConstraint(at, vRep2);
-            assert(f.isRepresentative(vA) && f.isRepresentative(vRep2));
-            solver.redirect(vA, vRep2);
-
-            expect(f.postponedListenerCalls, "Pair listener call should be enqueued", {showMatcherMessage: false}).
-                toContainEqual([fn, [at, ft]]);
-        });
-
-        test("pair listener 1 & 2", () => {
-            const {solver, a, f} = setup;
-
-            const at = a.canonicalizeToken(new ObjectToken(param));
-            const ft = a.canonicalizeToken(new FunctionToken(fun0));
-
-            const fn = jest.fn();
-            solver.addForAllTokenPairsConstraint(vA, vA, TokenListener.AWAIT, param, "", fn);
-            solver.addTokenConstraint(ft, vA);
-            assert(f.isRepresentative(vA) && f.isRepresentative(vRep));
-            solver.addSubsetEdge(vA, vRep, false);
-            solver.addTokenConstraint(at, vRep);
-            solver.redirect(vA, vRep);
-
-            expect(f.postponedListenerCalls, "Pair listener call should be enqueued", {showMatcherMessage: false}).
-                toContainEqual([fn, [at, ft]]);
         });
 
         test("object property", () => {
@@ -434,19 +396,22 @@ describe("tests/unit/analysis", () => {
         });
 
         test("PackageObjectToken gets ancestor listeners", async () => {
-            const {solver, f} = setup;
+            const {solver} = setup;
 
+            solver.addTokenConstraint(ot, vA);
             const fn = jest.fn();
-            solver.addForAllAncestorsConstraint(ot, TokenListener.ASSIGN_ANCESTORS, param, "", fn);
+            solver.addForAllTokensConstraint(vA, TokenListener.ASSIGN_MEMBER_BASE, param, (t: Token) => {
+                assert(isObjectPropertyVarObj(t));
+                solver.addForAllAncestorsConstraint(t, TokenListener.ASSIGN_ANCESTORS, param, "", fn);
+            });
 
-            expect(f.postponedListenerCalls, `Ancestor listener should be enqueued with ${ot}`, {showMatcherMessage: false}).
-                toEqual([[fn, ot]]);
             await solver.propagate();
+            expect(fn).toHaveBeenLastCalledWith(ot);
 
             widenObjects(new Set([ot]), solver);
 
-            expect(f.postponedListenerCalls, `Ancestor listener should be enqueued with ${pt}`, {showMatcherMessage: false}).
-                toEqual([[fn, pt]]);
+            await solver.propagate();
+            expect(fn).toHaveBeenLastCalledWith(pt);
         });
 
         test("Ancestor listener triggers for widened ancestor", async () => {
