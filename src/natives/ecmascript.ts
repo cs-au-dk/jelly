@@ -36,6 +36,7 @@ import {
     widenArgument,
     defineProperties,
     assignProperties,
+    returnUnknown,
 } from "./nativehelpers";
 import {PackageObjectToken} from "../analysis/tokens";
 import {isExpression, isNewExpression, isStringLiteral} from "@babel/types";
@@ -796,8 +797,9 @@ export const ecmascriptModels: NativeModel = {
                     invoke: (p: NativeFunctionParams) => {
                         if (p.path.node.arguments.length > 1)
                             warnNativeUsed("JSON.parse", p, "with reviver"); // TODO
-                        returnPackageObject(p, "Object");
-                        returnPackageObject(p, "Array");
+                        // returnPackageObject(p, "Object");
+                        // returnPackageObject(p, "Array");
+                        returnUnknown(p); // TODO: better model for unknown JSON object/array?
                     }
                 },
                 {

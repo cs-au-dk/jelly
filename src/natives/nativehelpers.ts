@@ -32,6 +32,7 @@ import {NodePath} from "@babel/traverse";
 import {Operations} from "../analysis/operations";
 import {AccessorType, ConstraintVar, IntermediateVar, ObjectPropertyVarObj, isObjectPropertyVarObj} from "../analysis/constraintvars";
 import {Location} from "../misc/util";
+import {UnknownAccessPath} from "../analysis/accesspaths";
 
 /**
  * Models an assignment from a function parameter (0-based indexing) to a property of the base object.
@@ -212,6 +213,13 @@ export function newArray(p: NativeFunctionParams): ArrayToken {
  */
 export function returnToken(t: Token, p: NativeFunctionParams) {
     p.solver.addTokenConstraint(t, p.solver.varProducer.expVar(p.path.node, p.path));
+}
+
+/**
+ * Models returning @Unknown.
+ */
+export function returnUnknown(p: NativeFunctionParams) {
+    p.solver.addAccessPath(UnknownAccessPath.instance, p.solver.varProducer.expVar(p.path.node, p.path));
 }
 
 type IteratorKind =

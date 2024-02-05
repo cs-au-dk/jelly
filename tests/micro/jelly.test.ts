@@ -279,7 +279,7 @@ describe("tests/micro", () => {
     describe.each([false, true])("oldobj=%p", (oldobj: boolean) => {
         const expected = oldobj ? 1 : 0;
         runTest("tests/micro", "client-this.js", {
-            options: {ignoreDependencies: true, oldobj: oldobj},
+            options: {ignoreDependencies: true, oldobj},
             soundness: "tests/micro/client-this.json",
             // TODO: make this work with newobj
             funFound: expected,
