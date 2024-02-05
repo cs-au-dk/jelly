@@ -71,6 +71,7 @@ export const options: {
     assumeInNodeModules: boolean,
     newobj: boolean,
     proto: boolean,
+    objSpread: boolean,
 } = {
     callgraphHtml: undefined,
     dataflowHtml: undefined,
@@ -134,6 +135,7 @@ export const options: {
     assumeInNodeModules: false,
     newobj: false,
     proto: false,
+    objSpread: false,
 };
 
 export function setOptions(opts: OptionValues & Partial<typeof options>) {

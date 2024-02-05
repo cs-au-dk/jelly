@@ -96,7 +96,7 @@ https://github.com/babel/babel/blob/master/packages/babel-parser/ast/spec.md
 
 
 - [ ] SpreadElement (https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Spread_syntax)
-
+  (supported for array and object literals)
 
 ### Module/import/export
 

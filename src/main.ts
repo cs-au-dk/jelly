@@ -96,6 +96,7 @@ program
     .option("--assume-in-node-modules", "treat analyzed files as in node_modules")
     .option("--newobj", "new object abstraction (experimental)")
     .option("--proto", "model assignments to the __proto__ property")
+    .option("--obj-spread", "model spread syntax for object literals ({...obj})")
     .usage("[options] [files]")
     .addHelpText("after",
         "\nAll modules reachable by require/import from the given files are included in the analysis\n" +

@@ -110,6 +110,7 @@ import {
     registerArtificialClassPropertyInitializer,
 } from "../misc/asthelpers";
 import {
+    ARRAY_UNKNOWN,
     ASYNC_GENERATOR_PROTOTYPE_NEXT,
     GENERATOR_PROTOTYPE_NEXT,
     INTERNAL_PROTOTYPE,
@@ -727,12 +728,22 @@ export function visit(ast: File, op: Operations) {
             if (!isParentExpressionStatement(path)) {
 
                 // constraint: t ∈ ⟦{...}⟧ where t is the object for this allocation site
-                solver.addTokenConstraint(op.newObjectToken(path.node), vp.nodeVar(path.node));
+                const ot = op.newObjectToken(path.node);
+                solver.addTokenConstraint(ot, vp.nodeVar(path.node));
                 // TODO: fall back to field-based if an object token appears in a constraint variable together with >k other object tokens?
 
                 for (const p of path.node.properties)
                     if (isSpreadElement(p)) {
-                        f.warnUnsupported(p, "SpreadElement in ObjectExpression"); // TODO: SpreadElement in ObjectExpression
+                        if (options.objSpread) {
+                            // it's enticing to rewrite the AST to use Object.assign, but assign invokes setters on the target object
+                            const enclosing = a.getEnclosingFunctionOrModule(path, op.moduleInfo);
+                            solver.addForAllTokensConstraint(vp.expVar(p.argument, path), TokenListener.OBJECT_SPREAD, p, (t: Token) => {
+                                if (isObjectPropertyVarObj(t))
+                                    solver.addForAllObjectPropertiesConstraint(t, TokenListener.OBJECT_SPREAD, p, (prop: string) =>
+                                        op.readPropertyBound(t, prop, vp.objPropVar(ot, prop), {n: p, s: prop}, enclosing));
+                            });
+                        } else
+                            f.warnUnsupported(p, "SpreadElement in ObjectExpression (use --obj-spread)");
                     } // (ObjectProperty and ObjectMethod are handled at rules Property and Method respectively)
             }
         },
@@ -746,14 +757,18 @@ export function visit(ast: File, op: Operations) {
                 const t = op.newArrayToken(path.node);
                 solver.addTokenConstraint(t, vp.nodeVar(path.node));
 
+                let indexKnown = true;
                 for (const [index, e] of path.node.elements.entries())
                     if (isExpression(e)) {
 
                         // constraint: ⟦E⟧ ⊆ ⟦t.i⟧ for each array element E with index i
-                        const prop = String(index);
+                        const prop = indexKnown ? String(index) : ARRAY_UNKNOWN;
                         solver.addSubsetConstraint(op.expVar(e, path), vp.objPropVar(t, prop));
-                    } else if (isSpreadElement(e))
-                        f.warnUnsupported(e, "SpreadElement in ArrayExpression"); // TODO: SpreadElement in ArrayExpression
+                    } else if (isSpreadElement(e)) {
+                        indexKnown = false;
+                        op.readIteratorValue(op.expVar(e.argument, path), vp.arrayUnknownVar(t), path.node);
+                    } else
+                        e satisfies null;
             }
         },
 

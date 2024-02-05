@@ -516,6 +516,9 @@ export default class Solver {
      * The listener function must allow for the token to be widened.
      */
     addForAllObjectPropertiesConstraint(t: ObjectPropertyVarObj, key: TokenListener, n: Node, listener: (prop: string) => void) {
+        // TODO: it would be beneficial (for precision and performance) if we could track _own_ properties of objects
+        // (because that's actually what we want to range over with these constraints).
+        // currently we treat all properties that are read as own properties, even if the read happens on a descendant object
         if (logger.isDebugEnabled())
             logger.debug(`Adding object properties constraint #${TokenListener[key]} to ${t} at ${locationToStringWithFileAndEnd(n.loc)}`);
         const id = this.getListenerID({l: key, n});

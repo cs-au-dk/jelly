@@ -927,6 +927,15 @@ describe("tests/micro", () => {
         reachableTotal: 3,
     });
 
+    runTest("tests/micro", "spread.js", {
+        options: {objSpread: true},
+        soundness: "tests/micro/spread.json",
+        funTotal: 10,
+        callFound: 17,
+        callTotal: 20,
+        reachableTotal: 9,
+    });
+
     describe("packagejson", () =>
         runTest("tests/micro/packagejson", "index.js", {
             vulnerabilities: [{
