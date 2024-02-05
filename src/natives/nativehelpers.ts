@@ -899,7 +899,7 @@ export function assignProperties(target: Expression, sources: Array<Node>, p: Na
         if (isObjectPropertyVarObj(s))
             p.solver.addForAllObjectPropertiesConstraint(s, TokenListener.NATIVE_ASSIGN_PROPERTIES2, node, (prop: string) => {
                 const iVar = p.solver.varProducer.intermediateVar(node, `Object.assign: ${prop}`);
-                p.op.readPropertyBound(s, prop, iVar, node, enclosing, {s: prop});
+                p.op.readPropertyBound(s, prop, iVar, {n: node, s: prop}, enclosing);
                 p.solver.addForAllTokensConstraint(tVar, TokenListener.NATIVE_ASSIGN_PROPERTIES3, {n: node, s: prop}, (t: Token) => {
                     p.op.writeProperty(iVar, tVar, t, prop, node, enclosing, node, "normal", true);
                 });

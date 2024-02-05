@@ -210,22 +210,23 @@ export class AncestorsVar extends ConstraintVar {
 }
 
 /**
- * A constraint variable for a node & token pair.
- * They are used to hold callees of method calls for a specific receiver token.
+ * A constraint variable for caching the result of a property read operation
+ * that follows the prototype chain.
  */
-export class NodeTokenVar extends ConstraintVar {
+export class ReadResultVar extends ConstraintVar {
+
     constructor(
-        readonly node: Node,
         readonly t: ObjectPropertyVarObj,
+        readonly prop: string,
     ) {
         super();
     }
 
     toString(): string {
-        return `NodeToken[${this.t} at ${locationToStringWithFileAndEnd(this.node.loc, true)}]`;
+        return `ReadResult[${this.t}.${this.prop}]`;
     }
 
-    getParent(): Node {
-        return this.node;
+    getParent() {
+        return getTokenParent(this.t);
     }
 }

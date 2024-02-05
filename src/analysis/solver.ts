@@ -2,7 +2,7 @@ import {ConstraintVar, IntermediateVar, NodeVar, ObjectPropertyVarObj, isObjectP
 import logger, {isTTY, writeStdOut} from "../misc/logger";
 import {AccessPathToken, ArrayToken, ObjectToken, PackageObjectToken, Token} from "./tokens";
 import {GlobalState} from "./globalstate";
-import {PackageInfo} from "./infos";
+import {FunctionInfo, ModuleInfo, PackageInfo} from "./infos";
 import {
     addAll,
     addAllMapHybridSet,
@@ -418,10 +418,10 @@ export default class Solver {
      */
     addForAllAncestorsConstraint(t: ObjectPropertyVarObj,
                                  key: TokenListener.READ_ANCESTORS | TokenListener.ASSIGN_ANCESTORS | TokenListener.CALL_FUNCTION_ANCESTORS,
-                                 n: Node, s: string, listener: (ancestor: Token) => void) {
+                                 opts: Omit<ListenerKey, "l" | "t">, listener: (ancestor: Token) => void) {
         if (logger.isDebugEnabled())
-            logger.debug(`Adding ancestors constraint to ${t} at ${nodeToString(n)}`);
-        const id = this.getListenerID({l: key, n, t, s});
+            logger.debug(`Adding ancestors constraint to ${t} ${opts.n ? `at ${nodeToString(opts.n)}` : `${TokenListener[key]} ${opts.s}`}`);
+        const id = this.getListenerID({...opts, l: key, t});
         this.callTokenListener(id, listener, t); // ancestry is reflexive
         this.addForAllTokensConstraintPrivate(
             this.fragmentState.getRepresentative(this.varProducer.ancestorsVar(t)),
@@ -587,14 +587,25 @@ export default class Solver {
 
     /**
      * Collects property read operations.
+     * @param typ the type of the property read operation
      * @param result the constraint variable for the result of the property read operation
      * @param base the constraint variable for the base expression
      * @param pck the current package object token
      * @param prop the property name
+     * @param node the AST node for the property read operation
      */
-    collectPropertyRead(result: ConstraintVar | undefined, base: ConstraintVar | undefined, pck: PackageObjectToken, prop: string | undefined) { // TODO: rename to registerPropertyRead, move to FragmentState
-        if (result && base)
-            this.fragmentState.maybeEmptyPropertyReads.push({typ: "read", result, base, pck, prop});
+    collectPropertyRead(
+        typ: "read" | "call", result: ConstraintVar | undefined, base: ConstraintVar | undefined,
+        pck: PackageObjectToken, prop: string | undefined, node: Node, enclosing: FunctionInfo | ModuleInfo,
+    ) { // TODO: rename to registerPropertyRead, move to FragmentState
+        if (typ === "read" && result && base)
+            this.fragmentState.maybeEmptyPropertyReads.push({typ, result, base, pck, prop});
+        else if (typ === "call" && base && prop)
+            // call with @Unknown already happens when prop is undefined, so we only need to register
+            // the property read for patching if the property is known
+            this.fragmentState.maybeEmptyPropertyReads.push({typ, base, prop});
+        if (base && prop && prop !== "prototype")
+            this.fragmentState.propertyReads.add({base, prop, node, enclosing});
     }
 
     /**
@@ -984,6 +995,7 @@ export default class Solver {
         mapMapSetAll(s.callResultAccessPaths, f.callResultAccessPaths);
         mapMapSetAll(s.componentAccessPaths, f.componentAccessPaths);
         mapArrayPushAll(s.importDeclRefs, f.importDeclRefs);
+        addAll(s.propertyReads, f.propertyReads);
         f.maybeEmptyPropertyReads.push(...s.maybeEmptyPropertyReads);
         addAll(s.dynamicPropertyWrites, f.dynamicPropertyWrites);
         this.printDiagnostics();

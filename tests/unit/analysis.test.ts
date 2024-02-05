@@ -5,10 +5,19 @@ import {ConstraintVar, IntermediateVar, ObjectPropertyVar, isObjectPropertyVarOb
 import {findEscapingObjects} from "../../src/analysis/escaping";
 import {ModuleInfo, PackageInfo} from "../../src/analysis/infos";
 import Solver from "../../src/analysis/solver";
-import {AccessPathToken, FunctionToken, NativeObjectToken, ObjectToken, PackageObjectToken, Token} from "../../src/analysis/tokens";
+import {
+    AccessPathToken,
+    ArrayToken,
+    FunctionToken,
+    NativeObjectToken,
+    ObjectToken,
+    PackageObjectToken,
+    Token,
+} from "../../src/analysis/tokens";
 import {options, resetOptions} from "../../src/options";
 import {JELLY_NODE_ID} from "../../src/parsing/extras";
 import {TokenListener} from "../../src/analysis/listeners";
+import {Operations} from "../../src/analysis/operations";
 import {widenObjects} from "../../src/analysis/widening";
 import {patchDynamics} from "../../src/patching/patchdynamics";
 import "../../src/testing/compare";
@@ -133,6 +142,32 @@ describe("tests/unit/analysis", () => {
                 f.objectProperties.get(ot),
                 "An object property for ot should be registered regardless of redirection",
             ).toEqual(new Set(["A"]));
+        });
+
+        test("read property chain getters", async () => {
+            const {solver, a, f, redirect, getTokens} = setup;
+
+            const ot1 = a.canonicalizeToken(new ObjectToken(fun0));
+            const ot2 = a.canonicalizeToken(new ObjectToken(fun1));
+            const g1 = f.varProducer.objPropVar(ot1, "A", "get");
+            const g2 = f.varProducer.objPropVar(ot2, "A", "get");
+            redirect(g1, g2);
+
+            // fun0 is a getter that returns an array
+            const ft = a.canonicalizeToken(new FunctionToken(fun0));
+            const at = a.canonicalizeToken(new ArrayToken(fun0));
+            solver.addTokenConstraint(ft, g2);
+            solver.addTokenConstraint(at, solver.varProducer.returnVar(fun0));
+
+            const op = new Operations(m.getPath(), solver, new Map());
+            const r2 = op.readPropertyFromChain(ot2, "A");
+            await solver.propagate();
+            expect(getTokens(r2)).toEqual([at]);
+
+            // both tokens should be able to read from the getter(s)
+            const r1 = op.readPropertyFromChain(ot1, "A");
+            await solver.propagate();
+            expect(getTokens(r1)).toEqual([at]);
         });
     });
 
@@ -402,7 +437,7 @@ describe("tests/unit/analysis", () => {
             const fn = jest.fn();
             solver.addForAllTokensConstraint(vA, TokenListener.ASSIGN_MEMBER_BASE, param, (t: Token) => {
                 assert(isObjectPropertyVarObj(t));
-                solver.addForAllAncestorsConstraint(t, TokenListener.ASSIGN_ANCESTORS, param, "", fn);
+                solver.addForAllAncestorsConstraint(t, TokenListener.ASSIGN_ANCESTORS, {n: param}, fn);
             });
 
             await solver.propagate();
@@ -418,7 +453,7 @@ describe("tests/unit/analysis", () => {
             const {solver, a} = setup;
 
             const fn = jest.fn();
-            solver.addForAllAncestorsConstraint(ot, TokenListener.READ_ANCESTORS, param, "", fn);
+            solver.addForAllAncestorsConstraint(ot, TokenListener.READ_ANCESTORS, {n: param}, fn);
 
             await solver.propagate();
             expect(fn).toHaveBeenLastCalledWith(ot);
@@ -463,8 +498,8 @@ describe("tests/unit/analysis", () => {
                     solver.redirect(res1, res2);
                 }
 
-                solver.collectPropertyRead(res1, base1, pt, "A");
-                solver.collectPropertyRead(res2, base2, pt, "A");
+                solver.collectPropertyRead("read", res1, base1, pt, "A", param, m);
+                solver.collectPropertyRead("read", res2, base2, pt, "A", param, m);
                 solver.collectDynamicPropertyWrite(base1);
                 solver.addTokenConstraint(ot, base1);
                 solver.addTokenConstraint(ot, base2);

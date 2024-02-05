@@ -6,11 +6,10 @@ import logger from "../misc/logger";
 import {UnknownAccessPath} from "../analysis/accesspaths";
 import {ConstraintVar, isObjectPropertyVarObj} from "../analysis/constraintvars";
 import assert from "assert";
-import {Node} from "@babel/types";
 
 export type MaybeEmptyPropertyRead = {base: ConstraintVar} & (
     {typ: "read", result: ConstraintVar, pck: PackageObjectToken, prop: string | undefined} |
-    {typ: "call", node: Node, prop: string}
+    {typ: "call", prop: string}
 );
 
 /**
@@ -39,7 +38,7 @@ export function patchDynamics(solver: Solver): boolean {
             typ satisfies "call";
             for (const t of bs)
                 if (isObjectPropertyVarObj(t)) {
-                    const callees = f.varProducer.nodeTokenVar(e.node, t);
+                    const callees = f.varProducer.readResultVar(t, e.prop);
                     const [size] = f.getTokensSize(f.getRepresentative(callees));
                     if (size > 0) // non-empty method call
                         return false;

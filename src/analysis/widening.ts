@@ -1,7 +1,7 @@
 import Solver from "./solver";
 import {ObjectToken, PackageObjectToken, Token} from "./tokens";
 import logger from "../misc/logger";
-import {AncestorsVar, ConstraintVar, NodeTokenVar, ObjectPropertyVar} from "./constraintvars";
+import {AncestorsVar, ConstraintVar, ObjectPropertyVar, ReadResultVar} from "./constraintvars";
 import {addAll, getOrSet, mapGetMap} from "../misc/util";
 import Timer from "../misc/timer";
 import {CallResultAccessPath, ComponentAccessPath, PropertyAccessPath} from "./accesspaths";
@@ -77,8 +77,8 @@ export function widenObjects(widened: Set<ObjectToken>, solver: Solver) {
             return getOrSet(varMap, v, () => f.varProducer.packagePropVar(vobj.getPackageInfo(), v.prop, v.accessor));
         } else if (v instanceof AncestorsVar && v.t instanceof ObjectToken && widened.has(v.t))
             return getOrSet(varMap, v, () => f.varProducer.ancestorsVar(v.t));
-        else if (v instanceof NodeTokenVar && v.t instanceof ObjectToken && widened.has(v.t))
-            return getOrSet(varMap, v, () => f.varProducer.nodeTokenVar(v.node, v.t));
+        else if (v instanceof ReadResultVar && v.t instanceof ObjectToken && widened.has(v.t))
+            return getOrSet(varMap, v, () => f.varProducer.readResultVar(v.t, v.prop));
         else
             return v;
     }

@@ -1,8 +1,9 @@
-import {ConstraintVar, ObjectPropertyVarObj} from "./constraintvars";
+import {ConstraintVar, ObjectPropertyVarObj, isObjectPropertyVarObj} from "./constraintvars";
 import {
     AccessPathToken,
     ArrayToken,
     FunctionToken,
+    NativeObjectToken,
     ObjectToken,
     PackageObjectToken,
     Token
@@ -21,7 +22,7 @@ import {
     SourceLocation,
 } from "@babel/types";
 import assert from "assert";
-import {mapGetSet, locationToStringWithFile, locationToStringWithFileAndEnd, addMapHybridSet} from "../misc/util";
+import {mapGetSet, locationToStringWithFile, locationToStringWithFileAndEnd, addMapHybridSet, addAll} from "../misc/util";
 import {AccessPath, CallResultAccessPath, ComponentAccessPath, ModuleAccessPath, PropertyAccessPath} from "./accesspaths";
 import {options} from "../options";
 import logger from "../misc/logger";
@@ -308,6 +309,12 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
      * Used by PatternMatcher.
      */
     readonly importDeclRefs: Map<Identifier, Array<Identifier | JSXIdentifier>> = new Map;
+
+    /**
+     * Set of property read operations encountered during analysis.
+     * Used to add call edges for accessors after the analysis terminates.
+     */
+    readonly propertyReads: Set<{base: ConstraintVar, prop: string, node: Node, enclosing: FunctionInfo | ModuleInfo}> = new Set;
 
     /**
      * Property reads that may have empty result.
@@ -774,7 +781,7 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
         return added;
     }
 
-    /*
+    /**
      * If the provided token is an object token that has been widened, the corresponding package object token is returned.
      * Otherwise the provided token is returned as is.
      */
@@ -783,5 +790,39 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
             return this.a.canonicalizeToken(new PackageObjectToken(t.getPackageInfo(), t.kind));
         else
             return t;
+    }
+
+    /**
+     * Adds call edges for getters of collected property read operations.
+     */
+    resolveGetterCalls() {
+        for (const {base, prop, node, enclosing} of this.propertyReads) {
+            const ts = new Set<ObjectPropertyVarObj>(); // ancestors to look up getters in
+            for (const t of this.getTokens(this.getRepresentative(base)))
+                if (isObjectPropertyVarObj(t)) {
+                    ts.add(t);
+                    addAll(this.getTokens(this.getRepresentative(this.varProducer.ancestorsVar(t))), ts);
+                }
+
+            const addCalls = (v: ConstraintVar) => {
+                for (const ft of this.getTokens(this.getRepresentative(v)))
+                    if (ft instanceof FunctionToken && ft.fun.params.length === 0) {
+                        this.registerCall(node, {accessor: true});
+                        this.registerCallEdge(node, enclosing, this.a.functionInfos.get(ft.fun)!, {accessor: true});
+                    }
+            };
+
+            for (const t of ts) {
+                // mirror logic from readPropertyBound...
+                if (!(t instanceof NativeObjectToken))
+                    addCalls(this.varProducer.objPropVar(t, prop, "get"));
+
+                if (options.readNeighbors && t instanceof PackageObjectToken && t.kind === "Object")
+                    for (const n of this.packageNeighbors.get(t.packageInfo) ?? [])
+                        addCalls(this.varProducer.objPropVar(this.a.canonicalizeToken(new PackageObjectToken(n, "Object")), prop, "get"));
+            }
+        }
+
+        this.propertyReads.clear();
     }
 }
