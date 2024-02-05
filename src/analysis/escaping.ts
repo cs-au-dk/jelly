@@ -17,17 +17,8 @@ import {isInExports} from "../misc/packagejson";
  */
 export function findEscapingObjects(m: ModuleInfo, solver: Solver): Set<ObjectToken> {
     const a = solver.globalState;
-
-    // we do not consider escaping objects for application modules
-    if (!m.getPath().includes("node_modules") && !options.assumeInNodeModules)
-        return new Set();
-
-    // only consider escaping objects from library modules that are exported
-    const pi = a.packageJsonInfos.get(m.packageInfo.dir);
-    if (pi?.exports && !isInExports(`./${m.relativePath}`, pi.exports))
-        return new Set();
-
     const f = solver.fragmentState; // (don't use in callbacks)
+
     const worklist: Array<ObjectPropertyVarObj> = [];
     const visited = new Set<Token>();
     const escaping = new Set<ObjectToken>();
@@ -45,22 +36,33 @@ export function findEscapingObjects(m: ModuleInfo, solver: Solver): Set<ObjectTo
             }
     }
 
-    // first round, seed worklist with module.exports, find functions accessible via property reads
-    addToWorklist(f.varProducer.objPropVar(a.canonicalizeToken(new NativeObjectToken("module", m)), "exports"));
-    const w2: Array<ObjectPropertyVarObj> = [];
-    while (worklist.length !== 0) {
-        const t = worklist.shift()!; // breadth-first
-        if (t instanceof FunctionToken)
-            w2.push(t);
-        else if (t instanceof ObjectToken || (t instanceof NativeObjectToken && t.name === "exports"))
-            for (const p of f.objectProperties.get(t) ?? [])
-                if (!isInternalProperty(p))
-                    addToWorklist(f.varProducer.objPropVar(t, p));
+    let isModuleExporting = true;
+    if (!m.getPath().includes("node_modules") && !options.assumeInNodeModules) // do not consider escaping objects for application modules
+        isModuleExporting = false;
+    else {
+        const pi = a.packageJsonInfos.get(m.packageInfo.dir);
+        if (pi?.exports && !isInExports(`./${m.relativePath}`, pi.exports)) // only consider escaping objects from library modules that are exported
+            isModuleExporting = false;
     }
-    visited.clear();
-    for (const t of w2) {
-        visited.add(t);
-        worklist.push(t);
+
+    // first round, seed worklist with module.exports, find functions accessible via property reads
+    if (isModuleExporting) {
+        addToWorklist(f.varProducer.objPropVar(a.canonicalizeToken(new NativeObjectToken("module", m)), "exports"));
+        const w2: Array<ObjectPropertyVarObj> = [];
+        while (worklist.length !== 0) {
+            const t = worklist.shift()!; // breadth-first
+            if (t instanceof FunctionToken)
+                w2.push(t);
+            else if (t instanceof ObjectToken || (t instanceof NativeObjectToken && t.name === "exports"))
+                for (const p of f.objectProperties.get(t) ?? [])
+                    if (!isInternalProperty(p))
+                        addToWorklist(f.varProducer.objPropVar(t, p));
+        }
+        visited.clear();
+        for (const t of w2) {
+            visited.add(t);
+            worklist.push(t);
+        }
     }
     // add expressions collected during AST traversal
     for (const v of f.maybeEscapingFromModule)
