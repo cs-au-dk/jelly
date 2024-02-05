@@ -22,3 +22,10 @@ function baz3(a) {
 var q3 = baz3(() => { console.log("5"); });
 q3();
 (baz3(() => { console.log("5"); })());
+function baz4(f) {
+    const a = [];
+    a.push(f);
+    return bar.apply((d) => d, a);
+}
+var q4 = baz4(() => { console.log("6"); });
+q4();

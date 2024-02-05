@@ -464,13 +464,13 @@ describe("tests/micro", () => {
 
     runTest("tests/micro", "fun.js", {
         soundness: "tests/micro/fun.json",
-        functionInfos: 16,
+        functionInfos: 19,
         moduleInfos: 1,
-        numberOfFunctionToFunctionEdges: 18,
-        oneCalleeCalls: 12,
-        funTotal: 18,
-        callTotal: 19,
-        reachableTotal: 17,
+        numberOfFunctionToFunctionEdges: 22,
+        oneCalleeCalls: 14,
+        funTotal: 22,
+        callTotal: 23,
+        reachableTotal: 20,
     });
 
     runTest("tests/micro", "obj.js", {

@@ -57,11 +57,8 @@ export function assignParameterToThisProperty(param: number, prop: string, p: Na
  */
 function assignExpressionToArrayValue(from: Expression, t: ArrayToken, p: NativeFunctionParams) {
     const argVar = p.solver.varProducer.expVar(from, p.path);
-    if (argVar) {
+    if (argVar)
         p.solver.addSubsetConstraint(argVar, p.solver.varProducer.arrayUnknownVar(t));
-        p.solver.addForAllArrayEntriesConstraint(t, TokenListener.NATIVE_13, from, (prop: string) =>
-            p.solver.addSubsetConstraint(argVar, p.solver.varProducer.objPropVar(t, prop)));
-    }
 }
 
 /**
@@ -524,8 +521,7 @@ export function invokeCallbackBound(kind: CallbackKind, p: NativeFunctionParams,
                     break;
             }
             // create a new promise
-            const thenPromise = a.canonicalizeToken(new AllocationSiteToken("Promise", p.path.node));
-            solver.addInherits(thenPromise, p.globalSpecialNatives.get(PROMISE_PROTOTYPE)!);
+            const thenPromise = newObject("Promise", p.globalSpecialNatives.get(PROMISE_PROTOTYPE)!, p);
 
             if (ft instanceof FunctionToken) {
                 // assign promise fulfilled/rejected value to the callback parameter and add call edge
@@ -618,7 +614,14 @@ export function invokeCallApplyBound(kind: CallApplyKind, p: NativeFunctionParam
                                 p.solver.fragmentState.registerEscapingFromModule(opv);
                             }
                         });
-                        // TODO: p.solver.addSubsetConstraint(vp.arrayValueVar(t), ...);
+
+                        const unk = p.solver.varProducer.arrayUnknownVar(t);
+                        if (escapes)
+                            p.solver.fragmentState.registerEscapingFromModule(unk);
+
+                        for (const param of ft.fun.params)
+                            if (isIdentifier(param)) // TODO: non-Identifier parameters?
+                                p.solver.addSubsetConstraint(unk, p.solver.varProducer.nodeVar(param));
                     }
                 });
             }
