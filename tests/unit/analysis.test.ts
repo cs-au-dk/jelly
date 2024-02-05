@@ -17,7 +17,7 @@ describe("tests/unit/analysis", () => {
         options.cycleElimination = true;
     });
 
-    const p = new PackageInfo("fake", undefined, undefined, "fake", true);
+    const p = new PackageInfo("fake", undefined, undefined, "node_modules/fake", true);
     const packagekey = "fake@?";
     const m = new ModuleInfo("fake.js", p, true, true);
 
@@ -290,6 +290,40 @@ describe("tests/unit/analysis", () => {
             expect(findEscapingObjects(m, solver)).toEqual(new Set([tObject]));
             expect(getTokens(rep)).toEqual([tFunction, tUnknown]);
             expect(getTokens(f.varProducer.nodeVar(param))).toEqual([tUnknown]);
+        });
+
+        test.each(["./fake.js", "./*", "./*.js"])("exported library module: %s", (pattern: string) => {
+            const {solver, a, f, getTokens} = setup;
+
+            a.packageJsonInfos.set(p.dir, {
+                name: p.name,
+                dir: p.dir,
+                version: undefined,
+                main: undefined,
+                packagekey,
+                exports: [pattern],
+            });
+
+            solver.addTokenConstraint(a.canonicalizeToken(new FunctionToken(fun1)), vExports);
+            expect(findEscapingObjects(m, solver).size).toBe(0);
+            expect(getTokens(f.varProducer.nodeVar(param))).toContain(tUnknown);
+        });
+
+        test("unexported library module", () => {
+            const {solver, a, f, getTokens} = setup;
+
+            a.packageJsonInfos.set(p.dir, {
+                name: p.name,
+                dir: p.dir,
+                version: undefined,
+                main: undefined,
+                packagekey,
+                exports: ["./other-file.js"],
+            });
+
+            solver.addTokenConstraint(a.canonicalizeToken(new FunctionToken(fun1)), vExports);
+            expect(findEscapingObjects(m, solver).size).toBe(0);
+            expect(getTokens(f.varProducer.nodeVar(param))).not.toContain(tUnknown);
         });
     });
 

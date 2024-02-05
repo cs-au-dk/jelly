@@ -6,6 +6,8 @@ import {isIdentifier} from "@babel/types";
 import Solver from "./solver";
 import {UnknownAccessPath} from "./accesspaths";
 import {isInternalProperty} from "../natives/ecmascript";
+import {options} from "../options";
+import {isInExports} from "../misc/packagejson";
 
 /**
  * Finds the ObjectTokens that may be accessed from outside the module via exporting to or importing from other modules.
@@ -15,6 +17,16 @@ import {isInternalProperty} from "../natives/ecmascript";
  */
 export function findEscapingObjects(m: ModuleInfo, solver: Solver): Set<ObjectToken> {
     const a = solver.globalState;
+
+    // we do not consider escaping objects for application modules
+    if (!m.getPath().includes("node_modules") && !options.assumeInNodeModules)
+        return new Set();
+
+    // only consider escaping objects from library modules that are exported
+    const pi = a.packageJsonInfos.get(m.packageInfo.dir);
+    if (pi?.exports && !isInExports(`./${m.relativePath}`, pi.exports))
+        return new Set();
+
     const f = solver.fragmentState; // (don't use in callbacks)
     const worklist: Array<ObjectPropertyVarObj> = [];
     const visited = new Set<Token>();

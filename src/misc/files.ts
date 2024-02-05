@@ -40,7 +40,7 @@ export function expand(paths: Array<string> | string): Array<string> {
 
 function* expandRec(path: string, sub: boolean): Generator<string> {
     const stat = lstatSync(path);
-    const inNodeModules = path.includes("node_modules");
+    const inNodeModules = options.assumeInNodeModules || path.includes("node_modules");
     if (stat.isDirectory()) {
         const base = basename(path);
         if (!sub ||

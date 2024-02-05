@@ -300,7 +300,7 @@ describe("tests/micro", () => {
         functionInfos: 4,
         moduleInfos: 1,
         numberOfFunctionToFunctionEdges: 4,
-        oneCalleeCalls: 1,
+        oneCalleeCalls: 0,
         funFound: 3,
         funTotal: 3,
         callFound: 3,
@@ -695,12 +695,14 @@ describe("tests/micro", () => {
     runTest("tests/micro", "dpr-this.js", {
         options: {newobj: true},
         soundness: "tests/micro/dpr-this.json",
-        funTotal: 4,
         // TODO: patch dynamics heuristic does not kick in for dynamic property reads
         // on 'this', as 'this' always contains the @Unknown access path which
         // propagates to `this[...]`.
+        funFound: 3,
+        funTotal: 4,
         callFound: 3,
         callTotal: 4,
+        reachableFound: 4,
         reachableTotal: 5,
     });
 
@@ -759,13 +761,13 @@ describe("tests/micro", () => {
     });
 
     runTest("tests/micro", "match10.ts",  {
-        options: {ignoreDependencies: true},
+        options: {ignoreDependencies: true, assumeInNodeModules: true},
         patterns: ["tests/micro/match10-patterns.json"],
         matches: {total: 1, low: 1},
     });
 
     runTest("tests/micro", "match11.ts",  {
-        options: {ignoreDependencies: true},
+        options: {ignoreDependencies: true, assumeInNodeModules: true},
         patterns: ["tests/micro/match11-patterns.json"],
         matches: {total: 2, low: 1}, // TODO: high confidence match with filter is maybe?
     });

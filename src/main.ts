@@ -93,6 +93,7 @@ program
     .option("--modules-only", "report reachable packages and modules only, no analysis")
     .option("--compare-callgraphs", "compare two call graphs given as JSON files, no analysis")
     .option("--reachability", "compare reachability as an additional call graph comparison metric (use with -s or --compare-callgraphs)")
+    .option("--assume-in-node-modules", "treat analyzed files as in node_modules")
     .option("--newobj", "new object abstraction (experimental)")
     .option("--proto", "model assignments to the __proto__ property")
     .usage("[options] [files]")

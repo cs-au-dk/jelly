@@ -68,6 +68,7 @@ export const options: {
     externalMatches: boolean,
     includePackages: Array<string> | undefined,
     excludePackages: Array<string> | undefined,
+    assumeInNodeModules: boolean,
     newobj: boolean,
     proto: boolean,
 } = {
@@ -130,6 +131,7 @@ export const options: {
     externalMatches: false,
     includePackages: undefined,
     excludePackages: undefined,
+    assumeInNodeModules: false,
     newobj: false,
     proto: false,
 };

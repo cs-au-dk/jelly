@@ -33,6 +33,11 @@ export interface PackageJsonInfo {
      * Directory containing the package.json file, or current working directory if the file is not found.
      */
     dir: string;
+
+    /**
+     * All values in "exports", undefined if absent.
+     */
+    exports: Array<string> | undefined;
 }
 
 /**
@@ -77,7 +82,7 @@ function parsePackageJson(packageJson: FilePath) {
  * Extracts PackageJsonInfo for the package containing the given file.
  */
 export function getPackageJsonInfo(tofile: FilePath): PackageJsonInfo {
-    let packagekey, name, version, main, dir;
+    let packagekey, name, version, main, dir, exports;
     const p = findPackageJson(tofile); // TODO: add command-line option to skip search for package.json for entry files?
     let f;
     if (p) {
@@ -95,7 +100,7 @@ export function getPackageJsonInfo(tofile: FilePath): PackageJsonInfo {
         if (!f.version)
             logger.verbose(`Package version missing in ${p.packageJson}`);
         version = f.version;
-        packagekey = `${name}@${version ?? "?"}`
+        packagekey = `${name}@${version ?? "?"}`;
         if (f.main) {
             try {
                 // normalize main file path
@@ -105,10 +110,52 @@ export function getPackageJsonInfo(tofile: FilePath): PackageJsonInfo {
                 main = undefined;
             }
         }
+        if (f.exports) {
+            // This documentation is better than the NodeJS documentation: https://webpack.js.org/guides/package-exports/
+            // TODO: negative patterns, e.g., {"./test/*": null}
+            exports = [];
+            const queue = [f.exports];
+            while (queue.length > 0) {
+                const exp = queue.pop();
+                if (typeof exp === "string") {
+                    if (exp.startsWith("./"))
+                        exports.push(exp !== "./" && exp.endsWith("/") ? exp + "*" : exp);
+                    else {
+                        exports = undefined;
+                        logger.warn(`Non-relative export (${exp}) found in package.json`);
+                        break;
+                    }
+                } else if (Array.isArray(exp))
+                    queue.push(...exp);
+                else if (exp === null)
+                    logger.warn("Warning: unsupported negative exports pattern found in package.json");
+                else if (typeof exp === "object")
+                    queue.push(...Object.values(exp));
+                else {
+                    exports = undefined;
+                    logger.warn(`Invalid export (${exp}) found in package.json`);
+                    break;
+                }
+            }
+        }
     } else {
         name = "<main>";
         packagekey = "<unknown>";
         dir = process.cwd();
     }
-    return {packagekey, name, version, main, dir}
+    return {packagekey, name, version, main, dir, exports};
+}
+
+/**
+ * Checks if a file (relative path) belongs to the exports of a package.
+ */
+export function isInExports(rel: string, exports: Array<string>): boolean {
+    // TODO: all wildcards in a pattern should expand to the same value
+    for (const path of exports)
+        if (path.includes("*")) {
+            if (new RegExp(`^${path.replace(/\*/g, ".*")}$`).test(rel))
+                return true;
+        } else if (path === rel)
+            return true;
+    return false;
 }
