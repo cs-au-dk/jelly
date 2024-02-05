@@ -625,8 +625,8 @@ export class Operations {
 
         } else if (lVar && base instanceof AccessPathToken) {
             // constraint: ...: ⟦E2⟧ ⊆ ⟦k.p⟧ where k is the current PackageObjectToken
-            if (src)
-                this.solver.addSubsetConstraint(src, this.solver.varProducer.packagePropVar(this.packageInfo, prop));
+            // if (src)
+            //     this.solver.addSubsetConstraint(src, this.solver.varProducer.packagePropVar(this.packageInfo, prop));
 
             // collect property write operation @E1.p
             this.solver.addAccessPath(new PropertyAccessPath(lVar, prop), this.solver.varProducer.nodeVar(escapeNode), base.ap);
