@@ -644,10 +644,11 @@ describe("tests/micro", () => {
     });
 
     runTest("tests/micro", "this.js", {
-        functionInfos: 5,
+        soundness: "tests/micro/this.json",
+        functionInfos: 8,
         moduleInfos: 1,
-        numberOfFunctionToFunctionEdges: 4,
-        oneCalleeCalls: 4,
+        numberOfFunctionToFunctionEdges: 7,
+        oneCalleeCalls: 7,
     });
 
 

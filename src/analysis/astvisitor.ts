@@ -174,11 +174,11 @@ export function visit(ast: File, op: Operations) {
                 // constraint: t ∈ ⟦this⟧ where t denotes the package
                 solver.addTokenConstraint(op.packageObjectToken, vp.nodeVar(path.node));
 
-                const fun = path.getFunctionParent();
+                const fun = f.getEnclosingFunction(path);
                 if (fun) {
 
                     // constraint: ⟦this_f⟧ ⊆ ⟦this⟧ where f is the enclosing function
-                    solver.addSubsetConstraint(vp.thisVar(fun.node), vp.nodeVar(path.node));
+                    solver.addSubsetConstraint(vp.thisVar(fun), vp.nodeVar(path.node));
                 } else {
 
                     // constraint %globalThis ∈ ⟦this⟧

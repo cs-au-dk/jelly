@@ -17,3 +17,14 @@ f.h = function() {
     this.g();
 }
 f.h();
+
+const o = {
+    foo() {
+        return () => this.bar();
+    },
+    bar() {
+        console.log("3");
+    },
+};
+const l = o.foo();
+l();
