@@ -3,6 +3,7 @@ import {resolve} from "path";
 import logger from "./misc/logger";
 
 export const VERSION = require("../package.json").version;
+export const COPYRIGHT = "Copyright (C) 2023-2024 Anders Møller & Oskar Haarklou Veileborg\n";
 export const PKG = "pkg" in process;
 
 /**

@@ -4,7 +4,7 @@ import {analyzeFiles} from "./analysis/analyzer";
 import {closeSync, openSync, readdirSync, readFileSync, unlinkSync} from "fs";
 import {program} from "commander";
 import logger, {logToFile, setLogLevel} from "./misc/logger";
-import {options, PKG, setDefaultTrackedModules, setOptions, setPatternProperties, VERSION} from "./options";
+import {COPYRIGHT, options, PKG, setDefaultTrackedModules, setOptions, setPatternProperties, VERSION} from "./options";
 import {spawnSync} from "child_process";
 import path from "path";
 import {autoDetectBaseDir, expand, writeStreamedStringify} from "./misc/files";
@@ -34,7 +34,7 @@ import {CallGraph} from "./typings/callgraph";
 program
     .name("jelly")
     .version(VERSION)
-    .addHelpText("before", "Copyright (C) 2023-2024 Anders Møller & Oskar Haarklou Veileborg\n")
+    .addHelpText("before", COPYRIGHT)
     .option("-b, --basedir <directory>", "base directory for files to analyze (default: auto-detect)")
     .option("-f, --logfile <file>", "log to file (default: log to stdout)")
     .option("-l, --loglevel <level>", "log level (debug/verbose/info/warn/error)", "info")

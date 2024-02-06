@@ -32,7 +32,7 @@ import {
     TSLibraryUsageResponse,
     TypeScriptRequest
 } from "./typings/ipc";
-import {options, resetOptions, setDefaultTrackedModules, setOptions, setPatternProperties} from "./options";
+import {COPYRIGHT, options, resetOptions, setDefaultTrackedModules, setOptions, setPatternProperties} from "./options";
 import {autoDetectBaseDir, expand} from "./misc/files";
 import {analyzeFiles} from "./analysis/analyzer";
 import {TypeScriptTypeInferrer} from "./typescript/typeinferrer";
@@ -57,7 +57,7 @@ const VERSION = require("../package.json").version;
 program
     .name("jelly-server")
     .version(VERSION)
-    .addHelpText("before", "Copyright (C) 2024 Anders Møller\n")
+    .addHelpText("before", COPYRIGHT)
     .option("-f, --logfile <file>", "log file (default: $TMP/jelly-PID.log)")
     .option("-l, --loglevel <level>", "analysis log level (info/warn/error)", "error")
     .option("-r, --loglevel-server <level>", "server log level (verbose/info/error)", "info")
