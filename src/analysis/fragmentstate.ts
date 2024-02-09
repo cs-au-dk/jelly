@@ -176,7 +176,7 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
     readonly functionsWithArguments: Set<Function> = new Set;
 
     /**
-     * Functions that use 'this'.
+     * Functions that use 'this' (either explicitly or implicitly).
      */
     readonly functionsWithThis: Set<Function> = new Set;
 
@@ -561,19 +561,6 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
             this.functionsWithArguments.add(f);
             if (logger.isDebugEnabled())
                 logger.debug(`Function uses 'arguments': ${locationToStringWithFile(f.loc)}`);
-        }
-        return f;
-    }
-
-    /**
-     * Registers that the current function uses 'this'.
-     */
-    registerThis(path: NodePath): Function | undefined {
-        const f = this.getEnclosingFunction(path);
-        if (f) {
-            this.functionsWithThis.add(f);
-            if (logger.isDebugEnabled())
-                logger.debug(`Function uses 'this': ${locationToStringWithFile(f.loc)}`);
         }
         return f;
     }

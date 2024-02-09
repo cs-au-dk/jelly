@@ -137,8 +137,6 @@ export function visit(ast: File, op: Operations) {
         ThisExpression(path: NodePath<ThisExpression>) {
 
             // this
-            f.registerThis(path);
-
             if (!options.oldobj) {
 
                 const encl = path.findParent((p: NodePath) =>
@@ -571,7 +569,8 @@ export function visit(ast: File, op: Operations) {
                                     const dst = vp.objPropVar(it, key, ac);
                                     solver.addTokenConstraint(t, dst);
                                     // constraint: i ∈ ⟦this_t⟧
-                                    solver.addTokenConstraint(it, vp.thisVar(path.node));
+                                    if (f.functionsWithThis.has(path.node))
+                                        solver.addTokenConstraint(it, vp.thisVar(path.node));
                                 } else {
                                     const cls = getClass(path);
                                     assert(cls);
@@ -592,7 +591,8 @@ export function visit(ast: File, op: Operations) {
                                         const dst = vp.objPropVar(pt, key, ac);
                                         solver.addTokenConstraint(t, dst);
                                         // constraint: ⟦this_c⟧ ∈ ⟦this_t⟧
-                                        solver.addSubsetConstraint(vp.thisVar(constr), vp.thisVar(path.node));
+                                        if (f.functionsWithThis.has(path.node))
+                                            solver.addSubsetConstraint(vp.thisVar(constr), vp.thisVar(path.node));
                                     }
                                 }
 

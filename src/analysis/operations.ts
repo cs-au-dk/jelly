@@ -322,7 +322,8 @@ export class Operations {
                 this.solver.addTokenConstraint(q, resultVar);
 
                 // ... q ∈ ⟦this_f⟧
-                this.solver.addTokenConstraint(q, this.solver.varProducer.thisVar(t.fun));
+                if (f.functionsWithThis.has(t.fun))
+                    this.solver.addTokenConstraint(q, this.solver.varProducer.thisVar(t.fun));
 
                 // constraint: ⟦t.prototype⟧ ⊆ ⟦q.[[Prototype]]⟧
                 this.solver.addInherits(q, this.solver.varProducer.objPropVar(t, "prototype"));
