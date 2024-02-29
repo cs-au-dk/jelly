@@ -192,7 +192,7 @@ export class Operations {
             const baseVar = this.expVar(p.node.object, p);
             const prop = getProperty(p.node);
 
-            this.solver.collectPropertyRead("call", undefined, baseVar, this.packageObjectToken, prop, p.node, caller);
+            this.solver.collectPropertyRead("call", undefined, baseVar, this.packageObjectToken, prop);
             f.registerMethodCall(path.node, baseVar, prop, calleeVar);
 
             if (prop === undefined) {
@@ -207,7 +207,7 @@ export class Operations {
 
                 if (prop !== undefined) {
                     if (isObjectPropertyVarObj(t))
-                        callees = this.readPropertyFromChain(t, prop);
+                        callees = this.readPropertyFromChain(t, prop, p.node, caller);
                     else {
                         assert(t instanceof AccessPathToken);
 
@@ -422,7 +422,7 @@ export class Operations {
      * @param extrakey is included as the str parameter when computing listener IDs
      */
     readProperty(base: ConstraintVar | undefined, prop: string | undefined, dst: ConstraintVar | undefined, node: Node, enclosing: FunctionInfo | ModuleInfo, extrakey = "") {
-        this.solver.collectPropertyRead("read", dst, base, this.packageObjectToken, prop, node, enclosing);
+        this.solver.collectPropertyRead("read", dst, base, this.packageObjectToken, prop);
         const lopts = {n: node, s: extrakey};
 
         // expression E.p or E["p"] or E[i]
@@ -432,7 +432,7 @@ export class Operations {
             this.solver.addForAllTokensConstraint(base, TokenListener.READ_PROPERTY_BASE, lopts, (t: Token) => {
                 if (isObjectPropertyVarObj(t)) {
 
-                    this.solver.addSubsetConstraint(this.readPropertyFromChain(t, prop), dst);
+                    this.solver.addSubsetConstraint(this.readPropertyFromChain(t, prop, node, enclosing), dst);
 
                     if (options.oldobj) {
                         if ((t instanceof FunctionToken || t instanceof ClassToken) && prop === "prototype") {
@@ -480,15 +480,17 @@ export class Operations {
      * Models reading a property on the object and its prototype chain.
      * The returned constraint variable holds the result of the read operation and is
      * re-used across all calls to this function for the same base and property.
-     *
-     * Call edges for getters are not added. They must be added later through collectPropertyRead.
      */
-    readPropertyFromChain(base: ObjectPropertyVarObj, prop: string): ReadResultVar {
+    readPropertyFromChain(base: ObjectPropertyVarObj, prop: string, node: Node, enclosing: FunctionInfo | ModuleInfo): ReadResultVar {
         const dst = this.solver.varProducer.readResultVar(base, prop);
         // constraint: ... ∀ ancestors t2 of t: ...
         this.solver.addForAllAncestorsConstraint(base, TokenListener.READ_ANCESTORS, {s: prop}, (t2: Token) => {
             assert(isObjectPropertyVarObj(t2));
             this.readPropertyBound(t2, prop, dst, {s: prop, t: base}, undefined, base);
+        });
+        this.solver.addForAllAncestorsConstraint(base, TokenListener.READ_ANCESTORS_GETTERS, {n: node}, (t2: Token) => {
+            assert(isObjectPropertyVarObj(t2));
+            this.readPropertyBound(t2, prop, undefined, {s: prop, n: node}, enclosing, base);
         });
         return dst;
     }
@@ -504,14 +506,15 @@ export class Operations {
      * @param thist token to use for 'this' when invoking getters
      */
     readPropertyBound(
-        t: ObjectPropertyVarObj, prop: string, dst: ConstraintVar, extrakey: Omit<ListenerKey, "l">,
+        t: ObjectPropertyVarObj, prop: string, dst: ConstraintVar | undefined, extrakey: Omit<ListenerKey, "l">,
         enclosing?: FunctionInfo | ModuleInfo, thist: Token = t,
     ) {
         assert(!enclosing || extrakey.n);
 
         const readFromGetter = (t: Token) => {
             if (t instanceof FunctionToken && t.fun.params.length === 0) {
-                this.solver.addSubsetConstraint(this.solver.varProducer.returnVar(t.fun), dst);
+                if (dst)
+                    this.solver.addSubsetConstraint(this.solver.varProducer.returnVar(t.fun), dst);
                 if (enclosing) {
                     const node = extrakey.n!;
                     this.solver.fragmentState.registerCall(node, {accessor: true});
@@ -530,10 +533,8 @@ export class Operations {
         if (dst)
             this.solver.addSubsetConstraint(this.solver.varProducer.objPropVar(t, prop), dst); // TODO: exclude AccessPathTokens?
 
-        // keep getter invocation logic in sync with FragmentState.resolveGetterCalls...
-
         // constraint: ... ∀ functions t3 ∈ ⟦(get)t.p⟧: ⟦ret_t3⟧ ⊆ ⟦E.p⟧ (unless NativeObjectToken or "prototype")
-        if (!(t instanceof NativeObjectToken) && prop !== "prototype") {
+        if (!(t instanceof NativeObjectToken && !t.moduleInfo) && prop !== "prototype") {
             const getter = this.solver.varProducer.objPropVar(t, prop, "get");
             this.solver.addForAllTokensConstraint(getter, TokenListener.READ_PROPERTY_GETTER, extrakey,
                                                   (t3: Token) => readFromGetter(t3));
@@ -557,7 +558,7 @@ export class Operations {
                     }
                 });
 
-        } else if (t instanceof ArrayToken) {
+        } else if (dst && t instanceof ArrayToken) {
             if (isArrayIndex(prop)) {
 
                 // constraint: ... ⟦t.*⟧ ⊆ ⟦E.p⟧
@@ -604,7 +605,7 @@ export class Operations {
                 this.solver.addSubsetConstraint(src, this.solver.varProducer.objPropVar(base, prop, ac));
 
             if (invokeSetters)
-                if (!(base instanceof NativeObjectToken) && prop !== "prototype") {
+                if (!(base instanceof NativeObjectToken && !base.moduleInfo) && prop !== "prototype") {
 
                     // constraint: ... ∀ ancestors anc of base: ...
                     this.solver.addForAllAncestorsConstraint(base, TokenListener.ASSIGN_ANCESTORS, {n: node, s: prop}, (anc: Token) => {

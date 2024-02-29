@@ -1,13 +1,5 @@
-import {ConstraintVar, ObjectPropertyVar, ObjectPropertyVarObj, isObjectPropertyVarObj} from "./constraintvars";
-import {
-    AccessPathToken,
-    ArrayToken,
-    FunctionToken,
-    NativeObjectToken,
-    ObjectToken,
-    PackageObjectToken,
-    Token
-} from "./tokens";
+import {ConstraintVar, ObjectPropertyVarObj} from "./constraintvars";
+import {AccessPathToken, ArrayToken, FunctionToken, ObjectToken, PackageObjectToken, Token} from "./tokens";
 import {DummyModuleInfo, FunctionInfo, ModuleInfo, PackageInfo} from "./infos";
 import {
     CallExpression,
@@ -22,8 +14,14 @@ import {
     SourceLocation,
 } from "@babel/types";
 import assert from "assert";
-import {mapGetSet, locationToStringWithFile, locationToStringWithFileAndEnd, addMapHybridSet, addAll, mapGetMap} from "../misc/util";
-import {AccessPath, CallResultAccessPath, ComponentAccessPath, ModuleAccessPath, PropertyAccessPath} from "./accesspaths";
+import {addMapHybridSet, locationToStringWithFile, locationToStringWithFileAndEnd, mapGetSet} from "../misc/util";
+import {
+    AccessPath,
+    CallResultAccessPath,
+    ComponentAccessPath,
+    ModuleAccessPath,
+    PropertyAccessPath
+} from "./accesspaths";
 import {options} from "../options";
 import logger from "../misc/logger";
 import {NodePath} from "@babel/traverse";
@@ -309,12 +307,6 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
      * Used by PatternMatcher.
      */
     readonly importDeclRefs: Map<Identifier, Array<Identifier | JSXIdentifier>> = new Map;
-
-    /**
-     * Set of property read operations encountered during analysis.
-     * Used to add call edges for accessors after the analysis terminates.
-     */
-    readonly propertyReads: Set<{base: ConstraintVar, prop: string, node: Node, enclosing: FunctionInfo | ModuleInfo}> = new Set;
 
     /**
      * Property reads that may have empty result.
@@ -770,62 +762,5 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
             return this.a.canonicalizeToken(new PackageObjectToken(t.getPackageInfo(), t.kind));
         else
             return t;
-    }
-
-    /**
-     * Adds call edges for getters of collected property read operations.
-     */
-    resolveGetterCalls() {
-        // collect getters for each property
-        const getters = new Map<string, Map<ObjectPropertyVarObj, Set<FunctionToken>>>();
-        const add = (prop: string, obj: ObjectPropertyVarObj, ts: Iterable<Token>) => {
-            obj = this.maybeWidened(obj);
-            if (obj instanceof NativeObjectToken)
-                return;
-
-            const gs = [...ts].filter(t => t instanceof FunctionToken && t.fun.params.length === 0);
-            if (gs.length === 0)
-                return;
-
-            addAll(gs, mapGetSet(mapGetMap(getters, prop), obj));
-        };
-        for (const [v, ts] of this.tokens)
-            if (v instanceof ObjectPropertyVar && v.accessor === "get")
-                add(v.prop, v.obj, ts instanceof Token ? [ts] : ts);
-        for (const v of this.redirections.keys())
-            if (v instanceof ObjectPropertyVar && v.accessor === "get") {
-                const [n, ts] = this.getTokensSize(this.getRepresentative(v));
-                if (n > 0)
-                    add(v.prop, v.obj, ts);
-            }
-
-        for (const {base, prop, node, enclosing} of this.propertyReads) {
-            const gs = getters.get(prop);
-            if (!gs)
-                continue;
-
-            const ts = new Set<ObjectPropertyVarObj>(); // objects to look up getters for
-            for (const t of this.getTokens(this.getRepresentative(base)))
-                if (isObjectPropertyVarObj(t)) {
-                    ts.add(t);
-                    addAll(this.getTokens(this.getRepresentative(this.varProducer.ancestorsVar(t))), ts);
-
-                    // mirror logic from readPropertyBound...
-                    if (t instanceof PackageObjectToken && t.kind === "Object")
-                        for (const n of this.packageNeighbors.get(t.packageInfo) ?? [])
-                            ts.add(this.a.canonicalizeToken(new PackageObjectToken(n, "Object")));
-                }
-
-            for (const t of ts) {
-                const fts = gs.get(t);
-                if (fts)
-                    for (const ft of fts) {
-                        this.registerCall(node, {accessor: true});
-                        this.registerCallEdge(node, enclosing, this.a.functionInfos.get(ft.fun)!, {accessor: true});
-                    }
-            }
-        }
-
-        this.propertyReads.clear();
     }
 }

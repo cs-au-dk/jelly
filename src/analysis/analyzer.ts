@@ -146,7 +146,6 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
                     await solver.propagate();
 
                 assert(a.pendingFiles.length === 0, "Unexpected module"); // (new modules shouldn't be discovered in the second phase)
-                solver.fragmentState.resolveGetterCalls();
                 solver.updateDiagnostics();
             }
         }
