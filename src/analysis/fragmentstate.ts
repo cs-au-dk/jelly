@@ -174,11 +174,6 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
     readonly functionsWithArguments: Set<Function> = new Set;
 
     /**
-     * Functions that use 'this' (either explicitly or implicitly).
-     */
-    readonly functionsWithThis: Set<Function> = new Set;
-
-    /**
      * Source code locations that correspond to the start of artificial functions in dyn.ts.
      * Such functions are ignored during soundness testing.
      */

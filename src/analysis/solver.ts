@@ -980,7 +980,6 @@ export default class Solver {
         f.numberOfFunctionToFunctionEdges += s.numberOfFunctionToFunctionEdges;
         f.numberOfCallToFunctionEdges += s.numberOfCallToFunctionEdges;
         addAll(s.functionsWithArguments, f.functionsWithArguments);
-        addAll(s.functionsWithThis, f.functionsWithThis);
         f.artificialFunctions.push(...s.artificialFunctions);
         addAll(s.callLocations, f.callLocations);
         setAll(s.maybeEmptyMethodCalls, f.maybeEmptyMethodCalls);

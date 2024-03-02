@@ -322,8 +322,7 @@ export class Operations {
                 this.solver.addTokenConstraint(q, resultVar);
 
                 // ... q ∈ ⟦this_f⟧
-                if (f.functionsWithThis.has(t.fun))
-                    this.solver.addTokenConstraint(q, this.solver.varProducer.thisVar(t.fun));
+                this.solver.addTokenConstraint(q, this.solver.varProducer.thisVar(t.fun));
 
                 // constraint: ⟦t.prototype⟧ ⊆ ⟦q.[[Prototype]]⟧
                 this.solver.addInherits(q, this.solver.varProducer.objPropVar(t, "prototype"));
@@ -388,7 +387,7 @@ export class Operations {
             }
         }
         // constraint: if non-'new', E0 is a member expression E.m and t uses 'this', then ⟦E⟧ ⊆ ⟦this_f⟧
-        if (!isNew && base && f.functionsWithThis.has(t.fun))
+        if (!isNew && base)
             addInclusionConstraint(base, vp.thisVar(t.fun));
         // constraint: ...: ⟦ret_t⟧ ⊆ ⟦(new) E0(E1,...,En)⟧
         if (!isParentExpressionStatement(pars))
@@ -406,8 +405,7 @@ export class Operations {
             for (let j = 0; j < at.fun.params.length; j++)
                 if (isIdentifier(at.fun.params[j])) // TODO: non-identifier parameters?
                     this.solver.addAccessPath(UnknownAccessPath.instance, f.varProducer.nodeVar(at.fun.params[j]));
-            if (f.functionsWithThis.has(at.fun))
-                this.solver.addAccessPath(UnknownAccessPath.instance, f.varProducer.thisVar(at.fun));
+            this.solver.addAccessPath(UnknownAccessPath.instance, f.varProducer.thisVar(at.fun));
             // TODO: handle 'this' under --newobj?
         }
     }
@@ -525,8 +523,7 @@ export class Operations {
 
         const bindGetterThis = (baset: Token, t: Token) => {
             if (t instanceof FunctionToken && t.fun.params.length === 0)
-                if (this.solver.fragmentState.functionsWithThis.has(t.fun))
-                    this.solver.addTokenConstraint(this.solver.fragmentState.maybeWidened(baset), this.solver.varProducer.thisVar(t.fun));
+                this.solver.addTokenConstraint(this.solver.fragmentState.maybeWidened(baset), this.solver.varProducer.thisVar(t.fun));
         };
 
         // constraint: ... ⟦t.p⟧ ⊆ ⟦E.p⟧
@@ -594,8 +591,7 @@ export class Operations {
 
         const bindSetterThis = (t: Token) => {
             if (t instanceof FunctionToken && t.fun.params.length === 1)
-                if (this.solver.fragmentState.functionsWithThis.has(t.fun))
-                    this.solver.addTokenConstraint(this.solver.fragmentState.maybeWidened(base), this.solver.varProducer.thisVar(t.fun));
+                this.solver.addTokenConstraint(this.solver.fragmentState.maybeWidened(base), this.solver.varProducer.thisVar(t.fun));
         };
 
         if (isObjectPropertyVarObj(base)) {

@@ -142,7 +142,6 @@ export class ConstraintVarProducer<RVT extends RepresentativeVar | MergeRepresen
      * Also registers the function as using 'this'.
      */
     thisVar(fun: Function): ThisVar {
-        this.f.functionsWithThis.add(fun);
         return this.a.canonicalizeVar(new ThisVar(fun));
     }
 

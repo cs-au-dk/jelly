@@ -31,7 +31,6 @@ import {
     isAssignmentPattern,
     isCallExpression,
     isClassAccessorProperty,
-    isClassDeclaration,
     isClassExpression,
     isClassMethod,
     isClassPrivateMethod,
@@ -308,21 +307,16 @@ export function visit(ast: File, op: Operations) {
                 }
 
                 if (!options.oldobj) {
-
                     if (isFunctionDeclaration(path.node) || isFunctionExpression(path.node) || isClassMethod(path.node) || isClassPrivateMethod(path.node)) {
-                        // create prototype object
-                        const pt = op.newPrototypeToken(path.node);
-                        const ft = op.newFunctionToken(path.node);
+
+                        // create prototype object and instance object
+                        const pt = op.newPrototypeToken(fun);
+                        const ft = op.newFunctionToken(fun);
+                        const obj = op.newObjectToken(fun);
                         solver.addTokenConstraint(pt, vp.objPropVar(ft, "prototype"));
                         solver.addTokenConstraint(ft, vp.objPropVar(pt, "constructor"));
-                    }
-
-                    // if constructor for non-abstract class, make sure there is an instance
-                    if (cls && !(isClassDeclaration(cls) && cls.abstract)) {
-                        const obj = op.newObjectToken(fun);
-                        const proto = op.newPrototypeToken(fun);
+                        solver.addInherits(obj, pt);
                         solver.addTokenConstraint(obj, vp.thisVar(fun));
-                        solver.addInherits(obj, proto);
                     }
                 }
 
@@ -569,8 +563,7 @@ export function visit(ast: File, op: Operations) {
                                     const dst = vp.objPropVar(it, key, ac);
                                     solver.addTokenConstraint(t, dst);
                                     // constraint: i ∈ ⟦this_t⟧
-                                    if (f.functionsWithThis.has(path.node))
-                                        solver.addTokenConstraint(it, vp.thisVar(path.node));
+                                    solver.addTokenConstraint(it, vp.thisVar(path.node));
                                 } else {
                                     const cls = getClass(path);
                                     assert(cls);
@@ -591,8 +584,7 @@ export function visit(ast: File, op: Operations) {
                                         const dst = vp.objPropVar(pt, key, ac);
                                         solver.addTokenConstraint(t, dst);
                                         // constraint: ⟦this_c⟧ ∈ ⟦this_t⟧
-                                        if (f.functionsWithThis.has(path.node))
-                                            solver.addSubsetConstraint(vp.thisVar(constr), vp.thisVar(path.node));
+                                        solver.addSubsetConstraint(vp.thisVar(constr), vp.thisVar(path.node));
                                     }
                                 }
 

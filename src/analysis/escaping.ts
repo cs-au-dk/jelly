@@ -88,8 +88,7 @@ export function findEscapingObjects(m: ModuleInfo, solver: Solver): Set<ObjectTo
             for (const param of t.fun.params)
                 if (isIdentifier(param)) // TODO: Pattern|RestElement?
                     solver.addToken(theUnknownAccessPathToken, f.getRepresentative(f.varProducer.nodeVar(param)));
-            if (f.functionsWithThis.has(t.fun))
-                solver.addToken(theUnknownAccessPathToken, f.getRepresentative(f.varProducer.thisVar(t.fun)));
+            solver.addToken(theUnknownAccessPathToken, f.getRepresentative(f.varProducer.thisVar(t.fun)));
 
             // TODO: also consider inheritance, ClassExtendsVar?
         }

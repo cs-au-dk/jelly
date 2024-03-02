@@ -190,7 +190,6 @@ describe("tests/unit/analysis", () => {
         test("module.exports = function", () => {
             const {solver, a, f, getTokens} = setup;
 
-            f.functionsWithThis.add(fun1);
             solver.addTokenConstraint(a.canonicalizeToken(new FunctionToken(fun1)), vExports);
             expect([...f.vars]).toContain(vExports);
 

@@ -605,7 +605,7 @@ export function functionBind(p: NativeFunctionParams) {
     const args = p.path.node.arguments;
     const basearg = args[0];
     if (p.base instanceof FunctionToken) { // TODO: ignoring native functions etc.
-        if (isExpression(basearg) && p.op.solver.fragmentState.functionsWithThis.has(p.base.fun)) { // TODO:SpreadElement? non-MemberExpression?
+        if (isExpression(basearg)) { // TODO:SpreadElement? non-MemberExpression?
             // base value
             const baseVar = p.solver.varProducer.expVar(basearg, p.path);
             p.solver.addSubsetConstraint(baseVar, p.solver.varProducer.thisVar(p.base.fun)); // TODO: only bind 'this' if the callback is a proper function (not a lambda?)
