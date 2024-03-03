@@ -84,13 +84,7 @@ function isShebang(path: string): boolean { // TODO: doesn't work with hacks lik
  * @throws exception if the module is not found
  */
 export function requireResolve(str: string, file: FilePath, node: Node, f: FragmentState): FilePath | undefined {
-    if (str.endsWith(".json")) {
-        logger.debug(`Skipping JSON file '${str}'`); // TODO: analyze JSON files?
-        return undefined;
-    } else if (str.endsWith(".node")) {
-        logger.debug(`Skipping binary addon file '${str}'`);
-        return undefined;
-    } else if (str.endsWith(".less") || str.endsWith(".svg") || str.endsWith(".png") || str.endsWith(".css") || str.endsWith(".scss")) {
+    if (str.endsWith(".less") || str.endsWith(".svg") || str.endsWith(".png") || str.endsWith(".css") || str.endsWith(".scss")) {
         logger.verbose(`Ignoring module '${str}' with special extension`);
         return undefined;
     } else if (str[0] === "/") {
@@ -128,6 +122,13 @@ export function requireResolve(str: string, file: FilePath, node: Node, f: Fragm
 
         if (!filepath)
             throw e;
+    }
+    if (filepath.endsWith(".json")) {
+        logger.debug(`Skipping JSON file '${str}'`); // TODO: analyze JSON files?
+        return undefined;
+    } else if (filepath.endsWith(".node")) {
+        logger.debug(`Skipping binary addon file '${str}'`);
+        return undefined;
     }
     if (!filepath.startsWith(options.basedir)) {
         const msg = `Found module at ${filepath}, but not in basedir`;

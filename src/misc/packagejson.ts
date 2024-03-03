@@ -1,4 +1,4 @@
-import {FilePath} from "./util";
+import {FilePath, pushAll} from "./util";
 import {dirname, relative, resolve, sep} from "path";
 import {existsSync, readFileSync} from "fs";
 import logger from "./logger";
@@ -126,11 +126,11 @@ export function getPackageJsonInfo(tofile: FilePath): PackageJsonInfo {
                         break;
                     }
                 } else if (Array.isArray(exp))
-                    queue.push(...exp);
+                    pushAll(exp, queue);
                 else if (exp === null)
                     logger.warn("Warning: unsupported negative exports pattern found in package.json");
                 else if (typeof exp === "object")
-                    queue.push(...Object.values(exp));
+                    pushAll(Object.values(exp), queue);
                 else {
                     exports = undefined;
                     logger.warn(`Invalid export (${exp}) found in package.json`);

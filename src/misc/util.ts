@@ -182,7 +182,7 @@ export function mapSetAddAll<K, V>(from: Map<K, Set<V>>, to: Map<K, Set<V>>) {
 
 export function mapArrayPushAll<K, V>(from: Map<K, Array<V>>, to: Map<K, Array<V>>) {
     for (const [k, vs] of from)
-        mapGetArray(to, k).push(...vs);
+        pushAll(vs, mapGetArray(to, k));
 }
 
 export function mapMapSetAll<K1, K2, V>(from: Map<K1, Map<K2, V>>, to: Map<K1, Map<K2, V>>) {
@@ -271,6 +271,16 @@ export function getMapHybridSetSize<K, V>(m: Map<K, V | Set<V>>): number {
         else
             c++;
     return c;
+}
+
+/**
+ * Pushes all elements from 'from' to 'to'.
+ * Use this instead of "to.push(...from)",
+ * see https://stackoverflow.com/questions/61740599/rangeerror-maximum-call-stack-size-exceeded-with-array-push
+ */
+export function pushAll<V>(from: Iterable<V>, to: Array<V>) {
+    for (const x of from)
+        to.push(x);
 }
 
 /**

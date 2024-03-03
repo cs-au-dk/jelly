@@ -80,7 +80,7 @@ export function patchDynamics(solver: Solver): boolean {
     const count = toPatch.length;
     if (count > 0) {
         if (logger.isVerboseEnabled())
-            logger.verbose(`${count} empty object property read${count === 1 ? "" : "s"} patched`);
+            logger.verbose(`${count} empty object property read${count === 1 ? "" : "s"} patched, propagating again`);
         return true;
     } else
         return false;

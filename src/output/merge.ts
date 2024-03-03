@@ -100,8 +100,8 @@ export function merge(callgraphs: Array<CallGraph>): CallGraph {
           result.ignore.push(ignoreLoc);
   }
 
-  result.fun2fun = [...fun2fun.values()];
-  result.call2fun = [...call2fun.values()];
+  result.fun2fun = Array.from(fun2fun.values());
+  result.call2fun = Array.from(call2fun.values());
 
   const firstTime = callgraphs[0]?.time;
   if (firstTime !== undefined)

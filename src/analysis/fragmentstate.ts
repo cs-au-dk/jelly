@@ -609,6 +609,8 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
         return [];
     }
 
+    private static emptyTokensSize: [number, Iterable<Token>] = [0, []];
+
     /**
      * Returns the number of tokens in the solution for the given constraint variable, and the tokens.
      */
@@ -621,7 +623,7 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
                 return [ts.size, ts];
             }
         }
-        return [0, []];
+        return FragmentState.emptyTokensSize;
     }
 
     /**
@@ -635,6 +637,8 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
                 yield [v, ts, ts.size];
     }
 
+    private static emptySizeAndHas: [number, (t: Token) => boolean] = [0, (_t: Token) => false];
+
     /**
      * Returns the number of tokens and a 'has' function for the given constraint variable.
      */
@@ -647,7 +651,7 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
                 return [ts.size, (t: Token) => ts.has(t)];
             }
         }
-        return [0, (_t: Token) => false];
+        return FragmentState.emptySizeAndHas;
     }
 
     /**

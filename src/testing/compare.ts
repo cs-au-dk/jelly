@@ -252,6 +252,7 @@ export const toMatchAnalysisResults: MatcherFunction<[Solver | FragmentState]> =
     for (const [header, get] of <Array<[string, (f: FragmentState) => object]>>[
         // (very shallow modules check due to singletonsPlugin)
         ["Modules", f => f.a.moduleInfos],
+        ["Packages", f => f.a.packageInfos],
         ["Functions", f => {
             const m = new Map([...f.a.functionInfos]
                 .map(([f, info]) => [locationToStringWithFileAndEnd(f.loc, true), info.toString()]));

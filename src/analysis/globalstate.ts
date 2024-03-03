@@ -53,7 +53,7 @@ export class GlobalState {
     readonly canonicalAccessPaths: Map<string, AccessPath> = new Map;
 
     /**
-     * Canonical global identifiers.
+     * Canonical global identifiers (excluding module-specific).
      */
     readonly canonicalGlobals: Map<string, Identifier> = new Map;
 

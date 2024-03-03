@@ -632,7 +632,7 @@ export default class Solver {
      * Assumes that there is a subset path from v to rep.
      *
      * The caller should carefully observe that once the function returns, v is likely not a representative
-     * any more, but v's type will not reflect this fact.
+     * anymore, but v's type will not reflect this fact.
      * Do not use v as a representative after calling redirect!
      *
      * @param v constraint variable to redirect
@@ -645,9 +645,6 @@ export default class Solver {
         if (v === rep)
             return;
 
-        // TODO: remove these - they are guaranteed by the RepresentativeVar invariant
-        assert(f.isRepresentative(v) && f.isRepresentative(rep));
-        assert(f.getRepresentative(v) === v && f.getRepresentative(rep) === rep);
         if (logger.isDebugEnabled())
             logger.debug(`Redirecting ${v} to ${rep}`);
 
