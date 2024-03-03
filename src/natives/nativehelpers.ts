@@ -628,7 +628,7 @@ export function assignIteratorValuesToProperty(param: number, t: AllocationSiteT
     if (isExpression(arg)) { // TODO: non-Expression argument
         const src = p.op.expVar(arg, p.path);
         const dst = p.solver.varProducer.objPropVar(t, prop);
-        p.op.readIteratorValue(src, dst, p.path.node);
+        p.op.readIteratorValue(src, dst, arg); // using the argument node as allocation site for the iterator values
     }
 }
 
@@ -640,7 +640,7 @@ export function assignIteratorValuesToArrayValue(param: number, t: ArrayToken, p
     if (isExpression(arg)) { // TODO: non-Expression argument
         const src = p.op.expVar(arg, p.path);
         const dst = p.solver.varProducer.arrayUnknownVar(t);
-        p.op.readIteratorValue(src, dst, p.path.node);
+        p.op.readIteratorValue(src, dst, arg); // using the argument node as allocation site for the iterator values
     }
 }
 
@@ -652,7 +652,7 @@ export function assignIteratorMapValuePairs(param: number, t: AllocationSiteToke
     if (isExpression(arg)) { // TODO: non-Expression argument
         const src = p.op.expVar(arg, p.path);
         const dst = p.solver.varProducer.intermediateVar(p.path.node, "assignIteratorValuePairsToProperties");
-        p.op.readIteratorValue(src, dst, p.path.node);
+        p.op.readIteratorValue(src, dst, arg); // using the argument node as allocation site for the iterator values
         p.solver.addForAllTokensConstraint(dst, TokenListener.NATIVE_8, p.path.node.arguments[param], (t2: Token) => {
             if (t2 instanceof ArrayToken) {
                 if (keys)
