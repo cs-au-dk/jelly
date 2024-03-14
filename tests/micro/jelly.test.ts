@@ -967,4 +967,10 @@ describe("tests/micro", () => {
             }],
             vulnerabilitiesMatches: 1,
         }));
+
+    runTest("tests/micro", "callapplymatch.js", {
+        options: {ignoreDependencies: true},
+        patterns: ["tests/micro/callapplymatch-patterns.json"],
+        matches: {total: 3},
+    });
 });

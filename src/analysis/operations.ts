@@ -229,6 +229,9 @@ export class Operations {
                     this.solver.addForAllTokensConstraint(callees, TokenListener.CALL_FUNCTION_CALLEE, {n: path.node, t},
                                                           (ft: Token) => handleCall(t, ft));
                 }
+
+                if (t instanceof AccessPathToken && (prop === "call" || prop === "apply"))
+                    this.solver.addAccessPath(new CallResultAccessPath(baseVar!), resultVar, t.ap);
             });
         }
         const strings = args.length >= 1 && isStringLiteral(args[0]) ? [args[0].value] : []; // TODO: currently supporting only string literals at 'require' and 'import'
