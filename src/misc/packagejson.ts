@@ -114,6 +114,10 @@ export function getPackageJsonInfo(tofile: FilePath): PackageJsonInfo {
             // This documentation is better than the NodeJS documentation: https://webpack.js.org/guides/package-exports/
             // TODO: negative patterns, e.g., {"./test/*": null}
             exports = [];
+            if (f.main)
+                exports.push(f.main);
+            if (f.module)
+                exports.push(f.module);
             const queue = [f.exports];
             while (queue.length > 0) {
                 const exp = queue.pop();
