@@ -18,6 +18,7 @@ import {
     mapMapSize,
     mapSetAddAll,
     nodeToString,
+    pushAll,
     setAll,
     strHash,
 } from "../misc/util";
@@ -977,7 +978,7 @@ export default class Solver {
         f.numberOfFunctionToFunctionEdges += s.numberOfFunctionToFunctionEdges;
         f.numberOfCallToFunctionEdges += s.numberOfCallToFunctionEdges;
         addAll(s.functionsWithArguments, f.functionsWithArguments);
-        f.artificialFunctions.push(...s.artificialFunctions);
+        pushAll(s.artificialFunctions, f.artificialFunctions);
         addAll(s.callLocations, f.callLocations);
         setAll(s.maybeEmptyMethodCalls, f.maybeEmptyMethodCalls);
         addAll(s.nativeCallLocations, f.nativeCallLocations);
@@ -1000,7 +1001,7 @@ export default class Solver {
         mapMapSetAll(s.callResultAccessPaths, f.callResultAccessPaths);
         mapMapSetAll(s.componentAccessPaths, f.componentAccessPaths);
         mapArrayPushAll(s.importDeclRefs, f.importDeclRefs);
-        f.maybeEmptyPropertyReads.push(...s.maybeEmptyPropertyReads);
+        pushAll(s.maybeEmptyPropertyReads, f.maybeEmptyPropertyReads);
         addAll(s.dynamicPropertyWrites, f.dynamicPropertyWrites);
         this.printDiagnostics();
     }
