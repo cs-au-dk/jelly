@@ -19,6 +19,7 @@ import {preprocessAst} from "../parsing/extras";
 import {FragmentState} from "./fragmentstate";
 import {patchDynamics} from "../patching/patchdynamics";
 import {patchMethodCalls} from "../patching/patchmethodcalls";
+import {FunctionToken} from "./tokens";
 
 export async function analyzeFiles(files: Array<string>, solver: Solver) {
     const a = solver.globalState;
@@ -172,6 +173,23 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
         logger.warn("Received abort signal, analysis aborted");
     else if (d.timeout)
         logger.warn("Time limit reached, analysis aborted");
+
+    // collect final call edges after abort/timeout
+    if (solver.diagnostics.aborted || solver.diagnostics.timeout) {
+        const f = solver.fragmentState;
+        for (const n of f.callLocations) {
+            const caller = f.callToContainingFunction.get(n);
+            assert(caller);
+            const vs = f.callToCalleeVars.get(n);
+            if (vs)
+                for (const v of vs) {
+                    const vRep = f.getRepresentative(v);
+                    for (const t of f.getTokens(vRep))
+                        if (t instanceof FunctionToken)
+                            f.registerCallEdge(n, caller, a.functionInfos.get(t.fun)!);
+                }
+        }
+    }
 
     // output statistics
     if (!options.modulesOnly && files.length > 0) {

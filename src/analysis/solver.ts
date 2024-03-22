@@ -974,6 +974,7 @@ export default class Solver {
         mapSetAddAll(s.callToFunction, f.callToFunction);
         mapSetAddAll(s.callToFunctionOrModule, f.callToFunctionOrModule);
         setAll(s.callToContainingFunction, f.callToContainingFunction);
+        mapSetAddAll(s.callToCalleeVars, f.callToCalleeVars);
         mapSetAddAll(s.callToModule, f.callToModule);
         f.numberOfFunctionToFunctionEdges += s.numberOfFunctionToFunctionEdges;
         f.numberOfCallToFunctionEdges += s.numberOfCallToFunctionEdges;

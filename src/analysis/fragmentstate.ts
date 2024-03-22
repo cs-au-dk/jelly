@@ -151,7 +151,15 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
      */
     readonly callToFunctionOrModule: Map<Node, Set<FunctionInfo | ModuleInfo | DummyModuleInfo>> = new Map;
 
+    /**
+     * Map from call node to the containing function/module.
+     */
     readonly callToContainingFunction: Map<Node, ModuleInfo | FunctionInfo> = new Map;
+
+    /**
+     * Map from call node to constraint variable(s) that represent the callees.
+     */
+    readonly callToCalleeVars: Map<Node, Set<ConstraintVar>> = new Map; // TODO: use singleton/set?
 
     /**
      * Map from require/import call to the set of modules being required. (For output only.)
@@ -356,7 +364,12 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
     /**
      * Registers a call location.
      */
-    registerCall(n: Node, {native, external, accessor}: {native?: boolean, external?: boolean, accessor?: boolean} = {}) {
+    registerCall(
+        n: Node,
+        enclosing: FunctionInfo | ModuleInfo,
+        calleeVar: ConstraintVar | undefined,
+        {native, external, accessor}: {native?: boolean, external?: boolean, accessor?: boolean} = {}
+    ) {
         if (accessor && !options.callgraphImplicit)
             return;
         if (!this.callLocations.has(n) ||
@@ -370,6 +383,9 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
             else if (external)
                 this.externalCallLocations.add(n);
         }
+        this.callToContainingFunction.set(n, enclosing);
+        if (calleeVar)
+            mapGetSet(this.callToCalleeVars, n).add(calleeVar);
     }
 
     /**

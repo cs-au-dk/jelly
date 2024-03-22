@@ -147,8 +147,14 @@ export class Operations {
 
         const caller = this.a.getEnclosingFunctionOrModule(path, this.moduleInfo);
 
+        let p = path.get("callee");
+        while (p.isParenthesizedExpression())
+            p = p.get("expression");
+
+        const calleeVar = isExpression(p.node) ? this.expVar(p.node, p) : undefined;
+
         const pars = getAdjustedCallNodePath(path);
-        f.registerCall(pars.node);
+        f.registerCall(pars.node, caller, calleeVar);
 
         // collect special information for pattern matcher
         if (isParentExpressionStatement(pars))
@@ -166,12 +172,6 @@ export class Operations {
                 f.warnUnsupported(arg, "SpreadElement in arguments"); // TODO: SpreadElement in arguments
             return undefined;
         });
-
-        let p = path.get("callee");
-        while (p.isParenthesizedExpression())
-            p = p.get("expression");
-
-        const calleeVar = isExpression(p.node) ? this.expVar(p.node, p) : undefined;
 
         const handleCall = (base: ObjectPropertyVarObj | undefined, t: Token) => {
             this.callFunctionBound(base, t, calleeVar, argVars, resultVar, strings, path);
@@ -224,6 +224,7 @@ export class Operations {
 
                 if (callees) {
                     assert(isObjectPropertyVarObj(t));
+                    this.solver.fragmentState.registerCall(pars.node, caller, callees);
                     // the node parameter is required as it defines the argument variables, result variable,
                     // and various implicit parameters of native calls
                     this.solver.addForAllTokensConstraint(callees, TokenListener.CALL_FUNCTION_CALLEE, {n: path.node, t},
@@ -268,7 +269,7 @@ export class Operations {
         if (t instanceof FunctionToken)
             this.callFunctionTokenBound(t, base, caller, argVars, resultVar, isNew, path);
         else if (t instanceof NativeObjectToken) {
-            f.registerCall(pars.node, {native: true});
+            f.registerCall(pars.node, caller, undefined, {native: true});
             if (t.invoke && (!isNew || t.constr))
                 t.invoke({
                     base,
@@ -293,7 +294,7 @@ export class Operations {
             callPromiseResolve(t, path.node.arguments, path, this);
 
         } else if (t instanceof AccessPathToken) {
-            f.registerCall(pars.node, {external: true});
+            f.registerCall(pars.node, caller, undefined, {external: true});
             f.registerEscapingFromModuleArguments(args, path);
 
             // constraint: add CallResultAccessPath
@@ -403,7 +404,7 @@ export class Operations {
     invokeExternalCallback(at: Token, node: Node, caller: ModuleInfo | FunctionInfo) {
         if (at instanceof FunctionToken) {
             const f = this.solver.fragmentState;
-            f.registerCall(node, {external: true});
+            f.registerCall(node, caller, undefined, {external: true});
             f.registerCallEdge(node, caller, this.a.functionInfos.get(at.fun)!, {external: true});
             for (let j = 0; j < at.fun.params.length; j++)
                 if (isIdentifier(at.fun.params[j])) // TODO: non-identifier parameters?
@@ -518,7 +519,7 @@ export class Operations {
                     this.solver.addSubsetConstraint(this.solver.varProducer.returnVar(t.fun), dst);
                 if (enclosing) {
                     const node = extrakey.n!;
-                    this.solver.fragmentState.registerCall(node, {accessor: true});
+                    this.solver.fragmentState.registerCall(node, enclosing, undefined, {accessor: true});
                     this.solver.fragmentState.registerCallEdge(node, enclosing, this.a.functionInfos.get(t.fun)!, {accessor: true});
                 }
             }
@@ -587,7 +588,7 @@ export class Operations {
         const writeToSetter = (t: Token) => {
             if (t instanceof FunctionToken && t.fun.params.length === 1) {
                 this.solver.addSubsetConstraint(src, this.solver.varProducer.nodeVar(t.fun.params[0]));
-                this.solver.fragmentState.registerCall(node, {accessor: true});
+                this.solver.fragmentState.registerCall(node, enclosing, undefined, {accessor: true});
                 this.solver.fragmentState.registerCallEdge(node, enclosing, this.a.functionInfos.get(t.fun)!, {accessor: true});
             }
         };
