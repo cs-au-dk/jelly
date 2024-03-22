@@ -228,7 +228,7 @@ export default class Solver {
                 this.diagnostics.lastPrintDiagnosticsTime = d;
                 const a = this.globalState;
                 const f = this.fragmentState;
-                writeStdOut(`Packages: ${a.packageInfos.size}, modules: ${a.moduleInfos.size}, call edges: ${f.numberOfFunctionToFunctionEdges}, ` +
+                writeStdOut(`Packages: ${a.packageInfos.size}, modules: ${a.moduleInfos.size}, call edges: ${f.numberOfCallToFunctionEdges}, ` +
                     (options.diagnostics ? `vars: ${f.getNumberOfVarsWithTokens()}, tokens: ${f.numberOfTokens}, subsets: ${f.numberOfSubsetEdges}, round: ${this.diagnostics.fixpointRound}, ` : "") +
                     `iterations: ${this.diagnostics.iterations}, worklist: ${this.diagnostics.unprocessedTokensSize}` +
                     (options.diagnostics ? `, listeners: ${f.postponedListenerCalls.length}` : ""));
@@ -427,7 +427,7 @@ export default class Solver {
      * The key, the token, the node and the string must together uniquely determine the function.
      */
     addForAllAncestorsConstraint(t: ObjectPropertyVarObj,
-                                 key: TokenListener.READ_ANCESTORS | TokenListener.READ_ANCESTORS_GETTERS | TokenListener.ASSIGN_ANCESTORS | TokenListener.CALL_FUNCTION_ANCESTORS,
+                                 key: TokenListener.READ_ANCESTORS | TokenListener.READ_ANCESTORS_GETTERS | TokenListener.ASSIGN_ANCESTORS,
                                  opts: Omit<ListenerKey, "l" | "t">, listener: (ancestor: Token) => void) {
         if (logger.isDebugEnabled())
             logger.debug(`Adding ancestors constraint to ${t} ${opts.n ? `at ${nodeToString(opts.n)}` : `${TokenListener[key]} ${opts.s}`}`);
