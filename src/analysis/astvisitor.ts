@@ -112,7 +112,6 @@ import {
     ARRAY_UNKNOWN,
     ASYNC_GENERATOR_PROTOTYPE_NEXT,
     GENERATOR_PROTOTYPE_NEXT,
-    INTERNAL_PROTOTYPE,
     PROMISE_FULFILLED_VALUES
 } from "../natives/ecmascript";
 import {Operations} from "./operations";
@@ -215,7 +214,7 @@ export function visit(ast: File, op: Operations) {
                     src = op.newPrototypeToken(constr);
                 }
             }
-            solver.addSubsetConstraint(vp.objPropVar(src, INTERNAL_PROTOTYPE()), vp.nodeVar(path.node));
+            solver.addSubsetConstraint(vp.ancestorsVar(src), vp.nodeVar(path.node));
         },
 
         Identifier(path: NodePath<Identifier>) {
