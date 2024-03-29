@@ -352,12 +352,16 @@ export default class Solver {
     /**
      * Enqueues a call to a token listener if it hasn't been done before.
      */
-    private callTokenListener(id: ListenerID, listener: (t: Token) => void, t: Token) {
+    private callTokenListener(id: ListenerID, listener: (t: Token) => void, t: Token, now?: boolean) {
         const s = mapGetSet(this.fragmentState.listenersProcessed, id);
         if (!s.has(t)) {
             s.add(t);
-            this.enqueueListenerCall([listener, t]);
-            this.diagnostics.tokenListenerNotifications++;
+            if (now)
+                listener(t);
+            else {
+                this.enqueueListenerCall([listener, t]);
+                this.diagnostics.tokenListenerNotifications++;
+            }
         }
     }
 
@@ -432,7 +436,7 @@ export default class Solver {
         if (logger.isDebugEnabled())
             logger.debug(`Adding ancestors constraint to ${t} ${opts.n ? `at ${nodeToString(opts.n)}` : `${TokenListener[key]} ${opts.s}`}`);
         const id = this.getListenerID({...opts, l: key, t});
-        this.callTokenListener(id, listener, t); // ancestry is reflexive
+        this.callTokenListener(id, listener, t, true); // ancestry is reflexive
         this.addForAllTokensConstraintPrivate(
             this.fragmentState.getRepresentative(this.varProducer.ancestorsVar(t)),
             id, listener,
