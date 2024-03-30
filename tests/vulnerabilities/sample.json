@@ -160,6 +160,6 @@
       "line": 15,
       "code": "Math.floor((start + end) / 2)"
     },
-    "patterns": ["<tr46>.findStatus"]
+    "patterns": ["call <tr46>.findStatus"]
   }
 ]

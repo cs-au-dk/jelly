@@ -941,7 +941,7 @@ describe("tests/micro", () => {
                     title: "title",
                     url: "url",
                 },
-                patterns: ["<terser>.minify"],
+                patterns: ["call <terser>.minify"],
             }],
             vulnerabilitiesMatches: 1,
         }));
@@ -963,7 +963,7 @@ describe("tests/micro", () => {
                     title: "title",
                     url: "url",
                 },
-                patterns: ["<ansi-regex>"],
+                patterns: ["call <ansi-regex>"],
             }],
             vulnerabilitiesMatches: 1,
         }));
