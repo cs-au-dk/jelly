@@ -274,14 +274,14 @@ export class GlobalState {
             if (moduleInfo) {
 
                 // module has been reached before in another directory
-                if (logger.isVerboseEnabled())
-                    logger.verbose(`${moduleInfo} already encountered in another directory`);
+                if (logger.isDebugEnabled())
+                    logger.debug(`${moduleInfo} already encountered in another directory`);
             } else {
 
                 // module has not been reached before, create new ModuleInfo
-                const ignoreModule = from && (options.ignoreDependencies ||
-                    (!packageInfo.isEntry && ((options.includePackages && !options.includePackages.includes(packageInfo.name))
-                        || options.excludePackages?.includes(packageInfo.name))));
+                const ignoreModule = (from && (options.ignoreDependencies ||
+                    (!packageInfo.isEntry && ((options.includePackages && !options.includePackages.includes(packageInfo.name)))))) ||
+                    options.excludePackages?.includes(packageInfo.name);
                 moduleInfo = new ModuleInfo(rel, packageInfo, from === undefined, !ignoreModule);
                 packageInfo.modules.set(rel, moduleInfo);
 
