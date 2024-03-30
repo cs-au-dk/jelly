@@ -375,6 +375,7 @@ export default class Solver {
         }
         f.vars.add(vRep);
     }
+
     /**
      * Enqueues a call to a token listener if it hasn't been done before.
      */
@@ -457,7 +458,7 @@ export default class Solver {
      * The key, the token, the node and the string must together uniquely determine the function.
      */
     addForAllAncestorsConstraint(t: ObjectPropertyVarObj,
-                                 key: TokenListener.READ_ANCESTORS | TokenListener.ASSIGN_ANCESTORS,
+                                 key: TokenListener.READ_ANCESTORS | TokenListener.WRITE_ANCESTORS,
                                  opts: Omit<ListenerKey, "l" | "t">, listener: (ancestor: Token) => void) {
         if (logger.isDebugEnabled())
             logger.debug(`Adding ancestors constraint to ${t} ${opts.n ? `at ${nodeToString(opts.n)}` : `${TokenListener[key]} ${opts.s}`}`);

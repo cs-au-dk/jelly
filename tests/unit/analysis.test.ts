@@ -392,8 +392,8 @@ describe("tests/unit/analysis", () => {
             const ot2 = a.canonicalizeToken(new ObjectToken(fun1));
             const fn1 = jest.fn();
             const fn2 = jest.fn();
-            solver.addForAllObjectPropertiesConstraint(ot1, TokenListener.NATIVE_8, param, fn1);
-            solver.addForAllObjectPropertiesConstraint(ot2, TokenListener.NATIVE_11, param, fn2);
+            solver.addForAllObjectPropertiesConstraint(ot1, TokenListener.NATIVE_ASSIGN_ITERATOR_MAP_VALUE_PAIRS, param, fn1);
+            solver.addForAllObjectPropertiesConstraint(ot2, TokenListener.NATIVE_ASSIGN_BASE_ARRAY_ARRAY_VALUE_TO_ARRAY, param, fn2);
 
             solver.addObjectProperty(ot, "A");
 
@@ -434,9 +434,9 @@ describe("tests/unit/analysis", () => {
 
             solver.addTokenConstraint(ot, vA);
             const fn = jest.fn();
-            solver.addForAllTokensConstraint(vA, TokenListener.ASSIGN_MEMBER_BASE, param, (t: Token) => {
+            solver.addForAllTokensConstraint(vA, TokenListener.WRITE_BASE, param, (t: Token) => {
                 assert(isObjectPropertyVarObj(t));
-                solver.addForAllAncestorsConstraint(t, TokenListener.ASSIGN_ANCESTORS, {n: param}, fn);
+                solver.addForAllAncestorsConstraint(t, TokenListener.WRITE_ANCESTORS, {n: param}, fn);
             });
 
             await solver.propagate();

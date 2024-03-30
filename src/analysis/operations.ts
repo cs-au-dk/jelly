@@ -176,7 +176,7 @@ export class Operations {
 
         // expression E0(E1,...,En) or new E0(E1,...,En)
         // constraint: ∀ functions t ∈ ⟦E0⟧: ...
-        this.solver.addForAllTokensConstraint(calleeVar, TokenListener.CALL_FUNCTION_CALLEE, path.node, (t: Token) => handleCall(undefined, t));
+        this.solver.addForAllTokensConstraint(calleeVar, TokenListener.CALL_CALLEE, path.node, (t: Token) => handleCall(undefined, t));
         // this looks odd for method calls (E0.p(E1,...,En)), but ⟦E0.p⟧ is empty for method calls
         // (see the special case for visitMemberExpression in astvisitor.ts)
         // the constraint is used for method calls when:
@@ -199,7 +199,7 @@ export class Operations {
 
             // TODO: this is very similar to Operations.readProperty - refactor?
             // constraint: ∀ objects t ∈ ⟦E0⟧: ...
-            this.solver.addForAllTokensConstraint(baseVar, TokenListener.CALL_FUNCTION_BASE, path.node, (t: Token) => {
+            this.solver.addForAllTokensConstraint(baseVar, TokenListener.CALL_BASE, path.node, (t: Token) => {
                 let callees: ConstraintVar | undefined;
 
                 if (prop !== undefined) {
@@ -224,7 +224,7 @@ export class Operations {
                     this.solver.fragmentState.registerCall(pars.node, caller, callees);
                     // the node parameter is required as it defines the argument variables, result variable,
                     // and various implicit parameters of native calls
-                    this.solver.addForAllTokensConstraint(callees, TokenListener.CALL_FUNCTION_CALLEE, {n: path.node, t},
+                    this.solver.addForAllTokensConstraint(callees, TokenListener.CALL_CALLEE, {n: path.node, t},
                                                           (ft: Token) => handleCall(t, ft));
                 }
 
@@ -302,7 +302,7 @@ export class Operations {
                 const argVar = argVars[i];
                 if (argVar) {
                     // constraint: assign UnknownAccessPath to arguments to function arguments for external functions, also add (artificial) call edge
-                    this.solver.addForAllTokensConstraint(argVar, TokenListener.CALL_FUNCTION_EXTERNAL, args[i], (at: Token) =>
+                    this.solver.addForAllTokensConstraint(argVar, TokenListener.CALL_EXTERNAL, args[i], (at: Token) =>
                         this.invokeExternalCallback(at, pars.node, caller));
                     f.registerEscapingToExternal(argVar, args[i]);
                 } else if (isSpreadElement(args[i]))
@@ -430,7 +430,7 @@ export class Operations {
             // TODO: model reads from __proto__ (if options.proto enabled), see nativehelpers.ts:returnPrototypeOf
 
             // constraint: ∀ objects t ∈ ⟦E⟧: ...
-            this.solver.addForAllTokensConstraint(base, TokenListener.READ_PROPERTY_BASE, lopts, (t: Token) => {
+            this.solver.addForAllTokensConstraint(base, TokenListener.READ_BASE, lopts, (t: Token) => {
                 if (isObjectPropertyVarObj(t)) {
 
                     this.solver.addSubsetConstraint(this.readPropertyFromChain(t, prop), dst);
@@ -457,7 +457,7 @@ export class Operations {
 
             // constraint: ∀ arrays t ∈ ⟦E⟧: ...
             if (dst)
-                this.solver.addForAllTokensConstraint(base, TokenListener.READ_PROPERTY_BASE_DYNAMIC, lopts, (t: Token) => {
+                this.solver.addForAllTokensConstraint(base, TokenListener.READ_BASE_DYNAMIC, lopts, (t: Token) => {
                     if (t instanceof ArrayToken) {
 
                         // constraint: ...: ⟦t.p⟧ ⊆ ⟦E[i]⟧ where p is a property of t
@@ -529,9 +529,9 @@ export class Operations {
         // constraint: ... ∀ functions t3 ∈ ⟦(get)t.p⟧: ⟦ret_t3⟧ ⊆ ⟦E.p⟧ (unless NativeObjectToken or "prototype")
         if (!(t instanceof NativeObjectToken && !t.moduleInfo) && prop !== "prototype") {
             const getter = this.solver.varProducer.objPropVar(t, prop, "get");
-            this.solver.addForAllTokensConstraint(getter, TokenListener.READ_PROPERTY_GETTER, dstkey,
+            this.solver.addForAllTokensConstraint(getter, TokenListener.READ_GETTER, dstkey,
                                                   (t3: Token) => readFromGetter(t3));
-            this.solver.addForAllTokensConstraint(getter, TokenListener.READ_PROPERTY_GETTER_THIS, {t: thist},
+            this.solver.addForAllTokensConstraint(getter, TokenListener.READ_GETTER_THIS, {t: thist},
                                                   (t3: Token) => bindGetterThis(thist, t3));
         }
 
@@ -544,9 +544,9 @@ export class Operations {
                     if (prop !== "prototype") {
                         const nt = this.a.canonicalizeToken(new PackageObjectToken(neighbor));
                         const getter = this.solver.varProducer.packagePropVar(neighbor, prop, "get");
-                        this.solver.addForAllTokensConstraint(getter, TokenListener.READ_PROPERTY_GETTER2, dstkey,
+                        this.solver.addForAllTokensConstraint(getter, TokenListener.READ_GETTER2, dstkey,
                                                               (t3: Token) => readFromGetter(t3));
-                        this.solver.addForAllTokensConstraint(getter, TokenListener.READ_PROPERTY_GETTER_THIS2, {t: nt},
+                        this.solver.addForAllTokensConstraint(getter, TokenListener.READ_GETTER_THIS2, {t: nt},
                                                               (t3: Token) => bindGetterThis(nt, t3));
                     }
                 });
@@ -600,12 +600,12 @@ export class Operations {
                 if (!(base instanceof NativeObjectToken && !base.moduleInfo) && prop !== "prototype") {
 
                     // constraint: ... ∀ ancestors anc of base: ...
-                    this.solver.addForAllAncestorsConstraint(base, TokenListener.ASSIGN_ANCESTORS, {n: node, s: prop}, (anc: Token) => {
+                    this.solver.addForAllAncestorsConstraint(base, TokenListener.WRITE_ANCESTORS, {n: node, s: prop}, (anc: Token) => {
                         if (isObjectPropertyVarObj(anc)) {
                             // constraint: ...: ∀ functions t2 ∈ ⟦(set)anc.p⟧: ⟦E2⟧ ⊆ ⟦x⟧ where x is the parameter of t2
                             const setter = this.solver.varProducer.objPropVar(anc, prop, "set");
-                            this.solver.addForAllTokensConstraint(setter, TokenListener.ASSIGN_SETTER, {n: node, s: prop}, writeToSetter);
-                            this.solver.addForAllTokensConstraint(setter, TokenListener.ASSIGN_SETTER_THIS, {t: base}, bindSetterThis);
+                            this.solver.addForAllTokensConstraint(setter, TokenListener.WRITE_SETTER, {n: node, s: prop}, writeToSetter);
+                            this.solver.addForAllTokensConstraint(setter, TokenListener.WRITE_SETTER_THIS, {t: base}, bindSetterThis);
                         }
                     });
                 }
@@ -741,7 +741,7 @@ export class Operations {
             const assignRequireExtensions = (t: Token) => {
                 if (t instanceof NativeObjectToken && t.name === "require.extensions")
                     // when a function is assigned to require.extensions, add an external call edge
-                    this.solver.addForAllTokensConstraint(src, TokenListener.ASSIGN_REQUIRE_EXTENSIONS, path.node, (ft: Token) =>
+                    this.solver.addForAllTokensConstraint(src, TokenListener.WRITE_REQUIRE_EXTENSIONS, path.node, (ft: Token) =>
                         this.invokeExternalCallback(ft, path.node, enclosing));
             };
 
@@ -749,7 +749,7 @@ export class Operations {
                 // E1.prop = E2
 
                 // constraint: ∀ objects t ∈ ⟦E1⟧: ...
-                this.solver.addForAllTokensConstraint(lVar, TokenListener.ASSIGN_MEMBER_BASE, dst, (t: Token) => {
+                this.solver.addForAllTokensConstraint(lVar, TokenListener.WRITE_BASE, dst, (t: Token) => {
                     this.writeProperty(src, lVar, t, prop, dst, enclosing, path.node);
                     assignRequireExtensions(t);
                 });
@@ -762,7 +762,7 @@ export class Operations {
 
                 // constraint: ∀ arrays t ∈ ⟦E1⟧: ...
                 if (src)
-                    this.solver.addForAllTokensConstraint(lVar, TokenListener.ASSIGN_DYNAMIC_BASE, dst, (t: Token) => {
+                    this.solver.addForAllTokensConstraint(lVar, TokenListener.WRITE_BASE_DYNAMIC, dst, (t: Token) => {
                         if (t instanceof ArrayToken) {
 
                             // constraint: ...: ⟦E2⟧ ⊆ ⟦t.*⟧
@@ -792,9 +792,9 @@ export class Operations {
                 if (isRestElement(p)) {
                     // read the remaining object properties of src into a fresh object at p
                     const t = this.newObjectToken(p);
-                    this.solver.addForAllTokensConstraint(src, TokenListener.ASSIGN_OBJECT_PATTERN_REST, p, (t2: Token) => {
+                    this.solver.addForAllTokensConstraint(src, TokenListener.WRITE_OBJECT_PATTERN_REST, p, (t2: Token) => {
                         if (t2 instanceof AllocationSiteToken || t2 instanceof FunctionToken || t2 instanceof NativeObjectToken || t2 instanceof PackageObjectToken) {
-                            this.solver.addForAllObjectPropertiesConstraint(t2, TokenListener.ASSIGN_OBJECT_PATTERN_REST_PROPERTIES, p, (prop: string) => { // TODO: only copying explicit properties, not unknown computed
+                            this.solver.addForAllObjectPropertiesConstraint(t2, TokenListener.WRITE_OBJECT_PATTERN_REST_PROPERTIES, p, (prop: string) => { // TODO: only copying explicit properties, not unknown computed
                                 if (!matched.has(prop))
                                     this.solver.addSubsetConstraint(this.solver.varProducer.objPropVar(t2, prop), this.solver.varProducer.objPropVar(t, prop));
                                 // TODO: PropertyAccessPaths for rest elements in destructuring assignments for objects?
@@ -822,9 +822,9 @@ export class Operations {
                     if (isRestElement(p)) {
                         // read the remaining array elements of src into a fresh array at p
                         const t = this.newArrayToken(p);
-                        this.solver.addForAllTokensConstraint(src, TokenListener.ASSIGN_ARRAY_PATTERN_REST, p, (t2: Token) => {
+                        this.solver.addForAllTokensConstraint(src, TokenListener.WRITE_ARRAY_PATTERN_REST, p, (t2: Token) => {
                             if (t2 instanceof ArrayToken) {
-                                this.solver.addForAllArrayEntriesConstraint(t2, TokenListener.ASSIGN_ARRAY_PATTERN_REST_ARRAY, p, (prop: string) => {
+                                this.solver.addForAllArrayEntriesConstraint(t2, TokenListener.WRITE_ARRAY_PATTERN_REST_ARRAY, p, (prop: string) => {
                                     const newprop = parseInt(prop) - i;
                                     if (newprop >= 0)
                                         this.solver.addSubsetConstraint(this.solver.varProducer.objPropVar(t2, prop), this.solver.varProducer.objPropVar(t, String(newprop)));

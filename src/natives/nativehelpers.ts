@@ -679,7 +679,7 @@ export function assignIteratorMapValuePairs(param: number, t: AllocationSiteToke
         const src = p.op.expVar(arg, p.path);
         const dst = p.solver.varProducer.intermediateVar(p.path.node, "assignIteratorValuePairsToProperties");
         p.op.readIteratorValue(src, dst, arg); // using the argument node as allocation site for the iterator values
-        p.solver.addForAllTokensConstraint(dst, TokenListener.NATIVE_8, p.path.node.arguments[param], (t2: Token) => {
+        p.solver.addForAllTokensConstraint(dst, TokenListener.NATIVE_ASSIGN_ITERATOR_MAP_VALUE_PAIRS, p.path.node.arguments[param], (t2: Token) => {
             if (t2 instanceof ArrayToken) {
                 if (keys)
                     p.solver.addSubsetConstraint(p.solver.varProducer.objPropVar(t2, "0"), p.solver.varProducer.objPropVar(t, keys));
@@ -704,7 +704,7 @@ export function assignBaseArrayValueToArray(t: ArrayToken, p: NativeFunctionPara
  */
 export function assignBaseArrayArrayValueToArray(t: ArrayToken, p: NativeFunctionParams) {
     if (p.base instanceof ArrayToken) {
-        p.solver.addForAllTokensConstraint(p.solver.varProducer.arrayAllVar(p.base), TokenListener.NATIVE_11, {n: p.path.node, t}, (t2: Token) => {
+        p.solver.addForAllTokensConstraint(p.solver.varProducer.arrayAllVar(p.base), TokenListener.NATIVE_ASSIGN_BASE_ARRAY_ARRAY_VALUE_TO_ARRAY, {n: p.path.node, t}, (t2: Token) => {
             if (t2 instanceof ArrayToken) {
                 const dst = p.solver.varProducer.arrayUnknownVar(t);
                 p.solver.addSubsetConstraint(p.solver.varProducer.arrayAllVar(t2), dst);
@@ -886,7 +886,7 @@ export function returnPromiseIterator(kind: "all" | "allSettled" | "any" | "race
 export function returnPrototypeOf(p: NativeFunctionParams) {
     const arg = p.path.node.arguments[0], dst = p.solver.varProducer.expVar(p.path.node, p.path);
     if (isExpression(arg) && !isParentExpressionStatement(p.path) && dst !== undefined) // TODO: non-Expression arguments?
-        p.solver.addForAllTokensConstraint(p.solver.varProducer.expVar(arg, p.path), TokenListener.NATIVE_12, p.path.node, (t: Token) => {
+        p.solver.addForAllTokensConstraint(p.solver.varProducer.expVar(arg, p.path), TokenListener.NATIVE_RETURN_PROTOTYPE_OF, p.path.node, (t: Token) => {
             if (isObjectPropertyVarObj(t)) {
                 p.solver.addSubsetConstraint(p.solver.varProducer.objPropVar(t, INTERNAL_PROTOTYPE()), dst);
                 if (t instanceof ObjectToken)
@@ -928,7 +928,7 @@ export function setPrototypeOf(p: NativeFunctionParams) {
     if (isExpression(obj) && isExpression(prototype)) { // TODO: non-Expression arguments?
         const pvar = p.op.solver.varProducer.expVar(prototype, p.path);
         if (pvar)
-            p.solver.addForAllTokensConstraint(p.solver.varProducer.expVar(obj, p.path), TokenListener.NATIVE_14, p.path.node, (t: Token) => {
+            p.solver.addForAllTokensConstraint(p.solver.varProducer.expVar(obj, p.path), TokenListener.NATIVE_SET_PROTOTYPE_OF, p.path.node, (t: Token) => {
                 if (isObjectPropertyVarObj(t))
                     p.solver.addInherits(t, pvar);
             });
