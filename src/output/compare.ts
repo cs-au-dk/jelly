@@ -47,7 +47,7 @@ class FileFilter {
      */
     private static fileInPackages(file: string, pcks: Set<string>): boolean {
         for (const pck of pcks)
-            if (file.includes(`node_modules/${pck}/`))
+            if (file.includes(`node_modules/${pck}/`) || file.includes(`node_modules\\${pck}\\`))
                 return true;
         return false;
     }
@@ -61,7 +61,7 @@ class FileFilter {
                 logger.info(`Ignoring file ${file} (ignoring dependencies)`);
             return false;
         }
-        if (!file.includes("node_modules/"))
+        if (!(file.includes("node_modules/") || file.includes("node_modules\\")))
             return true;
         if (this.incl && !FileFilter.fileInPackages(file, this.incl)) {
             if (msg)

@@ -6,7 +6,7 @@ import {program} from "commander";
 import logger, {logToFile, setLogLevel} from "./misc/logger";
 import {COPYRIGHT, options, PKG, setDefaultTrackedModules, setOptions, setPatternProperties, VERSION} from "./options";
 import {spawnSync} from "child_process";
-import path from "path";
+import path, {sep} from "path";
 import {autoDetectBaseDir, expand, writeStreamedStringify} from "./misc/files";
 import {tapirPatternMatch} from "./patternmatching/tapirpatterns";
 import {toDot} from "./output/graphviz";
@@ -156,7 +156,7 @@ async function main() {
     if (options.dynamic) {
 
         const graalHome = options.graalHome || process.env.GRAAL_HOME;
-        const node = graalHome ? path.resolve(graalHome, "bin/node") : "node";
+        const node = graalHome ? path.resolve(graalHome, "bin", "node") : "node";
         if (options.testGraal) {
             logger.info("Testing graal-nodejs");
             const t = spawnSync(node, ["-e", "process.exit(typeof Graal === 'object' ? 0 : -1)"]);
@@ -187,7 +187,7 @@ async function main() {
             const file = path.resolve(program.args[0]);
             // use directory containing the analyzed file as basedir if unspecified
             cwd = options.basedir ? path.resolve(options.basedir) : path.dirname(file);
-            cmd = `${__dirname}/../bin/node`;
+            cmd = `${__dirname}${sep}..${sep}bin${sep}node`;
             args = [path.relative(cwd, file)].concat(program.args.slice(1));
         }
         const dyn = path.resolve(options.dynamic);
@@ -199,7 +199,7 @@ async function main() {
                 ...env,
                 JELLY_OUT: dyn,
                 GRAAL_HOME: graalHome ? path.resolve(graalHome) : undefined,
-                PATH: `${__dirname}/../bin${path.delimiter}${process.env.PATH}`,
+                PATH: `${__dirname}${sep}..${sep}bin${path.delimiter}${process.env.PATH}`,
             },
         });
         if (t.status === null) {

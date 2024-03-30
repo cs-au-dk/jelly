@@ -2,6 +2,7 @@ import {tmpdir} from "os";
 import winston from "winston";
 import * as Transport from 'winston-transport';
 import {options} from "../options";
+import {sep} from "path";
 
 const RED = "\x1b[31m";
 const YELLOW = "\x1b[33m";
@@ -41,7 +42,7 @@ export function setLogLevel(level: string) {
 
 export function logToFile(file?: string): Transport {
     const t = new winston.transports.File({
-        filename: file ?? `${tmpdir()}/jelly-${process.pid}.log`
+        filename: file ?? `${tmpdir()}${sep}jelly-${process.pid}.log`
     });
     logger.remove(logger.transports[0]);
     logger.add(t);

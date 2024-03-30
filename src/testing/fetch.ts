@@ -2,6 +2,7 @@
 
 import fs from "fs";
 import {execSync} from "child_process";
+import {sep} from "path";
 
 const reposFile = process.argv[2];
 const installDir = process.argv[3];
@@ -24,7 +25,7 @@ for (const entry of j) {
         execSync(`git clone --depth 1 --branch ${entry.branch} https://github.com/${entry.github_repo} ${entry.github_repo} -q`,
             { cwd: installDir, encoding: "utf8", stdio: "inherit" });
         execSync(`npm install --ignore-scripts`,
-            { cwd: `${installDir}/${entry.github_repo}`, encoding: "utf8", stdio: "inherit" });
+            { cwd: `${installDir}${sep}${entry.github_repo}`, encoding: "utf8", stdio: "inherit" });
     } catch (e) {
         console.error(e);
     }

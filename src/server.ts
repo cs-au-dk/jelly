@@ -51,6 +51,7 @@ import {VulnerabilityDetector, VulnerabilityResults} from "./patternmatching/vul
 import {readFileSync} from "fs";
 import {Vulnerability} from "./typings/vulnerabilities";
 import {addAll} from "./misc/util";
+import {sep} from "path";
 
 const VERSION = require("../package.json").version;
 
@@ -67,7 +68,7 @@ program
 
 async function main() {
     setOptions(program.opts());
-    options.logfile ??= `${tmpdir()}/jelly-${process.pid}.log`;
+    options.logfile ??= `${tmpdir()}${sep}jelly-${process.pid}.log`;
     logToFile(options.logfile);
     if (options.loglevel === "debug" || options.loglevel === "verbose")
         options.loglevel = "info"; // prevent internal analysis log messages in server mode

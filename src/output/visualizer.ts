@@ -8,6 +8,7 @@ import {isIdentifier} from "@babel/types";
 import {VulnerabilityResults} from "../patternmatching/vulnerabilitydetector";
 import {getVulnerabilityId, Vulnerability} from "../typings/vulnerabilities";
 import {constraintVarToStringWithCode, funcToStringWithCode} from "./tostringwithcode";
+import {sep} from "path";
 
 export interface VisualizerGraphs {
     graphs: Array<{
@@ -464,7 +465,7 @@ function getVisualizerDataFlowGraphs(f: FragmentState): VisualizerGraphs {
 
 function writeVisualizerHtml(filename: string, g: VisualizerGraphs) {
     const DATA = "$DATA";
-    const templateFile = __dirname + "/../../resources/visualizer.html";
+    const templateFile = __dirname + `${sep}..${sep}..${sep}resources${sep}visualizer.html`;
     const t = readFileSync(templateFile, "utf-8");
     const i = t.indexOf(DATA); // string.replace doesn't like very long strings
     const res = t.substring(0, i) + JSON.stringify(g) + t.substring(i + DATA.length);

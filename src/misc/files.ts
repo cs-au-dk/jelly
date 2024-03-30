@@ -129,7 +129,7 @@ export function requireResolve(str: string, file: FilePath, node: Node, f: Fragm
         logger.debug(`Skipping binary addon file '${str}'`);
         return undefined;
     }
-    if (!filepath.startsWith(options.basedir)) {
+    if (!filepath.startsWith(options.basedir) && !filepath.replaceAll("/", "\\").startsWith(options.basedir)) {
         const msg = `Found module at ${filepath}, but not in basedir`;
         logger.debug(msg);
         throw new Error(msg);
