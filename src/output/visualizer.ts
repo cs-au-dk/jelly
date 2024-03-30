@@ -464,7 +464,7 @@ function getVisualizerDataFlowGraphs(f: FragmentState): VisualizerGraphs {
 
 function writeVisualizerHtml(filename: string, g: VisualizerGraphs) {
     const DATA = "$DATA";
-    const templateFile =  __dirname + "/../../resources/visualizer.html";
+    const templateFile = __dirname + "/../../resources/visualizer.html";
     const t = readFileSync(templateFile, "utf-8");
     const i = t.indexOf(DATA); // string.replace doesn't like very long strings
     const res = t.substring(0, i) + JSON.stringify(g) + t.substring(i + DATA.length);

@@ -9,7 +9,7 @@ const DEFAULT = "\x1b[39m";
 const GREEN = "\x1b[32m";
 const CYAN = "\x1b[36m";
 const WHITE = "\x1b[97m";
-const RESET =  "\x1b[0m";
+const RESET = "\x1b[0m";
 const CLEAR = "\u001b[0K";
 
 const colors: {

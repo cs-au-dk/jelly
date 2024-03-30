@@ -62,7 +62,7 @@ program
     .option("--largest", "report largest token sets and subset relations")
     .option("--no-cycle-elimination", "disable cycle elimination")
     .option("--no-natives", "disable nonessential models of native libraries")
-    .option("--skip-graal-test", "skip graal-nodejs test (use with -d)")
+    .option("--test-graal", "test graal-nodejs (use with -d)")
     .option("--no-print-progress", "don't print analysis progress information")
     .option("--no-tty", "don't print solver progress for TTY")
     .option("--warnings-unsupported", "print warnings about unsupported features")
@@ -74,7 +74,7 @@ program
     .option("--higher-order-functions", "report higher-order functions")
     .option("--zeros", "report calls with zero callees and functions with zero callers")
     .option("--exclude-entries <glob...>", "files to exclude when specifying entry directories")
-    .option("--tracked-modules <glob...>", "modules to track usage of (default: empty unless using -p, -v or --api-usage)")
+    .option("--tracked-modules <glob...>", "modules to track usage of (default: auto-detect)")
     .option("--external-matches", "enable pattern matches from external code")
     .option("--no-callgraph-implicit", "omit implicit calls in call graph") // TODO: not yet including implicit valueOf/toString calls
     .option("--no-callgraph-native", "omit native calls in call graph") // TODO: not yet including the native functions themselves, only callbacks from native functions
@@ -87,7 +87,7 @@ program
     .option("--typescript-library-usage <file>", "save TypeScript library usage in JSON file, no analysis")
     .option("--modules-only", "report reachable packages and modules only, no analysis")
     .option("--compare-callgraphs", "compare two call graphs given as JSON files, no analysis")
-    .option("--reachability", "compare reachability as an additional call graph comparison metric (use with -s or --compare-callgraphs)")
+    .option("--reachability", "compare call graph reachability (use with -s or --compare-callgraphs)")
     .option("--assume-in-node-modules", "treat analyzed files as in node_modules")
     .option("--no-alloc", "disable allocation site abstraction")
     .option("--oldobj", "old object abstraction")
@@ -95,8 +95,8 @@ program
     .option("--patch-dynamics", "enable dynamic property access patching heuristic")
     .option("--patch-method-calls", "enable method call patching heuristic")
     .option("--read-neighbors", "enable package neighbor heuristic")
-    .option("--proto", "model assignments to the __proto__ property")
-    .option("--obj-spread", "model spread syntax for object literals ({...obj})")
+    .option("--proto", "enable model of assignments to the __proto__ property")
+    .option("--obj-spread", "enable model of spread syntax for object literals ({...obj})")
     .usage("[options] [files]")
     .addHelpText("after",
         "\nAll modules reachable by require/import from the given files are included in the analysis\n" +
@@ -157,7 +157,7 @@ async function main() {
 
         const graalHome = options.graalHome || process.env.GRAAL_HOME;
         const node = graalHome ? path.resolve(graalHome, "bin/node") : "node";
-        if (!options.skipGraalTest) {
+        if (options.testGraal) {
             logger.info("Testing graal-nodejs");
             const t = spawnSync(node, ["-e", "process.exit(typeof Graal === 'object' ? 0 : -1)"]);
             if (t.status === null) {
