@@ -1,12 +1,11 @@
 import {closeSync, existsSync, lstatSync, openSync, readdirSync, readFileSync, readSync, writeSync} from "fs";
-import {basename, extname, relative, resolve} from "path";
+import {basename, dirname, extname, relative, resolve, sep} from "path";
 import module from "module";
 import {options} from "../options";
 import micromatch from "micromatch";
-import {FilePath, Location, locationToStringWithFileAndEnd} from "./util";
+import {FilePath, Location, locationToStringWithFileAndEnd, longestCommonPrefix} from "./util";
 import logger from "./logger";
 import {Node} from "@babel/types";
-import {findPackageJson} from "./packagejson";
 import stringify from "stringify2stream";
 import {FragmentState} from "../analysis/fragmentstate";
 
@@ -146,15 +145,14 @@ export function requireResolve(str: string, file: FilePath, node: Node, f: Fragm
 
 /**
  * Attempts to auto-detect basedir if not set explicitly.
- * If not set explicitly and a single path is given, basedir is set to the nearest enclosing directory
- * of paths[0] that contains a package.json file.
+ * If not set explicitly, basedir is first set to the nearest enclosing directory of the given files.
+ * If the resulting directory is inside a node_modules directory, that directory is used instead.
  * @param paths paths to entry files or directories
  * @return true if successful, false if failed
  */
 export function autoDetectBaseDir(paths: Array<string>): boolean {
     if (options.basedir) {
-        const stat = lstatSync(options.basedir);
-        if (!stat.isDirectory()) {
+        if (!lstatSync(options.basedir).isDirectory()) {
             logger.info(`Error: basedir ${options.basedir} is not a directory, aborting`);
             return false;
         }
@@ -162,21 +160,12 @@ export function autoDetectBaseDir(paths: Array<string>): boolean {
     }
     if (paths.length === 0)
         return true;
-    if (paths.length > 1) {
-        logger.info("Can't auto-detect basedir (use option -b), aborting");
-        return false;
-    }
-    if (!existsSync(paths[0])) {
-        logger.info(`File or directory ${paths[0]} not found, aborting`);
-        return false;
-    }
-    const t = findPackageJson(paths[0]);
-    if (!t) {
-        logger.info("Can't auto-detect basedir, package.json not found (use option -b), aborting");
-        return false;
-    }
-    options.basedir = resolve(process.cwd(), t.dir);
-    logger.verbose(`Basedir auto-detected: ${options.basedir}`);
+    let dir = resolve(process.cwd(), longestCommonPrefix(paths.map(p => lstatSync(p).isDirectory() ? p : dirname(p))));
+    const i = dir.lastIndexOf(`${sep}node_modules${sep}`);
+    if (i !== -1)
+        dir = resolve(dir.substring(0, i), "node_modules");
+    options.basedir = dir;
+    logger.verbose(`Basedir auto-detected: ${dir}`);
     return true;
 }
 

@@ -50,11 +50,10 @@ Directories are expanded (using heuristics to skip certain files and directories
 All files reachable from entry files are analyzed, except
 if option `--ignore-dependencies` is used, in which case only entry files are analyzed,
 and only files within the base directory (auto-detected or specified using option `--basedir` or `-b`) are included.
-Specific packages can also be selected using `--include-packages` or `--exclude-packages`.
 
 As an example, generate a call graph for the `winston` package and all its dependencies, both in JSON format and for HTML visualization:
 ```bash
-jelly -j cg.json -m cg.html -b node_modules node_modules/winston
+jelly -j cg.json -m cg.html node_modules/winston
 ```
 
 Viewing `cg.html` in a browser:
@@ -68,6 +67,7 @@ NODE_OPTIONS=--max-old-space-size=8192
 
 Note that analyzing with all dependencies (i.e., not using `--ignore-dependencies`) can take a long time.
 The options `--max-rounds` or `--timeout` can be used to terminate the analysis early to provide partial (unsound) results.  
+Specific packages can also be included or excluded using `--include-packages` or `--exclude-packages`.
 
 ## How to build
 
