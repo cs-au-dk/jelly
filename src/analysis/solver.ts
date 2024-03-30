@@ -1,6 +1,16 @@
 import {ConstraintVar, IntermediateVar, isObjectPropertyVarObj, NodeVar, ObjectPropertyVarObj} from "./constraintvars";
 import logger, {isTTY, writeStdOut} from "../misc/logger";
-import {AccessPathToken, ArrayToken, ObjectToken, PackageObjectToken, Token} from "./tokens";
+import {
+    AccessPathToken,
+    AllocationSiteToken,
+    ArrayToken,
+    ClassToken,
+    FunctionToken,
+    ObjectToken,
+    PackageObjectToken,
+    PrototypeToken,
+    Token
+} from "./tokens";
 import {GlobalState} from "./globalstate";
 import {FunctionInfo, ModuleInfo, PackageInfo} from "./infos";
 import {
@@ -42,7 +52,23 @@ import {setImmediate} from "timers/promises";
 import {getMemoryUsage} from "../misc/memory";
 import {JELLY_NODE_ID} from "../parsing/extras";
 import AnalysisDiagnostics from "./diagnostics";
-import {ARRAY_UNKNOWN, INTERNAL_PROTOTYPE, isInternalProperty} from "../natives/ecmascript";
+import {
+    ARRAY_PROTOTYPE,
+    ARRAY_UNKNOWN,
+    DATE_PROTOTYPE,
+    ERROR_PROTOTYPE,
+    FUNCTION_PROTOTYPE,
+    INTERNAL_PROTOTYPE,
+    isInternalProperty,
+    MAP_PROTOTYPE,
+    OBJECT_PROTOTYPE,
+    PROMISE_PROTOTYPE,
+    REGEXP_PROTOTYPE,
+    SET_PROTOTYPE,
+    WEAKMAP_PROTOTYPE,
+    WEAKREF_PROTOTYPE,
+    WEAKSET_PROTOTYPE
+} from "../natives/ecmascript";
 import {ConstraintVarProducer} from "./constraintvarproducer";
 
 export class AbortedException extends Error {}
@@ -437,6 +463,40 @@ export default class Solver {
             logger.debug(`Adding ancestors constraint to ${t} ${opts.n ? `at ${nodeToString(opts.n)}` : `${TokenListener[key]} ${opts.s}`}`);
         const id = this.getListenerID({...opts, l: key, t});
         this.callTokenListener(id, listener, t, true); // ancestry is reflexive
+        const g = this.globalState.globalSpecialNatives;
+        if (g) { // (not set when called from unit tests)
+            if (t instanceof ObjectToken)
+                this.callTokenListener(id, listener, g.get(OBJECT_PROTOTYPE)!);
+            else if (t instanceof ArrayToken) {
+                this.callTokenListener(id, listener, g.get(ARRAY_PROTOTYPE)!);
+                this.callTokenListener(id, listener, g.get(OBJECT_PROTOTYPE)!);
+            } else if (t instanceof FunctionToken || t instanceof PrototypeToken || t instanceof ClassToken) {
+                this.callTokenListener(id, listener, g.get(FUNCTION_PROTOTYPE)!);
+                this.callTokenListener(id, listener, g.get(OBJECT_PROTOTYPE)!);
+            } else if (t instanceof AllocationSiteToken) {
+                if (t.kind === "Promise")
+                    this.callTokenListener(id, listener, g.get(PROMISE_PROTOTYPE)!);
+                else if (t.kind === "Date")
+                    this.callTokenListener(id, listener, g.get(DATE_PROTOTYPE)!);
+                else if (t.kind === "RegExp")
+                    this.callTokenListener(id, listener, g.get(REGEXP_PROTOTYPE)!);
+                else if (t.kind === "Error")
+                    this.callTokenListener(id, listener, g.get(ERROR_PROTOTYPE)!);
+                else if (t.kind === "Map")
+                    this.callTokenListener(id, listener, g.get(MAP_PROTOTYPE)!);
+                else if (t.kind === "Set")
+                    this.callTokenListener(id, listener, g.get(SET_PROTOTYPE)!);
+                else if (t.kind === "WeakMap")
+                    this.callTokenListener(id, listener, g.get(WEAKMAP_PROTOTYPE)!);
+                else if (t.kind === "WeakSet")
+                    this.callTokenListener(id, listener, g.get(WEAKSET_PROTOTYPE)!);
+                else if (t.kind === "WeakRef")
+                    this.callTokenListener(id, listener, g.get(WEAKREF_PROTOTYPE)!);
+                else if (t.kind === "PromiseResolve" || t.kind === "PromiseReject")
+                    this.callTokenListener(id, listener, g.get(FUNCTION_PROTOTYPE)!);
+                this.callTokenListener(id, listener, g.get(OBJECT_PROTOTYPE)!);
+            }
+        }
         this.addForAllTokensConstraintPrivate(
             this.fragmentState.getRepresentative(this.varProducer.ancestorsVar(t)),
             id, listener,
@@ -592,11 +652,10 @@ export default class Solver {
             if (prop === INTERNAL_PROTOTYPE()) {
                 // constraint: ∀ b ∈ ⟦a.__proto__⟧: {b} ∪ Ancestors(b) ⊆ Ancestors(a)
                 this.addForAllTokensConstraint(f.varProducer.objPropVar(a, prop), TokenListener.ANCESTORS, {t: a}, (b: Token) => {
-                    if (isObjectPropertyVarObj(b)) { // TODO: ignoring inheritance from access path tokens
-                        const aVar = this.varProducer.ancestorsVar(a);
-                        this.addTokenConstraint(b, aVar);
+                    const aVar = this.varProducer.ancestorsVar(a);
+                    this.addTokenConstraint(b, aVar);
+                    if (isObjectPropertyVarObj(b))
                         this.addSubsetConstraint(this.varProducer.ancestorsVar(b), aVar);
-                    }
                 });
             }
         }

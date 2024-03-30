@@ -48,9 +48,9 @@ import {
     AccessorType,
     ConstraintVar,
     IntermediateVar,
-    ObjectPropertyVarObj,
     isObjectPropertyVarObj,
     NodeVar,
+    ObjectPropertyVarObj,
     ReadResultVar
 } from "./constraintvars";
 import {
@@ -69,15 +69,12 @@ import {options} from "../options";
 import {FilePath, getOrSet, isArrayIndex, Location, locationToStringWithFile} from "../misc/util";
 import assert from "assert";
 import {
-    ARRAY_PROTOTYPE,
-    FUNCTION_PROTOTYPE,
     MAP_KEYS,
     MAP_VALUES,
     OBJECT_PROTOTYPE,
     PROMISE_FULFILLED_VALUES,
-    PROMISE_PROTOTYPE,
-    REGEXP_PROTOTYPE,
-    SET_VALUES
+    SET_VALUES,
+    STANDARD_METHODS
 } from "../natives/ecmascript";
 import {CallNodePath, SpecialNativeObjects} from "../natives/nativebuilder";
 import {TokenListener} from "./listeners";
@@ -430,6 +427,8 @@ export class Operations {
         // expression E.p or E["p"] or E[i]
         if (prop !== undefined) {
 
+            // TODO: model reads from __proto__ (if options.proto enabled), see nativehelpers.ts:returnPrototypeOf
+
             // constraint: ∀ objects t ∈ ⟦E⟧: ...
             this.solver.addForAllTokensConstraint(base, TokenListener.READ_PROPERTY_BASE, lopts, (t: Token) => {
                 if (isObjectPropertyVarObj(t)) {
@@ -483,12 +482,18 @@ export class Operations {
      * The returned constraint variable holds the result of the read operation and is
      * re-used across all calls to this function for the same base and property.
      */
-    readPropertyFromChain(base: ObjectPropertyVarObj, prop: string): ReadResultVar {
+    readPropertyFromChain(base: ObjectPropertyVarObj, prop: string): ReadResultVar | undefined {
+        if (base instanceof ArrayToken && prop === "length")
+            return undefined;
         const dst = this.solver.varProducer.readResultVar(base, prop);
         // constraint: ... ∀ ancestors t2 of t: ...
         this.solver.addForAllAncestorsConstraint(base, TokenListener.READ_ANCESTORS, {s: prop}, (t2: Token) => {
-            assert(isObjectPropertyVarObj(t2));
-            this.readPropertyBound(t2, prop, dst, {t: base, s: prop}, base);
+            if (((base instanceof FunctionToken && STANDARD_METHODS.get("Function")!.has(prop)) ||
+                (base instanceof AllocationSiteToken && base.kind !== "Object" && STANDARD_METHODS.get(base.kind)?.has(prop))) &&
+                t2 === this.globalSpecialNatives.get(OBJECT_PROTOTYPE))
+                return; // safe to skip properties at Object.prototype that are in {base.kind}.prototype
+            if (isObjectPropertyVarObj(t2))
+                this.readPropertyBound(t2, prop, dst, {t: base, s: prop}, base);
         });
         return dst;
     }
@@ -596,11 +601,12 @@ export class Operations {
 
                     // constraint: ... ∀ ancestors anc of base: ...
                     this.solver.addForAllAncestorsConstraint(base, TokenListener.ASSIGN_ANCESTORS, {n: node, s: prop}, (anc: Token) => {
-                        assert(isObjectPropertyVarObj(anc));
-                        // constraint: ...: ∀ functions t2 ∈ ⟦(set)anc.p⟧: ⟦E2⟧ ⊆ ⟦x⟧ where x is the parameter of t2
-                        const setter = this.solver.varProducer.objPropVar(anc, prop, "set");
-                        this.solver.addForAllTokensConstraint(setter, TokenListener.ASSIGN_SETTER, {n: node, s: prop}, writeToSetter);
-                        this.solver.addForAllTokensConstraint(setter, TokenListener.ASSIGN_SETTER_THIS, {t: base}, bindSetterThis);
+                        if (isObjectPropertyVarObj(anc)) {
+                            // constraint: ...: ∀ functions t2 ∈ ⟦(set)anc.p⟧: ⟦E2⟧ ⊆ ⟦x⟧ where x is the parameter of t2
+                            const setter = this.solver.varProducer.objPropVar(anc, prop, "set");
+                            this.solver.addForAllTokensConstraint(setter, TokenListener.ASSIGN_SETTER, {n: node, s: prop}, writeToSetter);
+                            this.solver.addForAllTokensConstraint(setter, TokenListener.ASSIGN_SETTER_THIS, {t: base}, bindSetterThis);
+                        }
                     });
                 }
 
@@ -877,72 +883,58 @@ export class Operations {
     }
 
     /**
-     * Creates a new ObjectToken that inherits from Object.prototype
+     * Creates a new ObjectToken
      * (or, if allocation site is disabled or the token has been widened, returns the current PackageObjectToken).
      */
     newObjectToken(n: Node): ObjectToken | PackageObjectToken {
         if (options.alloc) {
             const t = this.a.canonicalizeToken(new ObjectToken(n));
-            if (!options.widening || !this.solver.fragmentState.widened.has(t)) {
-                this.solver.addInherits(t, this.globalSpecialNatives.get(OBJECT_PROTOTYPE)!);
+            if (!options.widening || !this.solver.fragmentState.widened.has(t))
                 return t;
-            }
         }
         return this.packageObjectToken;
     }
 
     /**
-     * Creates a new PrototypeToken that inherits from Function.prototype.
+     * Creates a new PrototypeToken.
      */
     newPrototypeToken(fun: Function): PrototypeToken {
-        const t = this.a.canonicalizeToken(new PrototypeToken(fun));
-        this.solver.addInherits(t, this.globalSpecialNatives.get(FUNCTION_PROTOTYPE)!);
-        return t;
+        return this.a.canonicalizeToken(new PrototypeToken(fun));
     }
 
     /**
-     * Creates a new ArrayToken that inherits from Array.prototype.
+     * Creates a new ArrayToken.
      */
     newArrayToken(n: Node): ArrayToken {
-        const t = this.a.canonicalizeToken(new ArrayToken(n));
-        this.solver.addInherits(t, this.globalSpecialNatives.get(ARRAY_PROTOTYPE)!);
-        return t;
+        return this.a.canonicalizeToken(new ArrayToken(n));
     }
 
     /**
-     * Creates a new ClassToken that inherits from Function.prototype.
+     * Creates a new ClassToken.
      */
     newClassToken(n: Node): ClassToken { // XXX: only used if options.oldobj enabled
-        const t = this.a.canonicalizeToken(new ClassToken(n));
-        this.solver.addInherits(t, this.globalSpecialNatives.get(FUNCTION_PROTOTYPE)!);
-        return t;
+        return this.a.canonicalizeToken(new ClassToken(n));
     }
 
     /**
-     * Creates a new FunctionToken that inherits from Function.prototype.
+     * Creates a new FunctionToken.
      */
     newFunctionToken(fun: Function): FunctionToken {
-        const t = this.a.canonicalizeToken(new FunctionToken(fun));
-        this.solver.addInherits(t, this.globalSpecialNatives.get(FUNCTION_PROTOTYPE)!);
-        return t;
+        return this.a.canonicalizeToken(new FunctionToken(fun));
     }
 
     /**
-     * Creates a PackageObjectToken of kind RegExp that inherits from RegExp.prototype.
+     * Creates a PackageObjectToken of kind RegExp.
      */
     newRegExpToken(): PackageObjectToken {
-        const t = this.a.canonicalizeToken(new PackageObjectToken(this.packageInfo, "RegExp"));
-        this.solver.addInherits(t, this.globalSpecialNatives.get(REGEXP_PROTOTYPE)!);
-        return t;
+        return this.a.canonicalizeToken(new PackageObjectToken(this.packageInfo, "RegExp"));
     }
 
     /**
-     * Creates a AllocationSiteToken of kind Promise that inherits from Promise.prototype.
+     * Creates a AllocationSiteToken of kind Promise.
      */
     newPromiseToken(n: Node): AllocationSiteToken {
-        const t = this.a.canonicalizeToken(new AllocationSiteToken("Promise", n));
-        this.solver.addInherits(t, this.globalSpecialNatives.get(PROMISE_PROTOTYPE)!);
-        return t;
+        return this.a.canonicalizeToken(new AllocationSiteToken("Promise", n));
     }
 
     /**

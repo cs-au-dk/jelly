@@ -160,12 +160,12 @@ describe("tests/unit/analysis", () => {
             solver.addTokenConstraint(at, solver.varProducer.returnVar(fun0));
 
             const op = new Operations(m.getPath(), solver, new Map());
-            const r2 = op.readPropertyFromChain(ot2, "A");
+            const r2 = op.readPropertyFromChain(ot2, "A")!;
             await solver.propagate();
             expect(getTokens(r2)).toEqual([at]);
 
             // both tokens should be able to read from the getter(s)
-            const r1 = op.readPropertyFromChain(ot1, "A");
+            const r1 = op.readPropertyFromChain(ot1, "A")!;
             await solver.propagate();
             expect(getTokens(r1)).toEqual([at]);
         });

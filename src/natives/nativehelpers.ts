@@ -1,36 +1,59 @@
-import {CallExpression, Expression, isExpression, isIdentifier, isObjectExpression, isObjectProperty} from "@babel/types";
+import {
+    CallExpression,
+    Expression,
+    isExpression,
+    isIdentifier,
+    isObjectExpression,
+    isObjectProperty
+} from "@babel/types";
 import {
     AccessPathToken,
     AllocationSiteToken,
     ArrayToken,
+    ClassToken,
     FunctionToken,
     NativeObjectToken,
     ObjectKind,
     ObjectToken,
     PackageObjectToken,
+    PrototypeToken,
     Token
 } from "../analysis/tokens";
 import {getKey, isParentExpressionStatement} from "../misc/asthelpers";
 import {Node} from "@babel/core";
 import {
     ARRAY_PROTOTYPE,
+    DATE_PROTOTYPE,
+    ERROR_PROTOTYPE,
     FUNCTION_PROTOTYPE,
     GENERATOR_PROTOTYPE_NEXT,
     INTERNAL_PROTOTYPE,
     MAP_KEYS,
+    MAP_PROTOTYPE,
     MAP_VALUES,
     OBJECT_PROTOTYPE,
     PROMISE_FULFILLED_VALUES,
     PROMISE_PROTOTYPE,
     PROMISE_REJECTED_VALUES,
-    SET_VALUES
+    REGEXP_PROTOTYPE,
+    SET_PROTOTYPE,
+    SET_VALUES,
+    WEAKMAP_PROTOTYPE,
+    WEAKREF_PROTOTYPE,
+    WEAKSET_PROTOTYPE
 } from "./ecmascript";
 import {NativeFunctionParams} from "./nativebuilder";
 import {TokenListener} from "../analysis/listeners";
 import assert from "assert";
 import {NodePath} from "@babel/traverse";
 import {Operations} from "../analysis/operations";
-import {AccessorType, ConstraintVar, IntermediateVar, ObjectPropertyVarObj, isObjectPropertyVarObj} from "../analysis/constraintvars";
+import {
+    AccessorType,
+    ConstraintVar,
+    IntermediateVar,
+    isObjectPropertyVarObj,
+    ObjectPropertyVarObj
+} from "../analysis/constraintvars";
 import {Location} from "../misc/util";
 import {UnknownAccessPath} from "../analysis/accesspaths";
 
@@ -99,7 +122,7 @@ export function returnThis(p: NativeFunctionParams) {
  */
 export function returnThisInPromise(p: NativeFunctionParams) {
     if (!isParentExpressionStatement(p.path) && p.base) {
-        const promise = newObject("Promise", p.globalSpecialNatives.get(PROMISE_PROTOTYPE)!, p);
+        const promise = newSpecialObject("Promise", p);
         p.solver.addTokenConstraint(p.base, p.solver.varProducer.objPropVar(promise, PROMISE_FULFILLED_VALUES));
         p.solver.addTokenConstraint(promise, p.solver.varProducer.nodeVar(p.path.node));
     }
@@ -172,40 +195,40 @@ export function returnArgument(arg: Node, p: NativeFunctionParams) {
 }
 
 /**
- * Creates a new AllocationSiteToken with the given kind and prototype.
+ * Creates a new object represented by an ObjectToken or PackageObjectToken.
  */
-export function newObject(kind: ObjectKind, proto: NativeObjectToken | PackageObjectToken | Expression, p: NativeFunctionParams): AllocationSiteToken | PackageObjectToken {
-    const t: AllocationSiteToken | PackageObjectToken = p.solver.globalState.canonicalizeToken(
-        kind ==="Object" ? new ObjectToken(p.path.node) :
-            kind === "Array" ? new ArrayToken(p.path.node) :
-                new AllocationSiteToken(kind, p.path.node));
-    if (proto instanceof Token)
-        p.solver.addInherits(t, proto);
-    else {
-        const pv = p.op.expVar(proto, p.path);
-        if (pv !== undefined)
-            p.solver.addInherits(t, pv);
-    }
-    return t;
+export function newObject(p: NativeFunctionParams): ObjectToken | PackageObjectToken {
+    return  p.op.newObjectToken(p.path.node);
 }
 
 /**
- * Creates a new PackageObjectToken with the given kind and prototype.
+ * Creates a new AllocationSiteToken with the given kind (not Object, Array or Prototype).
  */
-export function newPackageObject(kind: ObjectKind, proto: NativeObjectToken | PackageObjectToken, p: NativeFunctionParams): PackageObjectToken {
-    const t = p.solver.globalState.canonicalizeToken(new PackageObjectToken(p.moduleInfo.packageInfo, kind));
-    p.solver.addInherits(t, proto);
-    return t;
+export function newSpecialObject(kind: ObjectKind, p: NativeFunctionParams): AllocationSiteToken {
+    return p.solver.globalState.canonicalizeToken(new AllocationSiteToken(kind, p.path.node));
+}
+
+/**
+ * Creates a new PackageObjectToken with the given kind.
+ */
+export function newPackageObject(kind: ObjectKind, p: NativeFunctionParams): PackageObjectToken {
+    return p.solver.globalState.canonicalizeToken(new PackageObjectToken(p.moduleInfo.packageInfo, kind));
 }
 
 /**
  * Creates a new array represented by an ArrayToken.
  */
 export function newArray(p: NativeFunctionParams): ArrayToken {
-    const a = p.solver.globalState;
-    const t = a.canonicalizeToken(new ArrayToken(p.path.node));
-    p.solver.addInherits(t, p.globalSpecialNatives.get(ARRAY_PROTOTYPE)!);
-    return t;
+    return p.op.newArrayToken(p.path.node);
+}
+
+/**
+ * Models that t inherits from proto.
+ */
+export function addInherits(t: ObjectPropertyVarObj, proto: Expression, p: NativeFunctionParams) {
+    const pv = p.op.expVar(proto, p.path);
+    if (pv !== undefined)
+        p.solver.addInherits(t, pv);
 }
 
 /**
@@ -263,7 +286,6 @@ export function returnIterator(kind: IteratorKind, p: NativeFunctionParams) { //
                     if (t.kind !== "Array")
                         break;
                     const pair = a.canonicalizeToken(new ArrayToken(p.path.node)); // TODO: see newArrayToken
-                    p.solver.addInherits(t, p.globalSpecialNatives.get(ARRAY_PROTOTYPE)!);
                     const iterValue = vp.objPropVar(iter, "value");
                     p.solver.addTokenConstraint(pair, iterValue);
                     const oneVar = vp.objPropVar(pair, "1");
@@ -281,7 +303,6 @@ export function returnIterator(kind: IteratorKind, p: NativeFunctionParams) { //
                     if (t.kind !== "Set")
                         break;
                     const pair = a.canonicalizeToken(new ArrayToken(p.path.node)); // TODO: see newArrayToken
-                    p.solver.addInherits(t, p.globalSpecialNatives.get(ARRAY_PROTOTYPE)!);
                     const iterValue = vp.objPropVar(iter, "value");
                     p.solver.addTokenConstraint(pair, iterValue);
                     p.solver.addSubsetConstraint(vp.objPropVar(t, SET_VALUES), vp.objPropVar(pair, "0"));
@@ -306,7 +327,6 @@ export function returnIterator(kind: IteratorKind, p: NativeFunctionParams) { //
                     if (t.kind !== "Map")
                         break;
                     const pair = a.canonicalizeToken(new ArrayToken(p.path.node)); // TODO: see newArrayToken
-                    p.solver.addInherits(t, p.globalSpecialNatives.get(ARRAY_PROTOTYPE)!);
                     const iterValue = vp.objPropVar(iter, "value");
                     p.solver.addTokenConstraint(pair, iterValue);
                     p.solver.addSubsetConstraint(vp.objPropVar(t, MAP_KEYS), vp.objPropVar(pair, "0"));
@@ -492,7 +512,7 @@ export function invokeCallbackBound(kind: CallbackKind, p: NativeFunctionParams,
                     break;
             }
             // create a new promise
-            const thenPromise = newObject("Promise", p.globalSpecialNatives.get(PROMISE_PROTOTYPE)!, p);
+            const thenPromise = newSpecialObject("Promise", p);
 
             if (ft instanceof FunctionToken) {
                 // assign promise fulfilled/rejected value to the callback parameter and add call edge
@@ -704,8 +724,8 @@ export function callPromiseExecutor(p: NativeFunctionParams) {
         p.solver.addForAllTokensConstraint(funVar, TokenListener.CALL_PROMISE_EXECUTOR, p.path.node, (t: Token) => {
             if (t instanceof FunctionToken)
                 p.op.callFunctionTokenBound(t, undefined, caller, [
-                    newObject("PromiseResolve", p.globalSpecialNatives.get(FUNCTION_PROTOTYPE)!, p),
-                    newObject("PromiseReject", p.globalSpecialNatives.get(FUNCTION_PROTOTYPE)!, p),
+                    newSpecialObject("PromiseResolve", p),
+                    newSpecialObject("PromiseReject", p),
                 ], undefined, false, p.path, {native: true});
         });
     }
@@ -752,7 +772,7 @@ export function callPromiseResolve(t: AllocationSiteToken, args: CallExpression[
 export function returnResolvedPromise(kind: "resolve" | "reject", p: NativeFunctionParams) {
     const args = p.path.node.arguments;
     // make a new promise and return it
-    const promise = newObject("Promise", p.globalSpecialNatives.get(PROMISE_PROTOTYPE)!, p);
+    const promise = newSpecialObject("Promise", p);
     p.solver.addTokenConstraint(promise, p.solver.varProducer.expVar(p.path.node, p.path));
     if (args.length >= 1 && isExpression(args[0])) { // TODO: non-Expression?
         const arg = p.op.expVar(args[0], p.path);
@@ -790,7 +810,7 @@ export function returnPromiseIterator(kind: "all" | "allSettled" | "any" | "race
         const arg = p.op.expVar(args[0], p.path);
         if (arg) {
             // make a new promise and return it
-            const promise = newObject("Promise", p.globalSpecialNatives.get(PROMISE_PROTOTYPE)!, p);
+            const promise = newSpecialObject("Promise", p);
             p.solver.addTokenConstraint(promise, p.solver.varProducer.expVar(p.path.node, p.path));
             let array: ArrayToken | undefined;
             if (kind === "all" || kind === "allSettled") {
@@ -801,7 +821,7 @@ export function returnPromiseIterator(kind: "all" | "allSettled" | "any" | "race
             let allSettledObjects: AllocationSiteToken | PackageObjectToken | undefined;
             if (kind === "allSettled") {
                 // add a new object to the array
-                allSettledObjects = newObject("Object", p.globalSpecialNatives.get(OBJECT_PROTOTYPE)!, p);
+                allSettledObjects = newObject(p);
                 p.solver.addTokenConstraint(allSettledObjects, p.solver.varProducer.arrayUnknownVar(array!));
             }
             // read the iterator values
@@ -867,8 +887,39 @@ export function returnPrototypeOf(p: NativeFunctionParams) {
     const arg = p.path.node.arguments[0], dst = p.solver.varProducer.expVar(p.path.node, p.path);
     if (isExpression(arg) && !isParentExpressionStatement(p.path) && dst !== undefined) // TODO: non-Expression arguments?
         p.solver.addForAllTokensConstraint(p.solver.varProducer.expVar(arg, p.path), TokenListener.NATIVE_12, p.path.node, (t: Token) => {
-            if (isObjectPropertyVarObj(t))
+            if (isObjectPropertyVarObj(t)) {
                 p.solver.addSubsetConstraint(p.solver.varProducer.objPropVar(t, INTERNAL_PROTOTYPE()), dst);
+                if (t instanceof ObjectToken)
+                    p.solver.addTokenConstraint(p.globalSpecialNatives.get(OBJECT_PROTOTYPE)!, dst);
+                else if (t instanceof ArrayToken)
+                    p.solver.addTokenConstraint(p.globalSpecialNatives.get(ARRAY_PROTOTYPE)!, dst);
+                else if (t instanceof FunctionToken || t instanceof PrototypeToken || t instanceof ClassToken)
+                    p.solver.addTokenConstraint(p.globalSpecialNatives.get(FUNCTION_PROTOTYPE)!, dst);
+                else if (t instanceof AllocationSiteToken) {
+                    if (t.kind === "Promise")
+                        p.solver.addTokenConstraint(p.globalSpecialNatives.get(PROMISE_PROTOTYPE)!, dst);
+                    else if (t.kind === "Date")
+                        p.solver.addTokenConstraint(p.globalSpecialNatives.get(DATE_PROTOTYPE)!, dst);
+                    else if (t.kind === "RegExp")
+                        p.solver.addTokenConstraint(p.globalSpecialNatives.get(REGEXP_PROTOTYPE)!, dst);
+                    else if (t.kind === "Error")
+                        p.solver.addTokenConstraint(p.globalSpecialNatives.get(ERROR_PROTOTYPE)!, dst);
+                    else if (t.kind === "Map")
+                        p.solver.addTokenConstraint(p.globalSpecialNatives.get(MAP_PROTOTYPE)!, dst);
+                    else if (t.kind === "Set")
+                        p.solver.addTokenConstraint(p.globalSpecialNatives.get(SET_PROTOTYPE)!, dst);
+                    else if (t.kind === "WeakMap")
+                        p.solver.addTokenConstraint(p.globalSpecialNatives.get(WEAKMAP_PROTOTYPE)!, dst);
+                    else if (t.kind === "WeakSet")
+                        p.solver.addTokenConstraint(p.globalSpecialNatives.get(WEAKSET_PROTOTYPE)!, dst);
+                    else if (t.kind === "WeakRef")
+                        p.solver.addTokenConstraint(p.globalSpecialNatives.get(WEAKREF_PROTOTYPE)!, dst);
+                    else if (t.kind === "PromiseResolve" || t.kind === "PromiseReject")
+                        p.solver.addTokenConstraint(p.globalSpecialNatives.get(FUNCTION_PROTOTYPE)!, dst);
+                    else
+                        p.solver.addTokenConstraint(p.globalSpecialNatives.get(OBJECT_PROTOTYPE)!, dst);
+                }
+            }
         });
 }
 
