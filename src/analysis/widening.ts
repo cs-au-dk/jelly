@@ -150,6 +150,8 @@ export function widenObjects(widened: Set<ObjectToken>, solver: Solver) {
         solver.redirect(vRep, wRep);
     }
     f.dynamicPropertyWrites = widenVarSet(f.dynamicPropertyWrites);
+    for (const e of f.propertyReads)
+        e.base = widenVar(e.base);
     for (const e of f.maybeEmptyPropertyReads) {
         if ("result" in e)
             e.result = widenVar(e.result);

@@ -84,6 +84,10 @@ export default class AnalysisDiagnostics {
     
     totalWideningTime: number = 0;
 
+    totalFragmentMergeTime: number = 0;
+
+    finalizationTime: number = 0;
+
     unhandledDynamicPropertyWrites: number = 0;
 
     unhandledDynamicPropertyReads: number = 0;

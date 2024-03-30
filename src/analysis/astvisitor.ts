@@ -729,10 +729,14 @@ export function visit(ast: File, op: Operations) {
                         if (options.objSpread) {
                             // it's enticing to rewrite the AST to use Object.assign, but assign invokes setters on the target object
                             const enclosing = a.getEnclosingFunctionOrModule(path, op.moduleInfo);
-                            solver.addForAllTokensConstraint(vp.expVar(p.argument, path), TokenListener.OBJECT_SPREAD, p, (t: Token) => {
-                                if (isObjectPropertyVarObj(t))
-                                    solver.addForAllObjectPropertiesConstraint(t, TokenListener.OBJECT_SPREAD, p, (prop: string) =>
-                                        op.readPropertyBound(t, prop, vp.objPropVar(ot, prop), {n: p, s: prop}, enclosing));
+                            const argVar = vp.expVar(p.argument, path);
+                            solver.addForAllTokensConstraint(argVar, TokenListener.OBJECT_SPREAD, p, (t: Token) => {
+                                if (isObjectPropertyVarObj(t)) {
+                                    solver.addForAllObjectPropertiesConstraint(t, TokenListener.OBJECT_SPREAD, path.node, (prop: string) => {
+                                        solver.collectPropertyRead("read", undefined, argVar, undefined, prop, path.node, enclosing);
+                                        op.readPropertyBound(t, prop, vp.objPropVar(ot, prop), {t: ot, s: prop});
+                                    });
+                                }
                             });
                         } else
                             f.warnUnsupported(p, "SpreadElement in ObjectExpression (use --obj-spread)");

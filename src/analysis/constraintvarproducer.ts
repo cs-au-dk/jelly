@@ -40,6 +40,7 @@ import {FragmentState, MergeRepresentativeVar, RepresentativeVar} from "./fragme
 import assert from "assert";
 import Solver from "./solver";
 import {ARRAY_ALL, ARRAY_UNKNOWN} from "../natives/ecmascript";
+import {options} from "../options";
 
 export class ConstraintVarProducer<RVT extends RepresentativeVar | MergeRepresentativeVar = RepresentativeVar> {
 
@@ -103,7 +104,7 @@ export class ConstraintVarProducer<RVT extends RepresentativeVar | MergeRepresen
      * The (obj, prop) pair is registered on the provided solver instance and listener calls may be enqueued.
      */
     objPropVar(obj: ObjectPropertyVarObj, prop: string, accessor: AccessorType = "normal"): ObjectPropertyVar {
-        if (obj instanceof ObjectToken && this.f.widened.has(obj))
+        if (options.widening && obj instanceof ObjectToken && this.f.widened.has(obj))
             return this.packagePropVar(obj.getPackageInfo(), prop, accessor);
         return this.a.canonicalizeVar(ObjectPropertyVar.make(this.s, obj, prop, accessor));
     }
@@ -167,13 +168,13 @@ export class ConstraintVarProducer<RVT extends RepresentativeVar | MergeRepresen
     }
 
     ancestorsVar(t: ObjectPropertyVarObj): AncestorsVar {
-        if (t instanceof ObjectToken && this.f.widened.has(t))
+        if (options.widening && t instanceof ObjectToken && this.f.widened.has(t))
             t = this.a.canonicalizeToken(new PackageObjectToken(t.getPackageInfo()));
         return this.a.canonicalizeVar(new AncestorsVar(t));
     }
 
     readResultVar(t: ObjectPropertyVarObj, prop: string): ReadResultVar {
-        if (t instanceof ObjectToken && this.f.widened.has(t))
+        if (options.widening && t instanceof ObjectToken && this.f.widened.has(t))
             t = this.a.canonicalizeToken(new PackageObjectToken(t.getPackageInfo()));
         return this.a.canonicalizeVar(new ReadResultVar(t, prop));
     }

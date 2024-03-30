@@ -312,6 +312,11 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
     readonly importDeclRefs: Map<Identifier, Array<Identifier | JSXIdentifier>> = new Map;
 
     /**
+     * Property reads.
+     */
+    propertyReads: Array<{base: ConstraintVar, prop: string, node: Node, enclosing: FunctionInfo | ModuleInfo}> = [];
+
+    /**
      * Property reads that may have empty result.
      * Used by patchDynamics.
      */
@@ -773,7 +778,7 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
      * Otherwise the provided token is returned as is.
      */
     maybeWidened<T extends Token>(t: T): T | PackageObjectToken {
-        if (t instanceof ObjectToken && this.widened.has(t))
+        if (options.widening && t instanceof ObjectToken && this.widened.has(t))
             return this.a.canonicalizeToken(new PackageObjectToken(t.getPackageInfo(), t.kind));
         else
             return t;

@@ -1,6 +1,14 @@
 import {Class, Function, Identifier, Node} from "@babel/types";
 import {FilePath, getOrSet, Location, locationToString, strHash} from "../misc/util";
-import {AncestorsVar, ConstraintVar, FunctionReturnVar, NodeVar, ObjectPropertyVarObj, ThisVar} from "./constraintvars";
+import {
+    AncestorsVar,
+    ArgumentsVar,
+    ConstraintVar,
+    FunctionReturnVar,
+    NodeVar,
+    ObjectPropertyVarObj,
+    ThisVar
+} from "./constraintvars";
 import {AccessPathToken, NativeObjectToken, Token} from "./tokens";
 import {getPackageJsonInfo, PackageJsonInfo} from "../misc/packagejson";
 import {AccessPath, IgnoredAccessPath, UnknownAccessPath} from "./accesspaths";
@@ -25,11 +33,13 @@ export class GlobalState {
      */
     readonly canonicalConstraintVars: Map<string, ConstraintVar> = new Map;
 
-    private canonicalAncestorVars: Map<ObjectPropertyVarObj, AncestorsVar> = new Map;
+    private canonicalAncestorVars: WeakMap<ObjectPropertyVarObj, AncestorsVar> = new WeakMap;
 
-    private canonicalReturnVar: Map<Function, FunctionReturnVar> = new Map;
+    private canonicalReturnVar: WeakMap<Function, FunctionReturnVar> = new WeakMap;
 
-    private canonicalThisVar: Map<Function, ThisVar> = new Map;
+    private canonicalThisVar: WeakMap<Function, ThisVar> = new WeakMap;
+
+    private canonicalArgumentsVar: WeakMap<Function, ThisVar> = new WeakMap;
 
     /**
      * Map from AST node to canonical NodeVar object.
@@ -160,6 +170,8 @@ export class GlobalState {
             return getOrSet(this.canonicalReturnVar, v.fun, () => v) as unknown as T;
         else if (v instanceof ThisVar)
             return getOrSet(this.canonicalThisVar, v.fun, () => v) as unknown as T;
+        else if (v instanceof ArgumentsVar)
+            return getOrSet(this.canonicalArgumentsVar, v.fun, () => v) as unknown as T;
         this.numberOfCanonicalizeVarCalls++;
         return getOrSet(this.canonicalConstraintVars, v.toString(), () => v) as T;
     }

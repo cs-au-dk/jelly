@@ -2,7 +2,7 @@ import {ConstraintVar, IntermediateVar, isObjectPropertyVarObj, NodeVar, ObjectP
 import logger, {isTTY, writeStdOut} from "../misc/logger";
 import {AccessPathToken, ArrayToken, ObjectToken, PackageObjectToken, Token} from "./tokens";
 import {GlobalState} from "./globalstate";
-import {PackageInfo} from "./infos";
+import {FunctionInfo, ModuleInfo, PackageInfo} from "./infos";
 import {
     addAll,
     addAllMapHybridSet,
@@ -427,7 +427,7 @@ export default class Solver {
      * The key, the token, the node and the string must together uniquely determine the function.
      */
     addForAllAncestorsConstraint(t: ObjectPropertyVarObj,
-                                 key: TokenListener.READ_ANCESTORS | TokenListener.READ_ANCESTORS_GETTERS | TokenListener.ASSIGN_ANCESTORS,
+                                 key: TokenListener.READ_ANCESTORS | TokenListener.ASSIGN_ANCESTORS,
                                  opts: Omit<ListenerKey, "l" | "t">, listener: (ancestor: Token) => void) {
         if (logger.isDebugEnabled())
             logger.debug(`Adding ancestors constraint to ${t} ${opts.n ? `at ${nodeToString(opts.n)}` : `${TokenListener[key]} ${opts.s}`}`);
@@ -605,17 +605,21 @@ export default class Solver {
      * @param base the constraint variable for the base expression
      * @param pck the current package object token
      * @param prop the property name
+     * @param node AST node
+     * @param enclosing enclosing function or module
      */
     collectPropertyRead(
         typ: "read" | "call", result: ConstraintVar | undefined, base: ConstraintVar | undefined,
-        pck: PackageObjectToken, prop: string | undefined
+        pck: PackageObjectToken | undefined, prop: string | undefined, node: Node, enclosing: FunctionInfo | ModuleInfo
     ) { // TODO: rename to registerPropertyRead, move to FragmentState
-        if (typ === "read" && result && base)
+        if (typ === "read" && result && base && pck)
             this.fragmentState.maybeEmptyPropertyReads.push({typ, result, base, pck, prop});
         else if (typ === "call" && base && prop)
             // call with @Unknown already happens when prop is undefined, so we only need to register
             // the property read for patching if the property is known
             this.fragmentState.maybeEmptyPropertyReads.push({typ, base, prop});
+        if (base && prop)
+            this.fragmentState.propertyReads.push({base, prop, node, enclosing});
     }
 
     /**
@@ -796,7 +800,9 @@ export default class Solver {
                 if (options.cycleElimination) {
                     // find vars that are end points of new or restored subset edges
                     const nodes = new Set<RepresentativeVar>();
-                    for (const v of [...this.nodesWithNewEdges, ...this.restored])
+                    for (const v of this.nodesWithNewEdges)
+                        nodes.add(f.getRepresentative(v));
+                    for (const v of this.restored)
                         nodes.add(f.getRepresentative(v));
                     if (nodes.size > 0) {
                         // find strongly connected components
@@ -892,6 +898,7 @@ export default class Solver {
      * Merges the given fragment state into the current fragment state.
      */
     merge(_s: FragmentState, propagate: boolean) { // TODO: reconsider use of 'propagate' flag
+        const timer = new Timer();
         // use a different type for s' representative variables to prevent accidental mixups
         const s = _s as unknown as FragmentState<MergeRepresentativeVar>;
         const f = this.fragmentState;
@@ -1002,8 +1009,10 @@ export default class Solver {
         mapMapSetAll(s.callResultAccessPaths, f.callResultAccessPaths);
         mapMapSetAll(s.componentAccessPaths, f.componentAccessPaths);
         mapArrayPushAll(s.importDeclRefs, f.importDeclRefs);
+        pushAll(s.propertyReads, f.propertyReads);
         pushAll(s.maybeEmptyPropertyReads, f.maybeEmptyPropertyReads);
         addAll(s.dynamicPropertyWrites, f.dynamicPropertyWrites);
         this.printDiagnostics();
+        this.diagnostics.totalFragmentMergeTime += timer.elapsedCPU();
     }
 }

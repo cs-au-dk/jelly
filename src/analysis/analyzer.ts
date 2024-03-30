@@ -19,7 +19,7 @@ import {preprocessAst} from "../parsing/extras";
 import {FragmentState} from "./fragmentstate";
 import {patchDynamics} from "../patching/patchdynamics";
 import {patchMethodCalls} from "../patching/patchmethodcalls";
-import {FunctionToken} from "./tokens";
+import {finalizeCallEdges} from "./finalization";
 
 export async function analyzeFiles(files: Array<string>, solver: Solver) {
     const a = solver.globalState;
@@ -164,34 +164,19 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
         else
             throw ex;
     }
-    d.time = timer.elapsed();
-    d.cpuTime = timer.elapsedCPU();
-    d.errors = getMapHybridSetSize(solver.fragmentState.errors) + a.filesWithParseErrors.length;
-    d.warnings = getMapHybridSetSize(solver.fragmentState.warnings) + getMapHybridSetSize(solver.fragmentState.warningsUnsupported);
-
     if (d.aborted)
         logger.warn("Received abort signal, analysis aborted");
     else if (d.timeout)
         logger.warn("Time limit reached, analysis aborted");
 
-    // collect final call edges after abort/timeout
-    if (solver.diagnostics.aborted || solver.diagnostics.timeout) {
-        const f = solver.fragmentState;
-        for (const n of f.callLocations) {
-            const caller = f.callToContainingFunction.get(n);
-            assert(caller);
-            const vs = f.callToCalleeVars.get(n);
-            if (vs)
-                for (const v of vs) {
-                    const vRep = f.getRepresentative(v);
-                    for (const t of f.getTokens(vRep))
-                        if (t instanceof FunctionToken)
-                            f.registerCallEdge(n, caller, a.functionInfos.get(t.fun)!);
-                }
-        }
-    }
+    // collect final call edges
+    finalizeCallEdges(solver);
 
     // output statistics
+    d.time = timer.elapsed();
+    d.cpuTime = timer.elapsedCPU();
+    d.errors = getMapHybridSetSize(solver.fragmentState.errors) + a.filesWithParseErrors.length;
+    d.warnings = getMapHybridSetSize(solver.fragmentState.warnings) + getMapHybridSetSize(solver.fragmentState.warningsUnsupported);
     if (!options.modulesOnly && files.length > 0) {
         const f = solver.fragmentState; // current fragment (not final if aborted due to timeout)
         const r = new AnalysisStateReporter(f);
@@ -226,8 +211,8 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
                     `array: ${mapMapSize(f.arrayEntriesListeners)} (${d.arrayEntriesListenerNotifications}), ` +
                     `obj: ${mapMapSize(f.objectPropertiesListeners)} (${d.objectPropertiesListenerNotifications})`);
                 logger.info(`Canonicalize vars: ${a.canonicalConstraintVars.size} (${a.numberOfCanonicalizeVarCalls}), tokens: ${a.canonicalTokens.size} (${a.numberOfCanonicalizeTokenCalls}), access paths: ${a.canonicalAccessPaths.size} (${a.numberOfCanonicalizeAccessPathCalls})`);
-                logger.info(`CPU time: ${d.cpuTime}ms, propagation: ${d.totalPropagationTime}ms, listeners: ${d.totalListenerCallTime}ms` +
-                    (options.alloc && options.widening ? `, widening: ${d.totalWideningTime}ms` : ""));
+                logger.info(`CPU time: ${d.cpuTime}ms, propagation: ${d.totalPropagationTime}ms, listeners: ${d.totalListenerCallTime}ms, fragment merging: ${d.totalFragmentMergeTime}ms` +
+                    (options.alloc && options.widening ? `, widening: ${d.totalWideningTime}ms` : "") + `, finalization: ${d.finalizationTime}ms`);
                 if (options.cycleElimination)
                     logger.info(`Cycle elimination time: ${d.totalCycleEliminationTime}ms, runs: ${d.totalCycleEliminationRuns}, nodes removed: ${f.redirections.size}`);
             }
