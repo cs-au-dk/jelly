@@ -486,11 +486,12 @@ export class Operations {
         if (base instanceof ArrayToken && prop === "length")
             return undefined;
         const dst = this.solver.varProducer.readResultVar(base, prop);
+        const basePropSpecial =
+            (base instanceof FunctionToken && STANDARD_METHODS.get("Function")!.has(prop)) ||
+            (base instanceof AllocationSiteToken && base.kind !== "Object" && STANDARD_METHODS.get(base.kind)?.has(prop));
         // constraint: ... ∀ ancestors t2 of t: ...
         this.solver.addForAllAncestorsConstraint(base, TokenListener.READ_ANCESTORS, {s: prop}, (t2: Token) => {
-            if (((base instanceof FunctionToken && STANDARD_METHODS.get("Function")!.has(prop)) ||
-                (base instanceof AllocationSiteToken && base.kind !== "Object" && STANDARD_METHODS.get(base.kind)?.has(prop))) &&
-                t2 === this.globalSpecialNatives.get(OBJECT_PROTOTYPE))
+            if (basePropSpecial && t2 === this.globalSpecialNatives.get(OBJECT_PROTOTYPE))
                 return; // safe to skip properties at Object.prototype that are in {base.kind}.prototype
             if (isObjectPropertyVarObj(t2))
                 this.readPropertyBound(t2, prop, dst, {t: base, s: prop}, base);
