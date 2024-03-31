@@ -1,5 +1,15 @@
 import logger from "../misc/logger";
-import {deleteAll, FilePath, getOrSet, Location, locationToStringWithFile, locationToStringWithFileAndEnd, mapGetArray, SimpleLocation} from "../misc/util";
+import {
+    deleteAll,
+    FilePath,
+    getOrSet,
+    Location,
+    locationToStringWithFile,
+    locationToStringWithFileAndEnd,
+    mapGetArray,
+    SimpleLocation,
+    stringify
+} from "../misc/util";
 import {GlobalState} from "../analysis/globalstate";
 import {FunctionToken, NativeObjectToken, Token} from "../analysis/tokens";
 import fs from "fs";
@@ -464,7 +474,7 @@ export class AnalysisStateReporter {
      */
     saveDiagnostics(stats: AnalysisDiagnostics, file: string) {
         const fd = fs.openSync(file, "w");
-        fs.writeSync(fd, JSON.stringify(stats, undefined, 2));
+        fs.writeSync(fd, stringify(stats));
         fs.closeSync(fd);
         logger.info(`Analysis diagnostics written to ${file}`);
     }

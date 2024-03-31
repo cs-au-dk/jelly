@@ -2,7 +2,7 @@ import {ChildProcess, fork} from "child_process";
 import logger from "../misc/logger";
 import {options, resolveBaseDir} from "../options";
 import {HintsJSON, RequestType, ResponseType} from "../typings/hints";
-import {addPairArrayToMapSet, FilePath, LocationJSON, mapArraySize, percent} from "../misc/util";
+import {addPairArrayToMapSet, FilePath, LocationJSON, mapArraySize, percent, stringify} from "../misc/util";
 import {closeSync, openSync, writeSync} from "fs";
 import {checkFile} from "./transform";
 import {GlobalState} from "../analysis/globalstate";
@@ -273,7 +273,7 @@ export class ProcessManager {
      */
     saveDiagnosticsToFile(file: string) {
         const fd = openSync(file, "w");
-        writeSync(fd, JSON.stringify(this.getDiagnostics(), undefined, 2));
+        writeSync(fd, stringify(this.getDiagnostics()));
         closeSync(fd);
         logger.info(`Approximate interpretation diagnostics written to ${file}`);
     }
