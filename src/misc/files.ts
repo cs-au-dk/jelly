@@ -8,6 +8,7 @@ import logger from "./logger";
 import {Node} from "@babel/types";
 import stringify from "stringify2stream";
 import {FragmentState} from "../analysis/fragmentstate";
+import {findPackageJson} from "./packagejson";
 
 /**
  * Expands the given list of file paths.
@@ -145,7 +146,7 @@ export function requireResolve(str: string, file: FilePath, node: Node, f: Fragm
 
 /**
  * Attempts to auto-detect basedir if not set explicitly.
- * If not set explicitly, basedir is first set to the nearest enclosing directory of the given files.
+ * If not set explicitly, basedir is set to the nearest enclosing directory of all the given files containing a package.json file.
  * If the resulting directory is inside a node_modules directory, that directory is used instead.
  * @param paths paths to entry files or directories
  * @return true if successful, false if failed
@@ -160,12 +161,17 @@ export function autoDetectBaseDir(paths: Array<string>): boolean {
     }
     if (paths.length === 0)
         return true;
-    let dir = resolve(process.cwd(), longestCommonPrefix(paths.map(p => lstatSync(p).isDirectory() ? p : dirname(p))));
-    const i = dir.lastIndexOf(`${sep}node_modules${sep}`);
+    const t = findPackageJson(resolve(process.cwd(), longestCommonPrefix(paths.map(p =>
+        lstatSync(p).isDirectory() ? p : dirname(p)))));
+    if (!t) {
+        logger.info("Can't auto-detect basedir, package.json not found (use option -b), aborting");
+        return false;
+    }
+    options.basedir = t.dir;
+    const i = options.basedir.lastIndexOf(`${sep}node_modules${sep}`);
     if (i !== -1)
-        dir = resolve(dir.substring(0, i), "node_modules");
-    options.basedir = dir;
-    logger.verbose(`Basedir auto-detected: ${dir}`);
+        options.basedir = resolve(options.basedir.substring(0, i), "node_modules");
+    logger.verbose(`Basedir auto-detected: ${options.basedir}`);
     return true;
 }
 
