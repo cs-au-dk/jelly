@@ -116,7 +116,7 @@ export const JELLY_NODE_ID = Symbol("JELLY_NODE_ID");
 /**
  * Preprocesses the given AST.
  */
-export function preprocessAst(ast: File, file: string, module: ModuleInfo, globals: Array<Identifier>, globalsHidden: Array<Identifier>) {
+export function preprocessAst(ast: File, module?: ModuleInfo, globals?: Array<Identifier>, globalsHidden?: Array<Identifier>) {
     let nextNodeID = 0;
 
     function register(n: Node) {
@@ -124,24 +124,26 @@ export function preprocessAst(ast: File, file: string, module: ModuleInfo, globa
     }
 
     // assign unique index to each identifier in globals and globalsHidden
-    for (const n of [...globals, ...globalsHidden])
-        register(n);
+    if (globals && globalsHidden)
+        for (const n of [...globals, ...globalsHidden])
+            register(n);
 
     // artificially declare all native globals in the program scope (if not already declared)
-    traverse(ast, {
-        Program(path: NodePath<Program>) {
-            const decls = globals.filter(d => path.scope.getBinding(d.name) === undefined)
-                .map(id => {
-                    const d = variableDeclarator(id);
-                    d.loc = id.loc;
-                    return d;
-                });
-            const d = variableDeclaration("var", decls);
-            (d.loc as Location) = {start: {line: 0, column: 0}, end: {line: 0, column: 0}, native: "%ecmascript"};
-            path.scope.registerDeclaration(path.unshiftContainer("body", d)[0]);
-            path.stop();
-        }
-    });
+    if (globals)
+        traverse(ast, {
+            Program(path: NodePath<Program>) {
+                const decls = globals.filter(d => path.scope.getBinding(d.name) === undefined)
+                    .map(id => {
+                        const d = variableDeclarator(id);
+                        d.loc = id.loc;
+                        return d;
+                    });
+                const d = variableDeclaration("var", decls);
+                (d.loc as Location) = {start: {line: 0, column: 0}, end: {line: 0, column: 0}, native: "%ecmascript"};
+                path.scope.registerDeclaration(path.unshiftContainer("body", d)[0]);
+                path.stop();
+            }
+        });
 
     traverse(ast, {
         enter(path: NodePath) {
@@ -162,7 +164,7 @@ export function preprocessAst(ast: File, file: string, module: ModuleInfo, globa
             }
 
             // set module (if not already set and not native)
-            if ((n.loc as Location).module === undefined && (n.loc as Location).native === undefined)
+            if (module && (n.loc as Location).module === undefined && (n.loc as Location).native === undefined)
                 (n.loc as Location).module = module;
 
             // workarounds to match dyn.ts source locations
@@ -180,7 +182,8 @@ export function preprocessAst(ast: File, file: string, module: ModuleInfo, globa
             }
 
             // add bindings in global scope for identifiers with missing binding
-            if ((isIdentifier(n) || isJSXIdentifier(n)) &&
+            if (module &&
+                (isIdentifier(n) || isJSXIdentifier(n)) &&
                 n.name !== "arguments" && !path.scope.getBinding(n.name) &&
                 !((isMemberExpression(path.parent) || isOptionalMemberExpression(path.parent) || isJSXMemberExpression(path.parent)) &&
                     path.parent.property === path.node) &&

@@ -1,0 +1,15 @@
+{
+  "name": "approx",
+  "version": "1.0.0",
+  "description": "",
+  "main": "computedProperties.js",
+  "dependencies": {
+    "foolib": "^1.0.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC"
+}

@@ -13,22 +13,26 @@ Jelly is a static analyzer for performing
 
 for JavaScript (and TypeScript) programs that use the Node.js platform.
 
-The analyzer design is based on ideas from JAM [1], TAPIR [2] and ACG [3].
-Its core is a flow-insensitive control-flow and points-to analysis that uses a hybrid of field-based and allocation-site abstraction,
-together with access paths for tracking library usage.
+The analyzer design is based on ideas from JAM [1], TAPIR [2] and ACG [3] with support for approximate interpretation [4].
+Its core is a flow-insensitive control-flow and points-to analysis, together with access paths for tracking library usage.
 It models the main parts of the ECMAScript language and standard library (intentionally not fully soundly!),
 and not (yet) the Node.js standard library.
 
 [1] Benjamin Barslev Nielsen, Martin Toldam Torp, Anders Møller:
 [Modular call graph construction for security scanning of Node.js applications](https://dl.acm.org/doi/10.1145/3460319.3464836).
-ISSTA 2021: 29-41
+Proc. ISSTA 2021: 29-41
 
 [2] Anders Møller, Benjamin Barslev Nielsen, Martin Toldam Torp:
 [Detecting locations in JavaScript programs affected by breaking library changes](https://dl.acm.org/doi/10.1145/3428255).
 Proc. ACM Program. Lang. 4(OOPSLA): 187:1-187:25 (2020)
 
 [3] Asger Feldthaus, Max Schäfer, Manu Sridharan, Julian Dolby, Frank Tip:
-[Efficient construction of approximate call graphs for JavaScript IDE services](https://ieeexplore.ieee.org/document/6606621/). ICSE 2013: 752-761
+[Efficient construction of approximate call graphs for JavaScript IDE services](https://ieeexplore.ieee.org/document/6606621/).
+Proc. ICSE 2013: 752-761
+
+[4] Mathias Rud Laursen, Wenyuan Xu, Anders Møller:
+[Reducing Static Analysis Unsoundness with Approximate Interpretation](https://dl.acm.org/doi/10.1145/3656424).
+Proc. ACM Program. Lang. 8(PLDI): 194:1-194:24 (2024)
 
 ## Installing
 
@@ -124,6 +128,19 @@ Content-Length: <bytes>
 
 ```
 with `\r\n` linebreaks.
+
+## Approximate interpretation
+
+To enable static analysis with approximate interpretation (see reference [4] above), use option `--approx`:
+```bash
+jelly --approx tests/helloworld/app.js
+```
+(This example assumes you have first installed test dependencies by running `npm run tests-install`.)
+Alternatively, you can run approximate interpretation and static analysis separately using options `--approx-only` and `--approx-load`:
+```bash
+jelly --approx-only hints.json tests/helloworld/app.js
+jelly --approx-load hints.json tests/helloworld/app.js
+```
 
 ## Dynamic call graph construction
 

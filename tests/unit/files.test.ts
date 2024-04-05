@@ -416,7 +416,8 @@ describe("tests/unit/files/requireResolve", () => {
 
 		try {
 			const from = path.resolve(basedir, data.fromFile);
-			const resolve = () => requireResolve(data.requireStr, from, {} as Node, new Solver().fragmentState);
+			const solver = new Solver();
+			const resolve = () => requireResolve(data.requireStr, from, solver.globalState, {} as Node, solver.fragmentState);
 			if ("expected" in data)
 				expect(resolve()).toBe(data.expected && path.resolve(basedir, data.expected));
 			else

@@ -25,7 +25,7 @@ export function findModules(ast: File, file: FilePath, f: FragmentState, moduleI
     function requireModule(str: string, path: NodePath) { // see requireModule in operations.ts
         if (!Module.isBuiltin(str))
             try {
-                const filepath = requireResolve(str, file, path.node, f);
+                const filepath = requireResolve(str, file, f.a, path.node, f);
                 if (filepath)
                     f.a.reachedFile(filepath, moduleInfo);
             } catch {

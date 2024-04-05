@@ -1,3 +1,5 @@
+import {ApproxDiagnostics, PatchingDiagnostics} from "../approx/diagnostics";
+
 export default class AnalysisDiagnostics {
 
     packages: number = 0;
@@ -91,4 +93,8 @@ export default class AnalysisDiagnostics {
     unhandledDynamicPropertyWrites: number = 0;
 
     unhandledDynamicPropertyReads: number = 0;
+
+    approx?: ApproxDiagnostics; // set when analysis is completed if --approx enabled
+
+    patching?: PatchingDiagnostics; // set if --approx or --approx-load enabled
 }

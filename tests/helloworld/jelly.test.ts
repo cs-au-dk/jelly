@@ -18,3 +18,20 @@ describe("tests/helloworld", () => {
         reachableTotal: 189,
     });
 });
+
+describe("tests/helloworld-approx", () => {
+    runTest("tests/helloworld", "app.js", {
+        options: {callgraphExternal: false, proto: true, approx: true},
+        soundness: "tests/helloworld/app.json",
+        functionInfos: 775,
+        moduleInfos: 94,
+        numberOfFunctionToFunctionEdges: 941,
+        oneCalleeCalls: 988,
+        funFound: 136,
+        funTotal: 138,
+        callFound: 201,
+        callTotal: 204,
+        reachableFound: 168,
+        reachableTotal: 189,
+    });
+});

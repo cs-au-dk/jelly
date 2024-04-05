@@ -1,4 +1,4 @@
-import fs, {statSync} from "fs";
+import fs, {readFileSync, statSync} from "fs";
 import {resolve} from "path";
 import logger, {writeStdOutIfActive} from "../misc/logger";
 import Solver, {AbortedException} from "./solver";
@@ -20,6 +20,9 @@ import {FragmentState} from "./fragmentstate";
 import {patchDynamics} from "../patching/patchdynamics";
 import {patchMethodCalls} from "../patching/patchmethodcalls";
 import {finalizeCallEdges} from "./finalization";
+import {ProcessManager} from "../approx/processmanager";
+import {Patching} from "../approx/patching";
+import {PatchingDiagnostics} from "../approx/diagnostics";
 
 export async function analyzeFiles(files: Array<string>, solver: Solver) {
     const a = solver.globalState;
@@ -27,6 +30,16 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
     const timer = new Timer();
     resolveBaseDir();
     const fragmentStates = new Map<ModuleInfo | PackageInfo, FragmentState>();
+    if (options.approx || options.approxLoad) {
+        a.approx = new ProcessManager(a);
+        a.patching = new Patching(a.approx.hints);
+        d.patching = new PatchingDiagnostics();
+        if (options.approxLoad) {
+            if (options.printProgress)
+                logger.info(`Loading ${options.approxLoad}`);
+            a.approx!.add(JSON.parse(readFileSync(options.approxLoad, "utf-8")));
+        }
+    }
 
     function merge(mp: ModuleInfo | PackageInfo, propagate: boolean = true) {
         const f = fragmentStates.get(mp);
@@ -70,6 +83,16 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
                 a.filesAnalyzed.push(file);
                 d.codeSize += statSync(file).size;
 
+                if (options.approx) {
+                    if (a.approx!.hints.moduleIndex.has(moduleInfo.toString())) {
+                        if (logger.isVerboseEnabled())
+                            logger.verbose(`Skipping approximate interpretation of module ${file}, already visited`);
+                    } else {
+                        writeStdOutIfActive(`Approximate interpretation...`);
+                        await a.approx!.execute(file); // TODO: run in parallel with static analysis and sync later before the result is used?
+                    }
+                }
+
                 if (options.modulesOnly) {
 
                     // find modules only, no actual analysis
@@ -82,7 +105,7 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
                     a.globalSpecialNatives = globalSpecialNatives;
 
                     // preprocess the AST
-                    preprocessAst(ast, file, moduleInfo, globals, globalsHidden);
+                    preprocessAst(ast, moduleInfo, globals, globalsHidden);
 
                     // traverse the AST
                     writeStdOutIfActive("Traversing AST...");
@@ -140,6 +163,12 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
                 // propagate tokens until fixpoint reached
                 await solver.propagate();
 
+                // patch using hints from approximate interpretation
+                if (options.approx || options.approxLoad) {
+                    a.patching!.patch(solver);
+                    await solver.propagate();
+                }
+
                 // patch heuristics
                 const p1 = patchDynamics(solver);
                 const p2 = patchMethodCalls(solver);
@@ -163,6 +192,12 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
             d.aborted = true;
         else
             throw ex;
+    } finally {
+        if (a.approx) {
+            a.approx.stop();
+            if (options.approx && (options.diagnostics || options.diagnosticsJson))
+                solver.diagnostics.approx = a.approx.getDiagnostics();
+        }
     }
     if (d.aborted)
         logger.warn("Received abort signal, analysis aborted");
@@ -215,6 +250,10 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
                     (options.alloc && options.widening ? `, widening: ${d.totalWideningTime}ms` : "") + `, finalization: ${d.finalizationTime}ms`);
                 if (options.cycleElimination)
                     logger.info(`Cycle elimination time: ${d.totalCycleEliminationTime}ms, runs: ${d.totalCycleEliminationRuns}, nodes removed: ${f.redirections.size}`);
+                if ((options.approx || options.approxLoad) && options.diagnostics) {
+                    a.approx!.printDiagnostics();
+                    a.patching!.printDiagnostics(solver);
+                }
             }
         }
     }

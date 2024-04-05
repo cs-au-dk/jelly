@@ -1,5 +1,7 @@
 /*! DO NOT INSTRUMENT */
 
+import {decodeAndSetSourceMap, getSourceObject} from "./sourcemaps";
+
 /**
  * Commands that do not need instrumentation, for example because the actual work is known to happen in child processes.
  */
@@ -128,8 +130,12 @@ function addCallEdge(call: IID, callerInfo: FunInfo, callee: IID) {
         let cs = call2fun.get(call);
         if (!cs) {
             cs = new Set;
-            call2fun.set(call, cs);
-            callLocations.set(call, so2loc(J$.iidToSourceObject(call)));
+            try {
+                callLocations.set(call, so2loc(J$.iidToSourceObject(call)));
+                call2fun.set(call, cs);
+            } catch (e) {
+                log(`Source mapping error: ${e}, for ${JSON.stringify(J$.iidToSourceObject(call))}`);
+            }
         }
         cs.add(callee);
     }
@@ -162,6 +168,7 @@ function registerCall(call: IID, callerInfo: FunInfo, callee: Function) {
  */
 function so2loc(s: SourceObject): string {
     let fid = fileIds.get(s.name);
+    s = getSourceObject(s); // converting source object via source mapping if present
     if (fid === undefined) {
         fid = files.length;
         files.push(s.name);
@@ -199,8 +206,6 @@ J$.addAnalysis({ // TODO: super calls not detected (see tests/micro/classes.js)
      * Before function or constructor call.
      */
     invokeFunPre: function(iid: IID, f: Function, _base: unknown, _args: any[], _isConstructor: boolean, _isMethod: boolean, _functionIid: IID, _functionSid: IID) {
-        // console.log(`invokeFunPre ${f.name} from ${iid && J$.iidToLocation(iid)}`);
-
         const callerInApp = inAppStack.length > 0 && inAppStack[inAppStack.length - 1];
         if (callerInApp && typeof f === "function") {
             const callerIid = funLocStack[funLocStack.length - 1]!;
@@ -214,7 +219,6 @@ J$.addAnalysis({ // TODO: super calls not detected (see tests/micro/classes.js)
      * Entering function.
      */
     functionEnter: function(iid: IID, func: Function, _receiver: object, _args: any[]) {
-        // console.log(`Entered ${func.name} ${J$.iidToLocation(iid)}`);
         funIids.set(func, iid);
 
         let info = iidToInfo.get(iid);
@@ -281,12 +285,13 @@ J$.addAnalysis({ // TODO: super calls not detected (see tests/micro/classes.js)
                 absfp = path.isAbsolute(fp)? fp : path.join(cwd, fp);
             const diskSource = fs.readFileSync(absfp, "utf-8");
             if (diskSource !== source && !isSourceSimplyWrapped(diskSource, source)) {
-                // if the source does not match, we will potentially run into
-                // issues with matching static and dynamic source locations
-                // to avoid such issues we don't output any information for this file
-                // TODO: Handle this more cleanly, perhaps by using embedded source maps
-                log(`jelly: the source for ${sourceInfo.name} does not match the on-disk content - ignoring`);
-                ignoredFiles.add(sourceInfo.name);
+                log(`jelly: the source for ${sourceInfo.name} does not match the on-disk content, trying to find source mapping`);
+                // if the source does not match, try to find the source map and use that to resolve the source location
+                const m = decodeAndSetSourceMap(source, sourceInfo.name);
+                if (!m) {
+                    log(`jelly: the source mapping for ${sourceInfo.name} can't find - ignoring`);
+                    ignoredFiles.add(sourceInfo.name);
+                }
             }
         } catch (error: any) {
             if (error.code !== "ENOENT")
@@ -429,7 +434,30 @@ J$.addAnalysis({ // TODO: super calls not detected (see tests/micro/classes.js)
     // }
 }, // Exclude internal sources except actual files incorrectly marked as internal.
    // The incorrect marking has been observed for ECMAScript modules.
-   (source: SourceObject) => !source.internal || source.name.startsWith("file://"));
+   (source: SourceObject) =>  {
+       if (source.internal && !source.name.startsWith("file://"))
+           return false;
+       // exclude instrumentation of TypeScript to JavaScript compilation, sourcemap, and jest
+       const excludedPacakges = ["node_modules/ts-node/",
+           "node_modules/@cspotcode/source-map-support/",
+           "node_modules/@jridgewell/resolve-uri/",
+           "node_modules/@jridgewell/sourcemap-codec/",
+           "node_modules/tslib/",
+           "node_modules/typescript/",
+           "node_modules/source-map",
+           "node_modules/source-map-support",
+           "node_modules/jest-cli/",
+           "node_modules/@jest/",
+           "node_modules/ts-jest/",
+           "node_modules/jest-"
+       ];
+       for (const pattern of excludedPacakges) {
+           if(source.name.includes(pattern))
+               return false;
+       }
+       return true;
+   }
+);
 
 /**
  * Program exit, write call graph to JSON file.
@@ -438,7 +466,11 @@ J$.addAnalysis({ // TODO: super calls not detected (see tests/micro/classes.js)
 process.on('exit', () => {
     const outputFunctions = [];
     for (const [iid, info] of iidToInfo) if (!info.ignored && info.observedAsApp)
-        outputFunctions.push([iid, so2loc(info.loc)]);
+        try {
+            outputFunctions.push([iid, so2loc(info.loc)]);
+        } catch (e) {
+            log(`Source mapping error: ${e}, for ${JSON.stringify(info.loc)}`);
+        }
 
     if (outputFunctions.length === 0) {
         log(`jelly: No relevant functions detected for process ${process.pid}, skipping file write`);

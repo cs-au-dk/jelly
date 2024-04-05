@@ -9,6 +9,7 @@ import {Node} from "@babel/types";
 import stringify from "stringify2stream";
 import {FragmentState} from "../analysis/fragmentstate";
 import {findPackageJson} from "./packagejson";
+import {GlobalState} from "../analysis/globalstate";
 
 /**
  * Expands the given list of file paths.
@@ -69,7 +70,7 @@ function* expandRec(path: string, sub: boolean): Generator<string> {
 /**
  * Attempts to detect whether the given file is a Node.js shebang file.
  */
-function isShebang(path: string): boolean { // TODO: doesn't work with hacks like https://sambal.org/2014/02/passing-options-node-shebang-line/
+export function isShebang(path: string): boolean { // TODO: doesn't work with hacks like https://sambal.org/2014/02/passing-options-node-shebang-line/
     const fd = openSync(path, 'r');
     const buf = Buffer.alloc(256);
     readSync(fd, buf, 0, buf.length, 0);
@@ -83,17 +84,17 @@ function isShebang(path: string): boolean { // TODO: doesn't work with hacks lik
  * @return resolved file path if successful, undefined if file type not analyzable
  * @throws exception if the module is not found
  */
-export function requireResolve(str: string, file: FilePath, node: Node, f: FragmentState): FilePath | undefined {
+export function requireResolve(str: string, file: FilePath, a: GlobalState, node?: Node, f?: FragmentState): FilePath | undefined {
     if (str.endsWith(".less") || str.endsWith(".svg") || str.endsWith(".png") || str.endsWith(".css") || str.endsWith(".scss")) {
         logger.verbose(`Ignoring module '${str}' with special extension`);
         return undefined;
     } else if (str[0] === "/") {
-        f.error(`Ignoring absolute module path '${str}'`, node);
+        f?.error(`Ignoring absolute module path '${str}'`, node);
         return undefined;
     }
     let filepath;
     try {
-        filepath = f.a.tsModuleResolver.resolveModuleName(str, file);
+        filepath = a.tsModuleResolver.resolveModuleName(str, file);
         // TypeScript prioritizes .ts over .js, overrule if coming from a .js file
         if (file.endsWith(".js") && filepath.endsWith(".ts") && !str.endsWith(".ts")) {
             const p = filepath.substring(0, filepath.length - 3) + ".js";
@@ -109,10 +110,10 @@ export function requireResolve(str: string, file: FilePath, node: Node, f: Fragm
 
         if (!filepath)
             // see if the string refers to a package that is among those analyzed (and not in node_modules)
-            for (const p of f.a.packageInfos.values())
+            for (const p of a.packageInfos.values())
                 if (p.name === str)
                     if (filepath) {
-                        f.error(`Multiple packages named ${str} found, skipping module load`, node);
+                        f?.error(`Multiple packages named ${str} found, skipping module load`, node);
                         throw e;
                     } else {
                         filepath = resolve(p.dir, p.main || "index.js"); // https://nodejs.org/dist/latest-v8.x/docs/api/modules.html#modules_all_together
@@ -136,7 +137,7 @@ export function requireResolve(str: string, file: FilePath, node: Node, f: Fragm
         throw new Error(msg);
     }
     if (filepath.endsWith(".d.ts") || ![".js", ".jsx", ".es", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts"].includes(extname(filepath))) {
-        f.warn(`Module '${filepath}' has unrecognized extension, skipping it`, node);
+        f?.warn(`Module '${filepath}' has unrecognized extension, skipping it`, node);
         return undefined;
     }
     if (logger.isDebugEnabled())

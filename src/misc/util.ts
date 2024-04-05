@@ -220,6 +220,25 @@ export function mapArrayAdd<K, V>(k: K, v: V, m: Map<K, Array<V>> | WeakMap<any,
     a.push(v);
 }
 
+export function mapArrayAddNoDuplicates<K, V>(k: K, v: V, m: Map<K, Array<V>>, eq: (v1: V, v2: V) => boolean): void {
+    let a = m.get(k);
+    if (!a) {
+        a = [];
+        m.set(k, a);
+    }
+    for (const w of a)
+        if (eq(v, w))
+            return;
+    a.push(v);
+}
+
+export function mapArraySize<K, V>(m: Map<K, Array<V>>): number {
+    let n = 0;
+    for (const v of m.values())
+        n += v.length;
+    return n;
+}
+
 export function deleteAll<T>(xs: Iterable<T>, s: Set<T>) {
     for (const x of xs)
         s.delete(x);
@@ -271,6 +290,19 @@ export function getMapHybridSetSize<K, V>(m: Map<K, V | Set<V>>): number {
         else
             c++;
     return c;
+}
+
+export function mapSetToPairArray<K, V>(x: Map<K, Set<V>>): Array<[K, V]> {
+    const res: Array<[K, V]> = [];
+    for (const [k, vs] of x)
+        for (const v of vs)
+            res.push([k, v]);
+    return res;
+}
+
+export function addPairArrayToMapSet<K,V>(from: Array<[K, V]>, to: Map<K, Set<V>>) {
+    for (const [k, v] of from)
+        mapGetSet(to, k).add(v);
 }
 
 /**

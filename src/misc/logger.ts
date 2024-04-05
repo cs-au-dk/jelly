@@ -23,15 +23,15 @@ const colors: {
     debug: CYAN,
 };
 
-export const isTTY = process.stdout.isTTY;
+const stdout = process.stdout; // read before sandboxing
+
+export const isTTY = stdout.isTTY;
 
 const logger = winston.createLogger({
     level: "info",
     format: winston.format.printf(({level, message}) =>
         isTTY && options?.tty && !options.logfile ? colors[level] + message + RESET + CLEAR : message),
-    transports: new winston.transports.Console({
-        stderrLevels: [] // change to ["error"] to direct error messages to stderr
-    })
+    transports: new winston.transports.Stream({stream: stdout})
 });
 
 export default logger;
@@ -50,7 +50,7 @@ export function logToFile(file?: string): Transport {
 }
 
 export function writeStdOut(s: string) {
-    process.stdout.write(WHITE + s.substring(0, process.stdout.columns) + RESET + CLEAR + "\r");
+    stdout.write(WHITE + s.substring(0, stdout.columns) + RESET + CLEAR + "\r");
 }
 
 export function writeStdOutIfActive(s: string) {

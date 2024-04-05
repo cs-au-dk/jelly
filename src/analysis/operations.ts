@@ -66,7 +66,14 @@ import {DummyModuleInfo, FunctionInfo, ModuleInfo, normalizeModuleName, PackageI
 import logger from "../misc/logger";
 import {requireResolve} from "../misc/files";
 import {options} from "../options";
-import {FilePath, getOrSet, isArrayIndex, Location, locationToStringWithFile} from "../misc/util";
+import {
+    FilePath,
+    getOrSet,
+    isArrayIndex,
+    Location,
+    locationToString,
+    locationToStringWithFile
+} from "../misc/util";
 import assert from "assert";
 import {
     MAP_KEYS,
@@ -111,6 +118,7 @@ export class Operations {
         this.packageInfo = this.moduleInfo.packageInfo;
         this.packageObjectToken = this.a.canonicalizeToken(new PackageObjectToken(this.packageInfo));
         this.exportsObjectToken = this.a.canonicalizeToken(new NativeObjectToken("exports", this.moduleInfo));
+        this.a.patching?.registerAllocationSite(this.exportsObjectToken);
     }
 
     /**
@@ -132,6 +140,10 @@ export class Operations {
             this.solver.addAccessPath(UnknownAccessPath.instance, v);
         }
         return v;
+    }
+
+    private getRequireHints(pars: NodePath<Node>): Array<string> | undefined {
+        return this.a.patching?.getRequireHints((pars.node.loc as Location).module?.toString(), locationToString(pars.node.loc, false, true));
     }
 
     /**
@@ -232,14 +244,15 @@ export class Operations {
                     this.solver.addAccessPath(new CallResultAccessPath(baseVar!), resultVar, t.ap);
             });
         }
-        const strings = args.length >= 1 && isStringLiteral(args[0]) ? [args[0].value] : []; // TODO: currently supporting only string literals at 'require' and 'import'
+        const strings = args.length >= 1 && isStringLiteral(args[0]) ? [args[0].value] : [];
 
         // 'import' expression
         if (path.get("callee").isImport() && args.length >= 1) {
             const v = this.a.canonicalizeVar(new IntermediateVar(path.node, "import"));
-            if (strings.length === 0)
-                f.warnUnsupported(p.node, "Unhandled 'import'");
-            for (const str of strings)
+            const ss = strings.length > 0 ? strings : this.getRequireHints(p) ?? [];
+            if (ss.length === 0)
+                f.warnUnsupported(path.node, `Unhandled 'import'${this.a.patching ? " (no hints found)" : ""}`);
+            for (const str of ss)
                 this.requireModule(str, v, path);
             const promise = this.newPromiseToken(path.node);
             this.solver.addTokenConstraint(promise, this.expVar(path.node, path));
@@ -281,9 +294,10 @@ export class Operations {
             if (t.name === "require") {
 
                 // require(...)
-                if (strings.length === 0)
-                    f.warnUnsupported(path.node, "Unhandled 'require'");
-                for (const str of strings)
+                const ss = strings.length > 0 ? strings : this.getRequireHints(pars) ?? [];
+                if (ss.length === 0)
+                    f.warnUnsupported(path.node, `Unhandled 'require'${this.a.patching ? " (no hints found)" : ""}`);
+                for (const str of ss)
                     this.requireModule(str, resultVar, path);
             }
 
@@ -466,7 +480,7 @@ export class Operations {
                         // TODO: ignoring reads from prototype chain
 
                     } else if (!(t instanceof AccessPathToken)) { // TODO: assuming dynamic reads from arrays only read array indices
-                        if (logger.isInfoEnabled())
+                        if (logger.isInfoEnabled() || options.approx || options.approxLoad)
                             this.solver.fragmentState.registerUnhandledDynamicPropertyRead(node);
                     }
                 });
@@ -665,7 +679,7 @@ export class Operations {
             try {
 
                 // try to locate the module
-                const filepath = requireResolve(str, this.file, path.node, f);
+                const filepath = requireResolve(str, this.file, f.a, path.node, f);
                 if (filepath) {
 
                     // register that the module is reached
@@ -890,8 +904,10 @@ export class Operations {
     newObjectToken(n: Node): ObjectToken | PackageObjectToken {
         if (options.alloc) {
             const t = this.a.canonicalizeToken(new ObjectToken(n));
-            if (!options.widening || !this.solver.fragmentState.widened.has(t))
+            if (!options.widening || !this.solver.fragmentState.widened.has(t)) {
+                this.a.patching?.registerAllocationSite(t);
                 return t;
+            }
         }
         return this.packageObjectToken;
     }
@@ -900,14 +916,18 @@ export class Operations {
      * Creates a new PrototypeToken.
      */
     newPrototypeToken(fun: Function): PrototypeToken {
-        return this.a.canonicalizeToken(new PrototypeToken(fun));
+        const t = this.a.canonicalizeToken(new PrototypeToken(fun));
+        this.a.patching?.registerAllocationSite(t);
+        return t;
     }
 
     /**
      * Creates a new ArrayToken.
      */
     newArrayToken(n: Node): ArrayToken {
-        return this.a.canonicalizeToken(new ArrayToken(n));
+        const t = this.a.canonicalizeToken(new ArrayToken(n));
+        this.a.patching?.registerAllocationSite(t);
+        return t;
     }
 
     /**
@@ -921,7 +941,9 @@ export class Operations {
      * Creates a new FunctionToken.
      */
     newFunctionToken(fun: Function): FunctionToken {
-        return this.a.canonicalizeToken(new FunctionToken(fun));
+        const t = this.a.canonicalizeToken(new FunctionToken(fun));
+        this.a.patching?.registerAllocationSite(t);
+        return t;
     }
 
     /**

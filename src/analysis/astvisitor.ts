@@ -535,7 +535,7 @@ export function visit(ast: File, op: Operations) {
                             solver.addSubsetConstraint(rightvar, dst);
                         }
                     }
-                } else
+                } else // TODO: only warn if not patched?
                     f.warnUnsupported(path.node, "Dynamic property name"); // TODO: nontrivial computed property name
                 registerArtificialClassPropertyInitializer(f, path);
             },
@@ -611,8 +611,14 @@ export function visit(ast: File, op: Operations) {
                                 }
                                 solver.addTokenConstraint(t, dst);
                             }
-                        } else
+                        } else {
+
+                            if (!options.oldobj && (options.approx || options.approxLoad))
+                                op.newFunctionToken(path.node); // need to register the allocation site for patching
+
+                            // TODO: only warn if not patched?
                             f.warnUnsupported(path.node, "Dynamic method name"); // TODO: nontrivial computed method name
+                        }
                         break;
                     case "constructor":
 
@@ -974,11 +980,14 @@ export function visit(ast: File, op: Operations) {
      * Visits a MemberExpression or OptionalMemberExpression.
      */
     function visitMemberExpression(path: NodePath<MemberExpression | OptionalMemberExpression | JSXMemberExpression>) {
+        const dstVar = isParentExpressionStatement(path) ? undefined : vp.nodeVar(path.node);
+        // Record dynamic read for approximate interpretation
+        a.patching?.recordDynamicRead(path.node, dstVar);
         if (isAssignmentExpression(path.parent) && path.parent.left === path.node)
             return; // don't treat left-hand-sides of assignments as expressions
         if (isCalleeExpression(path))
             return; // don't perform a property read for method calls
 
-        op.readProperty(op.expVar(path.node.object, path), getProperty(path.node), isParentExpressionStatement(path) ? undefined : vp.nodeVar(path.node), path.node, a.getEnclosingFunctionOrModule(path, op.moduleInfo));
+        op.readProperty(op.expVar(path.node.object, path), getProperty(path.node), dstVar, path.node, a.getEnclosingFunctionOrModule(path, op.moduleInfo));
     }
 }

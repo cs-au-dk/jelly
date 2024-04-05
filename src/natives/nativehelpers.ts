@@ -198,14 +198,18 @@ export function returnArgument(arg: Node, p: NativeFunctionParams) {
  * Creates a new object represented by an ObjectToken or PackageObjectToken.
  */
 export function newObject(p: NativeFunctionParams): ObjectToken | PackageObjectToken {
-    return  p.op.newObjectToken(p.path.node);
+    const t = p.op.newObjectToken(p.path.node);
+    p.solver.globalState.patching?.registerAllocationSite(t);
+    return t;
 }
 
 /**
  * Creates a new AllocationSiteToken with the given kind (not Object, Array or Prototype).
  */
 export function newSpecialObject(kind: ObjectKind, p: NativeFunctionParams): AllocationSiteToken {
-    return p.solver.globalState.canonicalizeToken(new AllocationSiteToken(kind, p.path.node));
+    const t = p.solver.globalState.canonicalizeToken(new AllocationSiteToken(kind, p.path.node));
+    p.solver.globalState.patching?.registerAllocationSite(t);
+    return t;
 }
 
 /**
@@ -219,7 +223,9 @@ export function newPackageObject(kind: ObjectKind, p: NativeFunctionParams): Pac
  * Creates a new array represented by an ArrayToken.
  */
 export function newArray(p: NativeFunctionParams): ArrayToken {
-    return p.op.newArrayToken(p.path.node);
+    const t = p.op.newArrayToken(p.path.node);
+    p.solver.globalState.patching?.registerAllocationSite(t);
+    return t;
 }
 
 /**

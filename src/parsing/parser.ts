@@ -9,10 +9,10 @@ import {FragmentState} from "../analysis/fragmentstate";
  * Parses and desugars the given file.
  * @param str the contents of the file
  * @param file the name of the file
- * @param f analysis state object
+ * @param f analysis state object (if undefined then onlyRemoveTypeImports and allowDeclareFields are disabled)
  * @return AST, or null if error occurred
  */
-export function parseAndDesugar(str: string, file: string, f: FragmentState): File | null {
+export function parseAndDesugar(str: string, file: string, f?: FragmentState): File | null {
 
     // parse the file
     let originalAst: File;
@@ -44,7 +44,7 @@ export function parseAndDesugar(str: string, file: string, f: FragmentState): Fi
             originalAst = parse(str, options);
         }
     } catch (e) {
-        f.error(`Unrecoverable parse error for ${file}${e instanceof Error ? `: ${e.message}` : ""}`);
+        f?.error(`Unrecoverable parse error for ${file}${e instanceof Error ? `: ${e.message}` : ""}`);
         return null;
     }
 
@@ -58,8 +58,8 @@ export function parseAndDesugar(str: string, file: string, f: FragmentState): Fi
             plugins: [
                 replaceTypeScriptImportExportAssignmentsAndAddConstructors,
                 ["@babel/plugin-transform-typescript", {
-                    onlyRemoveTypeImports: true,
-                    allowDeclareFields: true
+                    onlyRemoveTypeImports: f !== undefined,
+                    allowDeclareFields: f !== undefined
                 }],
                 ["@babel/plugin-transform-template-literals", { loose: true }]
             ], // TODO: perform other transformations?
@@ -69,14 +69,14 @@ export function parseAndDesugar(str: string, file: string, f: FragmentState): Fi
             code: logger.isDebugEnabled()
         });
     } catch (e) {
-        f.error(`Babel transformation failed for ${file}${e instanceof Error ? `: ${e.message}` : ""}`);
+        f?.error(`Babel transformation failed for ${file}${e instanceof Error ? `: ${e.message}` : ""}`);
         return null;
     } finally {
         Error.prepareStackTrace = p; // Babel replaces prepareStackTrace, --enable-source-maps needs the original
         console.warn = cw;
     }
     if (!res) {
-        f.error(`Babel transformation failed silently for ${file}`);
+        f?.error(`Babel transformation failed silently for ${file}`);
         return null;
     }
     if (res.code) // set 'code: true' above to output desugared code

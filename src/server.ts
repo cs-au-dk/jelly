@@ -133,7 +133,7 @@ async function main() {
 
     let seq = 1;
 
-    function prepareResponse<S extends boolean, M extends string | undefined, B>(success: S, req: Request | undefined, extra: {message?: M, body?: B} = {}): Response & {success: S, message: typeof extra.message, body: typeof extra.body} {
+    function prepareResponse<S extends boolean, M extends string | undefined, B>(success: S, req: Request | undefined, extra: {message?: M & string, body?: B} = {}): Response & {success: S, message: typeof extra.message, body: typeof extra.body} {
         return {
             type: "response",
             seq: seq++,

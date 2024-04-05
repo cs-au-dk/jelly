@@ -41,7 +41,7 @@ export class FunctionToken extends Token {
  *
  * Prototype represents prototype objects associated with functions.
  */
-export type ObjectKind = "Object" | "Array" | "Class" | "Map" | "Set" | "WeakMap" | "WeakSet" | "WeakRef" | "Iterator" | "RegExp" | "Date" | "Promise" | "PromiseResolve" | "PromiseReject" | "Error" | "Prototype"; // XXX: "Class" unused if options.newobj enabled
+export type ObjectKind = "Object" | "Array" | "Class" | "Map" | "Set" | "WeakMap" | "WeakSet" | "WeakRef" | "Iterator" | "RegExp" | "Date" | "Promise" | "PromiseResolve" | "PromiseReject" | "Error" | "Prototype"; // XXX: "Class" only used if options.oldobj enabled
 
 /**
  * Token that represents objects with a specific allocation site.
@@ -102,7 +102,7 @@ export class ArrayToken extends AllocationSiteToken {
 /**
  * Token that represents classes with a specific allocation site.
  */
-export class ClassToken extends AllocationSiteToken { // XXX: unused if options.newobj enabled
+export class ClassToken extends AllocationSiteToken { // XXX: only used if options.oldobj enabled
 
     constructor(allocSite: Node) {
         super("Class", allocSite);

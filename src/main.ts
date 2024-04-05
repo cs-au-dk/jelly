@@ -30,6 +30,7 @@ import {addAll} from "./misc/util";
 import {getAPIExported, reportAccessPaths, reportAPIExportedFunctions} from "./patternmatching/apiexported";
 import {merge} from "./output/merge";
 import {CallGraph} from "./typings/callgraph";
+import {ProcessManager} from "./approx/processmanager";
 
 program
     .name("jelly")
@@ -45,6 +46,10 @@ program
     .option("-s, --soundness <file>", "compare with dynamic call graph")
     .option("-n, --graal-home <directory>", "home of graal-nodejs (default: $GRAAL_HOME)")
     .option("-d, --dynamic <file>", "generate call graph dynamically, no static analysis")
+    .option("--approx", "enable approximate interpretation")
+    .option("--approx-only <file>", "perform approximate interpretation, no static analysis")
+    .option("--approx-load <file>", "use pre-computed approximate interpretation results")
+    .option("--approx-store <file>", "store approximate interpretation results (use with --approx)")
     .option("-p, --patterns <file...>", "files containing API usage patterns to detect")
     .option("-v, --vulnerabilities <file>", "report vulnerability matches")
     // .option("-g, --callgraph-graphviz <file>", "save call graph as Graphviz dot file") // TODO: graphviz output disabled for now
@@ -246,7 +251,21 @@ async function main() {
                 logger.verbose(`  ${file}`);
         }
 
-        if (options.typescriptLibraryUsage) {
+        if (options.approxOnly) {
+
+            const p = new ProcessManager();
+            try {
+                await p.analyzeFiles(files);
+            } finally {
+                p.saveHintsToFile(options.approxOnly);
+                if (options.diagnostics)
+                    p.printDiagnostics();
+                if (options.diagnosticsJson)
+                    p.saveDiagnosticsToFile(options.diagnosticsJson);
+                p.stop();
+            }
+
+        } else if (options.typescriptLibraryUsage) {
 
             const ts = new TypeScriptTypeInferrer(files);
             const fd = openSync(options.typescriptLibraryUsage, "w");

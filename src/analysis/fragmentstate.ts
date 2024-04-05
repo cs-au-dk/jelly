@@ -722,6 +722,19 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
     }
 
     /**
+     * Checks whether a constraint variable has a token.
+     */
+    hasToken(v: RVT, t: Token): boolean {
+        const ts = this.tokens.get(v);
+        if (!ts)
+            return false;
+        else if (ts instanceof Token)
+            return ts === t;
+        else
+            return ts.has(t);
+    }
+
+    /**
      * Adds the given token to the solution for the given constraint variable.
      * @return true if not already there, false if already there
      */

@@ -22,6 +22,8 @@ import {dirname, relative, resolve} from "path";
 import {options} from "../options";
 import logger from "../misc/logger";
 import {TSModuleResolver} from "../typescript/moduleresolver";
+import {ProcessManager} from "../approx/processmanager";
+import {Patching} from "../approx/patching";
 
 /**
  * Global analysis state.
@@ -158,6 +160,10 @@ export class GlobalState {
      */
     globalSpecialNatives: SpecialNativeObjects | undefined;
 
+    approx: ProcessManager | undefined;
+
+    patching: Patching | undefined;
+
     /**
      * Returns the canonical representative of the given constraint variable (possibly the given one).
      */
@@ -259,7 +265,7 @@ export class GlobalState {
                 // package has not been reached before (also not in another directory)
                 packageInfo = new PackageInfo(p.name, p.version, p.main, p.dir, from === undefined);
                 this.packageInfos.set(p.packagekey, packageInfo);
-                if (!options.modulesOnly && options.printProgress && logger.isVerboseEnabled())
+                if (!options.modulesOnly && !options.approxOnly && options.printProgress && logger.isVerboseEnabled())
                     logger.verbose(`Reached package ${packageInfo} at ${p.dir}`);
                 if (this.vulnerabilities)
                     this.vulnerabilities.reachedPackage(packageInfo);
