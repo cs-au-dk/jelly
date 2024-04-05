@@ -496,9 +496,9 @@ describe("tests/unit/analysis", () => {
                     solver.redirect(res1, res2);
                 }
 
-                solver.collectPropertyRead("read", res1, base1, pt, "A", param, m);
-                solver.collectPropertyRead("read", res2, base2, pt, "A", param, m);
-                solver.collectDynamicPropertyWrite(base1);
+                solver.registerPropertyRead("read", res1, base1, pt, "A", param, m);
+                solver.registerPropertyRead("read", res2, base2, pt, "A", param, m);
+                solver.registerDynamicPropertyWrite(base1);
                 solver.addTokenConstraint(ot, base1);
                 solver.addTokenConstraint(ot, base2);
 

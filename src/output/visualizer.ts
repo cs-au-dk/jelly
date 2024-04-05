@@ -173,7 +173,7 @@ function getVisualizerCallGraph(f: FragmentState, vulnerabilities: Vulnerability
             id: id(n),
             kind: "function",
             parent: id(parent),
-            name: (n.name ?? "<anon>") + ` ${locationToString(n.node.loc, false, true)}`,
+            name: (n.name ?? "<anon>") + ` ${locationToString(n.loc, false, true)}`,
             fullName: funcToStringWithCode(n),
             callWeight: Math.round(100 * functionCallCount / maxFunctionCallCount),
             callCount: functionCallCount,

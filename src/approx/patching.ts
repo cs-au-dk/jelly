@@ -1,6 +1,13 @@
 import {ConstraintVar, ObjectPropertyVarObj} from "../analysis/constraintvars";
 import {LocationJSON, locationToStringWithFileAndEnd, mapArrayAdd, mapArraySize} from "../misc/util";
-import {AllocationSiteToken, ArrayToken, FunctionToken, NativeObjectToken, PrototypeToken, Token} from "../analysis/tokens";
+import {
+    AllocationSiteToken,
+    ArrayToken,
+    FunctionToken,
+    NativeObjectToken,
+    PrototypeToken,
+    Token
+} from "../analysis/tokens";
 import Solver from "../analysis/solver";
 import {isClassMethod, Node} from "@babel/types";
 import assert from "assert";
@@ -9,7 +16,6 @@ import {options} from "../options";
 import {EvalHint, ReadHint, RequireHint, WriteHint} from "../typings/hints";
 import {Hints} from "./hints";
 import {FunctionInfo} from "../analysis/infos";
-import {isDummyConstructor} from "../parsing/extras";
 
 export const APPROX_READ = true;
 export const APPROX_WRITE = true;
@@ -110,7 +116,7 @@ export class Patching {
         const d = solver.diagnostics.patching!;
         d.totalHints = mapArraySize(this.hints.reads) + mapArraySize(this.hints.writes) + mapArraySize(this.hints.requires) + mapArraySize(this.hints.evals);
         d.modulesNotAnalyzed = 0;
-        const mods = new Set(Array.from(solver.globalState.moduleInfos.values()).filter(m => m.node));
+        const mods = new Set(Array.from(solver.globalState.moduleInfos.values()).filter(m => m.loc));
         const fileToModule = this.hints.modules.map(m => {
             const mod = solver.globalState.moduleInfos.get(m);
             if (!mod) {
@@ -119,7 +125,7 @@ export class Patching {
                 d.modulesNotAnalyzed++;
             } else
                 mods.delete(mod);
-            if (mod && !mod.node)
+            if (mod && !mod.loc)
                 return undefined; // module found but excluded from analysis
             return mod?.toString();
         });
@@ -145,8 +151,8 @@ export class Patching {
         }
         d.functionsNotVisited = 0;
         function checkFunctionVisited(fun: FunctionInfo) {
-            if (!visitedFunctions.has(locationToStringWithFileAndEnd(fun.node.loc, true)) &&
-                !isDummyConstructor(fun.node)) {
+            if (!visitedFunctions.has(locationToStringWithFileAndEnd(fun.loc, true)) &&
+                !fun.isDummyConstructor) {
                 if (logger.isVerboseEnabled() || APPROX_DEVEL)
                     logger[APPROX_DEVEL ? "warn" : "verbose"](`Function analyzed statically but not dynamically: ${fun}`);
                 d.functionsNotVisited++;

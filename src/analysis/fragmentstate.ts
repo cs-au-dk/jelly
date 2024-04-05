@@ -497,6 +497,39 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
         this.unhandledDynamicPropertyReads.add(node);
     }
 
+    /**
+     * Registers a property read operation.
+     * @param typ the type of the property read operation
+     * @param result the constraint variable for the result of the property read operation
+     * @param base the constraint variable for the base expression
+     * @param pck the current package object token
+     * @param prop the property name
+     * @param node AST node
+     * @param enclosing enclosing function or module
+     */
+    registerPropertyRead(
+        typ: "read" | "call", result: ConstraintVar | undefined, base: ConstraintVar | undefined,
+        pck: PackageObjectToken | undefined, prop: string | undefined, node: Node, enclosing: FunctionInfo | ModuleInfo
+    ) {
+        if (typ === "read" && result && base && pck)
+            this.maybeEmptyPropertyReads.push({typ, result, base, pck, prop});
+        else if (typ === "call" && base && prop)
+            // call with @Unknown already happens when prop is undefined, so we only need to register
+            // the property read for patching if the property is known
+            this.maybeEmptyPropertyReads.push({typ, base, prop});
+        if (base && prop)
+            this.propertyReads.push({base, prop, node, enclosing});
+    }
+
+    /**
+     * Registers a dynamic property write operation.
+     * @param base the constraint variable for the base expression
+     */
+    registerDynamicPropertyWrite(base: ConstraintVar | undefined) {
+        if (base)
+            this.dynamicPropertyWrites.add(base);
+    }
+
     private makeMsg(msg: string, node?: Node): string {
         return `${msg}${node ? ` at ${locationToStringWithFile(node.loc)}` : ""}`;
     }

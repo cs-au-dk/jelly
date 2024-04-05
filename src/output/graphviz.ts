@@ -41,7 +41,7 @@ export function toDot(f: FragmentState, fd: number = process.stdout.fd) {
             ids.set(f, moduleId);
         else
             writeSync(fd, `${ind(i)}subgraph cluster${id(f)} {\n` +
-                `${ind(i)} label=\"${f.name ?? "<anon>"}@${locationToString(f.node.loc)}\";\n` +
+                `${ind(i)} label=\"${f.name ?? "<anon>"}@${locationToString(f.loc)}\";\n` +
                 `${ind(i)} bgcolor=\"#ffffff\";\n` +
                 `${ind(i)}node${id(f)}[style=invis,shape=point];\n`);
         for (const fs of f.functions)

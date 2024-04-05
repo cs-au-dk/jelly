@@ -201,7 +201,7 @@ export class Operations {
             const baseVar = this.expVar(p.node.object, p);
             const prop = getProperty(p.node);
 
-            this.solver.collectPropertyRead("call", undefined, baseVar, this.packageObjectToken, prop, p.node, caller);
+            f.registerPropertyRead("call", undefined, baseVar, this.packageObjectToken, prop, p.node, caller);
             f.registerMethodCall(path.node, baseVar, prop, calleeVar);
 
             if (prop === undefined) {
@@ -316,7 +316,7 @@ export class Operations {
                 const argVar = argVars[i];
                 if (argVar) {
                     // constraint: assign UnknownAccessPath to arguments to function arguments for external functions, also add (artificial) call edge
-                    this.solver.addForAllTokensConstraint(argVar, TokenListener.CALL_EXTERNAL, args[i], (at: Token) =>
+                    this.solver.addForAllTokensConstraint(argVar, TokenListener.CALL_EXTERNAL, pars.node, (at: Token) =>
                         this.invokeExternalCallback(at, pars.node, caller));
                     f.registerEscapingToExternal(argVar, args[i]);
                 } else if (isSpreadElement(args[i]))
@@ -435,7 +435,7 @@ export class Operations {
      * @param extrakey is included as the str parameter when computing listener IDs
      */
     readProperty(base: ConstraintVar | undefined, prop: string | undefined, dst: ConstraintVar | undefined, node: Node, enclosing: FunctionInfo | ModuleInfo, extrakey = "") {
-        this.solver.collectPropertyRead("read", dst, base, this.packageObjectToken, prop, node, enclosing);
+        this.solver.fragmentState.registerPropertyRead("read", dst, base, this.packageObjectToken, prop, node, enclosing);
         const lopts = {n: node, s: extrakey};
 
         // expression E.p or E["p"] or E[i]
@@ -772,7 +772,7 @@ export class Operations {
             } else {
 
                 // E1[...] = E2
-                this.solver.collectDynamicPropertyWrite(lVar);
+                this.solver.fragmentState.registerDynamicPropertyWrite(lVar);
                 this.solver.fragmentState.registerEscapingFromModule(src);
 
                 // constraint: ∀ arrays t ∈ ⟦E1⟧: ...

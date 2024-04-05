@@ -24,6 +24,7 @@ import logger from "../misc/logger";
 import {TSModuleResolver} from "../typescript/moduleresolver";
 import {ProcessManager} from "../approx/processmanager";
 import {Patching} from "../approx/patching";
+import {isDummyConstructor} from "../parsing/extras";
 
 /**
  * Global analysis state.
@@ -236,7 +237,7 @@ export class GlobalState {
      */
     registerFunctionInfo(file: FilePath, path: NodePath<Function | Class>, name: string | undefined, fun: Function) {
         const m = this.moduleInfosByPath.get(file)!;
-        const f = new FunctionInfo(name, fun, m);
+        const f = new FunctionInfo(name, fun.loc!, m, isDummyConstructor(fun));
         this.functionInfos.set(fun, f);
         const parent = path.getFunctionParent()?.node;
         (parent ? this.functionInfos.get(parent)!.functions : m.functions).add(f);
@@ -286,7 +287,7 @@ export class GlobalState {
 
                 // module has not been reached before, create new ModuleInfo
                 const ignoreModule = (from && (options.ignoreDependencies ||
-                    (!packageInfo.isEntry && ((options.includePackages && !options.includePackages.includes(packageInfo.name)))))) ||
+                        (!packageInfo.isEntry && ((options.includePackages && !options.includePackages.includes(packageInfo.name)))))) ||
                     options.excludePackages?.includes(packageInfo.name);
                 moduleInfo = new ModuleInfo(rel, packageInfo, from === undefined, !ignoreModule);
                 packageInfo.modules.set(rel, moduleInfo);

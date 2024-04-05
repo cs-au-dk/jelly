@@ -1,5 +1,5 @@
 import logger from "../misc/logger";
-import {deleteAll, FilePath, getOrSet, Location, locationToStringWithFile, locationToStringWithFileAndEnd, mapGetArray} from "../misc/util";
+import {deleteAll, FilePath, getOrSet, Location, locationToStringWithFile, locationToStringWithFileAndEnd, mapGetArray, SimpleLocation} from "../misc/util";
 import {GlobalState} from "../analysis/globalstate";
 import {FunctionToken, NativeObjectToken, Token} from "../analysis/tokens";
 import fs from "fs";
@@ -8,7 +8,7 @@ import {FragmentState} from "../analysis/fragmentstate";
 import {relative, resolve} from "path";
 import {options} from "../options";
 import {DummyModuleInfo, FunctionInfo, ModuleInfo} from "../analysis/infos";
-import {Function, isIdentifier, Node, SourceLocation} from "@babel/types";
+import {Function, isIdentifier, Node} from "@babel/types";
 import assert from "assert";
 import AnalysisDiagnostics from "../analysis/diagnostics";
 import {CallGraph} from "../typings/callgraph";
@@ -65,7 +65,7 @@ export class AnalysisStateReporter {
     }
 
 
-    private makeLocStr(fileIndex: number, loc: SourceLocation | undefined | null): string {
+    private makeLocStr(fileIndex: number, loc: SimpleLocation | undefined | null): string {
         return `${fileIndex}:${loc ? `${loc.start.line}:${loc.start.column + 1}:${loc.end.line}:${loc.end.column + 1}` : "?:?:?:?"}`;
     }
 
@@ -106,7 +106,7 @@ export class AnalysisStateReporter {
         const fileIndices = new Map<ModuleInfo, number>();
         first = true;
         for (const m of this.a.moduleInfos.values())
-            if (m.node) {
+            if (m.loc) {
                 fileIndices.set(m, fileIndices.size);
                 fs.writeSync(fd, `${first ? "" : ","}\n  ${JSON.stringify(relative(options.basedir, m.getPath()))}`);
                 first = false;
@@ -115,13 +115,13 @@ export class AnalysisStateReporter {
         const functionIndices = new Map<FunctionInfo | ModuleInfo, number>();
         first = true;
         for (const fun of [...this.a.functionInfos.values(), ...this.a.moduleInfos.values()])
-            if (fun.node) {
+            if (fun instanceof FunctionInfo || fun.loc) {
                 const funIndex = functionIndices.size;
                 functionIndices.set(fun, funIndex);
                 const fileIndex = fileIndices.get(fun instanceof ModuleInfo ? fun : fun.moduleInfo);
                 if (fileIndex === undefined)
                     assert.fail(`File index not found for ${fun}`);
-                fs.writeSync(fd, `${first ? "" : ","}\n  "${funIndex}": ${JSON.stringify(this.makeLocStr(fileIndex, fun.node?.loc))}`);
+                fs.writeSync(fd, `${first ? "" : ","}\n  "${funIndex}": ${JSON.stringify(this.makeLocStr(fileIndex, fun.loc))}`);
                 first = false;
             }
         fs.writeSync(fd, `\n },\n "calls": {`);
@@ -141,9 +141,9 @@ export class AnalysisStateReporter {
         fs.writeSync(fd, `\n },\n "fun2fun": [`);
         first = true;
         for (const [caller, callees] of [...this.f.functionToFunction, ...(options.callgraphRequire ? this.f.requireGraph : [])])
-            if (caller.node)
+            if (caller instanceof FunctionInfo || caller.loc)
                 for (const callee of callees)
-                    if (callee.node) {
+                    if (callee instanceof FunctionInfo || callee.loc) {
                         const callerIndex = functionIndices.get(caller);
                         if (callerIndex === undefined)
                             assert.fail(`Function index not found for ${caller}`);
@@ -159,7 +159,7 @@ export class AnalysisStateReporter {
             const funs = this.f.callToFunction.get(call) || [];
             const mods = this.f.callToModule.get(call) || [];
             for (const callee of [...funs, ...mods])
-                if (!(callee instanceof DummyModuleInfo) && callee.node) { // skipping require/import edges to modules that haven't been analyzed
+                if (!(callee instanceof DummyModuleInfo) && callee.loc) { // skipping require/import edges to modules that haven't been analyzed
                     const calleeIndex = functionIndices.get(callee);
                     if (calleeIndex === undefined)
                         assert.fail(`Function index not found for ${callee}`);
@@ -193,19 +193,19 @@ export class AnalysisStateReporter {
             call2fun: Edges = [];
         const fileIndices = new Map<ModuleInfo, number>();
         for (const m of this.a.moduleInfos.values())
-            if (m.node) {
+            if (m.loc) {
                 fileIndices.set(m, fileIndices.size);
                 files.push(relative(options.basedir, m.getPath()));
             }
         const functionIndices = new Map<FunctionInfo | ModuleInfo, number>();
         for (const fun of [...this.a.functionInfos.values(), ...this.a.moduleInfos.values()])
-            if (fun.node) {
+            if (fun instanceof FunctionInfo || fun.loc) {
                 const funIndex = functions.length;
                 functionIndices.set(fun, funIndex);
                 const fileIndex = fileIndices.get(fun instanceof ModuleInfo ? fun : fun.moduleInfo);
                 if (fileIndex === undefined)
                     assert.fail(`File index not found for ${fun}`);
-                functions.push(this.makeLocStr(fileIndex, fun.node?.loc));
+                functions.push(this.makeLocStr(fileIndex, fun.loc));
             }
         const callIndices = new Map<Node, number>();
         for (const call of this.f.callLocations) {
@@ -219,9 +219,9 @@ export class AnalysisStateReporter {
             calls.push(this.makeLocStr(fileIndex, call.loc));
         }
         for (const [caller, callees] of [...this.f.functionToFunction, ...(options.callgraphRequire ? this.f.requireGraph : [])])
-            if (caller.node)
+            if (caller instanceof FunctionInfo || caller.loc)
                 for (const callee of callees)
-                    if (callee.node) {
+                    if (callee instanceof FunctionInfo || callee.loc) {
                         const callerIndex = functionIndices.get(caller);
                         if (callerIndex === undefined)
                             assert.fail(`Function index not found for ${caller}`);
@@ -234,7 +234,7 @@ export class AnalysisStateReporter {
             const funs = this.f.callToFunction.get(call) || [];
             const mods = this.f.callToModule.get(call) || [];
             for (const callee of [...funs, ...mods])
-                if (!(callee instanceof DummyModuleInfo) && callee.node) { // skipping require/import edges to modules that haven't been analyzed
+                if (!(callee instanceof DummyModuleInfo) && callee.loc) { // skipping require/import edges to modules that haven't been analyzed
                     const calleeIndex = functionIndices.get(callee);
                     if (calleeIndex === undefined)
                         assert.fail(`Function index not found for ${callee}`);
@@ -269,7 +269,7 @@ export class AnalysisStateReporter {
         for (const [src, dsts] of this.f.callToFunctionOrModule)
             for (const dst of dsts)
                 if (dst instanceof FunctionInfo)
-                    logger.info(`  ${locationToStringWithFileAndEnd(src.loc)} -> ${locationToStringWithFile(dst.node.loc)}`);
+                    logger.info(`  ${locationToStringWithFileAndEnd(src.loc)} -> ${locationToStringWithFile(dst.loc)}`);
     }
 
     /**

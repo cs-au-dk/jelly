@@ -738,7 +738,7 @@ export function visit(ast: File, op: Operations) {
                             solver.addForAllTokensConstraint(argVar, TokenListener.OBJECT_SPREAD, p, (t: Token) => {
                                 if (isObjectPropertyVarObj(t)) {
                                     solver.addForAllObjectPropertiesConstraint(t, TokenListener.OBJECT_SPREAD, path.node, (prop: string) => {
-                                        solver.collectPropertyRead("read", undefined, argVar, undefined, prop, path.node, enclosing);
+                                        solver.fragmentState.registerPropertyRead("read", undefined, argVar, undefined, prop, path.node, enclosing);
                                         op.readPropertyBound(t, prop, vp.objPropVar(ot, prop), {t: ot, s: prop});
                                     });
                                 }

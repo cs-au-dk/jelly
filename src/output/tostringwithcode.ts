@@ -8,7 +8,7 @@ import {FunctionInfo} from "../analysis/infos";
  * Returns a string description of the given function, with a code snippet.
  */
 export function funcToStringWithCode(info: FunctionInfo): string {
-    return `'${codeFromLocation(info.node.loc)}'${info}`;
+    return `'${codeFromLocation(info.loc)}'${info}`;
 }
 
 /**

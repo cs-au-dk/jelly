@@ -1,5 +1,4 @@
-import {FilePath, locationToString, strHash} from "../misc/util";
-import {Function, Program} from "@babel/types";
+import {FilePath, Location, locationToString, strHash} from "../misc/util";
 import {sep} from "path";
 import assert from "assert";
 
@@ -38,7 +37,7 @@ export class ModuleInfo {
 
     readonly functions: Set<FunctionInfo> = new Set; // functions directly inside this module
 
-    node: Program | undefined; // top-level source location (set by analyzeFiles)
+    loc: Location | undefined; // top-level source location, undefined if not yet analyzed
 
     readonly hash: number;
 
@@ -108,11 +107,12 @@ export class FunctionInfo {
 
     constructor(
         readonly name: string | undefined, // function name
-        readonly node: Function, // function source location
-        readonly moduleInfo: ModuleInfo // module containing this function
+        readonly loc: Location, // function source location
+        readonly moduleInfo: ModuleInfo, // module containing this function
+        readonly isDummyConstructor: boolean // true if dummy constructor
     ) {}
 
     toString(): string {
-        return `${this.moduleInfo}:${locationToString(this.node.loc)}:${this.name ?? "<anonymous>"}`;
+        return `${this.moduleInfo}:${locationToString(this.loc)}:${this.name ?? "<anonymous>"}`;
     }
 }

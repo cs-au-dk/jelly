@@ -79,7 +79,7 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
                     a.filesWithParseErrors.push(file);
                     continue;
                 }
-                moduleInfo.node = ast.program;
+                moduleInfo.loc = ast.program.loc!;
                 a.filesAnalyzed.push(file);
                 d.codeSize += statSync(file).size;
 

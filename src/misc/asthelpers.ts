@@ -45,6 +45,8 @@ import {CallNodePath} from "../natives/nativebuilder";
 import {FragmentState} from "../analysis/fragmentstate";
 import {Location} from "./util";
 
+export type CallNode = CallExpression | OptionalCallExpression | NewExpression;
+
 /**
  * Finds the property name of a property access, returns undefined if dynamic and not literal string or number.
  * (See also getKey below.)
@@ -156,7 +158,7 @@ export function getAdjustedCallNodePath(path: CallNodePath): NodePath {
  * then false is returned, and otherwise true.
  * From tapir.ts.
  */
-export function isMaybeUsedAsPromise(path: NodePath<CallExpression | OptionalCallExpression | NewExpression>): boolean {
+export function isMaybeUsedAsPromise(path: NodePath<CallNode>): boolean {
     return !isExpressionStatement(path.node) &&
         // The call is definitely not used as a Promise if the node is a callee in a call node
         !(isCallExpression(path.parent) && path.parent.callee === path.node) &&

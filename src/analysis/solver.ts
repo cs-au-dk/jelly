@@ -12,7 +12,7 @@ import {
     Token
 } from "./tokens";
 import {GlobalState} from "./globalstate";
-import {FunctionInfo, ModuleInfo, PackageInfo} from "./infos";
+import {PackageInfo} from "./infos";
 import {
     addAll,
     addAllMapHybridSet,
@@ -628,7 +628,7 @@ export default class Solver {
      * Adds an object property.
      * By default also notifies listeners.
      */
-    addObjectProperty(a: ObjectPropertyVarObj, prop: string, propagate: boolean = true) {
+    addObjectProperty(a: ObjectPropertyVarObj, prop: string, propagate: boolean = true, merging: boolean = false) {
         const f = this.fragmentState;
         const ps = mapGetSet(f.objectProperties, a);
         if (!ps.has(prop)) {
@@ -643,56 +643,25 @@ export default class Solver {
                         this.diagnostics.objectPropertiesListenerNotifications++;
                     }
             }
-            if (a instanceof ArrayToken && prop === ARRAY_UNKNOWN)
-                // add flow to summary var
-                this.addSubsetEdge(
-                    f.getRepresentative(f.varProducer.arrayUnknownVar(a)),
-                    f.getRepresentative(f.varProducer.arrayAllVar(a)),
-                    propagate,
-                );
-            if (prop === INTERNAL_PROTOTYPE()) {
-                // constraint: ∀ b ∈ ⟦a.__proto__⟧: {b} ∪ Ancestors(b) ⊆ Ancestors(a)
-                this.addForAllTokensConstraint(f.varProducer.objPropVar(a, prop), TokenListener.ANCESTORS, {t: a}, (b: Token) => {
-                    const aVar = this.varProducer.ancestorsVar(a);
-                    this.addTokenConstraint(b, aVar);
-                    if (isObjectPropertyVarObj(b))
-                        this.addSubsetConstraint(this.varProducer.ancestorsVar(b), aVar);
-                });
+            if (!merging) {
+                if (a instanceof ArrayToken && prop === ARRAY_UNKNOWN)
+                    // add flow to summary var
+                    this.addSubsetEdge(
+                        f.getRepresentative(f.varProducer.arrayUnknownVar(a)),
+                        f.getRepresentative(f.varProducer.arrayAllVar(a)),
+                        propagate,
+                    );
+                if (prop === INTERNAL_PROTOTYPE()) {
+                    // constraint: ∀ b ∈ ⟦a.__proto__⟧: {b} ∪ Ancestors(b) ⊆ Ancestors(a)
+                    this.addForAllTokensConstraint(f.varProducer.objPropVar(a, prop), TokenListener.ANCESTORS, {t: a}, (b: Token) => {
+                        const aVar = this.varProducer.ancestorsVar(a);
+                        this.addTokenConstraint(b, aVar);
+                        if (isObjectPropertyVarObj(b))
+                            this.addSubsetConstraint(this.varProducer.ancestorsVar(b), aVar);
+                    });
+                }
             }
         }
-    }
-
-    /**
-     * Collects property read operations.
-     * @param typ the type of the property read operation
-     * @param result the constraint variable for the result of the property read operation
-     * @param base the constraint variable for the base expression
-     * @param pck the current package object token
-     * @param prop the property name
-     * @param node AST node
-     * @param enclosing enclosing function or module
-     */
-    collectPropertyRead(
-        typ: "read" | "call", result: ConstraintVar | undefined, base: ConstraintVar | undefined,
-        pck: PackageObjectToken | undefined, prop: string | undefined, node: Node, enclosing: FunctionInfo | ModuleInfo
-    ) { // TODO: rename to registerPropertyRead, move to FragmentState
-        if (typ === "read" && result && base && pck)
-            this.fragmentState.maybeEmptyPropertyReads.push({typ, result, base, pck, prop});
-        else if (typ === "call" && base && prop)
-            // call with @Unknown already happens when prop is undefined, so we only need to register
-            // the property read for patching if the property is known
-            this.fragmentState.maybeEmptyPropertyReads.push({typ, base, prop});
-        if (base && prop)
-            this.fragmentState.propertyReads.push({base, prop, node, enclosing});
-    }
-
-    /**
-     * Collects dynamic property write operations.
-     * @param base the constraint variable for the base expression
-     */
-    collectDynamicPropertyWrite(base: ConstraintVar | undefined) { // TODO: rename to registerDynamicPropertyWrite, move to FragmentState
-        if (base)
-            this.fragmentState.dynamicPropertyWrites.add(base);
     }
 
     /**
@@ -1027,7 +996,7 @@ export default class Solver {
         // add new object properties and array entries
         for (const [t, props] of s.objectProperties)
             for (const prop of props)
-                this.addObjectProperty(t, prop, propagate);
+                this.addObjectProperty(t, prop, propagate, true);
         for (const [t, entries] of s.arrayEntries)
             for (const entry of entries)
                 this.addArrayEntry(t, entry, propagate);
