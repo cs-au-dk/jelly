@@ -897,22 +897,21 @@ export default class Solver {
             }
             if (this.unprocessedTokens.size !== 0 || this.diagnostics.unprocessedTokensSize !== 0 || this.nodesWithNewEdges.size !== 0 || this.restored.size !== 0)
                 assert.fail(`worklist non-empty: unprocessedTokens.size: ${this.unprocessedTokens.size}, unprocessedTokensSize: ${this.diagnostics.unprocessedTokensSize}, nodesWithNewEdges.size: ${this.nodesWithNewEdges.size}, restored.size: ${this.restored.size}`);
-            // process all enqueued listener calls (excluding those created during the processing)
+            // process all enqueued listener calls (including those created during the processing)
             if (logger.isVerboseEnabled())
                 logger.verbose(`Processing listener calls: ${f.postponedListenerCalls.length}`);
             if (f.postponedListenerCalls.length > 0) {
                 const timer = new Timer();
                 this.diagnostics.listenerNotificationRounds++;
-                const calls = Array.from(f.postponedListenerCalls);
-                f.postponedListenerCalls.length = 0;
                 let count = 0;
-                for (const [fun, arg] of calls) {
+                for (const [fun, arg] of f.postponedListenerCalls) {
                     fun(arg as any);
                     if (++count % 100 === 0) {
                         f.a.timeoutTimer.checkTimeout();
                         this.printDiagnostics();
                     }
                 }
+                f.postponedListenerCalls.length = 0;
                 this.diagnostics.totalListenerCallTime += timer.elapsedCPU();
             }
         }
