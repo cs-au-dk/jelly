@@ -571,7 +571,7 @@ export default class Solver {
      * Non-numeric properties are ignored.
      * By default also notifies listeners.
      */
-    addArrayEntry(a: ArrayToken, prop: string, propagate: boolean = true) {
+    addArrayEntry(a: ArrayToken, prop: string, propagate: boolean = true, merging: boolean = false) {
         if (!isArrayIndex(prop)) // TODO: treat large indices as "unknown"?
             return;
         const f = this.fragmentState;
@@ -588,12 +588,14 @@ export default class Solver {
                         this.diagnostics.arrayEntriesListenerNotifications++;
                     }
             }
-            // add flow to summary var
-            this.addSubsetEdge(
-                f.getRepresentative(f.varProducer.objPropVar(a, prop)),
-                f.getRepresentative(f.varProducer.arrayAllVar(a)),
-                propagate,
-            );
+            if (!merging) {
+                // add flow to summary var
+                this.addSubsetEdge(
+                    f.getRepresentative(f.varProducer.objPropVar(a, prop)),
+                    f.getRepresentative(f.varProducer.arrayAllVar(a)),
+                    propagate,
+                );
+            }
         }
     }
 
@@ -969,11 +971,14 @@ export default class Solver {
             const ntr = s.tokenListeners.get(v);
             const svs = s.subsetEdges.get(v);
             if (propagate) {
-                // run new token listeners on existing tokens
-                if (ntr)
+                // run new token listeners on existing tokens that are not also in new
+                if (ntr) {
+                    const vHas = s.getHas(v);
                     for (const t of f.getTokens(vRep))
-                        for (const [id, listener] of ntr)
-                            this.callTokenListener(id, listener, t);
+                        if (!vHas(t))
+                            for (const [id, listener] of ntr)
+                                this.callTokenListener(id, listener, t);
+                }
                 // propagate existing tokens along new subset edges
                 if (svs)
                     for (const v2 of svs)
@@ -1005,7 +1010,7 @@ export default class Solver {
                 this.addObjectProperty(t, prop, propagate, true);
         for (const [t, entries] of s.arrayEntries)
             for (const entry of entries)
-                this.addArrayEntry(t, entry, propagate);
+                this.addArrayEntry(t, entry, propagate, true);
         // add new array entry listeners and object property listeners
         mapMapSetAll(s.arrayEntriesListeners, f.arrayEntriesListeners);
         mapMapSetAll(s.objectPropertiesListeners, f.objectPropertiesListeners);

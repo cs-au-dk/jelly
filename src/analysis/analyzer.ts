@@ -138,6 +138,9 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
 
             if (!options.modulesOnly) {
 
+                if (options.printProgress)
+                    logger.info("Analyzing combined modules");
+
                 // combine analysis states for all modules
                 solver.prepare();
                 for (const p of a.packageInfos.values()) {
@@ -156,9 +159,6 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
                     for (const d of p.directDependencies)
                         solver.addPackageNeighbor(p, d);
                 }
-
-                if (options.printProgress)
-                    logger.info("Analyzing combined modules");
 
                 // propagate tokens until fixpoint reached
                 await solver.propagate();

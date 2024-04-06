@@ -708,6 +708,23 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
         return FragmentState.emptySizeAndHas;
     }
 
+    private static emptyHas = (_t: Token) => false;
+
+    /**
+     * Returns a 'has' function for the given constraint variable.
+     */
+    getHas(v: RVT): (t: Token) => boolean {
+        if (v) {
+            const ts = this.tokens.get(v);
+            if (ts) {
+                if (ts instanceof Token)
+                    return (t: Token) => ts === t;
+                return (t: Token) => ts.has(t);
+            }
+        }
+        return FragmentState.emptyHas;
+    }
+
     /**
      * Returns the number of constraint variables with tokens.
      */
