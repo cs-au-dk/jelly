@@ -161,16 +161,16 @@ export default class Solver {
 
     /**
      * Adds a set of tokens if not already present.
-     * By default also adds to worklist and notifies listeners.
+     * Also adds to worklist and notifies listeners (unless 'propagate' set to false).
      */
     private addTokens(ts: Iterable<Token>, toRep: RepresentativeVar, propagate: boolean = true) {
         const f = this.fragmentState;
         f.vars.add(toRep);
         let ws: Array<Token> | undefined = undefined;
-        for (const t of f.addTokens(ts, toRep)) {
+        let tr: Map<ListenerID, (t: Token) => void> | undefined = undefined;
+        for (const t of f.addTokens(ts, toRep))
             if (propagate)
-                ws = this.tokenAdded(toRep, t, ws);
-        }
+                [ws, tr] = this.tokenAdded(toRep, t, ws, tr);
     }
 
     /**
@@ -183,11 +183,12 @@ export default class Solver {
             const r = new Set<Token>();
             let any = false;
             let ws: Array<Token> | undefined = undefined;
+            let tr: Map<ListenerID, (t: Token) => void> | undefined = undefined;
             for (const t of ts) {
                 const q = t instanceof ObjectToken && m.get(t);
                 if (q) {
                     if (!(Array.isArray(ts) ? ts.includes(q) : ts.has(q)) && !r.has(q))
-                        ws = this.tokenAdded(v, q, ws);
+                        [ws, tr] = this.tokenAdded(v, q, ws, tr);
                     r.add(q);
                     any = true;
                 } else
@@ -198,15 +199,25 @@ export default class Solver {
         }
     }
 
-    private tokenAdded(toRep: ConstraintVar, t: Token, ws?: Array<Token>): Array<Token> | undefined {
+    private tokenAdded(toRep: RepresentativeVar, t: Token, ws?: Array<Token>, tr?: Map<ListenerID, (t: Token) => void> | undefined):
+        [Array<Token>, Map<ListenerID, (t: Token) => void> | undefined] {
+        const f = this.fragmentState;
         if (logger.isDebugEnabled())
             logger.debug(`Added token ${t} to ${toRep}`);
+        if (!ws) {
+            ws = mapGetArray(this.unprocessedTokens, toRep);
+            tr = f.tokenListeners.get(toRep);
+        }
         // add to worklist
-        (ws ??= mapGetArray(this.unprocessedTokens, toRep)).push(t);
+        ws.push(t);
         this.diagnostics.unprocessedTokensSize++;
         if (this.diagnostics.unprocessedTokensSize % 100 === 0)
             this.printDiagnostics();
-        return ws;
+        // notify listeners
+        if (tr)
+            for (const [id, listener] of tr)
+                this.callTokenListener(id, listener, t);
+        return [ws, tr];
     }
 
     /**
@@ -363,7 +374,7 @@ export default class Solver {
         this.addForAllTokensConstraintPrivate(vRep, this.getListenerID(lkey), listener);
     }
 
-    private addForAllTokensConstraintPrivate(vRep: RepresentativeVar, id: ListenerID, listener: (t: Token) => void) {
+    private addForAllTokensConstraintPrivate(vRep: RepresentativeVar, id: ListenerID, listener: (t: Token) => void): boolean {
         const f = this.fragmentState;
         const m = mapGetMap(f.tokenListeners, vRep);
         if (!m.has(id)) {
@@ -372,8 +383,10 @@ export default class Solver {
                 this.callTokenListener(id, listener, t);
             // register listener for future tokens
             m.set(id, listener);
+            f.vars.add(vRep);
+            return true;
         }
-        f.vars.add(vRep);
+        return false;
     }
 
     /**
@@ -463,45 +476,44 @@ export default class Solver {
         if (logger.isDebugEnabled())
             logger.debug(`Adding ancestors constraint to ${t} ${opts.n ? `at ${nodeToString(opts.n)}` : `${TokenListener[key]} ${opts.s}`}`);
         const id = this.getListenerID({...opts, l: key, t});
-        this.callTokenListener(id, listener, t, true); // ancestry is reflexive
-        const g = this.globalState.globalSpecialNatives;
-        if (g) { // (not set when called from unit tests)
-            if (t instanceof ObjectToken)
-                this.callTokenListener(id, listener, g.get(OBJECT_PROTOTYPE)!);
-            else if (t instanceof ArrayToken) {
-                this.callTokenListener(id, listener, g.get(ARRAY_PROTOTYPE)!);
-                this.callTokenListener(id, listener, g.get(OBJECT_PROTOTYPE)!);
-            } else if (t instanceof FunctionToken || t instanceof PrototypeToken || t instanceof ClassToken) {
-                this.callTokenListener(id, listener, g.get(FUNCTION_PROTOTYPE)!);
-                this.callTokenListener(id, listener, g.get(OBJECT_PROTOTYPE)!);
-            } else if (t instanceof AllocationSiteToken) {
-                if (t.kind === "Promise")
-                    this.callTokenListener(id, listener, g.get(PROMISE_PROTOTYPE)!);
-                else if (t.kind === "Date")
-                    this.callTokenListener(id, listener, g.get(DATE_PROTOTYPE)!);
-                else if (t.kind === "RegExp")
-                    this.callTokenListener(id, listener, g.get(REGEXP_PROTOTYPE)!);
-                else if (t.kind === "Error")
-                    this.callTokenListener(id, listener, g.get(ERROR_PROTOTYPE)!);
-                else if (t.kind === "Map")
-                    this.callTokenListener(id, listener, g.get(MAP_PROTOTYPE)!);
-                else if (t.kind === "Set")
-                    this.callTokenListener(id, listener, g.get(SET_PROTOTYPE)!);
-                else if (t.kind === "WeakMap")
-                    this.callTokenListener(id, listener, g.get(WEAKMAP_PROTOTYPE)!);
-                else if (t.kind === "WeakSet")
-                    this.callTokenListener(id, listener, g.get(WEAKSET_PROTOTYPE)!);
-                else if (t.kind === "WeakRef")
-                    this.callTokenListener(id, listener, g.get(WEAKREF_PROTOTYPE)!);
-                else if (t.kind === "PromiseResolve" || t.kind === "PromiseReject")
+        const anc = this.fragmentState.getRepresentative(this.varProducer.ancestorsVar(t));
+        if (this.addForAllTokensConstraintPrivate(anc, id, listener)) {
+            this.callTokenListener(id, listener, t, true); // ancestry is reflexive
+            const g = this.globalState.globalSpecialNatives;
+            if (g) { // (not set when called from unit tests)
+                if (t instanceof ObjectToken)
+                    this.callTokenListener(id, listener, g.get(OBJECT_PROTOTYPE)!);
+                else if (t instanceof ArrayToken) {
+                    this.callTokenListener(id, listener, g.get(ARRAY_PROTOTYPE)!);
+                    this.callTokenListener(id, listener, g.get(OBJECT_PROTOTYPE)!);
+                } else if (t instanceof FunctionToken || t instanceof PrototypeToken || t instanceof ClassToken) {
                     this.callTokenListener(id, listener, g.get(FUNCTION_PROTOTYPE)!);
-                this.callTokenListener(id, listener, g.get(OBJECT_PROTOTYPE)!);
+                    this.callTokenListener(id, listener, g.get(OBJECT_PROTOTYPE)!);
+                } else if (t instanceof AllocationSiteToken) {
+                    if (t.kind === "Promise")
+                        this.callTokenListener(id, listener, g.get(PROMISE_PROTOTYPE)!);
+                    else if (t.kind === "Date")
+                        this.callTokenListener(id, listener, g.get(DATE_PROTOTYPE)!);
+                    else if (t.kind === "RegExp")
+                        this.callTokenListener(id, listener, g.get(REGEXP_PROTOTYPE)!);
+                    else if (t.kind === "Error")
+                        this.callTokenListener(id, listener, g.get(ERROR_PROTOTYPE)!);
+                    else if (t.kind === "Map")
+                        this.callTokenListener(id, listener, g.get(MAP_PROTOTYPE)!);
+                    else if (t.kind === "Set")
+                        this.callTokenListener(id, listener, g.get(SET_PROTOTYPE)!);
+                    else if (t.kind === "WeakMap")
+                        this.callTokenListener(id, listener, g.get(WEAKMAP_PROTOTYPE)!);
+                    else if (t.kind === "WeakSet")
+                        this.callTokenListener(id, listener, g.get(WEAKSET_PROTOTYPE)!);
+                    else if (t.kind === "WeakRef")
+                        this.callTokenListener(id, listener, g.get(WEAKREF_PROTOTYPE)!);
+                    else if (t.kind === "PromiseResolve" || t.kind === "PromiseReject")
+                        this.callTokenListener(id, listener, g.get(FUNCTION_PROTOTYPE)!);
+                    this.callTokenListener(id, listener, g.get(OBJECT_PROTOTYPE)!);
+                }
             }
         }
-        this.addForAllTokensConstraintPrivate(
-            this.fragmentState.getRepresentative(this.varProducer.ancestorsVar(t)),
-            id, listener,
-        );
     }
 
     /*
@@ -784,12 +796,6 @@ export default class Solver {
                     this.addTokens(ts, to);
                 this.incrementIterations();
             }
-            // notify listeners
-            const tr = f.tokenListeners.get(v);
-            if (tr)
-                for (const t of ts)
-                    for (const [id, listener] of tr)
-                        this.callTokenListener(id, listener, t);
         }
     }
 
