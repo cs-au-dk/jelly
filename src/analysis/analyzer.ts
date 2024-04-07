@@ -185,7 +185,6 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
         f.reportUnhandledDynamicPropertyReads();
 
     } catch (ex) {
-        solver.updateDiagnostics();
         if (ex instanceof TimeoutException)
             d.timeout = true;
         else if (ex instanceof AbortedException)
@@ -206,6 +205,7 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
 
     // collect final call edges
     finalizeCallEdges(solver);
+    solver.updateDiagnostics();
 
     // output statistics
     d.time = timer.elapsed();
@@ -226,7 +226,7 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
         d.reachableFunctions = Array.from(r.getReachableModulesAndFunctions(r.getEntryModules())).filter(r => r instanceof FunctionInfo).length;
         if (logger.isInfoEnabled()) {
             logger.info(`Analyzed packages: ${d.packages}, modules: ${d.modules}, functions: ${a.functionInfos.size}, code size: ${Math.ceil(d.codeSize / 1024)}KB`);
-            logger.info(`Call edges function->function: ${f.numberOfFunctionToFunctionEdges}, call->function: ${f.numberOfCallToFunctionEdges}`);
+            logger.info(`Call edges function->function: ${d.functionToFunctionEdges}, call->function: ${d.callToFunctionEdges}`);
             const total = d.totalCallSites, zeroOne = d.callsWithNoCallee + d.callsWithUniqueCallee, nativeExternal = d.nativeOnlyCalls + d.externalOnlyCalls + d.nativeOrExternalCalls;
             if (total > 0)
                 logger.info(`Calls with zero or one callee: ${zeroOne}/${total} (${percent(zeroOne / total)}), ` +
@@ -240,7 +240,7 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
                 logger.info(`Iterations: ${d.iterations}, listener notification rounds: ${d.listenerNotificationRounds}`);
                 if (options.maxRounds !== undefined)
                     logger.info(`Fixpoint round limit reached: ${d.roundLimitReached} time${d.roundLimitReached !== 1 ? "s" : ""}`);
-                logger.info(`Constraint vars: ${f.getNumberOfVarsWithTokens()} (${f.vars.size}), tokens: ${f.numberOfTokens}, subset edges: ${f.numberOfSubsetEdges}, max tokens: ${f.getLargestTokenSetSize()}, max subset out: ${f.getLargestSubsetEdgeOutDegree()}, redirections: ${f.redirections.size}`);
+                logger.info(`Constraint vars: ${f.getNumberOfVarsWithTokens()} (${f.vars.size}), tokens: ${d.tokens}, subset edges: ${d.subsetEdges}, max tokens: ${f.getLargestTokenSetSize()}, max subset out: ${f.getLargestSubsetEdgeOutDegree()}, redirections: ${f.redirections.size}`);
                 logger.info(`Listeners (notifications) token: ${mapMapSize(f.tokenListeners)} (${d.tokenListenerNotifications}), ` +
                     (options.readNeighbors ? `neighbor: ${mapMapSize(f.packageNeighborListeners)} (${d.packageNeighborListenerNotifications}), ` : "") +
                     `array: ${mapMapSize(f.arrayEntriesListeners)} (${d.arrayEntriesListenerNotifications}), ` +
