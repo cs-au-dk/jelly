@@ -2,7 +2,7 @@ import fs, {readFileSync, statSync} from "fs";
 import {resolve} from "path";
 import logger, {writeStdOutIfActive} from "../misc/logger";
 import Solver, {AbortedException} from "./solver";
-import Timer, {TimeoutException} from "../misc/timer";
+import Timer, {nanoToMs, TimeoutException} from "../misc/timer";
 import {getMapHybridSetSize, mapMapSize, percent} from "../misc/util";
 import {visit} from "./astvisitor";
 import {FunctionInfo, ModuleInfo, PackageInfo} from "./infos";
@@ -209,7 +209,6 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
 
     // output statistics
     d.time = timer.elapsed();
-    d.cpuTime = timer.elapsedCPU();
     d.errors = getMapHybridSetSize(solver.fragmentState.errors) + a.filesWithParseErrors.length;
     d.warnings = getMapHybridSetSize(solver.fragmentState.warnings) + getMapHybridSetSize(solver.fragmentState.warningsUnsupported);
     if (!options.modulesOnly && files.length > 0) {
@@ -234,7 +233,7 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
                     `native or external: ${nativeExternal}/${total} (${percent(nativeExternal / total)})`);
             logger.info(`Functions with zero callers: ${d.functionsWithZeroCallers}/${a.functionInfos.size}${a.functionInfos.size > 0 ? ` (${percent(d.functionsWithZeroCallers / a.functionInfos.size)})` : ""}, ` +
                 `reachable functions: ${d.reachableFunctions}/${a.functionInfos.size}${a.functionInfos.size > 0 ? ` (${percent(d.reachableFunctions / a.functionInfos.size)})` : ""}`);
-            logger.info(`Analysis time: ${d.time}ms, memory usage: ${d.maxMemoryUsage}MB${!options.gc ? " (without --gc)" : ""}`);
+            logger.info(`Analysis time: ${nanoToMs(d.time)}, memory usage: ${d.maxMemoryUsage}MB${!options.gc ? " (without --gc)" : ""}`);
             logger.info(`Analysis errors: ${d.errors}, warnings: ${d.warnings}${getMapHybridSetSize(f.warningsUnsupported) > 0 && !options.warningsUnsupported ? " (show all with --warnings-unsupported)" : ""}`);
             if (options.diagnostics) {
                 logger.info(`Iterations: ${d.iterations}, listener notification rounds: ${d.listenerNotificationRounds}`);
@@ -246,10 +245,10 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
                     `array: ${mapMapSize(f.arrayEntriesListeners)} (${d.arrayEntriesListenerNotifications}), ` +
                     `obj: ${mapMapSize(f.objectPropertiesListeners)} (${d.objectPropertiesListenerNotifications})`);
                 logger.info(`Canonicalize vars: ${a.canonicalConstraintVars.size} (${a.numberOfCanonicalizeVarCalls}), tokens: ${a.canonicalTokens.size} (${a.numberOfCanonicalizeTokenCalls}), access paths: ${a.canonicalAccessPaths.size} (${a.numberOfCanonicalizeAccessPathCalls})`);
-                logger.info(`CPU time: ${d.cpuTime}ms, propagation: ${d.totalPropagationTime}ms, listeners: ${d.totalListenerCallTime}ms, fragment merging: ${d.totalFragmentMergeTime}ms` +
-                    (options.alloc && options.widening ? `, widening: ${d.totalWideningTime}ms` : "") + `, finalization: ${d.finalizationTime}ms`);
+                logger.info(`Propagation: ${nanoToMs(d.totalPropagationTime)}, listeners: ${nanoToMs(d.totalListenerCallTime)}, fragment merging: ${nanoToMs(d.totalFragmentMergeTime)}` +
+                    (options.alloc && options.widening ? `, widening: ${nanoToMs(d.totalWideningTime)}` : "") + `, finalization: ${nanoToMs(d.finalizationTime)}`);
                 if (options.cycleElimination)
-                    logger.info(`Cycle elimination time: ${d.totalCycleEliminationTime}ms, runs: ${d.totalCycleEliminationRuns}, nodes removed: ${f.redirections.size}`);
+                    logger.info(`Cycle elimination: ${nanoToMs(d.totalCycleEliminationTime)}, runs: ${d.totalCycleEliminationRuns}, nodes removed: ${f.redirections.size}`);
                 if ((options.approx || options.approxLoad) && options.diagnostics) {
                     a.approx!.printDiagnostics();
                     a.patching!.printDiagnostics(solver);

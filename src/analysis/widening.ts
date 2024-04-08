@@ -3,7 +3,7 @@ import {ObjectToken, PackageObjectToken, Token} from "./tokens";
 import logger from "../misc/logger";
 import {AncestorsVar, ConstraintVar, ObjectPropertyVar, ReadResultVar} from "./constraintvars";
 import {addAll, getOrSet, mapGetMap} from "../misc/util";
-import Timer from "../misc/timer";
+import Timer, {nanoToMs} from "../misc/timer";
 import {CallResultAccessPath, ComponentAccessPath, PropertyAccessPath} from "./accesspaths";
 import assert from "assert";
 
@@ -190,5 +190,5 @@ export function widenObjects(widened: Set<ObjectToken>, solver: Solver) {
     const ms = timer.elapsed();
     solver.diagnostics.totalWideningTime += ms;
     if (logger.isVerboseEnabled())
-        logger.verbose(`Widening completed in ${ms}ms`);
+        logger.verbose(`Widening completed in ${nanoToMs(ms)}`);
 }

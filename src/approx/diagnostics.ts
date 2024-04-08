@@ -4,9 +4,9 @@
 export type ApproxDiagnostics = {
 
     /**
-     * Time (ms) spent on approximate interpretation.
+     * Time (nanoseconds) spent on approximate interpretation.
      */
-    time: number;
+    time: bigint;
 
     /**
      * Number of visited packages.

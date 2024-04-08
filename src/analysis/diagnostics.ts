@@ -28,9 +28,7 @@ export default class AnalysisDiagnostics {
 
     timeout: boolean = false;
 
-    time: number = 0; // set when analysis is completed
-
-    cpuTime: number = 0; // set when analysis is completed
+    time: bigint = 0n; // set when analysis is completed
 
     codeSize: number = 0;
 
@@ -76,19 +74,19 @@ export default class AnalysisDiagnostics {
     
     roundLimitReached: number = 0;
     
-    totalCycleEliminationTime: number = 0;
+    totalCycleEliminationTime: bigint = 0n;
     
     totalCycleEliminationRuns: number = 0;
     
-    totalPropagationTime: number = 0;
+    totalPropagationTime: bigint = 0n;
     
-    totalListenerCallTime: number = 0;
+    totalListenerCallTime: bigint = 0n;
     
-    totalWideningTime: number = 0;
+    totalWideningTime: bigint = 0n;
 
-    totalFragmentMergeTime: number = 0;
+    totalFragmentMergeTime: bigint = 0n;
 
-    finalizationTime: number = 0;
+    finalizationTime: bigint = 0n;
 
     unhandledDynamicPropertyWrites: number = 0;
 

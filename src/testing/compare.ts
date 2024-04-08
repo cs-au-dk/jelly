@@ -314,7 +314,6 @@ export const toMatchAnalysisResults: MatcherFunction<[Solver | FragmentState]> =
         }],
         // TODO: more checks?
     ]) {
-        // const t = new Timer;
         const act = get(actual), exp = get(expected);
         if (!this.equals(act, exp, equalPlugins, true))
             return {
@@ -324,7 +323,6 @@ export const toMatchAnalysisResults: MatcherFunction<[Solver | FragmentState]> =
                     `\n\nDifference for ${header}:\n\n${trydiff(exp, act, this)}`,
             };
 
-        // console.log(`Compared ${header} in ${t.elapsed() / 1000}s`);
     }
 
     return {

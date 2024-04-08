@@ -11,7 +11,7 @@ import {
     SimpleLocation
 } from "../misc/util";
 import {dirname, resolve} from "path";
-import Timer from "../misc/timer";
+import Timer, {nanoToMs} from "../misc/timer";
 import {Type} from "../patternmatching/patterns";
 import {existsSync, readFileSync} from "fs";
 import {options} from "../options";
@@ -64,7 +64,7 @@ export class TypeScriptTypeInferrer {
                 this.files.set(file.fileName, file);
                 logger.debug(file.fileName);
             }
-        logger.info(`TypeScript parsing time: ${this.timer.elapsed()}ms, files: ${this.program.getSourceFiles().length}`);
+        logger.info(`TypeScript parsing time: ${nanoToMs(this.timer.elapsed())}, files: ${this.program.getSourceFiles().length}`);
     }
 
     private createProgram(tsconfigPath: string): ts.Program {

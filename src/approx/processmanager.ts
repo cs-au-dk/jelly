@@ -7,7 +7,7 @@ import {closeSync, openSync, writeSync} from "fs";
 import {checkFile} from "./transform";
 import {GlobalState} from "../analysis/globalstate";
 import {Hints} from "./hints";
-import Timer from "../misc/timer";
+import Timer, {nanoToMs} from "../misc/timer";
 import {extname, resolve} from "path";
 import {isShebang, requireResolve, writeStreamedStringify} from "../misc/files";
 import {ApproxDiagnostics} from "./diagnostics";
@@ -55,9 +55,9 @@ export class ProcessManager {
     staticRequires = new Map<string, Set<string>>();
 
     /**
-     * Time (ms) spent on approximate interpretation.
+     * Time (nanoseconds) spent on approximate interpretation.
      */
-    approxTime: number = 0;
+    approxTime: bigint = 0n;
 
     /**
      * Total code size (bytes) excluding dynamically generated code.
@@ -227,7 +227,7 @@ export class ProcessManager {
      */
     printDiagnostics() {
         const staticFunctionsVisited = this.getStaticFunctionsVisited();
-        logger.info(`Approximate interpretation time: ${this.approxTime}ms, packages visited: ${this.a.packageInfos.size}, code size: ${Math.ceil(this.totalCodeSize / 1024)}KB`);
+        logger.info(`Approximate interpretation time: ${nanoToMs(this.approxTime)}, packages visited: ${this.a.packageInfos.size}, code size: ${Math.ceil(this.totalCodeSize / 1024)}KB`);
         logger.info(`Modules analyzed dynamically: ${this.numExecutions}, visited: ${this.a.moduleInfos.size}, exceptions: ${this.numModuleExceptions}`); // TODO: this.a.moduleInfos currently doesn't include pseudo-modules for eval code (see also getStaticFunctionsVisited)
         logger.info(`Force-executed functions: ${this.numForced}/${this.numStaticFunctions}, ` +
             `visited: ${staticFunctionsVisited}${this.numStaticFunctions > 0 ? ` (${percent(staticFunctionsVisited / this.numStaticFunctions)})` : ""}, ` +

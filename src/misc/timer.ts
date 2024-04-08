@@ -1,35 +1,22 @@
-import {cpuUsage} from "process";
 import {options} from "../options";
 
 export default class Timer {
 
-    startTime: Date;
+    startTime: bigint;
 
-    startUsage: NodeJS.CpuUsage;
-    
     constructor() {
-        this.startTime = new Date();
-        this.startUsage = cpuUsage();
+        this.startTime = process.hrtime.bigint();
     }
 
     /**
-     * Returns the elapsed time in milliseconds since the timer was created.
+     * Returns the elapsed time in nanoseconds since the timer was created.
      */
-    elapsed(): number {
-        return new Date().getTime() - this.startTime.getTime();
-    }
-
-    /**
-     * Returns the elapsed user+system CPU time in milliseconds since the timer was created.
-     * May be higher than the actual elapsed time if multiple CPU cores are performing work.
-     */
-    elapsedCPU(): number {
-        const u = cpuUsage(this.startUsage);
-        return Math.round((u.user + u.system) / 1000);
+    elapsed(): bigint {
+        return process.hrtime.bigint() - this.startTime;
     }
 
     checkTimeout() {
-        if (options.timeout && this.elapsed() > options.timeout * 1000)
+        if (options.timeout && this.elapsed() > BigInt(options.timeout) * 1000000000n)
             throw new TimeoutException();
     }
 }
@@ -39,4 +26,8 @@ export class TimeoutException extends Error {
     constructor() {
         super("Analysis time limit exceeded");
     }
+}
+
+export function nanoToMs(n: bigint): string {
+    return `${n / 1000000n}ms`;
 }

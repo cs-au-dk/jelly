@@ -861,7 +861,7 @@ export default class Solver {
                         // cycle elimination
                         for (const [v, rep] of repmap)
                             this.redirect(v, rep); // TODO: this includes processing pending edges and tokens for v, which may be unnecessary?
-                        this.diagnostics.totalCycleEliminationTime += timer1.elapsedCPU();
+                        this.diagnostics.totalCycleEliminationTime += timer1.elapsed();
                         this.diagnostics.totalCycleEliminationRuns++;
                         const timer2 = new Timer();
                         // process new tokens for the component representatives in topological order
@@ -872,7 +872,7 @@ export default class Solver {
                             this.processTokens(v);
                             await this.checkAbort(true);
                         }
-                        this.diagnostics.totalPropagationTime += timer2.elapsedCPU();
+                        this.diagnostics.totalPropagationTime += timer2.elapsed();
                         this.nodesWithNewEdges.clear();
                         this.restored.clear();
                     }
@@ -880,7 +880,7 @@ export default class Solver {
                     const timer3 = new Timer();
                     for (const v of this.unprocessedTokens.keys())
                         this.processTokens(v);
-                    this.diagnostics.totalPropagationTime += timer3.elapsedCPU();
+                    this.diagnostics.totalPropagationTime += timer3.elapsed();
                 } else {
                     // process all tokens in worklist until empty
                     if (logger.isVerboseEnabled())
@@ -892,7 +892,7 @@ export default class Solver {
                         this.processTokens(v);
                         await this.checkAbort(true);
                     }
-                    this.diagnostics.totalPropagationTime += timer.elapsedCPU();
+                    this.diagnostics.totalPropagationTime += timer.elapsed();
                 }
             }
             if (this.unprocessedTokens.size !== 0 || this.diagnostics.unprocessedTokensSize !== 0 || this.nodesWithNewEdges.size !== 0 || this.restored.size !== 0)
@@ -912,7 +912,7 @@ export default class Solver {
                     }
                 }
                 f.postponedListenerCalls.length = 0;
-                this.diagnostics.totalListenerCallTime += timer.elapsedCPU();
+                this.diagnostics.totalListenerCallTime += timer.elapsed();
             }
         }
         if (this.diagnostics.unprocessedTokensSize !== 0)
@@ -1063,6 +1063,6 @@ export default class Solver {
         pushAll(s.maybeEmptyPropertyReads, f.maybeEmptyPropertyReads);
         addAll(s.dynamicPropertyWrites, f.dynamicPropertyWrites);
         this.printDiagnostics();
-        this.diagnostics.totalFragmentMergeTime += timer.elapsedCPU();
+        this.diagnostics.totalFragmentMergeTime += timer.elapsed();
     }
 }
