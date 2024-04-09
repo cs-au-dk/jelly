@@ -20,7 +20,6 @@ import {
     Location,
     locationToStringWithFileAndEnd,
     mapArrayPushAll,
-    mapGetArray,
     mapGetMap,
     mapGetSet,
     mapMapMapSetAll,
@@ -29,6 +28,7 @@ import {
     mapSetAddAll,
     nodeToString,
     pushAll,
+    pushArraySingle,
     setAll,
     strHash,
 } from "../misc/util";
@@ -85,7 +85,7 @@ export default class Solver {
         return this.fragmentState.varProducer;
     }
 
-    unprocessedTokens: Map<RepresentativeVar, Array<Token>> = new Map;
+    unprocessedTokens: Map<RepresentativeVar, Array<Token> | Token> = new Map;
 
     nodesWithNewEdges: Set<ConstraintVar> = new Set;
 
@@ -163,14 +163,20 @@ export default class Solver {
      * Adds a set of tokens if not already present.
      * Also adds to worklist and notifies listeners (unless 'propagate' set to false).
      */
-    private addTokens(ts: Iterable<Token>, toRep: RepresentativeVar, propagate: boolean = true) {
+    private addTokens(ts: Iterable<Token> | Token, toRep: RepresentativeVar, propagate: boolean = true) {
         const f = this.fragmentState;
         f.vars.add(toRep);
-        let ws: Array<Token> | undefined = undefined;
-        let tr: Map<ListenerID, (t: Token) => void> | undefined = undefined;
-        for (const t of f.addTokens(ts, toRep))
+        if (ts instanceof Token) {
+            if (f.addToken(ts, toRep) && propagate)
+                this.tokenAdded(toRep, ts);
+        } else {
+            let ws: Array<Token> | Token | undefined = undefined;
+            let tr: Map<ListenerID, (t: Token) => void> | undefined = undefined;
+            const us = f.addTokens(ts, toRep);
             if (propagate)
-                [ws, tr] = this.tokenAdded(toRep, t, ws, tr);
+                for (const t of us)
+                    [ws, tr] = this.tokenAdded(toRep, t, ws, tr);
+        }
     }
 
     /**
@@ -182,7 +188,7 @@ export default class Solver {
         for (const [v, ts, size] of f.getAllVarsAndTokens()) {
             const r = new Set<Token>();
             let any = false;
-            let ws: Array<Token> | undefined = undefined;
+            let ws: Array<Token> | Token | undefined = undefined;
             let tr: Map<ListenerID, (t: Token) => void> | undefined = undefined;
             for (const t of ts) {
                 const q = t instanceof ObjectToken && m.get(t);
@@ -199,17 +205,17 @@ export default class Solver {
         }
     }
 
-    private tokenAdded(toRep: RepresentativeVar, t: Token, ws?: Array<Token>, tr?: Map<ListenerID, (t: Token) => void> | undefined):
-        [Array<Token>, Map<ListenerID, (t: Token) => void> | undefined] {
+    private tokenAdded(toRep: RepresentativeVar, t: Token, ws?: Array<Token> | Token, tr?: Map<ListenerID, (t: Token) => void> | undefined):
+        [Array<Token> | Token | undefined, Map<ListenerID, (t: Token) => void> | undefined] {
         const f = this.fragmentState;
         if (logger.isDebugEnabled())
             logger.debug(`Added token ${t} to ${toRep}`);
         if (!ws) {
-            ws = mapGetArray(this.unprocessedTokens, toRep);
+            ws = this.unprocessedTokens.get(toRep);
             tr = f.tokenListeners.get(toRep);
         }
         // add to worklist
-        ws.push(t);
+        ws = pushArraySingle(this.unprocessedTokens, toRep, t, ws);
         this.diagnostics.unprocessedTokensSize++;
         if (this.diagnostics.unprocessedTokensSize % 100 === 0)
             this.printDiagnostics();
@@ -784,11 +790,12 @@ export default class Solver {
      */
     processTokens(v: RepresentativeVar) {
         const ts = this.unprocessedTokens.get(v);
-        if (ts) {
+        if (ts !== undefined) {
+            const size = Array.isArray(ts) ? ts.length : 1;
             if (logger.isDebugEnabled())
-                logger.debug(`Worklist size: ${this.diagnostics.unprocessedTokensSize}, propagating ${ts.length} token${ts.length !== 1 ? "s" : ""} from ${v}`);
+                logger.debug(`Worklist size: ${this.diagnostics.unprocessedTokensSize}, propagating ${size} token${size !== 1 ? "s" : ""} from ${v}`);
             this.unprocessedTokens.delete(v);
-            this.diagnostics.unprocessedTokensSize -= ts.length;
+            this.diagnostics.unprocessedTokensSize -= size;
             // propagate new tokens to successors
             const f = this.fragmentState;
             assert(f.vars.has(v));

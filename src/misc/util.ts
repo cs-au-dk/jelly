@@ -157,6 +157,20 @@ export function mapGetArray<K, V>(m: Map<K, Array<V>> | WeakMap<any, Array<V>>, 
     return mt;
 }
 
+export function pushArraySingle<K, V>(m: Map<K, Array<V> | V>, k: K, v: V, vs: Array<V> | V | undefined): Array<V> | V {
+    if (Array.isArray(vs)) {
+        vs.push(v);
+        return vs;
+    }
+    if (vs === undefined) {
+        m.set(k, v);
+        return v;
+    }
+    const qs = [vs, v];
+    m.set(k, qs);
+    return qs;
+}
+
 export function getOrSet<K, V>(m: Map<K, V>, k: K, v: () => V): V
 export function getOrSet<K extends object, V>(m: WeakMap<K, V>, k: K, v: () => V): V
 export function getOrSet<K, V>(m: Map<K, V> | WeakMap<any, V>, k: K, v: () => V): V {

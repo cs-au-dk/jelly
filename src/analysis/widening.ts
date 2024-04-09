@@ -45,13 +45,19 @@ export function widenObjects(widened: Set<ObjectToken>, solver: Solver) {
         return res;
     }
 
-    function widenTokenMapArrayValues<K>(m: Map<K, Array<Token>>): [Map<K, Array<Token>>, number] {
-        const res: Map<K, Array<Token>> = new Map;
+    function widenTokenMapArrayValues<K>(m: Map<K, Array<Token> | Token>): [Map<K, Array<Token> | Token>, number] {
+        const res: Map<K, Array<Token> | Token> = new Map;
         let size = 0;
         for (const [v, ts] of m) {
-            const s = widenTokenSet(ts);
-            res.set(v, Array.from(s));
-            size += s.size;
+            if (ts instanceof Token) {
+                const s = widenToken(ts);
+                res.set(v, s);
+                size += 1;
+            } else {
+                const s = widenTokenSet(ts);
+                res.set(v, Array.from(s));
+                size += s.size;
+            }
         }
         return [res, size];
     }

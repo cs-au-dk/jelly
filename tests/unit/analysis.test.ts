@@ -365,7 +365,7 @@ describe("tests/unit/analysis", () => {
             expect(f.getRepresentative(opV)).toBe(ppV);
             expect(getTokens(ppV)).toEqual([pt]);
             assert(f.isRepresentative(ppV));
-            expect(solver.unprocessedTokens.get(ppV)).toContain(pt);
+            expect(solver.unprocessedTokens.get(ppV)).toEqual(pt);
         });
 
         test("PackageObjectToken gets object properties", () => {
@@ -496,9 +496,9 @@ describe("tests/unit/analysis", () => {
                     solver.redirect(res1, res2);
                 }
 
-                solver.registerPropertyRead("read", res1, base1, pt, "A", param, m);
-                solver.registerPropertyRead("read", res2, base2, pt, "A", param, m);
-                solver.registerDynamicPropertyWrite(base1);
+                solver.fragmentState.registerPropertyRead("read", res1, base1, pt, "A", param, m);
+                solver.fragmentState.registerPropertyRead("read", res2, base2, pt, "A", param, m);
+                solver.fragmentState.registerDynamicPropertyWrite(base1);
                 solver.addTokenConstraint(ot, base1);
                 solver.addTokenConstraint(ot, base2);
 
