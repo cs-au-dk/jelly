@@ -161,12 +161,12 @@ describe("tests/unit/analysis", () => {
 
             const op = new Operations(m.getPath(), solver, new Map());
             const r2 = op.readPropertyFromChain(ot2, "A")!;
-            await solver.propagate();
+            await solver.propagate("test");
             expect(getTokens(r2)).toEqual([at]);
 
             // both tokens should be able to read from the getter(s)
             const r1 = op.readPropertyFromChain(ot1, "A")!;
-            await solver.propagate();
+            await solver.propagate("test");
             expect(getTokens(r1)).toEqual([at]);
         });
     });
@@ -204,7 +204,7 @@ describe("tests/unit/analysis", () => {
             const {solver, a, f, getTokens} = setup;
 
             solver.addTokenConstraint(a.canonicalizeToken(new FunctionToken(fun1)), v);
-            f.registerEscapingFromModule(v);
+            f.registerEscaping(v);
 
             const escaping = findEscapingObjects(m, solver);
             expect(escaping.size).toBe(0);
@@ -232,7 +232,7 @@ describe("tests/unit/analysis", () => {
 
             const tObject = a.canonicalizeToken(new ObjectToken(param));
             solver.addTokenConstraint(tObject, v);
-            f.registerEscapingFromModule(v);
+            f.registerEscaping(v);
 
             const vA = f.varProducer.objPropVar(tObject, "A");
             const tFunction = a.canonicalizeToken(new FunctionToken(fun1));
@@ -249,7 +249,7 @@ describe("tests/unit/analysis", () => {
             const tObject = a.canonicalizeToken(new ObjectToken(param));
             solver.addTokenConstraint(tObject, vExports);
             solver.addTokenConstraint(tObject, v);
-            f.registerEscapingFromModule(v);
+            f.registerEscaping(v);
 
             expect(findEscapingObjects(m, solver)).toEqual(new Set([tObject]));
         });
@@ -260,7 +260,7 @@ describe("tests/unit/analysis", () => {
             const tObject = a.canonicalizeToken(new ObjectToken(param));
             solver.addTokenConstraint(tObject, v);
             // the not-redirected variable escapes
-            f.registerEscapingFromModule(v);
+            f.registerEscaping(v);
 
             const rep = f.varProducer.intermediateVar(param, "rep");
             redirect(v, rep);
@@ -277,7 +277,7 @@ describe("tests/unit/analysis", () => {
 
             const tObject = a.canonicalizeToken(new ObjectToken(param));
             solver.addTokenConstraint(tObject, v);
-            f.registerEscapingFromModule(v);
+            f.registerEscaping(v);
 
             const vA = f.varProducer.objPropVar(tObject, "A");
             const tFunction = a.canonicalizeToken(new FunctionToken(fun1));
@@ -420,7 +420,7 @@ describe("tests/unit/analysis", () => {
             solver.addForAllTokensConstraint(opV, TokenListener.AWAIT, param, fn);
 
             redirect(opV, vA);
-            await solver.propagate(); // clear nodesWithNewEdges
+            await solver.propagate("test"); // clear nodesWithNewEdges
 
             widenObjects(new Set([ot]), solver);
 
@@ -439,12 +439,12 @@ describe("tests/unit/analysis", () => {
                 solver.addForAllAncestorsConstraint(t, TokenListener.WRITE_ANCESTORS, {n: param}, fn);
             });
 
-            await solver.propagate();
+            await solver.propagate("test");
             expect(fn).toHaveBeenLastCalledWith(ot);
 
             widenObjects(new Set([ot]), solver);
 
-            await solver.propagate();
+            await solver.propagate("test");
             expect(fn).toHaveBeenLastCalledWith(pt);
         });
 
@@ -454,18 +454,18 @@ describe("tests/unit/analysis", () => {
             const fn = jest.fn();
             solver.addForAllAncestorsConstraint(ot, TokenListener.READ_ANCESTORS, {n: param}, fn);
 
-            await solver.propagate();
+            await solver.propagate("test");
             expect(fn).toHaveBeenLastCalledWith(ot);
 
             const anc = a.canonicalizeToken(new ObjectToken(fun0));
             solver.addInherits(ot, anc);
 
-            await solver.propagate();
+            await solver.propagate("test");
             expect(fn).toHaveBeenLastCalledWith(anc);
 
             widenObjects(new Set([anc]), solver);
 
-            await solver.propagate();
+            await solver.propagate("test");
             expect(fn).toHaveBeenLastCalledWith(pt);
         });
     });

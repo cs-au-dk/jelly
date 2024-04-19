@@ -11,9 +11,10 @@ export function getMemoryUsage(): number {
         assert(typeof gc === "function");
         writeStdOutIfActive("Garbage collecting...");
         gc();
+        gc(); // running a second time sometimes finds more garbage
     }
     const res = Math.ceil(process.memoryUsage().heapUsed / 1048576);
-    if ((options.gc && logger.isInfoEnabled()) || logger.isVerboseEnabled())
+    if ((options.gc && options.printProgress && logger.isInfoEnabled()) || logger.isVerboseEnabled())
         logger.info(`Memory usage: ${res}MB`);
     return res;
 }

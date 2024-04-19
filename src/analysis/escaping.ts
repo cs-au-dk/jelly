@@ -15,7 +15,7 @@ import {isInExports} from "../misc/packagejson";
  * Note: objects that are assigned to 'exports' (or to properties of such objects) are not considered escaping
  * (unless also returned by an escaping function or passed as argument to an external function).
  */
-export function findEscapingObjects(m: ModuleInfo, solver: Solver): Set<ObjectToken> {
+export function findEscapingObjects(ms: ModuleInfo | Array<ModuleInfo>, solver: Solver): Set<ObjectToken> {
     const a = solver.globalState;
     const f = solver.fragmentState; // (don't use in callbacks)
 
@@ -36,38 +36,32 @@ export function findEscapingObjects(m: ModuleInfo, solver: Solver): Set<ObjectTo
             }
     }
 
-    let isModuleExporting = true;
-    if (!m.getPath().includes("node_modules") && !options.assumeInNodeModules) // do not consider escaping objects for application modules
-        isModuleExporting = false;
-    else {
-        const pi = a.packageJsonInfos.get(m.packageInfo.dir);
-        if (pi?.exports && !isInExports(`./${m.relativePath}`, pi.exports)) // only consider escaping objects from library modules that are exported
-            isModuleExporting = false;
-    }
-
     // first round, seed worklist with module.exports, find functions accessible via property reads
-    if (isModuleExporting) {
-        addToWorklist(f.varProducer.objPropVar(a.canonicalizeToken(new NativeObjectToken("module", m)), "exports"));
-        const w2: Array<ObjectPropertyVarObj> = [];
-        while (worklist.length !== 0) {
-            const t = worklist.shift()!; // breadth-first
-            if (t instanceof FunctionToken)
-                w2.push(t);
-            else if (t instanceof ObjectToken || (t instanceof NativeObjectToken && t.name === "exports"))
-                for (const p of f.objectProperties.get(t) ?? [])
-                    if (!isInternalProperty(p))
-                        addToWorklist(f.varProducer.objPropVar(t, p));
+    for (const m of Array.isArray(ms) ? ms : [ms])
+        if (m.packageInfo.isEntry && (m.getPath().includes("node_modules") || options.library)) { // only consider escaping objects for entry packages in libraries
+            const pi = a.packageJsonInfos.get(m.packageInfo.dir);
+            if (!pi?.exports || isInExports(`./${m.relativePath}`, pi.exports)) // only consider escaping objects from modules that are exported
+                addToWorklist(f.varProducer.objPropVar(a.canonicalizeToken(new NativeObjectToken("module", m)), "exports"));
         }
-        visited.clear();
-        for (const t of w2) {
-            visited.add(t);
-            worklist.push(t);
-        }
+    const w2: Array<ObjectPropertyVarObj> = [];
+    while (worklist.length !== 0) {
+        const t = worklist.shift()!; // breadth-first
+        if (t instanceof FunctionToken)
+            w2.push(t);
+        else if (t instanceof ObjectToken || (t instanceof NativeObjectToken && t.name === "exports"))
+            for (const p of f.objectProperties.get(t) ?? [])
+                if (!isInternalProperty(p))
+                    addToWorklist(f.varProducer.objPropVar(t, p));
+    }
+    visited.clear();
+    for (const t of w2) {
+        visited.add(t);
+        worklist.push(t);
     }
     // add expressions collected during AST traversal
-    for (const v of f.maybeEscapingFromModule)
+    for (const v of f.maybeEscaping)
         addToWorklist(v);
-    f.maybeEscapingFromModule.clear(); // no longer needed
+    f.maybeEscaping.clear(); // no longer needed
 
     // FIXME: arguments to (non-modeled) native functions should also be considered escaped?
 

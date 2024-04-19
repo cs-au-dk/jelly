@@ -10,8 +10,9 @@ const DEFAULT = "\x1b[39m";
 const GREEN = "\x1b[32m";
 const CYAN = "\x1b[36m";
 const WHITE = "\x1b[97m";
+const BOLD = "\x1b[1m";
 const RESET = "\x1b[0m";
-const CLEAR = "\u001b[0K";
+const CLEAR = "\x1b[0K";
 
 const colors: {
     [key: string]: string
@@ -50,7 +51,7 @@ export function logToFile(file?: string): Transport {
 }
 
 export function writeStdOut(s: string) {
-    stdout.write(WHITE + s.substring(0, stdout.columns) + RESET + CLEAR + "\r");
+    stdout.write(WHITE + BOLD + s.substring(0, stdout.columns) + RESET + CLEAR + "\r");
 }
 
 export function writeStdOutIfActive(s: string) {

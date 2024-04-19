@@ -47,7 +47,7 @@ import {FragmentState, ListenerID, MergeRepresentativeVar, RepresentativeVar} fr
 import {TokenListener} from "./listeners";
 import {nuutila} from "../misc/scc";
 import {options, patternProperties} from "../options";
-import Timer from "../misc/timer";
+import Timer, {nanoToMs} from "../misc/timer";
 import {setImmediate} from "timers/promises";
 import {getMemoryUsage} from "../misc/memory";
 import {JELLY_NODE_ID} from "../parsing/extras";
@@ -75,6 +75,8 @@ export class AbortedException extends Error {}
 
 export type ListenerKey = {l: TokenListener, n?: Node, t?: Token, s?: string};
 
+export type Phase = "init" | "module" | "main" | "merging" | "widening" | "escape patching" | "approximate patching" | "extra patching" | "test";
+
 export default class Solver {
 
     readonly globalState: GlobalState = new GlobalState;
@@ -97,7 +99,11 @@ export default class Solver {
 
     readonly abort?: () => boolean;
 
-    fixpointIterationsThrottled: number = 0;
+    propagationsThrottled: number = 0;
+
+    phase: string | undefined;
+
+    timer = new Timer();
 
     constructor(abort?: () => boolean) {
         this.abort = abort;
@@ -265,16 +271,17 @@ export default class Solver {
      * Reports diagnostics periodically (only if print progress is enabled, stdout is tty, and log level is "info").
      */
     private printDiagnostics() {
-        if (options.printProgress && options.tty && isTTY && !options.logfile && logger.level === "info") {
-            const d = new Date().getTime();
+        if (options.printProgress && options.tty && isTTY && !options.logfile && logger.level === "info" && this.phase) {
+            const d = Number(this.timer.elapsed() / 1000000n);
             if (d > this.diagnostics.lastPrintDiagnosticsTime + 100) { // only report every 100ms
                 this.diagnostics.lastPrintDiagnosticsTime = d;
-                const a = this.globalState;
+                // const a = this.globalState;
                 const f = this.fragmentState;
-                writeStdOut(`Packages: ${a.packageInfos.size}, modules: ${a.moduleInfos.size}, call edges: ${f.numberOfCallToFunctionEdges}, ` +
-                    (options.diagnostics ? `vars: ${f.getNumberOfVarsWithTokens()}, tokens: ${f.numberOfTokens}, subsets: ${f.numberOfSubsetEdges}, round: ${this.diagnostics.fixpointRound}, ` : "") +
-                    `iterations: ${this.diagnostics.iterations}, worklist: ${this.diagnostics.unprocessedTokensSize}` +
-                    (options.diagnostics ? `, listeners: ${f.postponedListenerCalls.length}` : ""));
+                writeStdOut(`Phase: ${this.phase}, ` +
+                    // `packages: ${a.packageInfos.size}, modules: ${a.moduleInfos.size}, ` +
+                    `total time: ${d}ms, call edges: ${f.numberOfCallToFunctionEdges}` +
+                    (options.diagnostics ? `, vars: ${f.getNumberOfVarsWithTokens()}, tokens: ${f.numberOfTokens}, subsets: ${f.numberOfSubsetEdges}, wave: ${this.diagnostics.wave}, ` +
+                    `propagations: ${this.diagnostics.propagations}, worklist: ${this.diagnostics.unprocessedTokensSize}, listeners: ${f.postponedListenerCalls.length}` : ""));
                 f.a.timeoutTimer.checkTimeout();
             }
         }
@@ -312,7 +319,7 @@ export default class Solver {
                         if (logger.isDebugEnabled())
                             logger.debug(`Worklist size: ${this.diagnostics.unprocessedTokensSize}, propagating ${size} token${size !== 1 ? "s" : ""} from ${fromRep}`);
                         this.addTokens(ts, toRep);
-                        this.incrementIterations();
+                        this.incrementPropagations();
                     }
                     this.nodesWithNewEdges.add(fromRep);
                 }
@@ -803,14 +810,14 @@ export default class Solver {
             if (s) {
                 for (const to of s)
                     this.addTokens(ts, to);
-                this.incrementIterations();
+                this.incrementPropagations();
             }
         }
     }
 
-    incrementIterations() {
-        this.diagnostics.iterations++;
-        if (this.diagnostics.iterations % 100 === 0) {
+    incrementPropagations() {
+        this.diagnostics.propagations++;
+        if (this.diagnostics.propagations % 100 === 0) {
             this.globalState.timeoutTimer.checkTimeout();
             this.printDiagnostics();
         }
@@ -820,23 +827,23 @@ export default class Solver {
      * Processes all items in the worklist until a fixpoint is reached.
      * This notifies listeners and propagates tokens along subset edges.
      */
-    async propagate() {
+    async propagate(phase: Phase) {
+        this.phase = phase;
         if (logger.isDebugEnabled())
             logger.debug("Processing constraints until fixpoint...");
         const f = this.fragmentState;
         f.a.timeoutTimer.checkTimeout();
         await this.checkAbort();
         if (logger.isVerboseEnabled())
-            logger.verbose(`Propagating (${this.unprocessedTokens.size}, ${this.nodesWithNewEdges.size}, ${this.restored.size}, ${f.postponedListenerCalls.length})`);
-        let round = 0;
+            logger.verbose(`Propagating (tokens: ${this.unprocessedTokens.size}, nodes: ${this.nodesWithNewEdges.size}, restored: ${this.restored.size}, listeners: ${f.postponedListenerCalls.length})`);
+        let wave = 1;
         while (this.unprocessedTokens.size > 0 || this.nodesWithNewEdges.size > 0 || this.restored.size > 0 || f.postponedListenerCalls.length > 0) {
-            round++;
-            this.diagnostics.fixpointRound = round;
+            this.diagnostics.wave = wave;
             if (logger.isVerboseEnabled())
-                logger.verbose(`Fixpoint round: ${round} (call edges: ${f.numberOfFunctionToFunctionEdges}, vars: ${f.getNumberOfVarsWithTokens()}, tokens: ${f.numberOfTokens}, subsets: ${f.numberOfSubsetEdges})`);
-            if (options.maxRounds !== undefined && round > options.maxRounds) {
-                f.warn("Fixpoint round limit reached, aborting propagation");
-                this.diagnostics.roundLimitReached++;
+                logger.verbose(`Fixpoint wave: ${wave} (call edges: ${f.numberOfCallToFunctionEdges}, vars: ${f.getNumberOfVarsWithTokens()}, tokens: ${f.numberOfTokens}, subsets: ${f.numberOfSubsetEdges})`);
+            if (options.maxWaves !== undefined && wave > options.maxWaves) {
+                f.warn("Fixpoint wave limit reached, aborting propagation");
+                this.diagnostics.waveLimitReached++;
                 this.diagnostics.unprocessedTokensSize = 0;
                 this.unprocessedTokens.clear();
                 this.nodesWithNewEdges.clear();
@@ -914,7 +921,12 @@ export default class Solver {
                 f.postponedListenerCalls.length = 0;
                 this.diagnostics.totalListenerCallTime += timer.elapsed();
             }
+            if (logger.isVerboseEnabled())
+                logger.verbose(`Wave ${wave} completed after ${nanoToMs(this.timer.elapsed())}`);
+            wave++;
         }
+        if ((logger.isVerboseEnabled() || options.diagnostics) && this.phase !== "module")
+            logger.info(`Phase: ${this.phase}, completed after ${nanoToMs(this.timer.elapsed())} (call edges: ${f.numberOfCallToFunctionEdges}, vars: ${f.getNumberOfVarsWithTokens()}, tokens: ${f.numberOfTokens}, subsets: ${f.numberOfSubsetEdges})`);
         if (this.diagnostics.unprocessedTokensSize !== 0)
             assert.fail(`unprocessedTokensSize non-zero after propagate: ${this.diagnostics.unprocessedTokensSize}`);
     }
@@ -922,9 +934,9 @@ export default class Solver {
     async checkAbort(throttle: boolean = false) {
         if (this.abort) {
             if (throttle) {
-                if (this.diagnostics.iterations < this.fixpointIterationsThrottled + 1000)
+                if (this.diagnostics.propagations < this.propagationsThrottled + 10000)
                     return;
-                this.fixpointIterationsThrottled = this.diagnostics.iterations;
+                this.propagationsThrottled = this.diagnostics.propagations;
             }
             await setImmediate(); // gives the server a chance to process abort requests
             if (this.abort()) {
@@ -939,12 +951,14 @@ export default class Solver {
      */
     prepare() {
         this.fragmentState = new FragmentState(this);
+        this.phase = "init";
     }
 
     /**
      * Merges the given fragment state into the current fragment state.
      */
     merge(_s: FragmentState, propagate: boolean) { // TODO: reconsider use of 'propagate' flag
+        this.phase = "merging";
         const timer = new Timer();
         // use a different type for s' representative variables to prevent accidental mixups
         const s = _s as unknown as FragmentState<MergeRepresentativeVar>;
@@ -1045,7 +1059,7 @@ export default class Solver {
         addAll(s.callsWithResultMaybeUsedAsPromise, f.callsWithResultMaybeUsedAsPromise);
         mapSetAddAll(s.functionParameters, f.functionParameters);
         addAll(s.invokedExpressions, f.invokedExpressions);
-        addAll(s.maybeEscapingFromModule, f.maybeEscapingFromModule);
+        addAll(s.maybeEscaping, f.maybeEscaping);
         addAll(s.widened, f.widened);
         mapSetAddAll(s.maybeEscapingToExternal, f.maybeEscapingToExternal);
         setAll(s.unhandledDynamicPropertyWrites, f.unhandledDynamicPropertyWrites);

@@ -752,13 +752,13 @@ describe("tests/micro", () => {
     });
 
     runTest("tests/micro", "match10.ts",  {
-        options: {ignoreDependencies: true, assumeInNodeModules: true},
+        options: {ignoreDependencies: true, library: true},
         patterns: ["tests/micro/match10-patterns.json"],
         matches: {total: 1, low: 1},
     });
 
     runTest("tests/micro", "match11.ts",  {
-        options: {ignoreDependencies: true, assumeInNodeModules: true},
+        options: {ignoreDependencies: true, library: true},
         patterns: ["tests/micro/match11-patterns.json"],
         matches: {total: 2, low: 1}, // TODO: high confidence match with filter is maybe?
     });

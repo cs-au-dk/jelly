@@ -166,6 +166,11 @@ export function widenObjects(widened: Set<ObjectToken>, solver: Solver) {
     for (const e of f.maybeEmptyMethodCalls.values()) {
         e.baseVar = widenVar(e.baseVar);
         e.calleeVar = widenVar(e.calleeVar);
+        for (let i = 0; i < e.argVars.length; i++) {
+            const a = e.argVars[i];
+            if (a)
+                e.argVars[i] = widenVar(a);
+        }
     }
     for (const e of f.unhandledDynamicPropertyWrites.values())
         e.src = widenVar(e.src);

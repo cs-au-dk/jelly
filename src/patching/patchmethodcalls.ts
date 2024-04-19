@@ -30,7 +30,7 @@ export function patchMethodCalls(solver: Solver): boolean {
             mapGetArray(m, v.prop).push(v);
     let patched = 0, failed = 0;
     const cache = new Map<string, Map<Token, ObjectPropertyVar>>();
-    for (const [node, {prop, baseVar, calleeVar}] of f.maybeEmptyMethodCalls) {
+    for (const [node, {prop, baseVar, calleeVar, argVars, caller}] of f.maybeEmptyMethodCalls) {
         if (IGNORED.has(prop))
             continue;
         const ts = f.getTokens(f.getRepresentative(baseVar));
@@ -43,12 +43,10 @@ export function patchMethodCalls(solver: Solver): boolean {
         if (empty) {
             let any = false;
             const vs = m.get(prop);
-            if (vs) {
-                const pck = (node.loc as Location)?.module?.packageInfo;
-                if (pck) {
-                    const tokens = getOrSet(cache, prop, () => {
-                        const ts = new Map<Token, ObjectPropertyVar>();
-                        build:
+            if (vs && (node.loc as Location)?.module?.packageInfo) {
+                const tokens = getOrSet(cache, prop, () => {
+                    const ts = new Map<Token, ObjectPropertyVar>();
+                    build:
                         for (const v of vs)
                             for (const t of f.getTokens(f.getRepresentative(v))) {
                                 if ((t instanceof FunctionToken || t instanceof AccessPathToken) && !ts.has(t)) {
@@ -59,17 +57,21 @@ export function patchMethodCalls(solver: Solver): boolean {
                                     ts.set(t, v);
                                 }
                             }
-                        return ts;
-                    });
-                    if (tokens.size) {
-                        log(() => `Call to method named '${prop}' with empty base at ${locationToStringWithFileAndEnd(node.loc)}`);
-                        any = true;
-                        for (const [t, v] of tokens) {
-                            log(() => `  Adding ${t} from ${v}`);
-                            solver.addTokenConstraint(t, calleeVar);
-                        }
+                    return ts;
+                });
+                log(() => `Call to method named '${prop}' with empty base at ${locationToStringWithFileAndEnd(node.loc)}`);
+                if (tokens.size) {
+                    any = true;
+                    for (const [t, v] of tokens) {
+                        log(() => `  Adding ${t} from ${v}`);
+                        solver.addTokenConstraint(t, calleeVar);
                     }
-                }
+                } else
+                    for (const a of argVars)
+                        if (a)
+                            for (const t of f.getTokens(f.getRepresentative(a)))
+                                if (t instanceof FunctionToken)
+                                    f.registerCallEdge(node, caller, solver.globalState.functionInfos.get(t.fun)!, {external: true});
             }
             if (any)
                 patched++;

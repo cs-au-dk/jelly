@@ -24,65 +24,19 @@ import {
     ParenthesizedExpression
 } from "@babel/types";
 import {NodePath} from "@babel/traverse";
-import {
-    getAdjustedCallNodePath,
-    getKey,
-    getProperty,
-    isInTryBlockOrBranch,
-    isMaybeUsedAsPromise,
-    isParentExpressionStatement
-} from "../misc/asthelpers";
-import {
-    AccessPathToken,
-    AllocationSiteToken,
-    ArrayToken,
-    ClassToken,
-    FunctionToken,
-    NativeObjectToken,
-    ObjectToken,
-    PackageObjectToken,
-    PrototypeToken,
-    Token
-} from "./tokens";
-import {
-    AccessorType,
-    ConstraintVar,
-    IntermediateVar,
-    isObjectPropertyVarObj,
-    NodeVar,
-    ObjectPropertyVarObj,
-    ReadResultVar
-} from "./constraintvars";
-import {
-    CallResultAccessPath,
-    IgnoredAccessPath,
-    ModuleAccessPath,
-    PropertyAccessPath,
-    UnknownAccessPath
-} from "./accesspaths";
+import {getAdjustedCallNodePath, getKey, getProperty, isInTryBlockOrBranch, isMaybeUsedAsPromise, isParentExpressionStatement} from "../misc/asthelpers";
+import {AccessPathToken, AllocationSiteToken, ArrayToken, ClassToken, FunctionToken, NativeObjectToken, ObjectToken, PackageObjectToken, PrototypeToken, Token} from "./tokens";
+import {AccessorType, ConstraintVar, IntermediateVar, isObjectPropertyVarObj, NodeVar, ObjectPropertyVarObj, ReadResultVar} from "./constraintvars";
+import {CallResultAccessPath, IgnoredAccessPath, ModuleAccessPath, PropertyAccessPath, UnknownAccessPath} from "./accesspaths";
 import Solver, {ListenerKey} from "./solver";
 import {GlobalState} from "./globalstate";
 import {DummyModuleInfo, FunctionInfo, ModuleInfo, normalizeModuleName, PackageInfo} from "./infos";
 import logger from "../misc/logger";
 import {requireResolve} from "../misc/files";
 import {options} from "../options";
-import {
-    FilePath,
-    getOrSet,
-    isArrayIndex,
-    Location,
-    locationToString,
-    locationToStringWithFile
-} from "../misc/util";
+import {FilePath, getOrSet, isArrayIndex, Location, locationToString, locationToStringWithFile} from "../misc/util";
 import assert from "assert";
-import {
-    MAP_KEYS,
-    MAP_VALUES,
-    OBJECT_PROTOTYPE,
-    PROMISE_FULFILLED_VALUES,
-    SET_VALUES,
-    STANDARD_METHODS
-} from "../natives/ecmascript";
+import {MAP_KEYS, MAP_VALUES, OBJECT_PROTOTYPE, PROMISE_FULFILLED_VALUES, SET_VALUES, STANDARD_METHODS} from "../natives/ecmascript";
 import {CallNodePath, SpecialNativeObjects} from "../natives/nativebuilder";
 import {TokenListener} from "./listeners";
 import micromatch from "micromatch";
@@ -202,10 +156,10 @@ export class Operations {
             const prop = getProperty(p.node);
 
             f.registerPropertyRead("call", undefined, baseVar, this.packageObjectToken, prop, p.node, caller);
-            f.registerMethodCall(path.node, baseVar, prop, calleeVar);
+            f.registerMethodCall(path.node, baseVar, prop, calleeVar, argVars, caller);
 
             if (prop === undefined) {
-                this.solver.fragmentState.registerEscapingFromModule(baseVar); // unknown properties of the base object may escape
+                this.solver.fragmentState.registerEscaping(baseVar); // unknown properties of the base object may escape
                 this.solver.addAccessPath(UnknownAccessPath.instance, calleeVar);
             }
 
@@ -306,7 +260,9 @@ export class Operations {
 
         } else if (t instanceof AccessPathToken) {
             f.registerCall(pars.node, caller, undefined, {external: true});
-            f.registerEscapingFromModuleArguments(args, path);
+            for (const arg of args)
+                if (isExpression(arg)) // TODO: handle non-Expression arguments?
+                    f.registerEscaping(f.varProducer.expVar(arg, path));
 
             // constraint: add CallResultAccessPath
             assert(calleeVar);
@@ -375,9 +331,6 @@ export class Operations {
         const vp = f.varProducer;
         const pars = getAdjustedCallNodePath(path);
         f.registerCallEdge(pars.node, caller, this.a.functionInfos.get(t.fun)!, kind);
-        if ((t.fun.loc as Location).module !== this.moduleInfo)
-            for (const arg of args)
-                f.registerEscapingFromModule(arg);
         const hasArguments = f.functionsWithArguments.has(t.fun);
         const argumentsToken = hasArguments ? this.a.canonicalizeToken(new ArrayToken(t.fun.body)) : undefined;
         for (const [i, arg] of args.entries()) {
@@ -466,7 +419,7 @@ export class Operations {
             });
         } else {
 
-            this.solver.fragmentState.registerEscapingFromModule(base); // unknown properties of the base object may escape
+            this.solver.fragmentState.registerEscaping(base); // unknown properties of the base object may escape
             this.solver.addAccessPath(UnknownAccessPath.instance, dst);
 
             // constraint: ∀ arrays t ∈ ⟦E⟧: ...
@@ -773,7 +726,7 @@ export class Operations {
 
                 // E1[...] = E2
                 this.solver.fragmentState.registerDynamicPropertyWrite(lVar);
-                this.solver.fragmentState.registerEscapingFromModule(src);
+                this.solver.fragmentState.registerEscaping(src);
 
                 // constraint: ∀ arrays t ∈ ⟦E1⟧: ...
                 if (src)

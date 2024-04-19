@@ -20,7 +20,7 @@ export default class AnalysisDiagnostics {
 
     callToFunctionEdges: number = 0;
 
-    iterations: number = 0;
+    propagations: number = 0;
 
     uniqueTokens: number = 0;
 
@@ -58,7 +58,7 @@ export default class AnalysisDiagnostics {
 
     unprocessedTokensSize: number = 0;
 
-    fixpointRound: number = 0;
+    wave: number = 0;
 
     listenerNotificationRounds: number = 0;
 
@@ -71,20 +71,26 @@ export default class AnalysisDiagnostics {
     arrayEntriesListenerNotifications: number = 0;
 
     objectPropertiesListenerNotifications: number = 0;
-    
-    roundLimitReached: number = 0;
-    
+
+    waveLimitReached: number = 0;
+
     totalCycleEliminationTime: bigint = 0n;
-    
+
     totalCycleEliminationRuns: number = 0;
-    
+
     totalPropagationTime: bigint = 0n;
-    
+
     totalListenerCallTime: bigint = 0n;
-    
+
     totalWideningTime: bigint = 0n;
 
     totalFragmentMergeTime: bigint = 0n;
+
+    totalEscapePatchingTime: bigint = 0n;
+
+    totalApproxPatchingTime: bigint = 0n;
+
+    totalOtherPatchingTime: bigint = 0n;
 
     finalizationTime: bigint = 0n;
 

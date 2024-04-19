@@ -101,6 +101,7 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
                 } else {
 
                     // add model of native library
+                    writeStdOutIfActive("Initializing...");
                     const {globals, globalsHidden, moduleSpecialNatives, globalSpecialNatives} = buildNatives(solver, moduleInfo);
                     a.globalSpecialNatives = globalSpecialNatives;
 
@@ -109,21 +110,22 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
 
                     // traverse the AST
                     writeStdOutIfActive("Traversing AST...");
-                    solver.fragmentState.maybeEscapingFromModule.clear();
+                    solver.fragmentState.maybeEscaping.clear();
                     visit(ast, new Operations(file, solver, moduleSpecialNatives));
 
                     // propagate tokens until fixpoint reached for the module
-                    await solver.propagate();
+                    await solver.propagate("module");
 
-                    // find escaping objects and add UnknownAccessPaths
-                    const escaping = findEscapingObjects(moduleInfo, solver);
+                    if (options.alloc && options.widening) {
+                        // find escaping objects and add UnknownAccessPaths
+                        const escaping = findEscapingObjects(moduleInfo, solver);
 
-                    // if enabled, widen escaping objects for this module
-                    if (options.alloc && options.widening)
+                        // widen escaping objects for this module
                         widenObjects(escaping, solver);
 
-                    // propagate tokens (again) until fixpoint reached
-                    await solver.propagate();
+                        // propagate tokens (again) until fixpoint reached
+                        await solver.propagate("widening");
+                    }
 
                     // shelve the module state
                     if (logger.isDebugEnabled())
@@ -143,6 +145,7 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
 
                 // combine analysis states for all modules
                 solver.prepare();
+                const allModules: Array<ModuleInfo> = [];
                 for (const p of a.packageInfos.values()) {
                     await solver.checkAbort();
 
@@ -152,8 +155,10 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
                     d.packages++;
 
                     // merge analysis state for each module
-                    for (const m of p.modules.values())
+                    for (const m of p.modules.values()) {
                         merge(m);
+                        allModules.push(m);
+                    }
 
                     // connect neighbors
                     for (const d of p.directDependencies)
@@ -161,19 +166,32 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
                 }
 
                 // propagate tokens until fixpoint reached
-                await solver.propagate();
+                await solver.propagate("main");
+
+                // patch using escape analysis
+                if (options.patchEscaping) {
+                    const t = new Timer();
+                    findEscapingObjects(allModules, solver);
+                    await solver.propagate("escape patching");
+                    d.totalEscapePatchingTime += t.elapsed();
+                }
 
                 // patch using hints from approximate interpretation
                 if (options.approx || options.approxLoad) {
+                    const t = new Timer();
                     a.patching!.patch(solver);
-                    await solver.propagate();
+                    await solver.propagate("approximate patching");
+                    d.totalApproxPatchingTime += t.elapsed();
                 }
 
                 // patch heuristics
+                const t = new Timer();
                 const p1 = patchDynamics(solver);
                 const p2 = patchMethodCalls(solver);
-                if (p1 || p2)
-                    await solver.propagate();
+                if (p1 || p2) {
+                    await solver.propagate("extra patching");
+                    d.totalOtherPatchingTime += t.elapsed();
+                }
 
                 assert(a.pendingFiles.length === 0, "Unexpected module"); // (new modules shouldn't be discovered in the second phase)
                 solver.updateDiagnostics();
@@ -202,6 +220,8 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
         logger.warn("Received abort signal, analysis aborted");
     else if (d.timeout)
         logger.warn("Time limit reached, analysis aborted");
+    else if (d.waveLimitReached > 0)
+        logger.warn("Warning: Wave limit reached, analysis terminated early");
 
     // collect final call edges
     finalizeCallEdges(solver);
@@ -236,9 +256,9 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
             logger.info(`Analysis time: ${nanoToMs(d.time)}, memory usage: ${d.maxMemoryUsage}MB${!options.gc ? " (without --gc)" : ""}`);
             logger.info(`Analysis errors: ${d.errors}, warnings: ${d.warnings}${getMapHybridSetSize(f.warningsUnsupported) > 0 && !options.warningsUnsupported ? " (show all with --warnings-unsupported)" : ""}`);
             if (options.diagnostics) {
-                logger.info(`Iterations: ${d.iterations}, listener notification rounds: ${d.listenerNotificationRounds}`);
-                if (options.maxRounds !== undefined)
-                    logger.info(`Fixpoint round limit reached: ${d.roundLimitReached} time${d.roundLimitReached !== 1 ? "s" : ""}`);
+                logger.info(`Propagations: ${d.propagations}, listener notification rounds: ${d.listenerNotificationRounds}`);
+                if (options.maxWaves !== undefined)
+                    logger.info(`Fixpoint wave limit reached: ${d.waveLimitReached} time${d.waveLimitReached !== 1 ? "s" : ""}`);
                 logger.info(`Constraint vars: ${f.getNumberOfVarsWithTokens()} (${f.vars.size}), tokens: ${d.tokens}, subset edges: ${d.subsetEdges}, max tokens: ${f.getLargestTokenSetSize()}, max subset out: ${f.getLargestSubsetEdgeOutDegree()}, redirections: ${f.redirections.size}`);
                 logger.info(`Listeners (notifications) token: ${mapMapSize(f.tokenListeners)} (${d.tokenListenerNotifications}), ` +
                     (options.readNeighbors ? `neighbor: ${mapMapSize(f.packageNeighborListeners)} (${d.packageNeighborListenerNotifications}), ` : "") +
@@ -247,6 +267,7 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
                 logger.info(`Canonicalize vars: ${a.canonicalConstraintVars.size} (${a.numberOfCanonicalizeVarCalls}), tokens: ${a.canonicalTokens.size} (${a.numberOfCanonicalizeTokenCalls}), access paths: ${a.canonicalAccessPaths.size} (${a.numberOfCanonicalizeAccessPathCalls})`);
                 logger.info(`Propagation: ${nanoToMs(d.totalPropagationTime)}, listeners: ${nanoToMs(d.totalListenerCallTime)}, fragment merging: ${nanoToMs(d.totalFragmentMergeTime)}` +
                     (options.alloc && options.widening ? `, widening: ${nanoToMs(d.totalWideningTime)}` : "") + `, finalization: ${nanoToMs(d.finalizationTime)}`);
+                logger.info(`Patching time escape: ${nanoToMs(d.totalEscapePatchingTime)}, approx: ${nanoToMs(d.totalApproxPatchingTime)}, other: ${nanoToMs(d.totalOtherPatchingTime)}`);
                 if (options.cycleElimination)
                     logger.info(`Cycle elimination: ${nanoToMs(d.totalCycleEliminationTime)}, runs: ${d.totalCycleEliminationRuns}, nodes removed: ${f.redirections.size}`);
                 if ((options.approx || options.approxLoad) && options.diagnostics) {
