@@ -1,4 +1,14 @@
-import {closeSync, existsSync, lstatSync, openSync, readdirSync, readFileSync, readSync, writeSync} from "fs";
+import {
+    closeSync,
+    existsSync,
+    lstatSync,
+    openSync,
+    readdirSync,
+    readFileSync,
+    readSync,
+    realpathSync,
+    writeSync
+} from "fs";
 import {basename, dirname, extname, relative, resolve, sep} from "path";
 import module from "module";
 import {options} from "../options";
@@ -40,6 +50,7 @@ export function expand(paths: Array<string> | string): Array<string> {
 }
 
 function* expandRec(path: string, sub: boolean): Generator<string> {
+    path = realpathSync(path);
     const stat = lstatSync(path);
     const inNodeModules = options.library || path.includes("node_modules");
     if (stat.isDirectory()) {

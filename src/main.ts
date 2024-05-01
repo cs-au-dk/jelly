@@ -237,10 +237,10 @@ async function main() {
             return;
         }
 
-        if (!autoDetectBaseDir(program.args))
-            return;
         let files;
         try {
+            if (!autoDetectBaseDir(program.args))
+                return;
             files = expand(program.args);
         } catch (e) {
             logger.info(`Error: ${e instanceof Error ? "code" in e && e.code === "ENOENT" && "path" in e ? `File not found ${e.path}` : e.message : "Unable to expand paths"}`);
