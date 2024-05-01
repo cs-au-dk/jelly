@@ -193,7 +193,10 @@ export function visit(ast: File, op: Operations) {
                 isObjectMethod(p.node) || isClassMethod(p.node) || isClassPrivateMethod(p.node) ||
                 isStaticBlock(p.node) || isClassProperty(p.node) || isClassPrivateProperty(p.node)) as
                 NodePath<ObjectMethod | ClassMethod | ClassPrivateMethod | StaticBlock | ClassProperty | ClassPrivateProperty> | null;
-            assert(encl);
+            if (!encl) {
+                f.error("'super' keyword unexpected", path.node);
+                return;
+            }
             let src;
             if (isObjectMethod(encl.node)) { // in object expression
                 // super ~ this.[[Prototype]]

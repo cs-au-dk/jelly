@@ -8,6 +8,7 @@ import {
     isIdentifier,
     isLVal,
     isMemberExpression,
+    isMetaProperty,
     isObjectPattern,
     isOptionalMemberExpression,
     isParenthesizedExpression,
@@ -811,6 +812,8 @@ export class Operations {
                     }
         } else if (isTSParameterProperty(dst))
             this.assign(src, dst.parameter, path);
+        else if (isMetaProperty(dst))
+            this.solver.fragmentState.warnUnsupported(dst, "MetaProperty"); // TODO: MetaProperty, e.g. new.target
         else {
             if (!isRestElement(dst))
                 assert.fail(`Unexpected LVal type ${dst.type} at ${locationToStringWithFile(dst.loc)}`);
