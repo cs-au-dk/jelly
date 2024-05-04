@@ -11,20 +11,17 @@ export const nodejsModels: NativeModel = {
     init: (p: NativeModelParams) => {
         // module.exports = exports
         p.solver.addTokenConstraint(p.moduleSpecialNatives.get("exports")!, p.solver.varProducer.objPropVar(p.moduleSpecialNatives.get("module")!, "exports"));
+        const a = p.solver.globalState;
+        const rt = a.canonicalizeToken(new NativeObjectToken("require", p.moduleInfo));
+        // add a special object representing the value of require.extensions
+        // to the extensions property of the require variable
+        p.solver.addTokenConstraint(
+            a.canonicalizeToken(new NativeObjectToken("require.extensions", p.moduleInfo)),
+            p.solver.varProducer.objPropVar(rt, "extensions"));
     },
     params: [
         {
-            name: "require",
-            init: ({solver, moduleInfo}: NativeModelParams) => {
-                const a = solver.globalState;
-                const rt = a.canonicalizeToken(new NativeObjectToken("require", moduleInfo));
-                // add a special object representing the value of require.extensions
-                // to the extensions property of the require variable
-                solver.addTokenConstraint(
-                    a.canonicalizeToken(new NativeObjectToken("require.extensions", moduleInfo)),
-                    solver.varProducer.objPropVar(rt, "extensions"));
-                return rt;
-            },
+            name: "require"
         },
         {
             name: "module"
