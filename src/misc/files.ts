@@ -35,8 +35,9 @@ export function expand(paths: Array<string> | string): Array<string> {
     if (typeof paths === "string")
         paths = [paths];
     const res: Array<string> = [];
+    const visited: Set<string> = new Set();
     for (const path of paths)
-        for (const e of expandRec(resolve(path), false))
+        for (const e of expandRec(resolve(path), false, visited))
             res.push(e); // TODO: complain if e starts with "."? (happens if path is outside basedir)
     if (options.excludeEntries) {
         const excl = new Set(micromatch(res, options.excludeEntries));
@@ -49,8 +50,11 @@ export function expand(paths: Array<string> | string): Array<string> {
         return res;
 }
 
-function* expandRec(path: string, sub: boolean): Generator<string> {
+function* expandRec(path: string, sub: boolean, visited: Set<string>): Generator<string> {
     path = realpathSync(path);
+    if (visited.has(path))
+        return;
+    visited.add(path);
     const stat = lstatSync(path);
     const inNodeModules = options.library || path.includes("node_modules");
     if (stat.isDirectory()) {
@@ -64,7 +68,7 @@ function* expandRec(path: string, sub: boolean): Generator<string> {
                     // make sure files are ordered before directories
                     return (lstatSync(f1).isDirectory() ? 1 : 0) - (lstatSync(f2).isDirectory() ? 1 : 0) || f1.localeCompare(f2);
                 }))
-                    yield* expandRec(file, true);
+                    yield* expandRec(file, true, visited);
             else
                 logger.debug(`Skipping directory ${path}`);
         } else
