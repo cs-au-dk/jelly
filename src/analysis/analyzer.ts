@@ -41,12 +41,12 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
         }
     }
 
-    function merge(mp: ModuleInfo | PackageInfo, propagate: boolean = true) {
+    function merge(mp: ModuleInfo | PackageInfo) {
         const f = fragmentStates.get(mp);
         if (f) {
             if (logger.isDebugEnabled())
                 logger.debug(`Merging state for ${mp}`);
-            solver.merge(f, propagate);
+            solver.merge(f);
         } else if (logger.isVerboseEnabled())
             logger.verbose(`No state found for ${mp}`);
     }

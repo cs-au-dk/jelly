@@ -99,7 +99,7 @@ export function runTest(basedir: string,
             const solver2 = new Solver();
             (solver2 as any).globalState = solver.globalState; // copy globalState reference...
             solver2.prepare();
-            solver2.merge(solver.fragmentState, false);
+            solver2.merge(solver.fragmentState);
             expect(solver2).toMatchAnalysisResults(solver);
         });
 

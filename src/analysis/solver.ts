@@ -167,21 +167,19 @@ export default class Solver {
 
     /**
      * Adds a set of tokens if not already present.
-     * Also adds to worklist and notifies listeners (unless 'propagate' set to false).
+     * Also adds to worklist and notifies listeners.
      */
-    private addTokens(ts: Iterable<Token> | Token, toRep: RepresentativeVar, propagate: boolean = true) {
+    private addTokens(ts: Iterable<Token> | Token, toRep: RepresentativeVar) {
         const f = this.fragmentState;
         f.vars.add(toRep);
         if (ts instanceof Token) {
-            if (f.addToken(ts, toRep) && propagate)
+            if (f.addToken(ts, toRep))
                 this.tokenAdded(toRep, ts);
         } else {
             let ws: Array<Token> | Token | undefined = undefined;
             let tr: Map<ListenerID, (t: Token) => void> | undefined = undefined;
-            const us = f.addTokens(ts, toRep);
-            if (propagate)
-                for (const t of us)
-                    [ws, tr] = this.tokenAdded(toRep, t, ws, tr);
+            for (const t of f.addTokens(ts, toRep))
+                [ws, tr] = this.tokenAdded(toRep, t, ws, tr);
         }
     }
 
@@ -299,7 +297,7 @@ export default class Solver {
         this.addSubsetEdge(f.getRepresentative(from), f.getRepresentative(to));
     }
 
-    addSubsetEdge(fromRep: RepresentativeVar, toRep: RepresentativeVar, propagate: boolean = true) {
+    addSubsetEdge(fromRep: RepresentativeVar, toRep: RepresentativeVar) {
         if (fromRep !== toRep) {
             const f = this.fragmentState;
             const s = mapGetSet(f.subsetEdges, fromRep);
@@ -312,17 +310,15 @@ export default class Solver {
                     assert(!f.redirections.has(fromRep) && !f.redirections.has(toRep));
                 f.vars.add(fromRep);
                 f.vars.add(toRep);
-                if (propagate) {
-                    // propagate tokens
-                    const [size, ts] = this.fragmentState.getTokensSize(fromRep);
-                    if (size > 0) {
-                        if (logger.isDebugEnabled())
-                            logger.debug(`Worklist size: ${this.diagnostics.unprocessedTokensSize}, propagating ${size} token${size !== 1 ? "s" : ""} from ${fromRep}`);
-                        this.addTokens(ts, toRep);
-                        this.incrementPropagations();
-                    }
-                    this.nodesWithNewEdges.add(fromRep);
+                // propagate tokens
+                const [size, ts] = this.fragmentState.getTokensSize(fromRep);
+                if (size > 0) {
+                    if (logger.isDebugEnabled())
+                        logger.debug(`Worklist size: ${this.diagnostics.unprocessedTokensSize}, propagating ${size} token${size !== 1 ? "s" : ""} from ${fromRep}`);
+                    this.addTokens(ts, toRep);
+                    this.incrementPropagations();
                 }
+                this.nodesWithNewEdges.add(fromRep);
             }
         }
     }
@@ -453,29 +449,26 @@ export default class Solver {
     }
 
     /**
-     * Adds a package neighbor relation.
-     * By default also notifies listeners.
+     * Adds a package neighbor relation and notifies listeners.
      */
-    addPackageNeighbor(k1: PackageInfo, k2: PackageInfo, propagate: boolean = true) {
+    addPackageNeighbor(k1: PackageInfo, k2: PackageInfo) {
         if (options.readNeighbors) {
-            this.addPackageNeighborPrivate(k1, k2, propagate);
-            this.addPackageNeighborPrivate(k2, k1, propagate);
+            this.addPackageNeighborPrivate(k1, k2);
+            this.addPackageNeighborPrivate(k2, k1);
         }
     }
 
-    private addPackageNeighborPrivate(k: PackageInfo, neighbor: PackageInfo, propagate: boolean = true) {
+    private addPackageNeighborPrivate(k: PackageInfo, neighbor: PackageInfo) {
         const f = this.fragmentState;
         const s = mapGetSet(f.packageNeighbors, k);
         if (!s.has(neighbor)) {
             s.add(neighbor);
-            if (propagate) {
-                const ts = f.packageNeighborListeners.get(k);
-                if (ts)
-                    for (const listener of ts.values()) {
-                        this.enqueueListenerCall([listener, neighbor]);
-                        this.diagnostics.packageNeighborListenerNotifications++;
-                    }
-            }
+            const ts = f.packageNeighborListeners.get(k);
+            if (ts)
+                for (const listener of ts.values()) {
+                    this.enqueueListenerCall([listener, neighbor]);
+                    this.diagnostics.packageNeighborListenerNotifications++;
+                }
         }
     }
 
@@ -580,11 +573,10 @@ export default class Solver {
     }
 
     /**
-     * Adds an array numeric property.
+     * Adds an array numeric property and notifies listeners.
      * Non-numeric properties are ignored.
-     * By default also notifies listeners.
      */
-    addArrayEntry(a: ArrayToken, prop: string, propagate: boolean = true, merging: boolean = false) {
+    addArrayEntry(a: ArrayToken, prop: string, merging: boolean = false) {
         if (!isArrayIndex(prop)) // TODO: treat large indices as "unknown"?
             return;
         const f = this.fragmentState;
@@ -593,20 +585,17 @@ export default class Solver {
             if (logger.isDebugEnabled())
                 logger.debug(`Adding array entry ${a}[${prop}]`);
             ps.add(prop);
-            if (propagate) {
-                const ts = f.arrayEntriesListeners.get(a);
-                if (ts)
-                    for (const listener of ts.values()) {
-                        this.enqueueListenerCall([listener, prop]);
-                        this.diagnostics.arrayEntriesListenerNotifications++;
-                    }
-            }
+            const ts = f.arrayEntriesListeners.get(a);
+            if (ts)
+                for (const listener of ts.values()) {
+                    this.enqueueListenerCall([listener, prop]);
+                    this.diagnostics.arrayEntriesListenerNotifications++;
+                }
             if (!merging) {
                 // add flow to summary var
                 this.addSubsetEdge(
                     f.getRepresentative(f.varProducer.objPropVar(a, prop)),
-                    f.getRepresentative(f.varProducer.arrayAllVar(a)),
-                    propagate,
+                    f.getRepresentative(f.varProducer.arrayAllVar(a))
                 );
             }
         }
@@ -652,17 +641,16 @@ export default class Solver {
     }
 
     /**
-     * Adds an object property.
-     * By default also notifies listeners.
+     * Adds an object property and notifies listeners.
      */
-    addObjectProperty(a: ObjectPropertyVarObj, prop: string, propagate: boolean = true, merging: boolean = false) {
+    addObjectProperty(a: ObjectPropertyVarObj, prop: string, merging: boolean = false) {
         const f = this.fragmentState;
         const ps = mapGetSet(f.objectProperties, a);
         if (!ps.has(prop)) {
             if (logger.isDebugEnabled())
                 logger.debug(`Adding object property ${a}.${prop}`);
             ps.add(prop);
-            if (propagate && !isInternalProperty(prop)) {
+            if (!isInternalProperty(prop)) {
                 const ts = f.objectPropertiesListeners.get(a);
                 if (ts)
                     for (const listener of ts.values()) {
@@ -675,8 +663,7 @@ export default class Solver {
                     // add flow to summary var
                     this.addSubsetEdge(
                         f.getRepresentative(f.varProducer.arrayUnknownVar(a)),
-                        f.getRepresentative(f.varProducer.arrayAllVar(a)),
-                        propagate,
+                        f.getRepresentative(f.varProducer.arrayAllVar(a))
                     );
                 if (prop === INTERNAL_PROTOTYPE()) {
                     // constraint: ∀ b ∈ ⟦a.__proto__⟧: {b} ∪ Ancestors(b) ⊆ Ancestors(a)
@@ -957,7 +944,7 @@ export default class Solver {
     /**
      * Merges the given fragment state into the current fragment state.
      */
-    merge(_s: FragmentState, propagate: boolean) { // TODO: reconsider use of 'propagate' flag
+    merge(_s: FragmentState) {
         this.phase = "merging";
         const timer = new Timer();
         // use a different type for s' representative variables to prevent accidental mixups
@@ -990,22 +977,20 @@ export default class Solver {
             f.vars.add(vRep);
             const ntr = s.tokenListeners.get(v);
             const svs = s.subsetEdges.get(v);
-            if (propagate) {
-                // run new token listeners on existing tokens that are not also in new
-                if (ntr) {
-                    const vHas = s.getHas(v);
-                    for (const t of f.getTokens(vRep))
-                        if (!vHas(t))
-                            for (const [id, listener] of ntr)
-                                this.callTokenListener(id, listener, t);
-                }
-                // propagate existing tokens along new subset edges
-                if (svs)
-                    for (const v2 of svs)
-                        this.addTokens(f.getTokens(vRep), f.getRepresentative(v2));
+            // run new token listeners on existing tokens that are not also in new
+            if (ntr) {
+                const vHas = s.getHas(v);
+                for (const t of f.getTokens(vRep))
+                    if (!vHas(t))
+                        for (const [id, listener] of ntr)
+                            this.callTokenListener(id, listener, t);
             }
+            // propagate existing tokens along new subset edges
+            if (svs)
+                for (const v2 of svs)
+                    this.addTokens(f.getTokens(vRep), f.getRepresentative(v2));
             // add new tokens (if propagate set, also trigger existing listeners and propagate along existing subset edges)
-            this.addTokens(s.getTokens(v), vRep, propagate);
+            this.addTokens(s.getTokens(v), vRep);
             // add new listeners
             if (ntr)
                 for (const [id, listener] of ntr)
@@ -1027,17 +1012,17 @@ export default class Solver {
         // add new object properties and array entries
         for (const [t, props] of s.objectProperties)
             for (const prop of props)
-                this.addObjectProperty(t, prop, propagate, true);
+                this.addObjectProperty(t, prop, true);
         for (const [t, entries] of s.arrayEntries)
             for (const entry of entries)
-                this.addArrayEntry(t, entry, propagate, true);
+                this.addArrayEntry(t, entry, true);
         // add new array entry listeners and object property listeners
         mapMapSetAll(s.arrayEntriesListeners, f.arrayEntriesListeners);
         mapMapSetAll(s.objectPropertiesListeners, f.objectPropertiesListeners);
         // add new package neighbors and listeners
         for (const [k, ns] of s.packageNeighbors)
             for (const n of ns)
-                this.addPackageNeighbor(k, n, propagate);
+                this.addPackageNeighbor(k, n);
         mapMapSetAll(s.packageNeighborListeners, f.packageNeighborListeners);
         // add remaining fragment state
         mapSetAddAll(s.requireGraph, f.requireGraph);
