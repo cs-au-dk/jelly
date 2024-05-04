@@ -10,7 +10,7 @@ import {options} from "../options";
 import {isInExports} from "../misc/packagejson";
 
 /**
- * Finds the ObjectTokens that may be accessed from outside the module via exporting to or importing from other modules.
+ * Finds the ObjectTokens that may be accessed from outside the fragment via exporting to or importing from other modules.
  * Also adds UnknownAccessPath at parameters of escaping functions and properties of escaping objects.
  * Note: objects that are assigned to 'exports' (or to properties of such objects) are not considered escaping
  * (unless also returned by an escaping function or passed as argument to an external function).

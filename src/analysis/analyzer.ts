@@ -185,10 +185,12 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
                 }
 
                 // patch heuristics
-                const t = new Timer();
-                const p1 = patchDynamics(solver);
-                const p2 = patchMethodCalls(solver);
-                if (p1 || p2) {
+                if (options.patchDynamics || options.patchMethodCalls) {
+                    const t = new Timer();
+                    if (options.patchDynamics)
+                        patchDynamics(solver);
+                    if (options.patchMethodCalls)
+                        patchMethodCalls(solver);
                     await solver.propagate("extra patching");
                     d.totalOtherPatchingTime += t.elapsed();
                 }

@@ -1,5 +1,5 @@
 import {ConstraintVar, IntermediateVar, isObjectPropertyVarObj, NodeVar, ObjectPropertyVarObj} from "./constraintvars";
-import logger, {isTTY, writeStdOut} from "../misc/logger";
+import logger, {GREY, isTTY, RESET, writeStdOut} from "../misc/logger";
 import {
     AccessPathToken,
     AllocationSiteToken,
@@ -101,7 +101,7 @@ export default class Solver {
 
     propagationsThrottled: number = 0;
 
-    phase: string | undefined;
+    phase: Phase | undefined;
 
     timer = new Timer();
 
@@ -912,8 +912,8 @@ export default class Solver {
                 logger.verbose(`Wave ${wave} completed after ${nanoToMs(this.timer.elapsed())}`);
             wave++;
         }
-        if ((logger.isVerboseEnabled() || options.diagnostics) && this.phase !== "module")
-            logger.info(`Phase: ${this.phase}, completed after ${nanoToMs(this.timer.elapsed())} (call edges: ${f.numberOfCallToFunctionEdges}, vars: ${f.getNumberOfVarsWithTokens()}, tokens: ${f.numberOfTokens}, subsets: ${f.numberOfSubsetEdges})`);
+        if (logger.isVerboseEnabled() || options.diagnostics)
+            logger.info(`${isTTY ? GREY : ""}Phase: ${this.phase}, completed after ${nanoToMs(this.timer.elapsed())} (call edges: ${f.numberOfCallToFunctionEdges}, vars: ${f.getNumberOfVarsWithTokens()}, tokens: ${f.numberOfTokens}, subsets: ${f.numberOfSubsetEdges})${isTTY ? RESET : ""}`);
         if (this.diagnostics.unprocessedTokensSize !== 0)
             assert.fail(`unprocessedTokensSize non-zero after propagate: ${this.diagnostics.unprocessedTokensSize}`);
     }

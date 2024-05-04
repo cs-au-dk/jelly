@@ -1,5 +1,4 @@
 import Solver from "../analysis/solver";
-import {options} from "../options";
 import {AccessPathToken, PackageObjectToken, Token} from "../analysis/tokens";
 import {addAll} from "../misc/util";
 import logger from "../misc/logger";
@@ -16,8 +15,6 @@ export type MaybeEmptyPropertyRead = {base: ConstraintVar} & (
  * Patches empty object property constraint variables that may be affected by dynamic property writes.
  */
 export function patchDynamics(solver: Solver): boolean {
-    if (!options.patchDynamics)
-        return false;
     const f = solver.fragmentState;
     const dyns = new Set<Token>();
     for (const v of f.dynamicPropertyWrites)

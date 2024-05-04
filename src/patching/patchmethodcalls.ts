@@ -1,5 +1,4 @@
 import Solver from "../analysis/solver";
-import {options} from "../options";
 import logger from "../misc/logger";
 import {getOrSet, Location, locationToStringWithFileAndEnd, mapGetArray} from "../misc/util";
 import {ObjectPropertyVar} from "../analysis/constraintvars";
@@ -17,8 +16,6 @@ const IGNORED = new Set([ // method names on String, RegExp and Number, currentl
 const PATCH_LIMIT = 25; // TODO: test different values
 
 export function patchMethodCalls(solver: Solver): boolean {
-    if (!options.patchMethodCalls)
-        return false;
     const f = solver.fragmentState;
     const m = new Map<string, Array<ObjectPropertyVar>>();
     for (const v of [...f.vars, ...f.redirections.keys()])
