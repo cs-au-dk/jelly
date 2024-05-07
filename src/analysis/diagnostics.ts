@@ -32,6 +32,10 @@ export default class AnalysisDiagnostics {
 
     codeSize: number = 0;
 
+    codeSizeMain: number = 0;
+
+    codeSizeDependencies: number = 0;
+
     maxMemoryUsage: number = 0;
 
     errors: number = 0; // set when analysis is completed

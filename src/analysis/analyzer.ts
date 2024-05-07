@@ -81,7 +81,12 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
                 }
                 moduleInfo.loc = ast.program.loc!;
                 a.filesAnalyzed.push(file);
-                d.codeSize += statSync(file).size;
+                const fileSize = statSync(file).size;
+                d.codeSize += fileSize;
+                if (moduleInfo.packageInfo.isEntry)
+                    d.codeSizeMain += fileSize;
+                else
+                    d.codeSizeDependencies += fileSize;
 
                 if (options.approx) {
                     if (a.approx!.hints.moduleIndex.has(moduleInfo.toString())) {
@@ -246,7 +251,7 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
         d.functionsWithZeroCallers = r.getZeroCallerFunctions().size;
         d.reachableFunctions = Array.from(r.getReachableModulesAndFunctions(r.getEntryModules())).filter(r => r instanceof FunctionInfo).length;
         if (logger.isInfoEnabled()) {
-            logger.info(`Analyzed packages: ${d.packages}, modules: ${d.modules}, functions: ${a.functionInfos.size}, code size: ${Math.ceil(d.codeSize / 1024)}KB`);
+            logger.info(`Analyzed packages: ${d.packages}, modules: ${d.modules}, functions: ${a.functionInfos.size}, code size main: ${Math.ceil(d.codeSizeMain / 1024)}KB, dependencies: ${Math.ceil(d.codeSizeDependencies / 1024)}KB`);
             logger.info(`Call edges function->function: ${d.functionToFunctionEdges}, call->function: ${d.callToFunctionEdges}`);
             const total = d.totalCallSites, zeroOne = d.callsWithNoCallee + d.callsWithUniqueCallee, nativeExternal = d.nativeOnlyCalls + d.externalOnlyCalls + d.nativeOrExternalCalls;
             if (total > 0)
