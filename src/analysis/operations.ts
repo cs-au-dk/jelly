@@ -561,6 +561,11 @@ export class Operations {
 
         if (isObjectPropertyVarObj(base)) {
 
+            if (!options.nativeOverwrites && base instanceof NativeObjectToken && this.a.globalSpecialNatives?.has(base.name) && this.a.globalSpecialNatives?.has(`${base.name}.${prop}`)) {
+                this.solver.fragmentState.warnUnsupported(node, `Ignoring write to native property ${base.name}.${prop}`);
+                return;
+            }
+
             // constraint: ...: ⟦E2⟧ ⊆ ⟦base.p⟧
             if (src)
                 this.solver.addSubsetConstraint(src, this.solver.varProducer.objPropVar(base, prop, ac));

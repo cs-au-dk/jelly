@@ -78,6 +78,7 @@ export const options: {
     oldobj: boolean,
     proto: boolean,
     objSpread: boolean,
+    nativeOverwrites: boolean,
 } = {
     callgraphHtml: undefined,
     dataflowHtml: undefined,
@@ -147,6 +148,7 @@ export const options: {
     oldobj: false,
     proto: false,
     objSpread: false,
+    nativeOverwrites: false
 };
 
 export function setOptions(opts: OptionValues & Partial<typeof options>) {

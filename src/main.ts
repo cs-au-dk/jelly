@@ -103,6 +103,7 @@ program
     .option("--read-neighbors", "enable package neighbor heuristic")
     .option("--proto", "enable model of assignments to the __proto__ property")
     .option("--obj-spread", "enable model of spread syntax for object literals ({...obj})")
+    .option("--native-overwrites", "allow overwriting of native object properties")
     .usage("[options] [files]")
     .addHelpText("after",
         "\nAll modules reachable by require/import from the given files are included in the analysis\n" +
