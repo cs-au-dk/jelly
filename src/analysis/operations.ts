@@ -235,7 +235,9 @@ export class Operations {
             this.callFunctionTokenBound(t, base, caller, argVars, resultVar, isNew, path);
         else if (t instanceof NativeObjectToken) {
             f.registerCall(pars.node, caller, undefined, {native: true});
-            if (t.invoke && (!isNew || t.constr))
+            if (options.ignoreImpreciseNativeCalls && calleeVar && f.getTokensSize(f.getRepresentative(calleeVar))[0] > 2)
+                f.warnUnsupported(path.node, `Ignoring imprecise call to ${t}`);
+            else if (t.invoke && (!isNew || t.constr))
                 t.invoke({
                     base,
                     path,
