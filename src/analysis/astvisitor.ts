@@ -761,7 +761,7 @@ export function visit(ast: File, op: Operations) {
                 const t = op.newArrayToken(path.node);
                 solver.addTokenConstraint(t, vp.nodeVar(path.node));
 
-                let indexKnown = true;
+                let indexKnown = path.node.elements.length <= 10; // using ARRAY_UNKNOWN if more than 10 elements
                 for (const [index, e] of path.node.elements.entries())
                     if (isExpression(e)) {
 

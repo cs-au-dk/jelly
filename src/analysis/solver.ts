@@ -577,7 +577,7 @@ export default class Solver {
      * Non-numeric properties are ignored.
      */
     addArrayEntry(a: ArrayToken, prop: string, merging: boolean = false) {
-        if (!isArrayIndex(prop)) // TODO: treat large indices as "unknown"?
+        if (!isArrayIndex(prop))
             return;
         const f = this.fragmentState;
         const ps = mapGetSet(f.arrayEntries, a);
