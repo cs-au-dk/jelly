@@ -50,7 +50,7 @@ import {exportCallGraphHtml, exportDataFlowGraphHtml} from "./output/visualizer"
 import {VulnerabilityDetector, VulnerabilityResults} from "./patternmatching/vulnerabilitydetector";
 import {readFileSync} from "fs";
 import {Vulnerability} from "./typings/vulnerabilities";
-import {addAll} from "./misc/util";
+import {addAll, stringify} from "./misc/util";
 import {sep} from "path";
 
 const VERSION = require("../package.json").version;
@@ -146,12 +146,12 @@ async function main() {
     }
 
     function sendResponse(res: Response) {
-        const str = JSON.stringify(res);
+        const str = stringify(res, 0);
         process.stdout.write(`Content-Length: ${str.length}\r\n\r\n`);
         process.stdout.write(str);
         process.stdout.write("\r\n");
         if (logger.isVerboseEnabled())
-            logger.verbose(`Message sent: ${JSON.stringify(res, undefined, 2)}`);
+            logger.verbose(`Message sent: ${stringify(res)}`);
     }
 
     function sendErrorResponse(message: string, req?: Request) {

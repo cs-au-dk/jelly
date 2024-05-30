@@ -532,6 +532,6 @@ export function longestCommonPrefix(a: Array<string>): string {
     return a[0].substring(0, i);
 }
 
-export function stringify(x: any): string {
-    return JSON.stringify(x, (_k, v) => typeof v === "bigint" ? Number(v / 1000000n) : v, 2);
+export function stringify(x: any, space: string | number = 2): string {
+    return JSON.stringify(x, (_k, v) => typeof v === "bigint" ? Number(v / 1000000n) : v, space);
 }
