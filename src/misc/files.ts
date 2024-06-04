@@ -51,35 +51,39 @@ export function expand(paths: Array<string> | string): Array<string> {
 }
 
 function* expandRec(path: string, sub: boolean, visited: Set<string>): Generator<string> {
-    path = realpathSync(path);
-    if (visited.has(path))
-        return;
-    visited.add(path);
-    const stat = lstatSync(path);
-    const inNodeModules = options.library || path.includes("node_modules");
-    if (stat.isDirectory()) {
-        const base = basename(path);
-        if (!sub ||
-            !(["node_modules", ".git", ".yarn"].includes(base) ||
-                (!inNodeModules && ["out", "build", "dist", "generated"].includes(base)))) {
-            const files = readdirSync(path); // TODO: use withFileTypes and dirent.isdirectory()
-            if (!sub || inNodeModules || !files.includes("package.json"))
-                for (const file of files.map(f => resolve(path, f)).sort((f1, f2) => {
-                    // make sure files are ordered before directories
-                    return (lstatSync(f1).isDirectory() ? 1 : 0) - (lstatSync(f2).isDirectory() ? 1 : 0) || f1.localeCompare(f2);
-                }))
-                    yield* expandRec(file, true, visited);
-            else
+    try {
+        path = realpathSync(path);
+        if (visited.has(path))
+            return;
+        visited.add(path);
+        const stat = lstatSync(path);
+        const inNodeModules = options.library || path.includes("node_modules");
+        if (stat.isDirectory()) {
+            const base = basename(path);
+            if (!sub ||
+                !(["node_modules", ".git", ".yarn"].includes(base) ||
+                    (!inNodeModules && ["out", "build", "dist", "generated"].includes(base)))) {
+                const files = readdirSync(path); // TODO: use withFileTypes and dirent.isdirectory()
+                if (!sub || inNodeModules || !files.includes("package.json"))
+                    for (const file of files.map(f => resolve(path, f)).sort((f1, f2) => {
+                        // make sure files are ordered before directories
+                        return (lstatSync(f1).isDirectory() ? 1 : 0) - (lstatSync(f2).isDirectory() ? 1 : 0) || f1.localeCompare(f2);
+                    }))
+                        yield* expandRec(file, true, visited);
+                else
+                    logger.debug(`Skipping directory ${path}`);
+            } else
                 logger.debug(`Skipping directory ${path}`);
-        } else
-            logger.debug(`Skipping directory ${path}`);
-    } else if (stat.isFile() && !path.endsWith(".d.ts") &&
-        (!inNodeModules || !(path.endsWith(".min.js") || path.endsWith(".bundle.js"))) &&
-        (path.endsWith(".js") || path.endsWith(".jsx") || path.endsWith(".es") || path.endsWith(".mjs") || path.endsWith(".cjs") || path.endsWith(".ts") || path.endsWith(".tsx") || path.endsWith(".mts") || path.endsWith(".cts")
-            || isShebang(path)))
-        yield relative(options.basedir, path);
-    else
-        logger.debug(`Skipping file ${path}`);
+        } else if (stat.isFile() && !path.endsWith(".d.ts") &&
+            (!inNodeModules || !(path.endsWith(".min.js") || path.endsWith(".bundle.js"))) &&
+            (path.endsWith(".js") || path.endsWith(".jsx") || path.endsWith(".es") || path.endsWith(".mjs") || path.endsWith(".cjs") || path.endsWith(".ts") || path.endsWith(".tsx") || path.endsWith(".mts") || path.endsWith(".cts")
+                || isShebang(path)))
+            yield relative(options.basedir, path);
+        else
+            logger.debug(`Skipping file ${path}`);
+    } catch {
+        logger.error(`Error: Unable to read ${path}`);
+    }
 }
 
 /**
