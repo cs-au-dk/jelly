@@ -661,7 +661,7 @@ export class Operations {
                         logger.verbose(`Ignoring unresolved module '${str}' at ${locationToStringWithFile(path.node.loc)}`);
                 } else if (isInTryBlockOrBranch(path))
                     f.warn(`Unable to resolve conditionally loaded module '${str}'`, path.node);
-                else if (!(path.isCallExpression() && isIdentifier(path.node.callee) && path.node.callee.name === "require"))
+                else if (path.isCallExpression() && !(isIdentifier(path.node.callee) && path.node.callee.name === "require"))
                     f.warn(`Unable to resolve module '${str}' at indirect require call`, path.node);
                 else
                     f.error(`Unable to resolve module '${str}'`, path.node);
