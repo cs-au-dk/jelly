@@ -39,14 +39,9 @@ export function expand(paths: Array<string> | string): Array<string> {
     for (const path of paths)
         for (const e of expandRec(resolve(path), false, visited))
             res.push(e); // TODO: complain if e starts with "."? (happens if path is outside basedir)
-    if (options.excludeEntries) {
-        const excl = new Set(micromatch(res, options.excludeEntries));
-        const eres = [];
-        for (const r of res)
-            if (!excl.has(r))
-                eres.push(r);
-        return eres;
-    } else
+    if (options.excludeEntries)
+        return micromatch.not(res, options.excludeEntries);
+    else
         return res;
 }
 
@@ -159,6 +154,10 @@ export function requireResolve(str: string, file: FilePath, a: GlobalState, node
         f?.warn(`Module '${filepath}' has unrecognized extension, skipping it`, node);
         return undefined;
     }
+    if (options.excludeEntries && a.
+        getModuleInfo(file).packageInfo.isEntry &&
+        micromatch.isMatch(filepath, options.excludeEntries))
+        return undefined; // skip silently
     if (logger.isDebugEnabled())
         logger.debug(`Module '${str}' required from ${file} resolved to: ${filepath}`);
     return filepath;
