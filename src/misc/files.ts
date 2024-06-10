@@ -154,8 +154,8 @@ export function requireResolve(str: string, file: FilePath, a: GlobalState, node
         f?.warn(`Module '${filepath}' has unrecognized extension, skipping it`, node);
         return undefined;
     }
-    if (options.excludeEntries && a.
-        getModuleInfo(file).packageInfo.isEntry &&
+    if (options.excludeEntries &&
+        a.getModuleInfo(file).packageInfo.isEntry &&
         micromatch.isMatch(filepath, options.excludeEntries))
         return undefined; // skip silently
     if (logger.isDebugEnabled())

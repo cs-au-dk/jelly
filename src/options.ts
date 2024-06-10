@@ -160,7 +160,9 @@ export function setOptions(opts: OptionValues & Partial<typeof options>) {
     if (options.apiUsage)
         options.ignoreDependencies = true;
     if (options.excludeEntries)
-        options.excludeEntries = options.excludeEntries.map(p => `**/${p}`);
+        options.excludeEntries =
+            options.excludeEntries.length === 0 ? undefined : // micromatch bug workaround
+                options.excludeEntries.map(p => `**/${p}`);
 }
 
 /**
