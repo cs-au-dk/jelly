@@ -50,9 +50,11 @@ export class Patching {
     registerAllocationSite(t: Token) {
         assert(t instanceof AllocationSiteToken || t instanceof FunctionToken || t instanceof NativeObjectToken);
         let loc;
-        if (t instanceof AllocationSiteToken)
+        if (t instanceof AllocationSiteToken) {
+            if (t.kind === "PromiseResolve" || t.kind === "PromiseReject")
+                return; // ignore
             loc = locationToStringWithFileAndEnd(t.allocSite.loc, true);
-        else if (t instanceof FunctionToken)
+        } else if (t instanceof FunctionToken)
             loc = locationToStringWithFileAndEnd(t.fun.loc, true);
         else { // NativeObjectToken representing exports objects
             assert(t.moduleInfo);
@@ -72,7 +74,11 @@ export class Patching {
             type = "Object";
         if (logger.isDebugEnabled())
             logger.debug(`Registering token ${type}[${loc}]`);
-        this.allocToToken.set(`${loc}:${type}`, t);
+        const key = `${loc}:${type}`;
+        const q = this.allocToToken.get(key);
+        if (q && q !== t)
+            logger.error(`Error: token conflict for ${key}: ${q} !== ${t}`);
+        this.allocToToken.set(key, t);
     }
 
     /**
