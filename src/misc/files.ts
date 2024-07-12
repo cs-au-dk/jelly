@@ -27,7 +27,7 @@ import {GlobalState} from "../analysis/globalstate";
  * Directories are traversed recursively (except node_modules, .git, and .yarn,
  * and also excluding out, build, dist, generated and sub-directories that contain package.json unless inside a node_modules directory),
  * and all .js, .es, .mjs, .cjs, .ts, .tsx and Node.js shebang files are included
- * (except .d.ts and paths matching options.exclude and also excluding .min.js, .bundle.js unless inside a node_modules directory within basedir).
+ * (except .d.ts and paths matching options.excludeEntries and also excluding .min.js, .bundle.js unless inside a node_modules directory within basedir).
  * Symlinks are ignored.
  * The resulting paths are relative to options.basedir.
  */
