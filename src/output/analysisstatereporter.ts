@@ -1,5 +1,6 @@
 import logger from "../misc/logger";
 import {
+    addAll,
     deleteAll,
     FilePath,
     getOrSet,
@@ -14,7 +15,7 @@ import {GlobalState} from "../analysis/globalstate";
 import {FunctionToken, NativeObjectToken, Token} from "../analysis/tokens";
 import fs from "fs";
 import {ConstraintVar, NodeVar, ObjectPropertyVar} from "../analysis/constraintvars";
-import {FragmentState} from "../analysis/fragmentstate";
+import {FragmentState, RepresentativeVar} from "../analysis/fragmentstate";
 import {relative, resolve} from "path";
 import {options} from "../options";
 import {DummyModuleInfo, FunctionInfo, ModuleInfo} from "../analysis/infos";
@@ -560,7 +561,9 @@ export class AnalysisStateReporter {
      * Reports the kinds of constraint variables and the number of occurrences for each kind.
      */
     reportVariableKinds() {
-        const varsWithListeners = this.f.tokenListeners;
+        const varsWithListeners = new Set<RepresentativeVar>();
+        addAll(this.f.tokenListeners.keys(), varsWithListeners);
+        addAll(this.f.tokenListeners2.keys(), varsWithListeners);
         const counts = new Map<string, number>();
         const withListenersCounts = new Map<string, number>();
         const srcCounts = new Map<string, number>();

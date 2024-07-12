@@ -53,6 +53,11 @@ export type ListenerID = bigint;
 export type RepresentativeVar = ConstraintVar & { readonly __repr: unique symbol };
 export type MergeRepresentativeVar = ConstraintVar & { readonly __repr: unique symbol };
 
+export type PostponedListenerCall =
+    [(t: Token) => void, Token] |
+    [(neighbor: PackageInfo) => void, PackageInfo] |
+    [(prop: string) => void, string];
+
 /**
  * Analysis state for a fragment (a module or a package with dependencies, depending on the analysis phase).
  */
@@ -98,6 +103,8 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
 
     readonly tokenListeners: Map<RVT, Map<ListenerID, (t: Token) => void>> = new Map;
 
+    readonly tokenListeners2: Map<RVT, Map<ListenerID, (t: Token) => void>> = new Map;
+
     readonly listenersProcessed: Map<ListenerID, Set<Token>> = new Map;
 
     readonly packageNeighborListeners: Map<PackageInfo, Map<ListenerID, (neighbor: PackageInfo) => void>> = new Map;
@@ -108,11 +115,9 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
 
     readonly packageNeighbors: Map<PackageInfo, Set<PackageInfo>> = new Map;
 
-    readonly postponedListenerCalls: Array<
-        [(t: Token) => void, Token] |
-        [(neighbor: PackageInfo) => void, PackageInfo] |
-        [(prop: string) => void, string]
-    > = [];
+    readonly postponedListenerCalls: Array<PostponedListenerCall> = [];
+
+    readonly postponedListenerCalls2: Array<PostponedListenerCall> = [];
 
     /**
      * Map that provides for each function/module the set of modules being required.

@@ -7,7 +7,6 @@ import {getMapHybridSetSize, mapMapSize, percent} from "../misc/util";
 import {visit} from "./astvisitor";
 import {FunctionInfo, ModuleInfo, PackageInfo} from "./infos";
 import {options, resolveBaseDir} from "../options";
-import assert from "assert";
 import {widenObjects} from "./widening";
 import {findModules} from "./modulefinder";
 import {parseAndDesugar} from "../parsing/parser";
@@ -200,7 +199,8 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
                     d.totalOtherPatchingTime += t.elapsed();
                 }
 
-                assert(a.pendingFiles.length === 0, "Unexpected module"); // (new modules shouldn't be discovered in the second phase)
+                if (a.pendingFiles.length !== 0)
+                    solver.fragmentState.warn("Unexpected module"); // (new modules shouldn't be discovered in the second phase, unless terminating early)
                 solver.updateDiagnostics();
             }
         }
@@ -229,6 +229,8 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
         logger.warn("Time limit reached, analysis aborted");
     else if (d.waveLimitReached > 0)
         logger.warn("Warning: Wave limit reached, analysis terminated early");
+    else if (d.indirectionsLimitReached > 0)
+        logger.warn("Warning: Indirection limit reached, analysis terminated early");
 
     // collect final call edges
     finalizeCallEdges(solver);
@@ -267,7 +269,7 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
                 if (options.maxWaves !== undefined)
                     logger.info(`Fixpoint wave limit reached: ${d.waveLimitReached} time${d.waveLimitReached !== 1 ? "s" : ""}`);
                 logger.info(`Constraint vars: ${f.getNumberOfVarsWithTokens()} (${f.vars.size}), tokens: ${d.tokens}, subset edges: ${d.subsetEdges}, max tokens: ${f.getLargestTokenSetSize()}, max subset out: ${f.getLargestSubsetEdgeOutDegree()}, redirections: ${f.redirections.size}`);
-                logger.info(`Listeners (notifications) token: ${mapMapSize(f.tokenListeners)} (${d.tokenListenerNotifications}), ` +
+                logger.info(`Listeners (notifications) token: ${mapMapSize(f.tokenListeners)} (${d.tokenListenerNotifications}), bounded: ${mapMapSize(f.tokenListeners2)} (${d.tokenListener2Notifications}), ` +
                     (options.readNeighbors ? `neighbor: ${mapMapSize(f.packageNeighborListeners)} (${d.packageNeighborListenerNotifications}), ` : "") +
                     `array: ${mapMapSize(f.arrayEntriesListeners)} (${d.arrayEntriesListenerNotifications}), ` +
                     `obj: ${mapMapSize(f.objectPropertiesListeners)} (${d.objectPropertiesListenerNotifications})`);

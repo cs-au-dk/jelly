@@ -64,11 +64,15 @@ export default class AnalysisDiagnostics {
 
     wave: number = 0;
 
+    round: number = 0;
+
     listenerNotificationRounds: number = 0;
 
     lastPrintDiagnosticsTime: number = 0;
 
     tokenListenerNotifications: number = 0;
+
+    tokenListener2Notifications: number = 0;
 
     packageNeighborListenerNotifications: number = 0;
 
@@ -77,6 +81,8 @@ export default class AnalysisDiagnostics {
     objectPropertiesListenerNotifications: number = 0;
 
     waveLimitReached: number = 0;
+
+    indirectionsLimitReached: number = 0;
 
     totalCycleEliminationTime: bigint = 0n;
 

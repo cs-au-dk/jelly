@@ -3,7 +3,9 @@
  */
 export enum TokenListener {
     CALL_BASE, // base at method call
-    CALL_CALLEE, // callee at function/method call
+    CALL_METHOD, // callee at method call
+    CALL_FUNCTION, // callee at (non-method) function call
+    CALL_REQUIRE, // callee at 'require' call (direct calls only)
     CALL_EXTERNAL, // argument at call to external function
     READ_BASE, // base at property read (static)
     READ_BASE_DYNAMIC, // base at property read (dynamic)

@@ -17,9 +17,10 @@ export function finalizeCallEdges(solver: Solver) {
     const finalTimer = new Timer;
     const f = solver.fragmentState;
     const a = solver.globalState;
+    const d = solver.diagnostics;
 
     // ordinary calls
-    if (solver.diagnostics.aborted || solver.diagnostics.timeout) {
+    if (d.aborted || d.timeout || d.waveLimitReached > 0 || d.indirectionsLimitReached > 0) {
         for (const n of f.callLocations) {
             const caller = f.callToContainingFunction.get(n);
             assert(caller);
