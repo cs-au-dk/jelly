@@ -924,6 +924,11 @@ describe("tests/micro", () => {
         reachableTotal: 9,
     });
 
+    runTest("tests/micro", "flow.js", {
+        functionInfos: 1,
+        moduleInfos: 1,
+    });
+
     describe("packagejson", () =>
         runTest("tests/micro/packagejson", "index.js", {
             vulnerabilities: [{

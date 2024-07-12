@@ -39,8 +39,12 @@ export function parseAndDesugar(str: string, file: string, f?: FragmentState): F
             originalAst = parse(str, options);
         } catch (e) { // 'jsx' conflicts with TypeScript legacy cast syntax, see https://babeljs.io/docs/en/babel-plugin-transform-typescript/
             if (logger.isVerboseEnabled())
-                logger.verbose(`Parse error for ${file}${e instanceof Error ? `: ${e.message}` : ""}, retrying with JSX enabled`);
+                logger.verbose(`Parse error for ${file}${e instanceof Error ? `: ${e.message}` : ""}, retrying with JSX and Flow enabled`);
             options.plugins!.push("jsx");
+            if (file.endsWith(".jsx") || file.endsWith(".js")) {
+                options.plugins!.push("flow");
+                options.plugins!.splice(options.plugins?.indexOf("typescript")!, 1); // 'flow' conflicts with 'typescript'
+            }
             originalAst = parse(str, options);
         }
     } catch (e) {
