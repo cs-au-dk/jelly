@@ -91,7 +91,7 @@ import {
     PackageObjectToken,
     Token
 } from "./tokens";
-import {ModuleInfo} from "./infos";
+import {FunctionInfo, ModuleInfo} from "./infos";
 import logger from "../misc/logger";
 import {locationToStringWithFile, mapArrayAdd} from "../misc/util";
 import assert from "assert";
@@ -126,6 +126,16 @@ export function visit(ast: File, op: Operations) {
     const f = solver.fragmentState; // (don't use in callbacks)
     const vp = f.varProducer; // (don't use in callbacks)
     const class2constructor = new Map<Class, ClassMethod>();
+    const funStack: Array<Function> = [];
+
+    function currentFunction(): Function | undefined {
+        return funStack.length === 0 ? undefined : funStack[funStack.length - 1];
+    }
+
+    function currentFunctionInfo(): FunctionInfo | ModuleInfo {
+        const f = currentFunction();
+        return f ? a.functionInfos.get(f)! : op.moduleInfo;
+    }
 
     // traverse the AST and extend the analysis result with information about the current module
     if (logger.isVerboseEnabled())
@@ -171,7 +181,7 @@ export function visit(ast: File, op: Operations) {
                 // constraint: t ∈ ⟦this⟧ where t denotes the package
                 solver.addTokenConstraint(op.packageObjectToken, vp.nodeVar(path.node));
 
-                const fun = f.getEnclosingFunction(path);
+                const fun = currentFunction();
                 if (fun) {
 
                     // constraint: ⟦this_f⟧ ⊆ ⟦this⟧ where f is the enclosing function
@@ -252,25 +262,25 @@ export function visit(ast: File, op: Operations) {
         ReturnStatement: {
             exit(path: NodePath<ReturnStatement>) {
                 if (path.node.argument) {
-                    const fun = path.getFunctionParent();
+                    const fun = currentFunction();
                     if (fun) {
                         const expVar = op.expVar(path.node.argument, path);
 
                         // return E
                         let resVar;
-                        if (fun.node.generator) {
+                        if (fun.generator) {
                             // find the iterator object (it is returned via Function)
                             // constraint: ... ⊆ ⟦i.value⟧ where i is the iterator object for the function
-                            const iter = a.canonicalizeToken(new AllocationSiteToken("Iterator", fun.node.body));
+                            const iter = a.canonicalizeToken(new AllocationSiteToken("Iterator", fun.body));
                             resVar = vp.objPropVar(iter, "value");
                         } else {
                             // constraint: ... ⊆ ⟦ret_f⟧ where f is the enclosing function (ignoring top-level returns)
-                            resVar = vp.returnVar(fun.node);
+                            resVar = vp.returnVar(fun);
                         }
 
-                        if (fun.node.async && !fun.node.generator) {
+                        if (fun.async && !fun.generator) {
                             // make a new promise with the fulfilled value being the return value
-                            const promise = op.newPromiseToken(fun.node);
+                            const promise = op.newPromiseToken(fun);
                             solver.addSubsetConstraint(expVar, vp.objPropVar(promise, PROMISE_FULFILLED_VALUES));
                             solver.addTokenConstraint(promise!, resVar);
                         } else
@@ -285,6 +295,7 @@ export function visit(ast: File, op: Operations) {
 
                 // record that a function/method/constructor/getter/setter has been reached, connect to its enclosing function or module
                 const fun = path.node;
+                funStack.push(fun);
                 let cls: Class | undefined;
                 if (isClassMethod(fun) && fun.kind === "constructor")
                     cls = getClass(path);
@@ -343,6 +354,7 @@ export function visit(ast: File, op: Operations) {
                     const argumentsToken = a.canonicalizeToken(new ArrayToken(fun.body));
                     solver.addTokenConstraint(argumentsToken!, vp.argumentsVar(fun));
                 }
+                funStack.pop();
             }
         },
 
@@ -736,7 +748,7 @@ export function visit(ast: File, op: Operations) {
                     if (isSpreadElement(p)) {
                         if (options.objSpread) {
                             // it's enticing to rewrite the AST to use Object.assign, but assign invokes setters on the target object
-                            const enclosing = a.getEnclosingFunctionOrModule(path, op.moduleInfo);
+                            const enclosing = currentFunctionInfo();
                             const argVar = vp.expVar(p.argument, path);
                             solver.addForAllTokensConstraint(argVar, TokenListener.OBJECT_SPREAD, p, (t: Token) => {
                                 if (isObjectPropertyVarObj(t)) {
@@ -991,6 +1003,6 @@ export function visit(ast: File, op: Operations) {
         if (isCalleeExpression(path))
             return; // don't perform a property read for method calls
 
-        op.readProperty(op.expVar(path.node.object, path), getProperty(path.node), dstVar, path.node, a.getEnclosingFunctionOrModule(path, op.moduleInfo));
+        op.readProperty(op.expVar(path.node.object, path), getProperty(path.node), dstVar, path.node, currentFunctionInfo());
     }
 }

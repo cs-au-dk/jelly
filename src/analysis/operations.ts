@@ -97,7 +97,7 @@ export class Operations {
         return v;
     }
 
-    private getRequireHints(pars: NodePath<Node>): Array<string> | undefined {
+    private getRequireHints(pars: NodePath): Array<string> | undefined {
         return this.a.patching?.getRequireHints((pars.node.loc as Location).module?.toString(), locationToString(pars.node.loc, false, true));
     }
 
