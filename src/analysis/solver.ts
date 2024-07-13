@@ -24,8 +24,8 @@ import {FunctionInfo, ModuleInfo, PackageInfo} from "./infos";
 import {
     addAll,
     addAllMapHybridSet,
+    getNodeHash,
     isArrayIndex,
-    Location,
     locationToStringWithFileAndEnd,
     mapArrayPushAll,
     mapGetMap,
@@ -64,7 +64,6 @@ import {options, patternProperties} from "../options";
 import Timer, {nanoToMs} from "../misc/timer";
 import {setImmediate} from "timers/promises";
 import {getMemoryUsage} from "../misc/memory";
-import {JELLY_NODE_ID} from "../parsing/extras";
 import AnalysisDiagnostics from "./diagnostics";
 import {
     ARRAY_PROTOTYPE,
@@ -103,13 +102,13 @@ export default class Solver {
 
     unprocessedTokens: Map<RepresentativeVar, Array<Token> | Token> = new Map;
 
-    nodesWithNewEdges: Set<ConstraintVar> = new Set;
+    readonly nodesWithNewEdges: Set<ConstraintVar> = new Set;
 
     restored: Set<ConstraintVar> = new Set;
 
     readonly listeners: Map<ListenerID, ListenerKey> = new Map;
 
-    diagnostics = new AnalysisDiagnostics;
+    readonly diagnostics = new AnalysisDiagnostics;
 
     readonly abort?: () => boolean;
 
@@ -119,7 +118,7 @@ export default class Solver {
 
     phase: Phase | undefined;
 
-    timer = new Timer();
+    readonly timer = new Timer();
 
     constructor(abort?: () => boolean) {
         this.abort = abort;
@@ -347,26 +346,13 @@ export default class Solver {
         }
     }
 
-    /**
-     * Provides a unique'ish ID for the given node.
-     */
-    private getNodeHash(n: Node): bigint {
-        const nid = (n as any)[JELLY_NODE_ID];
-        assert(nid !== undefined);
-        let id = (BigInt(nid) << 32n);
-        const h = n.loc && (n.loc as Location).module?.hash;
-        if (h)
-            id += BigInt(h);
-        return id;
-    }
-
     private checkListenerIDCollision(id: ListenerID, key: ListenerKey) {
         const x = this.listeners.get(id);
         if (x) {
             if (x.l !== key.l || x.n !== key.n || x.t !== key.t || x.s !== key.s) {
                 const format = (x: ListenerKey) =>
-                    `${TokenListener[x.l]} ${x.t ?? ""} ${x.s || ""} ${x.n ? `at ${locationToStringWithFileAndEnd(x.n.loc)}` : ""}`;
-                logger.error(`Error: Hash collision in getListenerID: ${format(x)} != ${format(key)}`); // TODO: hash collision possible
+                    `(${TokenListener[x.l] ?? ""}${x.t ?? ""},${x.s ?? ""},${x.n ? nodeToString(x.n) : ""},${x.n ? ` at ${locationToStringWithFileAndEnd(x.n.loc)}` : ""}`;
+                logger.error(`Error: Hash collision in getListenerID ${id}: ${format(x)} != ${format(key)}`); // TODO: hash collision possible
             }
         } else
             this.listeners.set(id, key);
@@ -382,7 +368,7 @@ export default class Solver {
             id += BigInt(key.t.hash);
         }
         if (key.n)
-            id += this.getNodeHash(key.n);
+            id += getNodeHash(key.n);
         if (key.s)
             id ^= BigInt(strHash(key.s));
         // place listener type in the lower 16 bits
@@ -607,7 +593,7 @@ export default class Solver {
      */
     addForAllArrayEntriesConstraint(t: ArrayToken, key: TokenListener, n: Node, listener: (prop: string) => void) {
         if (logger.isDebugEnabled())
-            logger.debug(`Adding array entries constraint #${TokenListener[key]} to ${t} at ${locationToStringWithFileAndEnd(n.loc)}`);
+            logger.debug(`Adding array entries constraint #${TokenListener[key]} to ${t}`);
         const id = this.getListenerID({l: key, n});
         const m = this.runArrayEntriesListener(t, id, listener);
         if (m) {
@@ -674,7 +660,7 @@ export default class Solver {
         // (because that's actually what we want to range over with these constraints).
         // currently we treat all properties that are read as own properties, even if the read happens on a descendant object
         if (logger.isDebugEnabled())
-            logger.debug(`Adding object properties constraint #${TokenListener[key]} to ${t} at ${locationToStringWithFileAndEnd(n.loc)}`);
+            logger.debug(`Adding object properties constraint #${TokenListener[key]} to ${t}`);
         const id = this.getListenerID({l: key, n});
         const m = this.runObjectPropertiesListener(t, id, listener);
         if (m) {
@@ -1034,7 +1020,7 @@ export default class Solver {
                     }
                     this.diagnostics.totalListenerCallTime += timer.elapsed();
                     if (logger.isVerboseEnabled() || (options.diagnostics && options.printProgress))
-                        logger.info(`Phase: ${this.phase}, round: ${round} completed after ${nanoToMs(this.timer.elapsed())} (call edges: ${f.numberOfCallToFunctionEdges}, vars: ${f.getNumberOfVarsWithTokens()}, tokens: ${f.numberOfTokens}, subsets: ${f.numberOfSubsetEdges})`);
+                        logger.info(`${isTTY ? GREY : ""}Round ${round} completed after ${nanoToMs(this.timer.elapsed())} (call edges: ${f.numberOfCallToFunctionEdges}, vars: ${f.getNumberOfVarsWithTokens()}, tokens: ${f.numberOfTokens}, subsets: ${f.numberOfSubsetEdges})${isTTY ? RESET : ""}`);
                     round++;
                 }
             }
@@ -1043,7 +1029,7 @@ export default class Solver {
             wave++;
         }
         if (logger.isVerboseEnabled() || (options.diagnostics && options.printProgress))
-            logger.info(`${isTTY ? GREY : ""}Phase: ${this.phase}, completed after ${nanoToMs(this.timer.elapsed())} (call edges: ${f.numberOfCallToFunctionEdges}, vars: ${f.getNumberOfVarsWithTokens()}, tokens: ${f.numberOfTokens}, subsets: ${f.numberOfSubsetEdges})${isTTY ? RESET : ""}`);
+            logger.info(`${isTTY ? GREY : ""}Completed after ${nanoToMs(this.timer.elapsed())} (call edges: ${f.numberOfCallToFunctionEdges}, vars: ${f.getNumberOfVarsWithTokens()}, tokens: ${f.numberOfTokens}, subsets: ${f.numberOfSubsetEdges})${isTTY ? RESET : ""}`);
         if (this.diagnostics.unprocessedTokensSize !== 0)
             assert.fail(`unprocessedTokensSize non-zero after propagate: ${this.diagnostics.unprocessedTokensSize}`);
     }

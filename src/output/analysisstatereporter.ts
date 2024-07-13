@@ -12,9 +12,9 @@ import {
     stringify
 } from "../misc/util";
 import {GlobalState} from "../analysis/globalstate";
-import {FunctionToken, NativeObjectToken, Token} from "../analysis/tokens";
+import {FunctionToken, NativeObjectToken, PackageObjectToken, Token} from "../analysis/tokens";
 import fs from "fs";
-import {ConstraintVar, NodeVar, ObjectPropertyVar} from "../analysis/constraintvars";
+import {AncestorsVar, ConstraintVar, NodeVar, ObjectPropertyVar} from "../analysis/constraintvars";
 import {FragmentState, RepresentativeVar} from "../analysis/fragmentstate";
 import {relative, resolve} from "path";
 import {options} from "../options";
@@ -298,7 +298,8 @@ export class AnalysisStateReporter {
             if (size === 1) {
                 let any = false;
                 for (const w of [v, ...redir.get(v) ?? []])
-                    if (!((w instanceof ObjectPropertyVar && w.obj instanceof NativeObjectToken) || // TODO: don't omit native variables that contain non-native values?
+                    if (!((w instanceof ObjectPropertyVar && (w.obj instanceof NativeObjectToken || w.obj instanceof PackageObjectToken) ||
+                        w instanceof AncestorsVar && w.t instanceof PackageObjectToken) || // TODO: don't omit native variables that contain non-native values?
                         (w instanceof NodeVar && isIdentifier(w.node) && w.node.loc?.start.line === 0))) {
                         any = true;
                         break;
@@ -504,10 +505,52 @@ export class AnalysisStateReporter {
         // for (let i = Math.min(9, a.length - 1); i >= 0; i--) {
         for (let i = 0; i < 10 && i < a.length; i++) {
             logger.info(`  ${a[i].v}: ${a[i].size}`);
-            if (logger.isVerboseEnabled())
-                for (const t of a[i].ts)
-                    logger.info(`    ${t}`);
+            if (logger.isVerboseEnabled()) {
+                let c = 0;
+                for (const t of a[i].ts) {
+                    logger.verbose(`    ${t}`);
+                    if (c++ > 8) {
+                        logger.verbose("    ...");
+                        break;
+                    }
+                }
+            }
         }
+    }
+
+    reportLargestTokenTimesEdges() {
+        const a: Array<{ v: RepresentativeVar, edges: number, tokens: number, size: number }> = [];
+        for (const v of this.f.vars) {
+            const [ts,] = this.f.getTokensSize(v);
+            const es = (this.f.subsetEdges.get(v) ?? new Set()).size;
+            a.push({v, edges: es, tokens: ts, size: es*ts});
+        }
+        a.sort((x, y) => y.size - x.size);
+        logger.info("Largest tokens*edges:");
+        // for (let i = Math.min(9, a.length - 1); i >= 0; i--)
+        for (let i = 0; i < 10 && i < a.length; i++) {
+            logger.info(`  ${a[i].v}: ${a[i].size} (${a[i].tokens}*${a[i].edges})`);
+            let c = 0;
+            for (const t of this.f.getTokens(a[i].v)) {
+                logger.info(`    ${t}`);
+                if (c++ > 38) {
+                    logger.info("    ...");
+                    break;
+                }
+            }
+        }
+    }
+
+    reportMostCalledFunctions() {
+        const b: Map<FunctionInfo, number> = new Map();
+        for (const [, fs] of this.f.callToFunction)
+            for (const f of fs)
+                b.set(f, (b.get(f) || 0) + 1);
+        logger.info("Most called functions:");
+        const a = Array.from(b.entries());
+        a.sort((x, y) => y[1] - x[1]);
+        for (let i = 0; i < 20 && i < a.length; i++)
+            logger.info(`  ${a[i][0]}: ${a[i][1]}`);
     }
 
     /**
@@ -516,9 +559,10 @@ export class AnalysisStateReporter {
     reportLargestSubsetEdges() {
         const a: Array<{v: ConstraintVar, vs: Set<ConstraintVar>}> = [];
         for (const [v, vs] of this.f.subsetEdges)
-            a.push({v, vs});
+            if (!(v instanceof ObjectPropertyVar && v.obj instanceof NativeObjectToken))
+                a.push({v, vs});
         a.sort((x, y) => y.vs.size - x.vs.size);
-        logger.info("Largest subset outs:");
+        logger.info("Largest subset outs (excl. native object properties):");
         // for (let i = Math.min(9, a.length - 1); i >= 0; i--) {
         for (let i = 0; i < 10 && i < a.length; i++) {
             logger.info(`  ${a[i].v}: ${a[i].vs.size}`);

@@ -6,3 +6,4 @@ function BitterServer(opts) {
             req.params[0];
         }})(this));
 }
+new BitterServer()

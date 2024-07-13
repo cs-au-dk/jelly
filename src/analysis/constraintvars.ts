@@ -201,7 +201,7 @@ export class AncestorsVar extends ConstraintVar {
     }
 
     toString(): string {
-        return `Ancestors(${this.t})`;
+        return `Ancestors[${this.t}]`;
     }
 
     getParent(): Node | PackageInfo | ModuleInfo | undefined {

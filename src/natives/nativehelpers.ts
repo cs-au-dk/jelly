@@ -572,62 +572,57 @@ type CallApplyKind = "Function.prototype.call" | "Function.prototype.apply";
  * Models 'call' or 'apply'.
  */
 export function invokeCallApply(kind: CallApplyKind, p: NativeFunctionParams) {
-    if (p.base instanceof FunctionToken || p.base instanceof NativeObjectToken)
-        invokeCallApplyBound(kind, p, p.base);
-}
-
-export function invokeCallApplyBound(kind: CallApplyKind, p: NativeFunctionParams, ft: FunctionToken | NativeObjectToken) {
+    const ft = p.base;
     if (ft instanceof NativeObjectToken) {
         if (ft.invoke)
             warnNativeUsed(`${kind} with native function`, p); // TODO: call/apply to native function
-        return;
-    }
+    } else if (ft instanceof FunctionToken) {
+        const a = p.solver.globalState;
+        const vp = p.solver.varProducer;
+        const args = p.path.node.arguments;
+        const basearg = args[0];
+        const caller = a.getEnclosingFunctionOrModule(p.path);
 
-    const a = p.solver.globalState;
-    const vp = p.solver.varProducer;
-    const args = p.path.node.arguments;
-    const basearg = args[0];
-    const caller = a.getEnclosingFunctionOrModule(p.path);
-
-    let argVars: Array<ConstraintVar | undefined> = [];
-    // TODO: also model conversion for basearg to objects, see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/call
-    // arguments
-    switch (kind) {
-        case "Function.prototype.call":
-            // TODO: SpreadElement
-            argVars = args.slice(1).map(arg => isExpression(arg) ? vp.expVar(arg, p.path) : undefined);
-            break;
-        case "Function.prototype.apply": {
-            if (args.length >= 2 && isExpression(args[1])) { // TODO: SpreadElement
-                const argVar = vp.expVar(args[1], p.path);
-                // model dynamic parameter passing like 'callFunctionTokenBound'
-                p.solver.addForAllTokensConstraint(argVar, TokenListener.NATIVE_INVOKE_CALL_APPLY2, ft.fun, (t: Token) => {
-                    if (t instanceof ArrayToken) {
-                        p.solver.addForAllArrayEntriesConstraint(t, TokenListener.NATIVE_INVOKE_CALL_APPLY3, ft.fun, (prop: string) => {
-                            const param = parseInt(prop);
-                            if (param >= 0 && param < ft.fun.params.length && isIdentifier(ft.fun.params[param])) { // TODO: non-Identifier parameters?
-                                const opv = p.solver.varProducer.objPropVar(t, prop);
-                                const paramVar = p.solver.varProducer.nodeVar(ft.fun.params[param]);
-                                p.solver.addSubsetConstraint(opv, paramVar);
-                            }
-                        });
-                        for (const param of ft.fun.params)
-                            if (isIdentifier(param)) { // TODO: non-Identifier parameters?
-                                const unk = p.solver.varProducer.arrayUnknownVar(t);
-                                p.solver.addSubsetConstraint(unk, p.solver.varProducer.nodeVar(param));
-                            }
-                    }
-                });
+        let argVars: Array<ConstraintVar | undefined> = [];
+        // TODO: also model conversion for basearg to objects, see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/call
+        // arguments
+        switch (kind) {
+            case "Function.prototype.call":
+                // TODO: SpreadElement
+                argVars = args.slice(1).map(arg => isExpression(arg) ? vp.expVar(arg, p.path) : undefined);
+                break;
+            case "Function.prototype.apply": {
+                if (args.length >= 2 && isExpression(args[1])) { // TODO: SpreadElement
+                    const argVar = vp.expVar(args[1], p.path);
+                    // model dynamic parameter passing like 'callFunctionTokenBound'
+                    p.solver.addForAllTokensConstraint(argVar, TokenListener.NATIVE_INVOKE_CALL_APPLY2, ft.fun, (t: Token) => {
+                        if (t instanceof ArrayToken) {
+                            p.solver.addForAllArrayEntriesConstraint(t, TokenListener.NATIVE_INVOKE_CALL_APPLY3, ft.fun, (prop: string) => {
+                                const param = parseInt(prop);
+                                if (param >= 0 && param < ft.fun.params.length && isIdentifier(ft.fun.params[param])) { // TODO: non-Identifier parameters?
+                                    const opv = p.solver.varProducer.objPropVar(t, prop);
+                                    const paramVar = p.solver.varProducer.nodeVar(ft.fun.params[param]);
+                                    p.solver.addSubsetConstraint(opv, paramVar);
+                                }
+                            });
+                            for (const param of ft.fun.params)
+                                if (isIdentifier(param)) { // TODO: non-Identifier parameters?
+                                    const unk = p.solver.varProducer.arrayUnknownVar(t);
+                                    p.solver.addSubsetConstraint(unk, p.solver.varProducer.nodeVar(param));
+                                }
+                        }
+                    });
+                }
+                break;
             }
-            break;
         }
-    }
 
-    // base value
-    // TODO: SpreadElement? non-MemberExpression?
-    const baseVar = isExpression(basearg) ? vp.expVar(basearg, p.path) : undefined;
-    const resultVar = vp.expVar(p.path.node, p.path);
-    p.op.callFunctionTokenBound(ft, baseVar, caller, argVars, resultVar, false, p.path, {native: true});
+        // base value
+        // TODO: SpreadElement? non-MemberExpression?
+        const baseVar = isExpression(basearg) ? vp.expVar(basearg, p.path) : undefined;
+        const resultVar = vp.expVar(p.path.node, p.path);
+        p.op.callFunctionTokenBound(ft, baseVar, caller, argVars, resultVar, false, p.path, {native: true});
+    }
 }
 
 /**
@@ -685,7 +680,7 @@ export function assignIteratorMapValuePairs(param: number, t: AllocationSiteToke
         const src = p.op.expVar(arg, p.path);
         const dst = p.solver.varProducer.intermediateVar(p.path.node, "assignIteratorValuePairsToProperties");
         p.op.readIteratorValue(src, dst, arg); // using the argument node as allocation site for the iterator values
-        p.solver.addForAllTokensConstraint(dst, TokenListener.NATIVE_ASSIGN_ITERATOR_MAP_VALUE_PAIRS, p.path.node.arguments[param], (t2: Token) => {
+        p.solver.addForAllTokensConstraint(dst, TokenListener.NATIVE_ASSIGN_ITERATOR_MAP_VALUE_PAIRS, {n: p.path.node.arguments[param], t}, (t2: Token) => { // TODO: need keys+values in key?
             if (t2 instanceof ArrayToken) {
                 if (keys)
                     p.solver.addSubsetConstraint(p.solver.varProducer.objPropVar(t2, "0"), p.solver.varProducer.objPropVar(t, keys));

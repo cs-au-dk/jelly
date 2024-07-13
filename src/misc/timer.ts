@@ -1,18 +1,20 @@
 import {options} from "../options";
 
+const hrtime = process.hrtime;
+
 export default class Timer {
 
     startTime: bigint;
 
     constructor() {
-        this.startTime = process.hrtime.bigint();
+        this.startTime = hrtime.bigint();
     }
 
     /**
      * Returns the elapsed time in nanoseconds since the timer was created.
      */
     elapsed(): bigint {
-        return process.hrtime.bigint() - this.startTime;
+        return hrtime.bigint() - this.startTime;
     }
 
     checkTimeout() {

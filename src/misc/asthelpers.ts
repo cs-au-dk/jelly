@@ -217,7 +217,7 @@ export function registerArtificialClassPropertyInitializer(f: FragmentState, pat
  * Positions in computed function names belong to the enclosing function of the function being defined.
  * Positions in instance member initializers belong to the class constructor.
  */
-function getEnclosingFunctionPath(path: NodePath): NodePath<Function> | null {
+export function getEnclosingFunctionPath(path: NodePath): NodePath<Function> | null {
     let p: NodePath | null = path, c: Node | undefined = undefined, cc: Node | undefined = undefined;
     do {
         cc = c;

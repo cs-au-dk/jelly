@@ -92,9 +92,9 @@ export async function load(
         if (sandboxedBuiltin) {
             const m = url.substring(5);
             log("verbose", `Intercepting import "${m}"`);
-            res.source = `const m = globalThis.${PREFIX}builtin.${m};`;
+            res.source = `const m = globalThis.${PREFIX}builtin["${m}"];`;
             for (const p of Object.getOwnPropertyNames(require(m)))
-                res.source += `module.exports.${p} = m.${p};`
+                res.source += `module.exports["${p}"] = m["${p}"];`;
             return res;
         }
         if (res.format === "builtin" || res.format === "commonjs" || res.format === "json")

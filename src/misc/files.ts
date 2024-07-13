@@ -59,8 +59,8 @@ function* expandRec(path: string, sub: boolean, visited: Set<string>): Generator
                 /* skip sub-directories with these names */
                 ["node_modules", ".git", ".yarn"].includes(base) ||
                 (inNodeModules &&
-                    /* skip sub-directories with these names if inside node_modules */
-                    ["test"].includes(base)) ||
+                    /* skip sub-directories with these names if inside node_modules and skipTests enabled */
+                    (options.skipTests && ["test", "spec", "__test__"].includes(base))) ||
                 (!inNodeModules &&
                     /* skip sub-directories with these names if not inside node_modules */
                     ["out", "build", "dist", "generated", "compiled"].includes(base))
@@ -73,15 +73,16 @@ function* expandRec(path: string, sub: boolean, visited: Set<string>): Generator
                     }))
                         yield* expandRec(file, true, visited);
                 else
-                    logger.debug(`Skipping directory ${path}`);
+                    (sub ? logger.debug : logger.warn)(`Skipping directory ${path}`);
             } else
-                logger.debug(`Skipping directory ${path}`);
+                (sub ? logger.debug : logger.warn)(`Skipping directory ${path}`);
         } else if (stat.isFile() &&
             /* skip files with this extension */
             !path.endsWith(".d.ts") &&
             (!inNodeModules || !(
                 /* skip files with these extensions if inside node_modules */
-                path.endsWith(".min.js") || path.endsWith(".bundle.js") || path.endsWith(".spec.js")
+                // path.endsWith(".min.js") || path.endsWith(".bundle.js") || // FIXME: remove this?
+                (options.skipTests && (path.endsWith(".spec.js") || path.endsWith(".test.js")))
             )) &&
             /* include files with these extensions */
             (path.endsWith(".js") || path.endsWith(".es") || path.endsWith(".mjs") || path.endsWith(".cjs") ||
@@ -93,7 +94,7 @@ function* expandRec(path: string, sub: boolean, visited: Set<string>): Generator
                 ))))
             yield relative(options.basedir, path);
         else
-            (sub ? logger.debug : logger.warn)(`Skipping file ${path}`);
+            (sub ? logger.debug : logger.warn)(`Skipping file ${path}, doesn't look like a JavaScript/TypeScript file`);
     } catch {
         logger.error(`Error: Unable to read ${path}`);
     }

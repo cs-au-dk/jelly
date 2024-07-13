@@ -120,18 +120,18 @@ export function getPackageJsonInfo(tofile: FilePath): PackageJsonInfo {
                         exports.push(exp !== "./" && exp.endsWith("/") ? exp + "*" : exp);
                     else {
                         exports = undefined;
-                        logger.warn(`Non-relative export (${exp}) found in package.json`);
+                        logger.warn(`Warning: Non-relative export (${exp}) found in ${p.packageJson}`);
                         break;
                     }
                 } else if (Array.isArray(exp))
                     pushAll(exp, queue);
                 else if (exp === null)
-                    logger.warn("Warning: unsupported negative exports pattern found in package.json");
+                    logger.warn(`Warning: Unsupported negative exports pattern found in ${p.packageJson}`);
                 else if (typeof exp === "object")
                     pushAll(Object.values(exp), queue);
                 else {
                     exports = undefined;
-                    logger.warn(`Invalid export (${exp}) found in package.json`);
+                    logger.warn(`Warning: Invalid export (${exp}) found in ${p.packageJson}`);
                     break;
                 }
             }
@@ -151,7 +151,7 @@ export function isInExports(rel: string, exports: Array<string>): boolean {
     // TODO: all wildcards in a pattern should expand to the same value
     for (const path of exports)
         if (path.includes("*")) {
-            if (new RegExp(`^${path.replace(/\*/g, ".*")}$`).test(rel))
+            if (new RegExp(`^${path.replaceAll(/\*/g, ".*")}$`).test(rel))
                 return true;
         } else if (path === rel)
             return true;

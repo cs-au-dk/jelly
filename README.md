@@ -234,20 +234,3 @@ To enable source map transformation of stack traces, prefix commands by:
 ```bash
 NODE_OPTIONS=--enable-source-maps
 ```
-
-### Differential testing
-
-Differential testing can be used to test if updated code results in lower recall than the previous version by comparing the dataflow graph and call graphs of the two versions.
-
-Run the following command to test the testing framework:
-```bash
-TAG=<tag> npm run differential -- -t tiny
-```
-where `<tag>` is the git tag of the previous version you want to compare to.
-
-Then run the following commands to start full test:
-```bash
-TAG=<tag> npm run differential
-```
-
-During the test, the old version of Jelly will be installed in `tests/node_modules/jelly-previous` and test packages will be installed in `tmp/packages`.

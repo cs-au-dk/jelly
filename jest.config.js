@@ -200,16 +200,5 @@ module.exports = {
                 "**/*.test.ts"
             ],
         },
-        {
-            displayName: "differential",
-            ...base,
-            // A path to a module which exports an async function that is triggered once before all test suites
-            globalSetup: "<rootDir>/tests/differential/install.ts",
-            // The glob patterns Jest uses to detect test files
-            testMatch: [
-                "**/*.difftest.ts"
-            ],
-            transformIgnorePatterns: ["node_modules/(?!(jelly-previous)/)"]
-        },
     ],
 };

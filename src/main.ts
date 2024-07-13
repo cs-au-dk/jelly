@@ -58,7 +58,6 @@ program
     .option("--approx", "enable approximate interpretation")
     .option("--approx-only <file>", "perform approximate interpretation, no static analysis")
     .option("--approx-load <file>", "use pre-computed approximate interpretation results")
-    .option("--approx-store <file>", "store approximate interpretation results (use with --approx)")
     .option("-p, --patterns <file...>", "files containing API usage patterns to detect")
     .option("-v, --vulnerabilities <file>", "report vulnerability matches")
     // .option("-g, --callgraph-graphviz <file>", "save call graph as Graphviz dot file") // TODO: graphviz output disabled for now
@@ -105,6 +104,7 @@ program
     .option("--compare-callgraphs", "compare two call graphs given as JSON files, no analysis")
     .option("--reachability", "compare call graph reachability (use with -s or --compare-callgraphs)")
     .option("--library", "assume program is a library (default: true if in node_modules)")
+    .option("--skip-tests", "skip files that look like tests")
     .option("--no-alloc", "disable allocation site abstraction")
     .option("--oldobj", "old object abstraction")
     .option("--widening", "enable object widening")
@@ -267,6 +267,11 @@ async function main() {
         }
 
         if (options.approxOnly) {
+            if (!options.approxOnly.endsWith(".json")) {
+                logger.error("Error: --approx-only should be a .json file");
+                process.exitCode = -1;
+                return;
+            }
 
             const p = new ProcessManager();
             try {
@@ -289,6 +294,21 @@ async function main() {
             logger.info(`TypeScript library usage written to ${options.typescriptLibraryUsage}`);
 
         } else {
+            if (options.callgraphJson !== undefined && !options.callgraphJson.endsWith(".json")) {
+                logger.error("Error: --callgraph-json (-j) should be a .json file");
+                process.exitCode = -1;
+                return;
+            }
+            if (options.tokensJson !== undefined && !options.tokensJson.endsWith(".json")) {
+                logger.error("Error: --tokens-json should be a .json file");
+                process.exitCode = -1;
+                return;
+            }
+            if (options.diagnosticsJson !== undefined && !options.diagnosticsJson.endsWith(".json")) {
+                logger.error("Error: --diagnostics-json should be a .json file");
+                process.exitCode = -1;
+                return;
+            }
 
             let tapirPatterns, patterns, globs, props, vulnerabilityDetector;
             if (options.patterns) {
@@ -353,6 +373,8 @@ async function main() {
             if (options.largest) {
                 out.reportLargestSubsetEdges();
                 out.reportLargestTokenSets();
+                out.reportLargestTokenTimesEdges();
+                out.reportMostCalledFunctions();
             }
 
             if (options.callgraphJson)

@@ -243,8 +243,7 @@ export class GlobalState {
         this.functionInfos.set(fun, f);
         const parent = getEnclosingFunction(path);
         (parent ? this.functionInfos.get(parent)!.functions : m.functions).add(f);
-        if (this.vulnerabilities)
-            this.vulnerabilities.reachedFunction(path, f); // TODO: move to FragmentState?
+        this.vulnerabilities?.reachedFunction(path, f); // TODO: move to FragmentState?
     }
 
     /**
@@ -304,7 +303,7 @@ export class GlobalState {
                 const ignoreModule = (from && (options.ignoreDependencies ||
                         (!packageInfo.isEntry && ((options.includePackages && !options.includePackages.includes(packageInfo.name)))))) ||
                     options.excludePackages?.includes(packageInfo.name);
-                moduleInfo = new ModuleInfo(rel, packageInfo, from === undefined, !ignoreModule);
+                moduleInfo = new ModuleInfo(rel, packageInfo, from === undefined, !ignoreModule); // FIXME: from === undefined may depend on visit order when using approx
                 packageInfo.modules.set(rel, moduleInfo);
 
                 // record that module has been reached

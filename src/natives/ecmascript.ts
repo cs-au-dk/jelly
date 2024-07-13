@@ -14,12 +14,13 @@ import {
     callPromiseExecutor,
     defineProperties,
     functionBind,
+    generatorCall,
     invokeCallApply,
     invokeCallback,
-    newSpecialObject,
     newArray,
     newObject,
     newPackageObject,
+    newSpecialObject,
     prepareDefineProperties,
     prepareDefineProperty,
     returnArgument,
@@ -39,7 +40,6 @@ import {
     setPrototypeOf,
     warnNativeUsed,
     widenArgument,
-    generatorCall,
 } from "./nativehelpers";
 import {
     AllocationSiteToken,
@@ -1677,6 +1677,9 @@ export const ecmascriptModels: NativeModel = {
                     name: "substring"
                 },
                 {
+                    name: "substr" // deprecated
+                },
+                {
                     name: "toLocaleLowerCase"
                 },
                 {
@@ -1710,6 +1713,12 @@ export const ecmascriptModels: NativeModel = {
             invoke: (p: NativeFunctionParams) => {
                 warnNativeUsed("Symbol", p); // TODO
             },
+            staticMethods: [
+                {
+                    name: "for"
+                }
+                // TODO
+            ],
             methods: []
             // TODO
         },

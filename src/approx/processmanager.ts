@@ -116,9 +116,9 @@ export class ProcessManager {
                 if (logger.isDebugEnabled())
                     logger.debug(`Skipping ${m}, module already visited`);
             } else if (!([".js", ".jsx", ".es", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts"].includes(extname(file)) ||
-                (extname(file) === "" && isShebang(file)))) {
+                (extname(file) === "" && isShebang(file))))
                 logger.info(`Skipping ${m}, unsupported extension`);
-            } else {
+            else {
                 if (options.printProgress)
                     logger.info(`Analyzing ${m}`);
                 await this.execute(file);

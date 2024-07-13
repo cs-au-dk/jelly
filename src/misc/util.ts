@@ -3,6 +3,7 @@ import assert from "assert";
 import {ModuleInfo} from "../analysis/infos";
 import {CallGraph} from "../typings/callgraph";
 import logger from "./logger";
+import {JELLY_NODE_ID} from "../parsing/extras";
 
 export type SimpleLocation = {
     start: {
@@ -545,4 +546,17 @@ export function longestCommonPrefix(a: Array<string>): string {
 
 export function stringify(x: any, space: string | number = 2): string {
     return JSON.stringify(x, (_k, v) => typeof v === "bigint" ? Number(v / 1000000n) : v, space);
+}
+
+/**
+ * Provides a unique'ish ID for the given node.
+ */
+export function getNodeHash(n: Node): bigint {
+    const nid = (n as any)[JELLY_NODE_ID];
+    assert(nid !== undefined);
+    let id = (BigInt(nid) << 32n);
+    const h = n.loc && (n.loc as Location).module?.hash;
+    if (h)
+        id += BigInt(h);
+    return id;
 }

@@ -201,18 +201,7 @@ function processPendingWriteHints(fun: any, res: any) {
  * @return if proceed is true then proceed with the call, otherwise return the result value
  */
 function callPre(mod: string, loc: string, base: any, fun: any, args: Array<any>, isNew: boolean): {proceed: boolean, result?: any} {
-    if (fun === eval && !isNew) {
-        const str = args[0];
-        if (logger.isVerboseEnabled())
-            logger.verbose(`Indirect eval ${mod}:${loc} (code length: ${typeof str === "string" ? str.length : "?"})`);
-        if (typeof str === "string")
-            hints.addEvalHint({
-                loc: getLocationJSON(mod, loc),
-                str
-            });
-        const result = fun(transform(mod, loc, str, "commonjs"));
-        return {proceed: false, result};
-    } else if (fun === Function) {
+    if (fun === Function) {
         const funargs = args.slice(0, args.length - 1);
         const funbody = args[args.length - 1] ?? "";
         let error = false;
@@ -235,21 +224,35 @@ function callPre(mod: string, loc: string, base: any, fun: any, args: Array<any>
             objLoc.set(result, [getLocationJSON(mod, loc), "Function"]);
             return {proceed: false, result};
         }
-    } else if (fun.name === "require" && "resolve" in fun && "cache" in fun) { // probably a require function
-        const str = typeof args[0] === "string" && args[0].startsWith("node:") ? args[0].substring(5) : args[0];
-        if (Module.isBuiltin(str) && !WHITELISTED.has(str)) {
-            if (logger.isDebugEnabled())
-                logger.debug(`Intercepting require "${args[0]}"`);
-            return {proceed: false, result: stdlibProxy(fun(args[0]))};
+    } else if (!isNew)
+        if (fun.name === "require" && "resolve" in fun && "cache" in fun) { // probably a require function
+            const str = typeof args[0] === "string" && args[0].startsWith("node:") ? args[0].substring(5) : args[0];
+            if (Module.isBuiltin(str) && !WHITELISTED.has(str)) {
+                if (logger.isDebugEnabled())
+                    logger.debug(`Intercepting require "${args[0]}"`);
+                return {proceed: false, result: stdlibProxy(fun(args[0]))};
+            }
+        } else switch (fun) {
+            case eval:
+                const str = args[0];
+                if (logger.isVerboseEnabled())
+                    logger.verbose(`Indirect eval ${mod}:${loc} (code length: ${typeof str === "string" ? str.length : "?"})`);
+                if (typeof str === "string")
+                    hints.addEvalHint({
+                        loc: getLocationJSON(mod, loc),
+                        str
+                    });
+                const result = fun(transform(mod, loc, str, "commonjs"));
+                return {proceed: false, result};
+            case Function.prototype.apply:
+                return callPre(mod, loc, args[0], base, args[1] ?? [], false);
+            case Function.prototype.call:
+                return callPre(mod, loc, args[0], base, args.slice(1), false);
+            case Reflect.apply:
+                return callPre(mod, loc, args[1], args[0], args[2], false);
+            case Reflect.construct:
+                return callPre(mod, loc, args[1], args[0], args[2], true);
         }
-    } else if (fun === Function.prototype.apply)
-        return callPre(mod, loc, args[0], base, args[1] ?? [], false);
-    else if (fun === Function.prototype.call)
-        return callPre(mod, loc, args[0], base, args.slice(1), false);
-    else if (fun === Reflect.apply)
-        return callPre(mod, loc, args[1], args[0], args[2], false);
-    else if (fun === Reflect.construct)
-        return callPre(mod, loc, args[1], args[0], args[2], true);
     return {proceed: true};
 }
 
@@ -463,7 +466,7 @@ for (const [name, val] of Object.entries({
             logger.debug(`$start ${mod}: ${i}`);
         if (modobj && modobj.exports) { // undefined for ESM modules (don't have dynamic exports anyway)
             objLoc.set(modobj.exports, [`${i}:-1:-1:-1:-1`, "Object"]); // allocation site for module.exports
-            return makeModuleProxy(modobj);
+            return makeModuleProxy(modobj); // FIXME: assigning to module fails in strict mode (suppressed exception)
         }
         return undefined;
     },
@@ -972,9 +975,9 @@ Module.register("./hooks.js", {
     },
     transferList: [port2]
 });
-port1.on("message",(msg:
-                        {type: "log", level: string, str: string} |
-                        {type: "transform", filename: FilePath, source: string}) => {
+port1.on("message", (msg:
+                         {type: "log", level: string, str: string} |
+                         {type: "transform", filename: FilePath, source: string}) => {
     switch (msg.type) {
         case "log": {
             const {level, str} = msg;

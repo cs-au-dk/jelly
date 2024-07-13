@@ -744,6 +744,7 @@ export class Operations {
                     const fp = getEnclosingFunction(path);
                     const from = fp ? this.a.functionInfos.get(fp)! : this.moduleInfo;
                     const to = this.a.moduleInfosByPath.get(filepath)!;
+                    assert(to === m); // XXX: ?
                     f.registerRequireEdge(from, to);
 
                     if (!reexport) {

@@ -1,6 +1,5 @@
 import {FilePath, Location, locationToString, strHash} from "../misc/util";
 import {sep} from "path";
-import assert from "assert";
 
 /**
  * Information about a package.
@@ -51,7 +50,6 @@ export class ModuleInfo {
     }
 
     toString(): string {
-        assert(this.packageInfo !== undefined && this.relativePath !== undefined);
         return `${this.packageInfo}:${this.relativePath}`;
     }
 
@@ -59,7 +57,6 @@ export class ModuleInfo {
      * Returns normalized file path of the representative file (different paths may refer to the same ModuleInfo).
      */
     getPath(): FilePath {
-        assert(this.packageInfo.dir !== undefined);
         return `${this.packageInfo.dir}${sep}${this.relativePath}`;
     }
 

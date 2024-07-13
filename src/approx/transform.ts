@@ -87,8 +87,8 @@ const START_ESM = template.statements(
     `__filename = import.meta.url.startsWith("file://") ? import.meta.url.substring(7) : undefined, ` +
     `__dirname = import.meta.url.startsWith("file://") ? ${PREFIX}dirname(import.meta.url.substring(7)) : undefined;`
 );
-const OBJCLS = template.expression(`(${PREFIX}init(), ${PREFIX}alloc(${PREFIX}mod, LOC, BODY, true, CLS))`);
-const FUNARRAY = template.expression(`${PREFIX}alloc(${PREFIX}mod, LOC, BODY)`);
+const OBJCLS = template.expression(`(${PREFIX}init(), ${PREFIX}alloc(${PREFIX}mod, LOC, VAL, true, CLS))`);
+const FUNARRAY = template.expression(`${PREFIX}alloc(${PREFIX}mod, LOC, VAL)`);
 const FUNDECL = template.statement(`${PREFIX}alloc(${PREFIX}mod, LOC, VAL)`);
 const INIT = template.statement(`${PREFIX}init()`);
 const ALLOC = template.statements(`${PREFIX}alloc(${PREFIX}mod, LOC, VAL, true, true)`);
@@ -99,7 +99,7 @@ const FUNCALL = template.expression(`${PREFIX}fun(${PREFIX}mod, LOC, FUN, OPTCAL
 const EVAL = template.expression(`${PREFIX}eval(${PREFIX}mod, LOC, STR)`);
 const REQUIRE = template.expression(`${PREFIX}require(${PREFIX}mod, LOC, STR)`);
 const METHODCALL = template.expression(`${PREFIX}method(${PREFIX}mod, LOC, BASE, PROP, DYN, OPTMEMBER, OPTCALL, ARGS)`);
-const COMP = template.expression(`${PREFIX}comp(${PREFIX}mod, LOC, BODY, KIND, STATIC, DYN)`);
+const COMP = template.expression(`${PREFIX}comp(${PREFIX}mod, LOC, VAL, KIND, STATIC, DYN)`);
 const ENTER = template.expression(`${PREFIX}enter(${PREFIX}mod, LOC)`);
 const SUPER = template.expression(`${PREFIX}this(${PREFIX}mod, LOC, SUPER)`);
 const THIS = template.expression(`${PREFIX}this(${PREFIX}mod, LOC, NEWTARGET)`);
@@ -297,7 +297,7 @@ export function approxTransform(ast: File, str: string, file: string, mode: "com
     function visitObjectOrClassExpression(path: NodePath<ObjectExpression | ClassExpression>) {
         path.replaceWith(OBJCLS({
             LOC: getLoc(path.node.loc),
-            BODY: path.node,
+            VAL: path.node,
             CLS: booleanLiteral(isClassExpression(path.node))
         }));
         path.skip();
@@ -306,7 +306,7 @@ export function approxTransform(ast: File, str: string, file: string, mode: "com
     function visitFunctionOrArrayExpression(path: NodePath<FunctionExpression | ArrowFunctionExpression | ArrayExpression>) {
         path.replaceWith(FUNARRAY({
             LOC: getLoc(path.node.loc),
-            BODY: path.node
+            VAL: path.node
         }));
         path.skip();
     }
@@ -435,7 +435,7 @@ export function approxTransform(ast: File, str: string, file: string, mode: "com
         }
         path.get("key").replaceWith(COMP({
             LOC: getLoc(path.node.loc),
-            BODY: path.node.key,
+            VAL: path.node.key,
             KIND: stringLiteral(isObjectMethod(path.node) || isClassMethod(path.node) ? path.node.kind : "field"),
             STATIC: booleanLiteral(isClassMethod(path.node) || isClassProperty(path.node) ? path.node.static : false),
             DYN: booleanLiteral(computed)
