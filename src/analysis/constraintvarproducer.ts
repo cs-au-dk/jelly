@@ -83,9 +83,9 @@ export class ConstraintVarProducer<RVT extends RepresentativeVar | MergeRepresen
     identVar(id: Identifier | JSXIdentifier, path: NodePath): ConstraintVar {
         const binding = path.scope.getBinding(id.name);
         let d;
-        if (binding) {
+        if (binding)
             d = binding.identifier;
-        } else {
+        else {
             if (id.name === "arguments") {
                 const fun = this.f.registerArguments(path);
                 return fun ? this.argumentsVar(fun) : this.nodeVar(id); // using the identifier itself as fallback if no enclosing function

@@ -197,7 +197,7 @@ export class Operations {
                     // the node parameter is required as it defines the argument variables, result variable,
                     // and various implicit parameters of native calls
                     this.solver.addForAllTokensConstraint(callees, key, {n: path.node, t},
-                                                          (ft: Token) => handleCall(t, ft));
+                        (ft: Token) => handleCall(t, ft));
                 }
 
                 if (t instanceof AccessPathToken && (prop === "call" || prop === "apply"))
@@ -339,8 +339,7 @@ export class Operations {
         const vp = f.varProducer;
         const pars = getAdjustedCallNodePath(path);
         f.registerCallEdge(pars.node, caller, this.a.functionInfos.get(t.fun)!, kind);
-        const hasArguments = f.functionsWithArguments.has(t.fun);
-        const argumentsToken = hasArguments ? this.a.canonicalizeToken(new ArrayToken(t.fun.body)) : undefined;
+        const argumentsToken = f.functionsWithArguments.has(t.fun) ? this.a.canonicalizeToken(new ArrayToken(t.fun.body)) : undefined;
         for (const [i, arg] of args.entries()) {
             // constraint: ...: ⟦Ei⟧ ⊆ ⟦Xi⟧ for each argument/parameter i (Xi may be a pattern)
             if (arg) {
@@ -358,10 +357,13 @@ export class Operations {
                         addInclusionConstraint(arg, vp.nodeVar(param));
                 }
                 // constraint ...: ⟦Ei⟧ ⊆ ⟦t_arguments[i]⟧ for each argument i if the function uses 'arguments'
-                if (hasArguments)
-                    addInclusionConstraint(arg, vp.objPropVar(argumentsToken!, String(i)));
+                if (argumentsToken)
+                    addInclusionConstraint(arg, vp.objPropVar(argumentsToken, String(i)));
             }
         }
+        // constraint: ...: t_arguments ∈ ⟦t_arguments⟧ if the function uses 'arguments'
+        if (argumentsToken)
+            this.solver.addTokenConstraint(argumentsToken, vp.argumentsVar(t.fun));
         // constraint: if non-'new', E0 is a member expression E.m and t uses 'this', then ⟦E⟧ ⊆ ⟦this_f⟧
         if (!isNew && base)
             addInclusionConstraint(base, vp.thisVar(t.fun));
@@ -401,8 +403,6 @@ export class Operations {
 
         // expression E.p or E["p"] or E[i]
         if (prop !== undefined) {
-
-            // TODO: model reads from __proto__ (if options.proto enabled), see nativehelpers.ts:returnPrototypeOf
 
             // constraint: ∀ objects t ∈ ⟦E⟧: ...
             this.solver.addForAllTokensConstraint(base, TokenListener.READ_BASE, lopts, (t: Token) => {
@@ -506,9 +506,9 @@ export class Operations {
         if (!(t instanceof NativeObjectToken && !t.moduleInfo) && prop !== "prototype") {
             const getter = this.solver.varProducer.objPropVar(t, prop, "get");
             this.solver.addForAllTokensConstraint(getter, TokenListener.READ_GETTER, dstkey,
-                                                  (t3: Token) => readFromGetter(t3));
+                (t3: Token) => readFromGetter(t3));
             this.solver.addForAllTokensConstraint(getter, TokenListener.READ_GETTER_THIS, {t: thist},
-                                                  (t3: Token) => bindGetterThis(thist, t3));
+                (t3: Token) => bindGetterThis(thist, t3));
         }
 
         if (t instanceof PackageObjectToken && t.kind === "Object") {

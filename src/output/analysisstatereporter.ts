@@ -554,7 +554,6 @@ export class AnalysisStateReporter {
         a.sort();
         for (const f of a)
             logger.info(f);
-
     }
 
     /**

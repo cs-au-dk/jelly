@@ -83,7 +83,6 @@ import {
 import {
     AccessPathToken,
     AllocationSiteToken,
-    ArrayToken,
     ClassToken,
     FunctionToken,
     NativeObjectToken,
@@ -134,7 +133,9 @@ export function visit(ast: File, op: Operations) {
 
     function currentFunctionInfo(): FunctionInfo | ModuleInfo {
         const f = currentFunction();
-        return f ? a.functionInfos.get(f)! : op.moduleInfo;
+        const g = f ? a.functionInfos.get(f) : op.moduleInfo;
+        assert(g);
+        return g;
     }
 
     // traverse the AST and extend the analysis result with information about the current module
@@ -295,7 +296,6 @@ export function visit(ast: File, op: Operations) {
 
                 // record that a function/method/constructor/getter/setter has been reached, connect to its enclosing function or module
                 const fun = path.node;
-                funStack.push(fun);
                 let cls: Class | undefined;
                 if (isClassMethod(fun) && fun.kind === "constructor")
                     cls = getClass(path);
@@ -345,21 +345,14 @@ export function visit(ast: File, op: Operations) {
                     // constraint i ∈ ⟦ret_f⟧ where i is the iterator object for the function
                     solver.addTokenConstraint(iter, vp.returnVar(fun));
                 }
-            },
 
-            exit(path: NodePath<Function>) {
-                // constraint: ...: t_arguments ∈ ⟦t_arguments⟧ if the function uses 'arguments'
-                const fun = path.node;
-                if (f.functionsWithArguments.has(fun)) {
-                    const argumentsToken = a.canonicalizeToken(new ArrayToken(fun.body));
-                    solver.addTokenConstraint(argumentsToken!, vp.argumentsVar(fun));
-                }
-                funStack.pop();
+                funStack.push(fun);
             }
         },
 
         FunctionDeclaration: {
             exit(path: NodePath<FunctionDeclaration>) {
+                funStack.pop();
 
                 // function f(...) {...}  (as declaration)
                 // constraint: t ∈ ⟦f⟧ where t denotes the function
@@ -370,6 +363,7 @@ export function visit(ast: File, op: Operations) {
 
         FunctionExpression: {
             exit(path: NodePath<FunctionExpression>) {
+                funStack.pop();
 
                 // function f(...) {...} (as expression, possibly without name)
                 // constraint: t ∈ ⟦function f(...) {...}⟧ where t denotes the function
@@ -383,14 +377,16 @@ export function visit(ast: File, op: Operations) {
 
         ArrowFunctionExpression: {
             exit(path: NodePath<ArrowFunctionExpression>) {
+                // constraint: ⟦E⟧ ⊆ ⟦ret_f⟧ where f is the function
+                if (isExpression(path.node.body))
+                    solver.addSubsetConstraint(op.expVar(path.node.body, path), vp.returnVar(path.node));
+
+                funStack.pop();
 
                 // (...) => E
                 // constraint: t ∈ ⟦(...) => E⟧ where t denotes the function
                 if (!isParentExpressionStatement(path))
                     solver.addTokenConstraint(op.newFunctionToken(path.node), vp.nodeVar(path.node));
-                // constraint: ⟦E⟧ ⊆ ⟦ret_f⟧ where f is the function
-                if (isExpression(path.node.body))
-                    solver.addSubsetConstraint(op.expVar(path.node.body, path), vp.returnVar(path.node));
             }
         },
 
@@ -558,6 +554,7 @@ export function visit(ast: File, op: Operations) {
 
         Method: {
             exit(path: NodePath<ObjectMethod | ClassMethod | ClassPrivateMethod>) {
+                funStack.pop();
                 switch (path.node.kind) {
                     case "method":
                     case "get":
@@ -627,7 +624,6 @@ export function visit(ast: File, op: Operations) {
                                 solver.addTokenConstraint(t, dst);
                             }
                         } else {
-
                             if (!options.oldobj && (options.approx || options.approxLoad))
                                 op.newFunctionToken(path.node); // need to register the allocation site for patching
 
@@ -920,7 +916,6 @@ export function visit(ast: File, op: Operations) {
                                     f.warnUnsupported(spec); // TODO: ExportNamespaceSpecifier, see https://babeljs.io/docs/en/babel-plugin-proposal-export-namespace-from
                                     break;
                             }
-
                     }
                     break;
                 case "ExportAllDeclaration": // example: export * from "m"

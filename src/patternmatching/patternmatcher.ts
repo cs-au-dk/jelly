@@ -423,7 +423,7 @@ export class PatternMatcher {
             for (const [v, ts] of this.fragmentState.getAllVarsAndTokens()) // only includes representatives, but always followed by property read
                 if (v instanceof NodeVar)
                     check(v, ts);
-            for (const v of this.fragmentState.redirections)
+            for (const v of this.fragmentState.redirections.keys())
                 if (v instanceof NodeVar)
                     check(v, this.fragmentState.getTokens(this.fragmentState.getRepresentative(v)));
         }

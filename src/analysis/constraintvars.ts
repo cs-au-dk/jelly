@@ -217,7 +217,7 @@ export class ReadResultVar extends ConstraintVar {
 
     constructor(
         readonly t: ObjectPropertyVarObj,
-        readonly prop: string,
+        readonly prop: string
     ) {
         super();
     }

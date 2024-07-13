@@ -1,7 +1,7 @@
 import {ConstraintVar, ObjectPropertyVarObj} from "./constraintvars";
 import {AccessPathToken, ArrayToken, FunctionToken, ObjectToken, PackageObjectToken, Token} from "./tokens";
 import {DummyModuleInfo, FunctionInfo, ModuleInfo, PackageInfo} from "./infos";
-import {CallExpression, Function, Identifier, isArrowFunctionExpression, JSXIdentifier, NewExpression, Node, OptionalCallExpression, SourceLocation,} from "@babel/types";
+import {CallExpression, Function, Identifier, JSXIdentifier, NewExpression, Node, OptionalCallExpression, SourceLocation,} from "@babel/types";
 import assert from "assert";
 import {addMapHybridSet, locationToStringWithFile, locationToStringWithFileAndEnd, mapGetSet} from "../misc/util";
 import {AccessPath, CallResultAccessPath, ComponentAccessPath, ModuleAccessPath, PropertyAccessPath} from "./accesspaths";
@@ -12,6 +12,7 @@ import {GlobalState} from "./globalstate";
 import {ConstraintVarProducer} from "./constraintvarproducer";
 import Solver from "./solver";
 import {MaybeEmptyPropertyRead} from "../patching/patchdynamics";
+import {getEnclosingNonArrowFunction} from "../misc/asthelpers";
 
 export type ListenerID = bigint;
 
@@ -588,23 +589,12 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
      * Registers that the current function uses 'arguments'.
      */
     registerArguments(path: NodePath): Function | undefined {
-        const f = this.getEnclosingFunction(path);
+        const f = getEnclosingNonArrowFunction(path);
         if (f) {
             this.functionsWithArguments.add(f);
             if (logger.isDebugEnabled())
                 logger.debug(`Function uses 'arguments': ${locationToStringWithFile(f.loc)}`);
         }
-        return f;
-    }
-
-    /**
-     * Returns the enclosing (non-arrow) function, or undefined if no such function.
-     */
-    getEnclosingFunction(path: NodePath): Function | undefined {
-        let p: NodePath | NodePath<Function> | null | undefined = path, f: Function | undefined;
-        do {
-            f = (p = p?.getFunctionParent())?.node;
-        } while (f && isArrowFunctionExpression(f));
         return f;
     }
 

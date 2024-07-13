@@ -9,9 +9,11 @@ import {
     ClassPrivateProperty,
     ClassProperty,
     Expression,
+    Function,
     Identifier,
     ImportDefaultSpecifier,
     ImportSpecifier,
+    isArrowFunctionExpression,
     isCallExpression,
     isClassPrivateMethod,
     isClassPrivateProperty,
@@ -216,4 +218,15 @@ export function registerArtificialClassPropertyInitializer(f: FragmentState, pat
     const m = (path.node.loc as Location).module;
     assert(m);
     f.registerArtificialFunction(m, sl);
+}
+
+/**
+ * Returns the enclosing non-arrow function, or undefined if no such function.
+ */
+export function getEnclosingNonArrowFunction(path: NodePath): Function | undefined {
+    let p: NodePath | NodePath<Function> | null | undefined = path, f: Function | undefined;
+    do {
+        f = (p = p?.getFunctionParent())?.node;
+    } while (f && isArrowFunctionExpression(f));
+    return f;
 }
