@@ -38,6 +38,7 @@ import {
     isObjectExpression,
     isObjectMethod,
     isObjectPattern,
+    isOptionalCallExpression,
     isOptionalMemberExpression,
     isPrivateName,
     isStringLiteral,
@@ -361,7 +362,7 @@ export function approxTransform(ast: File, str: string, file: string, mode: "com
     function visitCall(path: NodePath<CallExpression | OptionalCallExpression>) {
         if (isMemberExpression(path.node.callee) || isOptionalMemberExpression(path.node.callee)) {
             if (!isPrivateName(path.node.callee.property) && !isSuper(path.node.callee.object)) // TODO: currently not producing hints for super[...](...)
-                visitMethodCall(path, path.node.callee.object, path.node.callee.property, Boolean(path.node.callee.computed), Boolean(path.node.callee.optional));
+                visitMethodCall(path, path.node.callee.object, path.node.callee.property, Boolean(path.node.callee.computed), isOptionalMemberExpression(path.node.callee) || isOptionalCallExpression(path.node.callee));
         } else if (isExpression(path.node.callee))
             visitFunctionCall(path);
     }
@@ -380,7 +381,7 @@ export function approxTransform(ast: File, str: string, file: string, mode: "com
         if (isIdentifier(fun)) {
             if (SPECIALS.has(fun.name))
                 return;
-            if (fun.name === "eval" && !path.scope.getBinding(fun.name) && !path.node.optional) { // direct eval
+            if (fun.name === "eval" && !path.scope.getBinding(fun.name) && !isOptionalCallExpression(path.node)) { // direct eval
                 if (path.node.arguments.length >= 1)
                     path.get("arguments")[0].replaceWith(EVAL({
                         LOC: getLoc(path.node.loc),
@@ -394,7 +395,7 @@ export function approxTransform(ast: File, str: string, file: string, mode: "com
         path.replaceWith(FUNCALL({
             LOC: getLoc(path.node.loc),
             FUN: fun,
-            OPTCALL: booleanLiteral(Boolean(path.node.optional)),
+            OPTCALL: booleanLiteral(isOptionalCallExpression(path.node)),
             ARGS: path.node.arguments
         }));
         path.skip();
@@ -407,7 +408,7 @@ export function approxTransform(ast: File, str: string, file: string, mode: "com
             PROP: isDynamic ? prop : stringLiteral((prop as Identifier).name),
             DYN: booleanLiteral(isDynamic),
             OPTMEMBER: booleanLiteral(isOptMember),
-            OPTCALL: booleanLiteral(Boolean(path.node.optional)),
+            OPTCALL: booleanLiteral(isOptionalCallExpression(path.node)),
             ARGS: path.node.arguments
         }));
         path.skip();

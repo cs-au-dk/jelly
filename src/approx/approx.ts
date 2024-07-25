@@ -225,7 +225,9 @@ function callPre(mod: string, loc: string, base: any, fun: any, args: Array<any>
             const str = `function anonymous(${funargs.join(",")}){${funbody}}`;
             if (logger.isVerboseEnabled())
                 logger.verbose(`Function ${mod}:${loc} (code length: ${str.length})`);
-            const result = fun(funargs, transform(mod, loc, String(funbody), "commonjs"));
+            if (logger.isDebugEnabled())
+                logger.debug(str);
+            const result = fun(...funargs, transform(mod, loc, String(funbody), "commonjs"));
             hints.addEvalHint({
                 loc: getLocationJSON(mod, loc),
                 str
@@ -695,7 +697,7 @@ for (const [name, val] of Object.entries({
             incrementStackSize();
             const {proceed, result} = callPre(mod, loc, undefined, fun, args, false);
             if (proceed) {
-                const res = fun(...args);
+                const res = Reflect.apply(fun, undefined, args);
                 callPost(mod, loc, fun, args, res);
                 return res;
             } else
@@ -741,7 +743,7 @@ for (const [name, val] of Object.entries({
             incrementStackSize();
             const {proceed, result} = callPre(mod, loc, base, fun, args, false);
             if (proceed) {
-                const res = fun.apply(base, args);
+                const res = Reflect.apply(fun, base, args);
                 callPost(mod, loc, fun, args, res, base);
                 return res;
             } else
@@ -772,10 +774,17 @@ for (const [name, val] of Object.entries({
             incrementStackSize();
             const {proceed, result} = callPre(mod, loc, undefined, fun, args, true);
             if (proceed) {
-                const res = new fun(...args);
+                const res = Reflect.construct(fun, args) as any;
                 processPendingWriteHints(fun, res);
-                if (NATIVE_CONSTRUCTORS.has(fun))
-                    objLoc.set(res, [getLocationJSON(mod, loc), "Object"]);
+                if (NATIVE_CONSTRUCTORS.has(fun) && (typeof res === "object" || typeof res === "function")) {
+                    const t =
+                        typeof res === "object" ? "Object" :
+                            typeof res === "function" ? "Function" :
+                                Array.isArray(res) ? "Array" :
+                                    undefined;
+                    if (t)
+                        objLoc.set(res, [getLocationJSON(mod, loc), t]);
+                }
                 return res;
             } else
                 return result;
