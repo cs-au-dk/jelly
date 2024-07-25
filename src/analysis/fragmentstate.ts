@@ -406,8 +406,10 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
      * Registers a require/import call.
      */
     registerRequireCall(node: Node, from: ModuleInfo | FunctionInfo, m: ModuleInfo | DummyModuleInfo) {
-        if (options.callgraphRequire)
+        if (options.callgraphRequire) {
             mapGetSet(this.callToModule, node).add(m);
+            this.callLocations.add(node);
+        }
         mapGetSet(this.callToFunctionOrModule, node).add(m);
         this.callToContainingFunction.set(node, from);
     }
