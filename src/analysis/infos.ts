@@ -24,7 +24,7 @@ export class PackageInfo {
     }
 }
 
-export function normalizeModuleName(s: string): string {
+export function normalizeModuleName(s: string): string { // TODO: should utilize "main" in package.json (see ModuleInfo.getOfficialName)
     return (s.endsWith("/index.js") || s.endsWith("\\index.js")) ? s.substring(0, s.length - 9) : // (ignoring index.json and index.node)
         s.endsWith(".js") ? s.substring(0, s.length - 3) :
             s.endsWith(".mjs") ? s.substring(0, s.length - 4) : s;

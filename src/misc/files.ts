@@ -75,7 +75,7 @@ function* expandRec(path: string, sub: boolean, visited: Set<string>): Generator
                 || isShebang(path)))
             yield relative(options.basedir, path);
         else
-            logger.debug(`Skipping file ${path}`);
+            (sub ? logger.debug : logger.warn)(`Skipping file ${path}, doesn't look like a JavaScript/TypeScript file`);
     } catch {
         logger.error(`Error: Unable to read ${path}`);
     }

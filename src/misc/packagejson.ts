@@ -74,7 +74,10 @@ function doesDirContainPackageJsonForNpmPackage(dir: FilePath): boolean {
     return parsePackageJson(packageJson).name === expectedNameOfPackage;
 }
 
-function parsePackageJson(packageJson: FilePath) {
+/**
+ * Loads and parses the given package.json file.
+ */
+function parsePackageJson(packageJson: FilePath): any {
     return JSON.parse(readFileSync(packageJson, {encoding: "utf8"}));
 }
 

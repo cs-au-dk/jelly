@@ -458,7 +458,7 @@ for (const [name, val] of Object.entries({
      * Records the entry of a module.
      * Also wraps the module object to prevent access to module.constructor.
      */
-    start(mod: string, modobj?: typeof module | false) {
+    start(mod: string, modobj?: typeof module | false): any {
         const i = hints.addModule(mod);
         if (logger.isDebugEnabled())
             logger.debug(`$start ${mod}: ${i}`);

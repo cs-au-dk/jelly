@@ -280,7 +280,7 @@ export class AnalysisStateReporter {
         for (const [src, dsts] of this.f.callToFunctionOrModule)
             for (const dst of dsts)
                 if (dst instanceof FunctionInfo)
-                    logger.info(`  ${locationToStringWithFileAndEnd(src.loc)} -> ${locationToStringWithFile(dst.loc)}`);
+                    logger.info(`  ${locationToStringWithFileAndEnd(src.loc, true)} -> ${locationToStringWithFile(dst.loc, true)}`);
     }
 
     /**

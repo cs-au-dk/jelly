@@ -66,7 +66,7 @@ export function parseAndDesugar(str: string, file: string, f?: FragmentState): F
                     allowDeclareFields: f !== undefined
                 }],
                 ["@babel/plugin-transform-template-literals", { loose: true }]
-            ], // TODO: perform other transformations?
+            ],
             cwd: __dirname,
             configFile: false,
             ast: true,
@@ -86,6 +86,5 @@ export function parseAndDesugar(str: string, file: string, f?: FragmentState): F
     if (res.code) // set 'code: true' above to output desugared code
         if (logger.isDebugEnabled())
             logger.debug("Desugared code:\n" + res.code);
-
     return res.ast!;
 }
