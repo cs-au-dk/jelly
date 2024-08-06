@@ -16,13 +16,15 @@ import {
     isSpreadElement,
     isStringLiteral,
     isTSParameterProperty,
+    isTypeCastExpression,
     JSXIdentifier,
     JSXMemberExpression,
     JSXNamespacedName,
     LVal,
     Node,
     OptionalMemberExpression,
-    ParenthesizedExpression
+    ParenthesizedExpression,
+    TypeCastExpression
 } from "@babel/types";
 import {NodePath} from "@babel/traverse";
 import {getAdjustedCallNodePath, getKey, getProperty, isInTryBlockOrBranch, isMaybeUsedAsPromise, isParentExpressionStatement} from "../misc/asthelpers";
@@ -826,6 +828,8 @@ export class Operations {
                     }
         } else if (isTSParameterProperty(dst))
             this.assign(src, dst.parameter, path);
+        else if (isTypeCastExpression(dst))
+            this.assign(src, (dst as TypeCastExpression).expression as any, path);
         else if (isMetaProperty(dst))
             this.solver.fragmentState.warnUnsupported(dst, "MetaProperty"); // TODO: MetaProperty, e.g. new.target
         else {
