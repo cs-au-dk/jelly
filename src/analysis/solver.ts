@@ -107,6 +107,8 @@ export default class Solver {
 
     propagationsThrottled: number = 0;
 
+    postponedListenersProcessed: number = 0;
+
     phase: Phase | undefined;
 
     timer = new Timer();
@@ -286,7 +288,7 @@ export default class Solver {
                     (options.diagnostics ? `, vars: ${f.getNumberOfVarsWithTokens()}, tokens: ${f.numberOfTokens}, subsets: ${f.numberOfSubsetEdges}, ` +
                         (options.maxIndirections !== undefined ? `round: ${this.diagnostics.round}, ` : "") +
                         `wave: ${this.diagnostics.wave}, ` +
-                    `propagations: ${this.diagnostics.propagations}, worklist: ${this.diagnostics.unprocessedTokensSize}, listeners: ${f.postponedListenerCalls.length}` : ""));
+                    `propagations: ${this.diagnostics.propagations}, worklist: ${this.diagnostics.unprocessedTokensSize+f.postponedListenerCalls.length+f.postponedListenerCalls2.length-this.postponedListenersProcessed}` : ""));
                 f.a.timeoutTimer.checkTimeout();
             }
         }
@@ -972,15 +974,14 @@ export default class Solver {
                     logger.verbose(`Processing non-bounded listener calls: ${f.postponedListenerCalls.length}`);
                 const timer = new Timer();
                 this.diagnostics.listenerNotificationRounds++;
-                let count = 0;
                 for (const [fun, arg] of f.postponedListenerCalls) {
                     fun(arg as any);
-                    if (++count % 100 === 0) {
+                    if (++this.postponedListenersProcessed % 100 === 0) {
                         f.a.timeoutTimer.checkTimeout();
                         this.printDiagnostics();
                     }
                 }
-                f.postponedListenerCalls.length = 0;
+                f.postponedListenerCalls.length = this.postponedListenersProcessed = 0;
                 this.diagnostics.totalListenerCallTime += timer.elapsed();
             } else if (f.postponedListenerCalls2.length > 0) {
                 if (options.maxIndirections !== undefined && round > options.maxIndirections) {
@@ -998,11 +999,10 @@ export default class Solver {
                     const timer = new Timer();
                     this.diagnostics.listenerNotificationRounds++;
                     const calls = Array.from(f.postponedListenerCalls2);
-                    f.postponedListenerCalls2.length = 0;
-                    let count = 0;
+                    f.postponedListenerCalls2.length = this.postponedListenersProcessed = 0;
                     for (const [fun, args] of calls) {
                         (fun as Function).apply(undefined, Array.isArray(args) ? args : [args]);
-                        if (++count % 100 === 0) {
+                        if (++this.postponedListenersProcessed % 100 === 0) {
                             f.a.timeoutTimer.checkTimeout();
                             this.printDiagnostics();
                         }

@@ -20,19 +20,19 @@ cd "$TESTS/micro"
 for f in *.*js; do
   JSON="${f%.*}.json"
   if [[ -f "${JSON}" ]]; then
-    jelly --skip-graal-test --dynamic "$JSON" "$f"
+    jelly --dynamic "$JSON" "$f"
   fi
 done
 
 cd "$TESTS/mochatest"
 
-jelly --skip-graal-test --dynamic "test.json" --npm-test .
-jelly --skip-graal-test --dynamic "test-with-hook.json" --npm-test . -- -- -r ./require-hook
+jelly --dynamic "test.json" --npm-test .
+jelly --dynamic "test-with-hook.json" --npm-test . -- -- -r ./require-hook
 
 cd "$TESTS/helloworld"
 
 # Run server in background
-jelly --skip-graal-test --dynamic app.json app.js &
+jelly --dynamic app.json app.js &
 PID=$!
 
 # Wait for server to come up and send two requests
