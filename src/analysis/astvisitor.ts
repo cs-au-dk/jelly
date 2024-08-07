@@ -95,7 +95,7 @@ import logger from "../misc/logger";
 import {locationToStringWithFile, mapArrayAdd} from "../misc/util";
 import assert from "assert";
 import {options} from "../options";
-import {ComponentAccessPath, PropertyAccessPath} from "./accesspaths";
+import {PropertyAccessPath} from "./accesspaths";
 import {ConstraintVar, isObjectPropertyVarObj} from "./constraintvars";
 import {
     getClass,
@@ -977,12 +977,7 @@ export function visit(ast: File, op: Operations) {
         },
 
         JSXElement(path: NodePath<JSXElement>) {
-            const componentVar = op.expVar(path.node.openingElement.name, path);
-            if (componentVar)
-                solver.addForAllTokensConstraint(componentVar, TokenListener.JSX_ELEMENT, path.node, (t: Token) => {
-                    if (t instanceof AccessPathToken)
-                        solver.addAccessPath(new ComponentAccessPath(componentVar), solver.varProducer.nodeVar(path.node), t.ap);
-                });
+            op.callComponent(path);
         }
     });
 

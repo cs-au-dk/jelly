@@ -17,6 +17,7 @@ import {
     isStringLiteral,
     isTSParameterProperty,
     isTypeCastExpression,
+    JSXElement,
     JSXIdentifier,
     JSXMemberExpression,
     JSXNamespacedName,
@@ -30,7 +31,14 @@ import {NodePath} from "@babel/traverse";
 import {getAdjustedCallNodePath, getKey, getProperty, isInTryBlockOrBranch, isMaybeUsedAsPromise, isParentExpressionStatement} from "../misc/asthelpers";
 import {AccessPathToken, AllocationSiteToken, ArrayToken, ClassToken, FunctionToken, NativeObjectToken, ObjectToken, PackageObjectToken, PrototypeToken, Token} from "./tokens";
 import {AccessorType, ConstraintVar, IntermediateVar, isObjectPropertyVarObj, NodeVar, ObjectPropertyVarObj, ReadResultVar} from "./constraintvars";
-import {CallResultAccessPath, IgnoredAccessPath, ModuleAccessPath, PropertyAccessPath, UnknownAccessPath} from "./accesspaths";
+import {
+    CallResultAccessPath,
+    ComponentAccessPath,
+    IgnoredAccessPath,
+    ModuleAccessPath,
+    PropertyAccessPath,
+    UnknownAccessPath
+} from "./accesspaths";
 import Solver, {ListenerKey} from "./solver";
 import {GlobalState} from "./globalstate";
 import {DummyModuleInfo, FunctionInfo, ModuleInfo, normalizeModuleName, PackageInfo} from "./infos";
@@ -101,6 +109,27 @@ export class Operations {
 
     private getRequireHints(pars: NodePath): Array<string> | undefined {
         return this.a.patching?.getRequireHints((pars.node.loc as Location).module?.toString(), locationToString(pars.node.loc, false, true));
+    }
+
+    /**
+     * Models calling a component.
+     * @param path path of the call expression
+     */
+    callComponent(path: NodePath<JSXElement>) {
+        const componentVar = this.expVar(path.node.openingElement.name, path);
+        if (componentVar) {
+            this.solver.addForAllTokensConstraint(componentVar, TokenListener.JSX_ELEMENT, path.node, (t: Token) => {
+                if (t instanceof AccessPathToken)
+                    this.solver.addAccessPath(new ComponentAccessPath(componentVar), this.solver.varProducer.nodeVar(path.node), t.ap);
+                else if (t instanceof FunctionToken) {
+                    f.registerCallEdge(path.node, caller, this.a.functionInfos.get(t.fun)!);
+                    // TODO: model call using one object that has all attributes as properties, see tests/micro/jsx2.jsx
+                }
+            });
+            const caller = this.a.getEnclosingFunctionOrModule(path, this.moduleInfo);
+            const f = this.solver.fragmentState;
+            f.registerCall(path.node, caller, componentVar);
+        }
     }
 
     /**

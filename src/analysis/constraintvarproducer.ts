@@ -64,6 +64,8 @@ export class ConstraintVarProducer<RVT extends RepresentativeVar | MergeRepresen
     expVar(exp: Expression | JSXIdentifier | JSXMemberExpression | JSXNamespacedName, path: NodePath): ConstraintVar | undefined {
         while (isParenthesizedExpression(exp))
             exp = exp.expression; // for parenthesized expressions, use the inner expression
+        if (isJSXIdentifier(exp) && exp.name[0] !== exp.name[0].toUpperCase()) // component names always start with capital letter
+            return undefined;
         if (isIdentifier(exp) || isJSXIdentifier(exp)) {
             const id = this.identVar(exp, path);
             if (id instanceof NodeVar && exp.name === "undefined" && (id.node?.loc as Location)?.native === "%ecmascript")
