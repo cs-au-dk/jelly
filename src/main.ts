@@ -24,7 +24,7 @@ import {compareCallGraphs} from "./output/compare";
 import {getMemoryLimit} from "./misc/memory";
 import Solver from "./analysis/solver";
 import {exportCallGraphHtml, exportDataFlowGraphHtml} from "./output/visualizer";
-import {VulnerabilityDetector, VulnerabilityResults} from "./patternmatching/vulnerabilitydetector";
+import {VulnerabilityDetector} from "./patternmatching/vulnerabilitydetector";
 import {Vulnerability} from "./typings/vulnerabilities";
 import {addAll} from "./misc/util";
 import {getAPIExported, reportAccessPaths, reportAPIExportedFunctions} from "./patternmatching/apiexported";
@@ -309,16 +309,7 @@ async function main() {
             if (options.typescript)
                 typer = new TypeScriptTypeInferrer(files);
 
-            const vr: VulnerabilityResults = {};
-            if (vulnerabilityDetector) {
-                vr.package = vulnerabilityDetector.findPackagesThatMayDependOnVulnerablePackages(f);
-                vr.module = vulnerabilityDetector.findModulesThatMayDependOnVulnerableModules(f);
-                vr.function = vulnerabilityDetector.findFunctionsThatMayReachVulnerableFunctions(f);
-                vr.call = vulnerabilityDetector.findCallsThatMayReachVulnerableFunctions(f, vr.function);
-                vulnerabilityDetector.reportResults(f, vr);
-                vr.matches = vulnerabilityDetector.patternMatch(f, typer, solver.diagnostics);
-                // TODO: find functions that may reach functions in vulnerabilities.matches
-            }
+            const vr = vulnerabilityDetector?.collectAllVulnerabilityResults(solver, typer) ?? {};
 
             if (options.callgraphHtml) {
                 const file = options.callgraphHtml;

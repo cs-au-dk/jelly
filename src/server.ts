@@ -47,7 +47,7 @@ import winston from "winston";
 import {tmpdir} from "os";
 import {AnalysisStateReporter} from "./output/analysisstatereporter";
 import {exportCallGraphHtml, exportDataFlowGraphHtml} from "./output/visualizer";
-import {VulnerabilityDetector, VulnerabilityResults} from "./patternmatching/vulnerabilitydetector";
+import {VulnerabilityDetector} from "./patternmatching/vulnerabilitydetector";
 import {readFileSync} from "fs";
 import {Vulnerability} from "./typings/vulnerabilities";
 import {addAll, stringify} from "./misc/util";
@@ -353,16 +353,7 @@ async function main() {
                 return prepareResponse(false, req, {message: "Analysis results not available"});
             if (!options.callgraphHtml)
                 return prepareResponse(false, req, {message: "Option callgraphHtml not set"});
-            const vr: VulnerabilityResults = {};
-            if (vulnerabilityDetector && options.vulnerabilities) {
-                const f = solver.fragmentState;
-                vr.package = vulnerabilityDetector.findPackagesThatMayDependOnVulnerablePackages(f);
-                vr.module = vulnerabilityDetector.findModulesThatMayDependOnVulnerableModules(f);
-                vr.function = vulnerabilityDetector.findFunctionsThatMayReachVulnerableFunctions(f);
-                vr.call = vulnerabilityDetector.findCallsThatMayReachVulnerableFunctions(f, vr.function);
-                vr.matches = vulnerabilityDetector.patternMatch(f, typer, solver.diagnostics);
-                // TODO: include vulnerability pattern match reachability like in main.ts
-            }
+            const vr = options.vulnerabilities && vulnerabilityDetector?.collectAllVulnerabilityResults(solver, typer) || {};
             exportCallGraphHtml(solver.fragmentState, options.callgraphHtml, vr);
             logger.info("Call graph HTML file generated");
             return prepareResponse(true, req);
