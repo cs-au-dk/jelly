@@ -118,17 +118,18 @@ export class Operations {
     callComponent(path: NodePath<JSXElement>) {
         const componentVar = this.expVar(path.node.openingElement.name, path);
         if (componentVar) {
+            const caller = this.a.getEnclosingFunctionOrModule(path, this.moduleInfo);
+            const f = this.solver.fragmentState; // (don't use in callbacks)
+            f.registerCall(path.node, caller, componentVar);
             this.solver.addForAllTokensConstraint(componentVar, TokenListener.JSX_ELEMENT, path.node, (t: Token) => {
                 if (t instanceof AccessPathToken)
                     this.solver.addAccessPath(new ComponentAccessPath(componentVar), this.solver.varProducer.nodeVar(path.node), t.ap);
                 else if (t instanceof FunctionToken) {
+                    const f = this.solver.fragmentState;
                     f.registerCallEdge(path.node, caller, this.a.functionInfos.get(t.fun)!);
                     // TODO: model call using one object that has all attributes as properties, see tests/micro/jsx2.jsx
                 }
             });
-            const caller = this.a.getEnclosingFunctionOrModule(path, this.moduleInfo);
-            const f = this.solver.fragmentState;
-            f.registerCall(path.node, caller, componentVar);
         }
     }
 
