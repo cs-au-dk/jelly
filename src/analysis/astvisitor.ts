@@ -307,7 +307,8 @@ export function visit(ast: File, op: Operations) {
                 const msg = cls ? "constructor" : `${name ?? (anon ? "<anonymous>" : "<computed>")}`;
                 if (logger.isVerboseEnabled())
                     logger.verbose(`Reached function ${msg} at ${locationToStringWithFile(fun.loc)}`);
-                a.registerFunctionInfo(op.file, path, name, fun);
+                if (!cls) // FunctionInfos for constructors need to be generated early, see Class
+                    a.registerFunctionInfo(op.file, path, name);
                 if (!name && !anon)
                     f.warnUnsupported(fun, `Dynamic ${isFunctionDeclaration(path.node) || isFunctionExpression(path.node) ? "function" : "method"} name`); // TODO: handle functions/methods with unknown name?
 
@@ -647,20 +648,21 @@ export function visit(ast: File, op: Operations) {
 
         Class(path: NodePath<ClassExpression | ClassDeclaration>) {
 
-            let constructor: ClassMethod | undefined;
-            for (const b of path.node.body.body)
-                if (isClassMethod(b) && b.kind === "constructor") {
-                    constructor = b;
+            let constructor: NodePath<ClassMethod> | undefined;
+            for (const b of path.get("body.body") as Array<NodePath>)
+                if (isClassMethod(b.node) && b.node.kind === "constructor") {
+                    constructor = b as NodePath<ClassMethod>;
                     break;
                 }
             assert(constructor); // see extras.ts
-            class2constructor.set(path.node, constructor);
+            class2constructor.set(path.node, constructor.node);
+            a.registerFunctionInfo(op.file, constructor, path.node?.id?.name); // for constructors, use the class name if present
 
             const exported = isExportDeclaration(path.parent);
 
             if (!options.oldobj) {
 
-                const ct = op.newFunctionToken(constructor);
+                const ct = op.newFunctionToken(constructor.node);
 
                 if (isClassExpression(path.node) || exported) {
 
@@ -685,7 +687,7 @@ export function visit(ast: File, op: Operations) {
                         solver.addInherits(ct, w);
 
                         if (w instanceof FunctionToken || w instanceof AccessPathToken) {
-                            const pt = op.newPrototypeToken(constructor!);
+                            const pt = op.newPrototypeToken(constructor.node);
 
                             if (w instanceof FunctionToken) {
 
@@ -693,7 +695,7 @@ export function visit(ast: File, op: Operations) {
                                 solver.addInherits(pt, solver.varProducer.objPropVar(w, "prototype"));
 
                                 // ... ⟦this_ct⟧ ⊆ ⟦this_w⟧
-                                solver.addSubsetConstraint(solver.varProducer.thisVar(constructor!), solver.varProducer.thisVar(w.fun));
+                                solver.addSubsetConstraint(solver.varProducer.thisVar(constructor.node), solver.varProducer.thisVar(w.fun));
 
                                 // ... ⟦return_w⟧ ⊆ ⟦return_ct⟧
                                 solver.addSubsetConstraint(solver.varProducer.returnVar(w.fun), solver.varProducer.returnVar(ct.fun));
@@ -714,7 +716,7 @@ export function visit(ast: File, op: Operations) {
                         // class ... {...}
                         // constraint: t ∈ ⟦class ... {...}⟧ where t denotes the constructor function
                         if (!isParentExpressionStatement(path) || exported)
-                            solver.addTokenConstraint(op.newFunctionToken(constructor), vp.nodeVar(path.node));
+                            solver.addTokenConstraint(op.newFunctionToken(constructor.node), vp.nodeVar(path.node));
                     }
                 } else // no explicit constructor (dyn.ts records a call to an implicit constructor)
                     f.registerArtificialFunction(op.moduleInfo, path.node.loc);

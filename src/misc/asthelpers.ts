@@ -14,8 +14,11 @@ import {
     ImportSpecifier,
     isArrowFunctionExpression,
     isCallExpression,
+    isClass,
+    isClassMethod,
     isClassPrivateMethod,
     isClassPrivateProperty,
+    isClassProperty,
     isExpressionStatement,
     isFunction,
     isFunctionExpression,
@@ -43,7 +46,7 @@ import {
 import assert from "assert";
 import {CallNodePath} from "../natives/nativebuilder";
 import {FragmentState} from "../analysis/fragmentstate";
-import {Location} from "./util";
+import {Location, nodeToString} from "./util";
 
 export type CallNode = CallExpression | OptionalCallExpression | NewExpression;
 
@@ -204,17 +207,23 @@ export function registerArtificialClassPropertyInitializer(f: FragmentState, pat
 
 /**
  * Returns the path for the enclosing function, or undefined if no such function.
- * Positions inside .id, .key or .params of a function do not belong to that function but the enclosing function.
+ * Positions in default parameters belong to the function being defined.
+ * Positions in computed function names belong to the enclosing function of the function being defined.
+ * Positions in instance member initializers belong to the class constructor.
  */
 function getEnclosingFunctionPath(path: NodePath): NodePath<Function> | null {
-    let p: NodePath | null = path, c: Node;
+    let p: NodePath | null = path, c: Node | undefined = undefined, cc: Node | undefined = undefined;
     do {
+        cc = c;
         c = p.node;
         p = p?.parentPath;
-    } while (p && (!isFunction(p.node) ||
-        ("id" in p.node && p.node.id === c) ||
-        ("key" in p.node && p.node.key === c) ||
-        ("params" in p.node && p.node.params.includes(c as any))));
+        if (p && isClass(p.node) && (isClassProperty(cc) || isClassPrivateProperty(cc)) && !cc.static) {
+            for (const b of p.get("body.body") as Array<NodePath>)
+                if (isClassMethod(b.node) && b.node.kind === "constructor")
+                    return b as NodePath<ClassMethod>;
+            assert.fail(`Constructor not found for class ${nodeToString(p.node)}`);
+        }
+    } while (p && (!isFunction(p.node) || ("id" in p.node && p.node.id === c) || ("key" in p.node && p.node.key === c)));
     return p as NodePath<Function> | null;
 }
 

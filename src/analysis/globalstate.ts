@@ -1,4 +1,4 @@
-import {Class, Function, Identifier, Node} from "@babel/types";
+import {Function, Identifier, Node} from "@babel/types";
 import {FilePath, getOrSet, Location, locationToString, strHash} from "../misc/util";
 import {
     AncestorsVar,
@@ -236,7 +236,8 @@ export class GlobalState {
     /**
      * Registers a new FunctionInfo for a function/method/constructor.
      */
-    registerFunctionInfo(file: FilePath, path: NodePath<Function | Class>, name: string | undefined, fun: Function) {
+    registerFunctionInfo(file: FilePath, path: NodePath<Function>, name: string | undefined) {
+        const fun = path.node;
         const m = this.moduleInfosByPath.get(file)!;
         const f = new FunctionInfo(name, fun.loc!, m, isDummyConstructor(fun));
         this.functionInfos.set(fun, f);

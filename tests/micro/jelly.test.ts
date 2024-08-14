@@ -468,8 +468,10 @@ describe("tests/micro", () => {
 
     runTest("tests/micro", "fun2.js", {
         hasEdges: [
-            ["micro@0.0.1:fun2.js", "micro@0.0.1:fun2.js:11:1:f"],
-            ["micro@0.0.1:fun2.js", "micro@0.0.1:fun2.js:15:1:g"]
+            ["micro@0.0.1:fun2.js", "micro@0.0.1:fun2.js:15:1:f"],
+            ["micro@0.0.1:fun2.js:6:5:bar", "micro@0.0.1:fun2.js:19:1:g"],
+            ["micro@0.0.1:fun2.js:1:1:C", "micro@0.0.1:fun2.js:23:1:h"],
+            ["micro@0.0.1:fun2.js", "micro@0.0.1:fun2.js:25:1:i"]
         ]
     });
 
@@ -871,15 +873,14 @@ describe("tests/micro", () => {
         reachableTotal: 11,
     });
 
-    runTest("tests/micro", "default-parameter.js", {
+    runTest("tests/micro", "default-parameter.js", { // FIXME
         soundness: "tests/micro/default-parameter.json",
         functionInfos: 3,
         // TODO: make static and dynamic analysis agree on source function in fun2fun edges in default parameter initialization
         // in dynamic analysis the source is the caller of the function with a default parameter
         // difficult to change due to order of observed events in dynamic analysis
         // in static analysis the source is the function with a default parameter
-        // impossible to change without context sensitivity
-        funFound: 3,
+        funFound: 2,
         funTotal: 3,
         callFound: 3,
         callTotal: 3,
