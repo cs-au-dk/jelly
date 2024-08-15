@@ -8,7 +8,6 @@ import {
     ClassPrivateMethod,
     ClassPrivateProperty,
     ClassProperty,
-    Expression,
     Function,
     Identifier,
     ImportDefaultSpecifier,
@@ -17,8 +16,8 @@ import {
     isCallExpression,
     isClassPrivateMethod,
     isClassPrivateProperty,
-    isExpression,
     isExpressionStatement,
+    isFunction,
     isFunctionExpression,
     isIdentifier,
     isImportSpecifier,
@@ -26,7 +25,6 @@ import {
     isMemberExpression,
     isNewExpression,
     isNumericLiteral,
-    isOptionalMemberExpression,
     isParenthesizedExpression,
     isPrivateName,
     isStringLiteral,
@@ -106,22 +104,6 @@ export function isCalleeExpression(path: NodePath): boolean {
 }
 
 /**
- * Returns the base expression and property of the given method call, or undefined if not applicable.
- */
-export function getBaseAndProperty(path: CallNodePath): {base: Expression, property: string | undefined} | undefined {
-    let p: NodePath | null = path.get("callee") as NodePath;
-    while (isParenthesizedExpression(p.node))
-        p = p.get("expression") as NodePath;
-    if (!(isMemberExpression(p.node) || isOptionalMemberExpression(p.node)))
-        return undefined;
-    const base = p.node.object;
-    if (!isExpression(base)) // excluding Super
-        return undefined;
-    const property = getProperty(p.node);
-    return {base, property};
-}
-
-/**
  * Finds the exported property name for an export specifier.
  */
 export function getExportName(exported: Identifier | StringLiteral): string {
@@ -147,7 +129,7 @@ export function getClass(path: NodePath<any>): Class | undefined {
  * for calls by the dynamic analysis, which has wrong source locations for calls
  * in certain parenthesized expressions.
  */
-export function getAdjustedCallNodePath(path: CallNodePath): NodePath {
+export function getAdjustedCallNodePath(path: CallNodePath): NodePath { // XXX: remove with new dyn.ts?
     return isParenthesizedExpression(path.parentPath.node) &&
     (isNewExpression(path.node) ||
         (!isParenthesizedExpression(path.node.callee) && !isFunctionExpression(path.node.callee))) ?
@@ -221,12 +203,35 @@ export function registerArtificialClassPropertyInitializer(f: FragmentState, pat
 }
 
 /**
+ * Returns the path for the enclosing function, or undefined if no such function.
+ * Positions inside .id, .key or .params of a function do not belong to that function but the enclosing function.
+ */
+function getEnclosingFunctionPath(path: NodePath): NodePath<Function> | null {
+    let p: NodePath | null = path, c: Node;
+    do {
+        c = p.node;
+        p = p?.parentPath;
+    } while (p && (!isFunction(p.node) ||
+        ("id" in p.node && p.node.id === c) ||
+        ("key" in p.node && p.node.key === c) ||
+        ("params" in p.node && p.node.params.includes(c as any))));
+    return p as NodePath<Function> | null;
+}
+
+/**
  * Returns the enclosing non-arrow function, or undefined if no such function.
  */
 export function getEnclosingNonArrowFunction(path: NodePath): Function | undefined {
-    let p: NodePath | NodePath<Function> | null | undefined = path, f: Function | undefined;
+    let p: NodePath | null = path;
     do {
-        f = (p = p?.getFunctionParent())?.node;
-    } while (f && isArrowFunctionExpression(f));
-    return f;
+        p = getEnclosingFunctionPath(p!);
+    } while (p && isArrowFunctionExpression(p.node));
+    return p?.node as Function | undefined;
+}
+
+/**
+ * Returns the enclosing function, or undefined if no such function.
+ */
+export function getEnclosingFunction(path: NodePath): Function | undefined {
+    return getEnclosingFunctionPath(path)?.node;
 }

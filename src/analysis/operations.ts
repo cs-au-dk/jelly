@@ -28,7 +28,15 @@ import {
     TypeCastExpression
 } from "@babel/types";
 import {NodePath} from "@babel/traverse";
-import {getAdjustedCallNodePath, getKey, getProperty, isInTryBlockOrBranch, isMaybeUsedAsPromise, isParentExpressionStatement} from "../misc/asthelpers";
+import {
+    getAdjustedCallNodePath,
+    getEnclosingFunction,
+    getKey,
+    getProperty,
+    isInTryBlockOrBranch,
+    isMaybeUsedAsPromise,
+    isParentExpressionStatement
+} from "../misc/asthelpers";
 import {AccessPathToken, AllocationSiteToken, ArrayToken, ClassToken, FunctionToken, NativeObjectToken, ObjectToken, PackageObjectToken, PrototypeToken, Token} from "./tokens";
 import {AccessorType, ConstraintVar, IntermediateVar, isObjectPropertyVarObj, NodeVar, ObjectPropertyVarObj, ReadResultVar} from "./constraintvars";
 import {
@@ -684,7 +692,7 @@ export class Operations {
                     m = this.a.reachedFile(filepath, this.moduleInfo);
 
                     // extend the require graph
-                    const fp = path.getFunctionParent()?.node;
+                    const fp = getEnclosingFunction(path);
                     const from = fp ? this.a.functionInfos.get(fp)! : this.moduleInfo;
                     const to = this.a.moduleInfosByPath.get(filepath)!;
                     f.registerRequireEdge(from, to);

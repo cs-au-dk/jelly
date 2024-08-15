@@ -99,6 +99,7 @@ import {PropertyAccessPath} from "./accesspaths";
 import {ConstraintVar, isObjectPropertyVarObj} from "./constraintvars";
 import {
     getClass,
+    getEnclosingFunction,
     getExportName,
     getImportName,
     getKey,
@@ -940,7 +941,7 @@ export function visit(ast: File, op: Operations) {
         },
 
         YieldExpression(path: NodePath<YieldExpression>) {
-            const fun = path.getFunctionParent()?.node;
+            const fun = getEnclosingFunction(path);
             assert(fun, "yield not in function?!");
             const iter = a.canonicalizeToken(new AllocationSiteToken("Iterator", fun.body));
             const iterValue = vp.objPropVar(iter, "value");

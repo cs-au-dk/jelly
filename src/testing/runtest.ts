@@ -38,8 +38,9 @@ export function runTest(basedir: string,
                             reachableFound?: number,
                             reachableTotal?: number,
                             apiUsageAccessPathPatternsAtNodes?: number
-                            vulnerabilities?: Vulnerability[],
+                            vulnerabilities?: Array<Vulnerability>,
                             vulnerabilitiesMatches?: number,
+                            hasEdges?: Array<[string, string]>
                         }) {
 
     const files = Array.isArray(app) ? app : [app];
@@ -198,6 +199,13 @@ export function runTest(basedir: string,
                     }
                 });
             });
+
+        if (args.hasEdges)
+            test("has edges", () => {
+                for (const [src, dst] of args.hasEdges!)
+                    if (!hasEdge(solver.fragmentState, src, dst))
+                        assert.fail(`Call edge missing: ${src} -> ${dst}`);
+            });
     });
 }
 
@@ -205,7 +213,7 @@ export function hasEdge(f: FragmentState, fromStr: string, toStr: string): boole
     for (const [from, tos] of f.functionToFunction)
         for (const to of tos) {
             // console.log(`${from} -> ${to}`);
-            if (from.toString().includes(fromStr) && to.toString().includes(toStr))
+            if (from.toString() === fromStr && to.toString() === toStr)
                 return true;
         }
     return false;

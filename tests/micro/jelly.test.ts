@@ -466,6 +466,13 @@ describe("tests/micro", () => {
         reachableTotal: 20,
     });
 
+    runTest("tests/micro", "fun2.js", {
+        hasEdges: [
+            ["micro@0.0.1:fun2.js", "micro@0.0.1:fun2.js:11:1:f"],
+            ["micro@0.0.1:fun2.js", "micro@0.0.1:fun2.js:15:1:g"]
+        ]
+    });
+
     runTest("tests/micro", "obj.js", {
         soundness: "tests/micro/obj.json",
         functionInfos: 1,
@@ -872,7 +879,7 @@ describe("tests/micro", () => {
         // difficult to change due to order of observed events in dynamic analysis
         // in static analysis the source is the function with a default parameter
         // impossible to change without context sensitivity
-        funFound: 2,
+        funFound: 3,
         funTotal: 3,
         callFound: 3,
         callTotal: 3,
