@@ -240,8 +240,11 @@ export class Operations {
                         (ft: Token) => handleCall(t, ft));
                 }
 
-                if (t instanceof AccessPathToken && (prop === "call" || prop === "apply"))
-                    this.solver.addAccessPath(new CallResultAccessPath(baseVar!), resultVar, t.ap);
+                if (t instanceof AccessPathToken)
+                    if (prop === "call" || prop === "apply")
+                        this.solver.addAccessPath(new CallResultAccessPath(baseVar!), resultVar, t.ap);
+                    else if (prop === "bind")
+                        this.solver.addTokenConstraint(t, resultVar);
             });
         }
         const strings = args.length >= 1 && isStringLiteral(args[0]) ? [args[0].value] : [];
