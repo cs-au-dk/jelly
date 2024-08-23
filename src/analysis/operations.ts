@@ -385,24 +385,22 @@ export class Operations {
         const argumentsToken = f.functionsWithArguments.has(t.fun) ? this.a.canonicalizeToken(new ArrayToken(t.fun.body)) : undefined;
         for (const [i, arg] of args.entries()) {
             // constraint: ...: ⟦Ei⟧ ⊆ ⟦Xi⟧ for each argument/parameter i (Xi may be a pattern)
-            if (arg) {
-                if (i < t.fun.params.length) {
-                    const param = t.fun.params[i];
-                    if (isRestElement(param)) {
-                        // read the remaining arguments into a fresh array
-                        const rest = args.slice(i);
-                        const t = this.newArrayToken(param);
-                        for (const [i, arg] of rest.entries())
-                            if (arg) // TODO: SpreadElement in arguments (warning emitted below)
-                                addInclusionConstraint(arg, vp.objPropVar(t, String(i)));
-                        this.solver.addTokenConstraint(t, vp.nodeVar(param));
-                    } else
-                        addInclusionConstraint(arg, vp.nodeVar(param));
-                }
-                // constraint ...: ⟦Ei⟧ ⊆ ⟦t_arguments[i]⟧ for each argument i if the function uses 'arguments'
-                if (argumentsToken)
-                    addInclusionConstraint(arg, vp.objPropVar(argumentsToken, String(i)));
+            if (i < t.fun.params.length) {
+                const param = t.fun.params[i];
+                if (isRestElement(param)) {
+                    // read the remaining arguments into a fresh array
+                    const rest = args.slice(i);
+                    const t = this.newArrayToken(param);
+                    for (const [i, rarg] of rest.entries())
+                        if (rarg) // TODO: SpreadElement in arguments (warning emitted below)
+                            addInclusionConstraint(rarg, vp.objPropVar(t, String(i)));
+                    this.solver.addTokenConstraint(t, vp.nodeVar(param));
+                } else if (arg)
+                    addInclusionConstraint(arg, vp.nodeVar(param));
             }
+            // constraint ...: ⟦Ei⟧ ⊆ ⟦t_arguments[i]⟧ for each argument i if the function uses 'arguments'
+            if (argumentsToken && arg)
+                addInclusionConstraint(arg, vp.objPropVar(argumentsToken, String(i)));
         }
         // constraint: ...: t_arguments ∈ ⟦t_arguments⟧ if the function uses 'arguments'
         if (argumentsToken)
