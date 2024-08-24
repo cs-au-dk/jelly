@@ -7,31 +7,21 @@ function approxLoad(app: string) {
     runTest("tests/approx", app, {
         options: {approxLoad: `tests/approx/hints-${noExtension}.json`},
         soundness: `tests/approx/${noExtension}.json`
-    })
+    });
 }
 
 describe("approx", () => {
     approxLoad("simple.js");
     approxLoad("natives.js");
-    approxLoad("dynamic.js")
-    approxLoad("library.js")
-    approxLoad("srcLoc.js")
-    approxLoad("staticRequire.js")
-    approxLoad("computedProperties.js")
-    approxLoad("this.js")
-    approxLoad("function.js")
-    approxLoad("newNative.js")
-    // Cannot guarantee 100% reachability due to unsupported rest operator in static phase
-    runTest("tests/approx", "deconstruction.js", {
-        options: {approxLoad: "tests/approx/hints-deconstruction.json"},
-        soundness: "tests/approx/deconstruction.json",
-        funFound: 9,
-        funTotal: 9,
-        callFound: 9,
-        callTotal: 9,
-        reachableFound: 10, // Missing reachable function related to spread operator(?)
-        reachableTotal: 11
-    })
+    approxLoad("dynamic.js");
+    approxLoad("library.js");
+    approxLoad("srcLoc.js");
+    approxLoad("staticRequire.js");
+    approxLoad("computedProperties.js");
+    approxLoad("this.js");
+    approxLoad("function.js");
+    approxLoad("newNative.js");
+    approxLoad("deconstruction.js");
 })
 
 function assertHints(name: string, expected: { modules: number, functions: number, reads: number, writes: number, evals?: number}) {
@@ -39,13 +29,13 @@ function assertHints(name: string, expected: { modules: number, functions: numbe
     test(name, () => {
         let json = fs.readFileSync(`tests/approx/hints-${noExtension}.json`, "utf-8")
         let parsed = JSON.parse(json);
-        expect(parsed.modules.length).toBe(expected.modules)
-        expect(parsed.functions.length).toBe(expected.functions)
-        expect(parsed.reads.length).toBe(expected.reads)
-        expect(parsed.writes.length).toBe(expected.writes)
+        expect(parsed.modules.length).toBe(expected.modules);
+        expect(parsed.functions.length).toBe(expected.functions);
+        expect(parsed.reads.length).toBe(expected.reads);
+        expect(parsed.writes.length).toBe(expected.writes);
         if (expected.evals)
-            expect(parsed.evals.length).toBe(expected.evals)
-    })
+            expect(parsed.evals.length).toBe(expected.evals);
+    });
 }
 
 /** Ensures the correct amount of entries in the hint file. Use this suite when call graph generation is non-trivial
