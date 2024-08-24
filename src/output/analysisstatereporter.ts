@@ -276,7 +276,7 @@ export class AnalysisStateReporter {
      * Reports the call graph (call sites -> functions).
      */
     reportCallGraph() {
-        logger.info("Call graph:");
+        logger.info("Call graph (call->function):");
         for (const [src, dsts] of this.f.callToFunctionOrModule)
             for (const dst of dsts)
                 if (dst instanceof FunctionInfo)

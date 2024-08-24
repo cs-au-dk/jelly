@@ -1,5 +1,6 @@
 import {NativeFunctionParams, NativeModel, NativeModelParams} from "./nativebuilder";
 import {NativeObjectToken} from "../analysis/tokens";
+import {invokeCallback} from "./nativehelpers";
 
 /*
  * Models of Node.js standard built-in objects.
@@ -66,25 +67,25 @@ export const nodejsModels: NativeModel = {
         {
             name: "queueMicrotask",
             invoke: (p: NativeFunctionParams) => {
-                // TODO: model callback
+                invokeCallback("queueMicrotask", p);
             }
         },
         {
             name: "setImmediate",
             invoke: (p: NativeFunctionParams) => {
-                // TODO: model callback
+                invokeCallback("setImmediate", p);
             }
         },
         {
             name: "setInterval",
             invoke: (p: NativeFunctionParams) => {
-                // TODO: model callback
+                invokeCallback("setInterval", p);
             }
         },
         {
             name: "setTimeout",
             invoke: (p: NativeFunctionParams) => {
-                // TODO: model callback
+                invokeCallback("setTimeout", p);
             }
         },
         {

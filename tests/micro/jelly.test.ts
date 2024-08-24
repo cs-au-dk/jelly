@@ -932,6 +932,13 @@ describe("tests/micro", () => {
         reachableTotal: 9,
     });
 
+    runTest("tests/micro", "timers.js", {
+        options: {objSpread: true},
+        funTotal: 1,
+        callTotal: 1,
+        reachableTotal: 4,
+    });
+
     runTest("tests/micro", "flow.js", {
         functionInfos: 1,
         moduleInfos: 1,
