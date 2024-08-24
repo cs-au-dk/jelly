@@ -1,4 +1,12 @@
-import {CallExpression, Expression, isExpression, isIdentifier, isObjectExpression, isObjectProperty} from "@babel/types";
+import {
+    CallExpression,
+    Expression,
+    isExpression,
+    isFunction,
+    isIdentifier,
+    isObjectExpression,
+    isObjectProperty
+} from "@babel/types";
 import {AccessPathToken, AllocationSiteToken, ArrayToken, ClassToken, FunctionToken, NativeObjectToken, ObjectKind, ObjectToken, PackageObjectToken, PrototypeToken, Token} from "../analysis/tokens";
 import {getKey, isParentExpressionStatement} from "../misc/asthelpers";
 import {Node} from "@babel/core";
@@ -365,6 +373,19 @@ export function invokeCallback(kind: CallbackKind, p: NativeFunctionParams, arg:
                 }
             });
         }
+    }
+}
+
+/**
+ * Models a call into a generator.
+ */
+export function generatorCall(p: NativeFunctionParams) {
+    if (p.base instanceof AllocationSiteToken && isFunction(p.base.allocSite)) {
+        const solver = p.solver;
+        const f = solver.fragmentState;
+        const a = solver.globalState;
+        const caller = a.getEnclosingFunctionOrModule(p.path, p.moduleInfo);
+        f.registerCallEdge(p.path.node, caller, a.functionInfos.get(p.base.allocSite)!, {native: true});
     }
 }
 

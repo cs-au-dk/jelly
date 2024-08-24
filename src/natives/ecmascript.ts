@@ -39,6 +39,7 @@ import {
     setPrototypeOf,
     warnNativeUsed,
     widenArgument,
+    generatorCall,
 } from "./nativehelpers";
 import {PackageObjectToken} from "../analysis/tokens";
 import {isExpression, isNewExpression, isStringLiteral} from "@babel/types";
@@ -719,12 +720,14 @@ export const ecmascriptModels: NativeModel = {
                     invoke: (p: NativeFunctionParams) => {
                         assignParameterToThisProperty(0, "value", p); // assuming the iterator/iterable uses the same abstract object as the iterator result
                         returnThis(p);
+                        generatorCall(p);
                     }
                 },
                 {
                     name: "return",
                     invoke: (p: NativeFunctionParams) => {
                         returnThis(p);
+                        generatorCall(p);
                     }
                 },
                 {
@@ -732,6 +735,7 @@ export const ecmascriptModels: NativeModel = {
                     invoke: (p: NativeFunctionParams) => {
                         if (p.path.node.arguments.length >= 1)
                             widenArgument(p.path.node.arguments[0], p);
+                        generatorCall(p);
                     }
                 },
             ]
@@ -745,8 +749,24 @@ export const ecmascriptModels: NativeModel = {
                     invoke: (p: NativeFunctionParams) => {
                         assignParameterToThisProperty(0, "value", p);
                         returnThisInPromise(p);
+                        generatorCall(p);
                     }
-                }
+                },
+                {
+                    name: "return",
+                    invoke: (p: NativeFunctionParams) => {
+                        returnThis(p);
+                        generatorCall(p);
+                    }
+                },
+                {
+                    name: "throw",
+                    invoke: (p: NativeFunctionParams) => {
+                        if (p.path.node.arguments.length >= 1)
+                            widenArgument(p.path.node.arguments[0], p);
+                        generatorCall(p);
+                    }
+                },
             ]
         },
         {

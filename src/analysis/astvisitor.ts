@@ -273,7 +273,7 @@ export function visit(ast: File, op: Operations) {
                         if (fun.generator) {
                             // find the iterator object (it is returned via Function)
                             // constraint: ... ⊆ ⟦i.value⟧ where i is the iterator object for the function
-                            const iter = a.canonicalizeToken(new AllocationSiteToken("Iterator", fun.body));
+                            const iter = a.canonicalizeToken(new AllocationSiteToken("Iterator", fun));
                             resVar = vp.objPropVar(iter, "value");
                         } else {
                             // constraint: ... ⊆ ⟦ret_f⟧ where f is the enclosing function (ignoring top-level returns)
@@ -340,7 +340,7 @@ export function visit(ast: File, op: Operations) {
                     // function*
 
                     // constraint: %(Async)Generator.prototype.next ⊆ ⟦i.next⟧ where i is the iterator object for the function
-                    const iter = a.canonicalizeToken(new AllocationSiteToken("Iterator", fun.body));
+                    const iter = a.canonicalizeToken(new AllocationSiteToken("Iterator", fun));
                     const iterNext = vp.objPropVar(iter, "next");
                     solver.addTokenConstraint(op.globalSpecialNatives.get(fun.async ? ASYNC_GENERATOR_PROTOTYPE_NEXT : GENERATOR_PROTOTYPE_NEXT)!, iterNext);
 
@@ -945,7 +945,7 @@ export function visit(ast: File, op: Operations) {
         YieldExpression(path: NodePath<YieldExpression>) {
             const fun = getEnclosingFunction(path);
             assert(fun, "yield not in function?!");
-            const iter = a.canonicalizeToken(new AllocationSiteToken("Iterator", fun.body));
+            const iter = a.canonicalizeToken(new AllocationSiteToken("Iterator", fun));
             const iterValue = vp.objPropVar(iter, "value");
             if (path.node.argument) {
                 if (path.node.delegate) {

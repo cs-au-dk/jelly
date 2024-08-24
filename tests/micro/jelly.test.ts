@@ -366,7 +366,7 @@ describe("tests/micro", () => {
         functionInfos: 24,
         moduleInfos: 1,
         numberOfFunctionToFunctionEdges: 27,
-        oneCalleeCalls: 15,
+        oneCalleeCalls: 26,
         funTotal: 25,
         callTotal: 25,
         reachableTotal: 25,
