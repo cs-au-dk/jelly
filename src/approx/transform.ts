@@ -72,11 +72,12 @@ import assert from "assert";
 export const PREFIX = "_J$"; // prefix for special global variables
 
 export const SPECIALS =
-    new Set(["start", "pw", "dpr", "alloc", "init", "method", "comp", "new", "enter", "catch", "loop", "eval", "cr"]
+    new Set(["start", "pw", "dpr", "alloc", "init", "method", "comp", "new", "enter", "catch", "loop", "eval", "cr", "freeze"]
         .map(s => PREFIX + s));
 
 const START_CJS = template.statements(
-    `const ${PREFIX}mod = MODULE; module = ${PREFIX}start(${PREFIX}mod, typeof module !== 'undefined' && module); Object.freeze(require.extensions)`
+    `const ${PREFIX}mod = MODULE; module = ${PREFIX}start(${PREFIX}mod, typeof module !== 'undefined' && module); ` +
+    `if (typeof require !== "undefined") ${PREFIX}freeze(require.extensions)`
 );
 const START_ESM = template.statements(
     `const ${PREFIX}mod = MODULE; ${PREFIX}start(${PREFIX}mod); ` +

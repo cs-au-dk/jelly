@@ -899,6 +899,13 @@ for (const [name, val] of Object.entries({
                 str
             });
         return str;
+    },
+
+    /**
+     * Freezes the given object.
+     */
+    freeze(obj: any) {
+        Object.freeze(obj);
     }
 
 }))
