@@ -835,9 +835,10 @@ export class Operations {
                         // read the property using p for the temporary result
                         this.readProperty(src, prop, vp.nodeVar(p), p, this.a.getEnclosingFunctionOrModule(path, this.moduleInfo));
                         // assign the temporary result at p to the locations represented by p.value
-                        if (!isLVal(p.value))
-                            assert.fail(`Unexpected expression ${p.value.type}, expected LVal at ${locationToStringWithFile(p.value.loc)}`);
-                        this.assign(vp.nodeVar(p), p.value, path);
+                        if (isLVal(p.value))
+                            this.assign(vp.nodeVar(p), p.value, path);
+                        else // TODO: see test262-main/test and TypeScript-main/tests/cases
+                            this.solver.fragmentState.error(`Unexpected expression ${p?.value?.type}, expected LVal at ${locationToStringWithFile(p?.value?.loc)}`);
                     }
                 }
         } else if (isArrayPattern(dst)) {
@@ -871,12 +872,11 @@ export class Operations {
             this.assign(src, (dst as TypeCastExpression).expression as any, path);
         else if (isMetaProperty(dst))
             this.solver.fragmentState.warnUnsupported(dst, "MetaProperty"); // TODO: MetaProperty, e.g. new.target
-        else {
-            if (!isRestElement(dst))
-                assert.fail(`Unexpected LVal type ${dst.type} at ${locationToStringWithFile(dst.loc)}`);
+        else if (isRestElement(dst)) {
             // assign the array generated at callFunction to the sub-l-value
             this.assign(vp.nodeVar(dst), dst.argument, path);
-        }
+        } else // TODO: see test262-main/test and TypeScript-main/tests/cases
+           this.solver.fragmentState.error(`Unexpected LVal type ${dst.type} at ${locationToStringWithFile(dst.loc)}`);
     }
 
     /**

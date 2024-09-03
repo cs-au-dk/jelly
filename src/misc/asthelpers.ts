@@ -46,7 +46,7 @@ import {
 import assert from "assert";
 import {CallNodePath} from "../natives/nativebuilder";
 import {FragmentState} from "../analysis/fragmentstate";
-import {Location, nodeToString} from "./util";
+import {Location, locationToStringWithFileAndEnd, nodeToString} from "./util";
 
 export type CallNode = CallExpression | OptionalCallExpression | NewExpression;
 
@@ -188,7 +188,10 @@ export function registerArtificialClassPropertyInitializer(f: FragmentState, pat
         const tokens = (path.hub as unknown as {file: BabelFile}).
             file.ast.tokens as Array<{start: number, loc: SourceLocation, type: any}>;
         const keyStart = path.node.key.start;
-        assert(tokens && typeof keyStart === "number");
+        if (!(tokens && typeof keyStart === "number")) { // TODO: see test262-main/test and TypeScript-main/tests/cases
+            f.error(`Unexpected key.start ${keyStart} at ${locationToStringWithFileAndEnd(path.node.loc)}`);
+            return;
+        }
         let lo = 0;
         for (let hi = tokens.length; lo < hi;) {
             const mid = (lo + hi) >>> 1;
@@ -197,7 +200,10 @@ export function registerArtificialClassPropertyInitializer(f: FragmentState, pat
             else
                 lo = mid + 1;
         }
-        assert(lo >= 1 && tokens[lo].start === keyStart && tokens[lo-1].type.label === "[");
+        if (!(lo >= 1 && tokens[lo].start === keyStart && tokens[lo-1].type.label === "[")) { // TODO: see test262-main/test and TypeScript-main/tests/cases
+            f.error(`Unexpected label ${tokens[lo - 1].type.label} at ${locationToStringWithFileAndEnd(path.node.loc)}`);
+            return;
+        }
         sl = tokens[lo-1].loc;
     }
     const m = (path.node.loc as Location).module;

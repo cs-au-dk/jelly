@@ -503,8 +503,10 @@ export function visit(ast: File, op: Operations) {
                 const key = getKey(path.node);
                 if (key) {
                     if (path.node.value) {
-                        if (!isExpression(path.node.value))
-                            assert.fail(`Unexpected Property value type ${path.node.value?.type} at ${locationToStringWithFile(path.node.loc)}`);
+                        if (!isExpression(path.node.value)) { // TODO: see test262-main/test and TypeScript-main/tests/cases
+                            f.error(`Unexpected Property value type ${path.node.value?.type} at ${locationToStringWithFile(path.node.loc)}`);
+                            return;
+                        }
 
                         if (!options.oldobj) {
 
