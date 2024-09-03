@@ -29,6 +29,12 @@ export const nodejsModels: NativeModel = {
         },
         {
             name: "exports"
+        },
+        {
+            name: "__filename"
+        },
+        {
+            name: "__dirname"
         }
     ],
     variables: [

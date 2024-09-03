@@ -13,20 +13,24 @@ import {
     File,
     Identifier,
     identifier,
+    isBreakStatement,
     isCallExpression,
     isClassMethod,
     isClassPrivateMethod,
     isClassPrivateProperty,
     isClassProperty,
+    isContinueStatement,
     isIdentifier,
     isImportSpecifier,
     isJSXAttribute,
     isJSXIdentifier,
     isJSXMemberExpression,
+    isLabeledStatement,
     isMemberExpression,
     isObjectMethod,
     isObjectProperty,
     isOptionalMemberExpression,
+    isPrivateName,
     isSuper,
     isTSExternalModuleReference,
     Node,
@@ -191,6 +195,11 @@ export function preprocessAst(ast: File, module?: ModuleInfo, globals?: Array<Id
                 !(isObjectMethod(path.parent) && path.parent.key === n) &&
                 !(isClassProperty(path.parent) && path.parent.key === n) &&
                 !(isClassMethod(path.parent) && path.parent.key === n) &&
+                !(isPrivateName(path.parent) && isClassPrivateProperty(path.parentPath?.parent) && path.parentPath?.parent?.key === path.parent) &&
+                !(isPrivateName(path.parent) && isClassPrivateMethod(path.parentPath?.parent) && path.parentPath?.parent?.key === path.parent) &&
+                !(isLabeledStatement(path.parent) && path.parent.label === n) &&
+                !isContinueStatement(path.parent) &&
+                !isBreakStatement(path.parent) &&
                 !isImportSpecifier(path.parent) &&
                 !isJSXAttribute(path.parent)) {
                 const ps = path.scope.getProgramParent();
