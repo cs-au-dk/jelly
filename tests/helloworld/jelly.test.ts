@@ -4,34 +4,33 @@ jest.setTimeout(20000);
 
 describe("tests/helloworld", () => {
     runTest("tests/helloworld", "app.js", {
-        options: {callgraphExternal: false, proto: true},
         soundness: "tests/helloworld/app.json",
         functionInfos: 775,
         moduleInfos: 94,
-        numberOfFunctionToFunctionEdges: 867,
-        oneCalleeCalls: 929,
-        funFound: 115,
+        numberOfFunctionToFunctionEdges: 899,
+        oneCalleeCalls: 950,
+        funFound: 114,
         funTotal: 138,
-        callFound: 165,
+        callFound: 163,
         callTotal: 204,
-        reachableFound: 138,
+        reachableFound: 140,
         reachableTotal: 189,
     });
 });
 
 describe("tests/helloworld-approx", () => {
     runTest("tests/helloworld", "app.js", {
-        options: {callgraphExternal: false, proto: true, approx: true},
+        options: {approx: true},
         soundness: "tests/helloworld/app.json",
         functionInfos: 775,
         moduleInfos: 94,
-        numberOfFunctionToFunctionEdges: 947,
-        oneCalleeCalls: 987,
+        numberOfFunctionToFunctionEdges: 1109,
+        oneCalleeCalls: 993,
         funFound: 136,
         funTotal: 138,
         callFound: 201,
         callTotal: 204,
-        reachableFound: 168,
+        reachableFound: 186,
         reachableTotal: 189,
     });
 });

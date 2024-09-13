@@ -15,6 +15,7 @@ import {
     isRestElement,
     isSpreadElement,
     isStringLiteral,
+    isSuper,
     isTSParameterProperty,
     isTypeCastExpression,
     JSXElement,
@@ -405,9 +406,16 @@ export class Operations {
         // constraint: ...: t_arguments ∈ ⟦t_arguments⟧ if the function uses 'arguments'
         if (argumentsToken)
             this.solver.addTokenConstraint(argumentsToken, vp.argumentsVar(t.fun));
-        // constraint: if non-'new', E0 is a member expression E.m and t uses 'this', then ⟦E⟧ ⊆ ⟦this_f⟧
-        if (!isNew && base)
-            addInclusionConstraint(base, vp.thisVar(t.fun));
+        // constraint: if non-'new', E0 is a member expression E.m, then ⟦E⟧ ⊆ ⟦this_f⟧
+        if (!isNew && base) {
+            // ...except if E is 'super'
+            if (isMemberExpression(path.node.callee) && isSuper(path.node.callee.object)) {
+                const fun = getEnclosingFunction(path);
+                if (fun)
+                    addInclusionConstraint(vp.thisVar(fun), vp.thisVar(t.fun));
+            } else
+                addInclusionConstraint(base, vp.thisVar(t.fun));
+        }
         // constraint: ...: ⟦ret_t⟧ ⊆ ⟦(new) E0(E1,...,En)⟧
         if (!isParentExpressionStatement(pars))
             this.solver.addSubsetConstraint(vp.returnVar(t.fun), resultVar);
@@ -762,7 +770,10 @@ export class Operations {
             }
 
         } else if (isMemberExpression(dst) || isOptionalMemberExpression(dst)) {
-            const lVar = this.expVar(dst.object, path);
+            const e = getEnclosingFunction(path);
+            const lVar = isSuper(dst.object) ? e ? this.solver.varProducer.thisVar(e) : undefined : this.expVar(dst.object, path);
+            if (!lVar)
+                return;
             const prop = getProperty(dst);
             const enclosing = this.a.getEnclosingFunctionOrModule(path, this.moduleInfo);
 

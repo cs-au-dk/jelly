@@ -328,14 +328,11 @@ export function visit(ast: File, op: Operations) {
                 if (!options.oldobj) {
                     if (isFunctionDeclaration(path.node) || isFunctionExpression(path.node) || isClassMethod(path.node) || isClassPrivateMethod(path.node)) {
 
-                        // create prototype object and instance object
-                        const pt = op.newPrototypeToken(fun);
+                        // connect function object and its prototype object
                         const ft = op.newFunctionToken(fun);
-                        const obj = op.newObjectToken(fun);
+                        const pt = op.newPrototypeToken(fun);
                         solver.addTokenConstraint(pt, vp.objPropVar(ft, "prototype"));
                         solver.addTokenConstraint(ft, vp.objPropVar(pt, "constructor"));
-                        solver.addInherits(obj, pt);
-                        solver.addTokenConstraint(obj, vp.thisVar(fun));
                     }
                 }
 
