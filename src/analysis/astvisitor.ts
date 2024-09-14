@@ -130,18 +130,6 @@ export function visit(ast: File, op: Operations) {
     const f = solver.fragmentState; // (don't use in callbacks)
     const vp = f.varProducer; // (don't use in callbacks)
     const class2constructor = new Map<Class, ClassMethod>();
-    const funStack: Array<Function> = [];
-
-    function currentFunction(): Function | undefined {
-        return funStack.length === 0 ? undefined : funStack[funStack.length - 1];
-    }
-
-    function currentFunctionInfo(): FunctionInfo | ModuleInfo {
-        const f = currentFunction();
-        const g = f ? a.functionInfos.get(f) : op.moduleInfo;
-        assert(g);
-        return g;
-    }
 
     // traverse the AST and extend the analysis result with information about the current module
     if (logger.isVerboseEnabled())
@@ -187,7 +175,7 @@ export function visit(ast: File, op: Operations) {
                 // constraint: t ∈ ⟦this⟧ where t denotes the package
                 solver.addTokenConstraint(op.packageObjectToken, vp.nodeVar(path.node));
 
-                const fun = currentFunction();
+                const fun = getEnclosingFunction(path);
                 if (fun) {
 
                     // constraint: ⟦this_f⟧ ⊆ ⟦this⟧ where f is the enclosing function
@@ -268,7 +256,7 @@ export function visit(ast: File, op: Operations) {
         ReturnStatement: {
             exit(path: NodePath<ReturnStatement>) {
                 if (path.node.argument) {
-                    const fun = currentFunction();
+                    const fun = path.getFunctionParent()?.node;
                     if (fun) {
                         const expVar = op.expVar(path.node.argument, path);
 
@@ -352,15 +340,11 @@ export function visit(ast: File, op: Operations) {
                     // constraint i ∈ ⟦ret_f⟧ where i is the iterator object for the function
                     solver.addTokenConstraint(iter, vp.returnVar(fun));
                 }
-
-                funStack.push(fun);
             }
         },
 
         FunctionDeclaration: {
             exit(path: NodePath<FunctionDeclaration>) {
-                funStack.pop();
-
                 // function f(...) {...}  (as declaration)
                 // constraint: t ∈ ⟦f⟧ where t denotes the function
                 const to = path.node.id ? path.node.id : path.node; // export default functions may not have names, use the FunctionDeclaration node as constraint variable in that situation
@@ -370,8 +354,6 @@ export function visit(ast: File, op: Operations) {
 
         FunctionExpression: {
             exit(path: NodePath<FunctionExpression>) {
-                funStack.pop();
-
                 // function f(...) {...} (as expression, possibly without name)
                 // constraint: t ∈ ⟦function f(...) {...}⟧ where t denotes the function
                 if (!isParentExpressionStatement(path))
@@ -387,8 +369,6 @@ export function visit(ast: File, op: Operations) {
                 // constraint: ⟦E⟧ ⊆ ⟦ret_f⟧ where f is the function
                 if (isExpression(path.node.body))
                     solver.addSubsetConstraint(op.expVar(path.node.body, path), vp.returnVar(path.node));
-
-                funStack.pop();
 
                 // (...) => E
                 // constraint: t ∈ ⟦(...) => E⟧ where t denotes the function
@@ -563,7 +543,6 @@ export function visit(ast: File, op: Operations) {
 
         Method: {
             exit(path: NodePath<ObjectMethod | ClassMethod | ClassPrivateMethod>) {
-                funStack.pop();
                 switch (path.node.kind) {
                     case "method":
                     case "get":
@@ -754,7 +733,7 @@ export function visit(ast: File, op: Operations) {
                     if (isSpreadElement(p)) {
                         if (options.objSpread) {
                             // it's enticing to rewrite the AST to use Object.assign, but assign invokes setters on the target object
-                            const enclosing = currentFunctionInfo();
+                            const enclosing = currentFunctionInfo(path);
                             const argVar = vp.expVar(p.argument, path);
                             solver.addForAllTokensConstraint(argVar, TokenListener.OBJECT_SPREAD, p, (t: Token) => {
                                 if (isObjectPropertyVarObj(t)) {
@@ -950,7 +929,7 @@ export function visit(ast: File, op: Operations) {
         },
 
         YieldExpression(path: NodePath<YieldExpression>) {
-            const fun = getEnclosingFunction(path);
+            const fun = path.getFunctionParent()?.node;
             assert(fun, "yield not in function?!");
             const iter = a.canonicalizeToken(new AllocationSiteToken("Iterator", fun));
             const iterValue = vp.objPropVar(iter, "value");
@@ -1003,6 +982,16 @@ export function visit(ast: File, op: Operations) {
         if (isCalleeExpression(path))
             return; // don't perform a property read for method calls
 
-        op.readProperty(op.expVar(path.node.object, path), getProperty(path.node), dstVar, path.node, currentFunctionInfo());
+        op.readProperty(op.expVar(path.node.object, path), getProperty(path.node), dstVar, path.node, currentFunctionInfo(path));
+    }
+
+    /**
+     * Finds the FunctionInfo or ModuleInfo representing the function the given path belongs to.
+     */
+    function currentFunctionInfo(path: NodePath): FunctionInfo | ModuleInfo {
+        const f = getEnclosingFunction(path); // TODO: maintain during AST traversal?
+        const g = f ? a.functionInfos.get(f) : op.moduleInfo;
+        assert(g);
+        return g;
     }
 }
