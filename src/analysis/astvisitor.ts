@@ -100,6 +100,7 @@ import {ConstraintVar, isObjectPropertyVarObj} from "./constraintvars";
 import {
     getClass,
     getEnclosingFunction,
+    getEnclosingNonArrowFunction,
     getExportName,
     getImportName,
     getKey,
@@ -116,6 +117,7 @@ import {
     GENERATOR_PROTOTYPE_NEXT,
     GENERATOR_PROTOTYPE_RETURN,
     GENERATOR_PROTOTYPE_THROW,
+    INTERNAL_PROTOTYPE,
     PROMISE_FULFILLED_VALUES
 } from "../natives/ecmascript";
 import {Operations} from "./operations";
@@ -139,64 +141,38 @@ export function visit(ast: File, op: Operations) {
         ThisExpression(path: NodePath<ThisExpression>) {
 
             // this
-            if (!options.oldobj) {
-
-                const encl = path.findParent((p: NodePath) =>
-                    isFunctionDeclaration(p.node) || isFunctionExpression(p.node) || isObjectMethod(p.node) ||
-                    isClassMethod(p.node) || isClassPrivateMethod(p.node) ||
-                    isStaticBlock(p.node) || isClassProperty(p.node) || isClassPrivateProperty(p.node)
-                );
-                if (encl) {
-                    if (isFunction(encl.node)) {
-
-                        // constraint: ⟦this_f⟧ ⊆ ⟦this⟧ where f is the enclosing function (excluding arrow functions)
-                        solver.addSubsetConstraint(vp.thisVar(encl.node), vp.nodeVar(path.node));
-
-                    } else {
-                        const cls = encl.parentPath?.parentPath?.node as Class;
-                        assert(cls);
-                        const constr = class2constructor.get(cls);
-                        assert(constr);
-
-                        if (isStaticBlock(encl.node) || ((isClassProperty(encl.node) || isClassPrivateProperty(encl.node)) && encl.node.static))
-                            // constraint: c ∈ ⟦this⟧ where c is the constructor of the enclosing class
-                            solver.addTokenConstraint(op.newFunctionToken(constr), vp.nodeVar(path.node));
-                        else
-                            // constraint: ⟦this_c⟧ ⊆ ⟦this⟧ where c is the constructor of the enclosing class
-                            solver.addSubsetConstraint(vp.thisVar(constr), vp.nodeVar(path.node));
-                    }
-                } else {
-
-                    // constraint %globalThis ∈ ⟦this⟧
-                    solver.addTokenConstraint(op.globalSpecialNatives.get("globalThis")!, vp.nodeVar(path.node));
-                }
+            const encl = path.findParent((p: NodePath) =>
+                isFunction(p.node) || isStaticBlock(p.node) || isClassProperty(p.node) || isClassPrivateProperty(p.node));
+            if (encl && (isStaticBlock(encl.node) || ((isClassProperty(encl.node) || isClassPrivateProperty(encl.node)) && encl.node.static))) {
+                // in static block or static field initializer
+                // constraint: c ∈ ⟦this⟧ where c is the constructor of the enclosing class
+                const cls = encl.parentPath?.parentPath?.node as Class;
+                assert(cls);
+                const constr = class2constructor.get(cls);
+                assert(constr);
+                solver.addTokenConstraint(op.newFunctionToken(constr), vp.nodeVar(path.node));
             } else {
-
-                // constraint: t ∈ ⟦this⟧ where t denotes the package
-                solver.addTokenConstraint(op.packageObjectToken, vp.nodeVar(path.node));
-
-                const fun = getEnclosingFunction(path);
+                const fun = getEnclosingNonArrowFunction(path);
                 if (fun) {
-
-                    // constraint: ⟦this_f⟧ ⊆ ⟦this⟧ where f is the enclosing function
+                    // in constructor or method
+                    // constraint: ⟦this_f⟧ ⊆ ⟦this⟧ where f is the enclosing function (excluding arrow functions)
                     solver.addSubsetConstraint(vp.thisVar(fun), vp.nodeVar(path.node));
                 } else {
-
                     // constraint %globalThis ∈ ⟦this⟧
                     solver.addTokenConstraint(op.globalSpecialNatives.get("globalThis")!, vp.nodeVar(path.node));
                 }
             }
-
-            // FIXME: the 'this' value in the computed static field names is the 'this' surrounding the class definition
+            if (options.oldobj) {
+                // constraint: t ∈ ⟦this⟧ where t denotes the package
+                solver.addTokenConstraint(op.packageObjectToken, vp.nodeVar(path.node));
+            }
         },
 
         Super(path: NodePath<Super>) {
 
             // super
             const encl = path.findParent((p: NodePath) =>
-                isObjectMethod(p.node) || isClassMethod(p.node) || isClassPrivateMethod(p.node) ||
-                isStaticBlock(p.node) || isClassProperty(p.node) || isClassPrivateProperty(p.node)) as
-                NodePath<ObjectMethod | ClassMethod | ClassPrivateMethod | StaticBlock | ClassProperty | ClassPrivateProperty> | null;
+                isFunction(p.node) || isStaticBlock(p.node) || isClassProperty(p.node) || isClassPrivateProperty(p.node));
             if (!encl) {
                 f.error("'super' keyword unexpected", path.node);
                 return;
@@ -221,7 +197,7 @@ export function visit(ast: File, op: Operations) {
                     src = op.newPrototypeToken(constr);
                 }
             }
-            solver.addSubsetConstraint(vp.ancestorsVar(src), vp.nodeVar(path.node));
+            solver.addSubsetConstraint(vp.objPropVar(src, INTERNAL_PROTOTYPE()), vp.nodeVar(path.node));
         },
 
         Identifier(path: NodePath<Identifier>) {
