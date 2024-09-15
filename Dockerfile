@@ -1,4 +1,4 @@
-FROM ubuntu:20.04 as node-builder
+FROM ubuntu:20.04 AS node-builder
 WORKDIR /tools
 
 # install Node & update NPM
@@ -23,7 +23,7 @@ RUN arch="$(dpkg --print-architecture)"; \
     PATH="/tools/node/bin:$PATH" npm install -g "npm@^9.8.0"
     # GraalJS uses Node 16 which is not supported by npm v10
 
-FROM ubuntu:20.04 as nodeprof-builder
+FROM ubuntu:20.04 AS nodeprof-builder
 WORKDIR /tools
 
 # install GraalVM JavaScript and NodeProf
@@ -46,12 +46,12 @@ RUN mkdir -p /usr/lib/jvm
 COPY --from=node-builder /tools/node /opt/node
 COPY --from=nodeprof-builder /tools/jdk /usr/lib/jvm/jdk
 COPY --from=nodeprof-builder /tools/graal/sdk/latest_graalvm_home /usr/lib/jvm/graalvm
-ENV NODE_PATH /opt/node/lib/node_modules
-ENV PATH /opt/node/bin:$PATH
+ENV NODE_PATH=/opt/node/lib/node_modules
+ENV PATH=/opt/node/bin:$PATH
 ENV JAVA_HOME=/usr/lib/jvm/jdk
 ENV GRAAL_HOME=/usr/lib/jvm/graalvm
-ENV NODE_OPTIONS --max-old-space-size=8192
-ENV NODE_ENV production
+ENV NODE_OPTIONS="--max-old-space-size=8192"
+ENV NODE_ENV=production
 
 # install Jelly files built locally
 RUN mkdir /jelly
