@@ -28,7 +28,7 @@ export default class AnalysisDiagnostics {
 
     timeout: boolean = false;
 
-    time: bigint = 0n; // set when analysis is completed
+    analysisTime: bigint = 0n; // set when analysis is completed
 
     codeSize: number = 0;
 
@@ -103,6 +103,8 @@ export default class AnalysisDiagnostics {
     totalOtherPatchingTime: bigint = 0n;
 
     finalizationTime: bigint = 0n;
+
+    patternMatchingTime: bigint = 0n;
 
     unhandledDynamicPropertyWrites: number = 0;
 

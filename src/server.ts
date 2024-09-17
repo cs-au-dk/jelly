@@ -334,7 +334,7 @@ async function main() {
             if (!tapirPatterns || !patterns)
                 return prepareResponse(false, req, {message: "Patterns have not been loaded"});
             const matcher = new PatternMatcher(solver.fragmentState, typer);
-            const body = convertPatternMatchesToJSON(patterns, matcher);
+            const body = convertPatternMatchesToJSON(patterns, matcher, solver.diagnostics);
             const res: PatternMatchResponse = prepareResponse(true, req, {body});
             logger.info("Sending pattern matching results");
             return res;

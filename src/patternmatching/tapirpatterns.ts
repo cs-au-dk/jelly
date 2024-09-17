@@ -73,7 +73,7 @@ export function tapirPatternMatch(tapirPatterns: Array<PatternWrapper | Semantic
             const p = patterns[i];
             if (p) {
                 solver.globalState.timeoutTimer.checkTimeout();
-                const ms = matcher.findDetectionPatternMatches(p); // the set of expressions that match tp and p
+                const ms = matcher.findDetectionPatternMatches(p, solver.diagnostics); // the set of expressions that match tp and p
                 for (const m of ms) {
                     logger.info(`Pattern #${tpId}: ${tpPattern}${tpVersion} matches ${locationToStringWithFileAndEnd(m.exp.loc)} (confidence: ${isHigh(m) ? "high" : "low"})`);
                     if (m.uncertainties && m.uncertainties.length > 0) {

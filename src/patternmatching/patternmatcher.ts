@@ -60,6 +60,8 @@ import {FragmentState} from "../analysis/fragmentstate";
 import {expressionMatchesType} from "./typematcher";
 import {TypeScriptTypeInferrer} from "../typescript/typeinferrer";
 import {options} from "../options";
+import Timer from "../misc/timer";
+import AnalysisDiagnostics from "../analysis/diagnostics";
 
 /**
  * Different kinds of match uncertainty for detection pattern matching.
@@ -495,7 +497,8 @@ export class PatternMatcher {
      * Finds the AST nodes that match the given detection pattern,
      * with descriptions of the causes of uncertainty for low-confidence matches.
      */
-    findDetectionPatternMatches(d: DetectionPattern, moduleFilter?: ModuleFilter): Array<DetectionPatternMatch> {
+    findDetectionPatternMatches(d: DetectionPattern, diagnostics?: AnalysisDiagnostics, moduleFilter?: ModuleFilter): Array<DetectionPatternMatch> {
+        const timer = new Timer();
         this.findEscapingAccessPathsToExternal();
         const res: Array<DetectionPatternMatch> = [];
         if (d instanceof ImportDetectionPattern) {
@@ -615,6 +618,8 @@ export class PatternMatcher {
                 }
         } else
             assert.fail("Unexpected DetectionPattern");
+        if (diagnostics)
+            diagnostics.patternMatchingTime += timer.elapsed();
         return res;
     }
 }
@@ -633,7 +638,7 @@ function getPropertyReadObject(exp: Node): Node | undefined {
     assert.fail(`Unexpected node type ${exp.type} at ${locationToStringWithFileAndEnd(exp.loc)}`);
 }
 
-export function convertPatternMatchesToJSON(patterns: Array<DetectionPattern | undefined>, matcher: PatternMatcher): PatternMatchesJSON {
+export function convertPatternMatchesToJSON(patterns: Array<DetectionPattern | undefined>, matcher: PatternMatcher, diagnostics: AnalysisDiagnostics): PatternMatchesJSON {
     const res: PatternMatchesJSON = {files: [], patterns: []};
     const locs = new SourceLocationsToJSON(res.files);
     function convertUncertaintyToJSON(u: Uncertainty): UncertaintyJSON {
@@ -646,7 +651,7 @@ export function convertPatternMatchesToJSON(patterns: Array<DetectionPattern | u
     }
     for (const p of patterns)
         if (p) {
-            const ms = matcher.findDetectionPatternMatches(p);
+            const ms = matcher.findDetectionPatternMatches(p, diagnostics);
             if (ms.length > 0) {
                 const matches: Array<PatternMatchJSON> = [];
                 res.patterns.push({pattern: p.toString(), matches});

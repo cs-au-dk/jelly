@@ -237,7 +237,7 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
     solver.updateDiagnostics();
 
     // output statistics
-    d.time = timer.elapsed();
+    d.analysisTime = timer.elapsed();
     d.errors = getMapHybridSetSize(solver.fragmentState.errors) + a.filesWithParseErrors.length;
     d.warnings = getMapHybridSetSize(solver.fragmentState.warnings) + getMapHybridSetSize(solver.fragmentState.warningsUnsupported);
     if (!options.modulesOnly && files.length > 0) {
@@ -262,7 +262,7 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
                     `native or external: ${nativeExternal}/${total} (${percent(nativeExternal / total)})`);
             logger.info(`Functions with zero callers: ${d.functionsWithZeroCallers}/${a.functionInfos.size}${a.functionInfos.size > 0 ? ` (${percent(d.functionsWithZeroCallers / a.functionInfos.size)})` : ""}, ` +
                 `reachable functions: ${d.reachableFunctions}/${a.functionInfos.size}${a.functionInfos.size > 0 ? ` (${percent(d.reachableFunctions / a.functionInfos.size)})` : ""}`);
-            logger.info(`Analysis time: ${nanoToMs(d.time)}, memory usage: ${d.maxMemoryUsage}MB${!options.gc ? " (without --gc)" : ""}`);
+            logger.info(`Analysis time: ${nanoToMs(d.analysisTime)}, memory usage: ${d.maxMemoryUsage}MB${!options.gc ? " (without --gc)" : ""}`);
             logger.info(`Analysis errors: ${d.errors}, warnings: ${d.warnings}${getMapHybridSetSize(f.warningsUnsupported) > 0 && !options.warningsUnsupported ? " (show all with --warnings-unsupported)" : ""}`);
             if (options.diagnostics) {
                 logger.info(`Propagations: ${d.propagations}, listener notification rounds: ${d.listenerNotificationRounds}`);
