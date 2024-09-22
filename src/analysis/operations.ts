@@ -32,6 +32,7 @@ import {NodePath} from "@babel/traverse";
 import {
     getAdjustedCallNodePath,
     getEnclosingFunction,
+    getEnclosingNonArrowFunction,
     getKey,
     getProperty,
     isInTryBlockOrBranch,
@@ -407,13 +408,21 @@ export class Operations {
         if (argumentsToken)
             this.solver.addTokenConstraint(argumentsToken, vp.argumentsVar(t.fun));
         // constraint: if non-'new', E0 is a member expression E.m, then ⟦E⟧ ⊆ ⟦this_f⟧
-        if (!isNew && base) {
-            // ...except if E is 'super'
-            if (isMemberExpression(path.node.callee) && isSuper(path.node.callee.object)) {
-                const fun = getEnclosingFunction(path);
-                if (fun)
+        if (!isNew) {
+            // ...except if E or E0 is 'super'
+            const sup = isSuper(path.node.callee);
+            if (sup || (isMemberExpression(path.node.callee) && isSuper(path.node.callee.object))) {
+                const fun = getEnclosingNonArrowFunction(path);
+                if (fun) {
+                    // ... ⟦this_g⟧ ⊆ ⟦this_f⟧ where g is the current function
                     addInclusionConstraint(vp.thisVar(fun), vp.thisVar(t.fun));
-            } else
+
+                    if (sup) {
+                        // ... ⟦return_f⟧ ⊆ ⟦return_g⟧
+                        this.solver.addSubsetConstraint(vp.returnVar(t.fun), vp.returnVar(fun));
+                    }
+                }
+            } else if (base)
                 addInclusionConstraint(base, vp.thisVar(t.fun));
         }
         // constraint: ...: ⟦ret_t⟧ ⊆ ⟦(new) E0(E1,...,En)⟧

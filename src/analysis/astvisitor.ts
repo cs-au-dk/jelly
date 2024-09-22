@@ -656,12 +656,6 @@ export function visit(ast: File, op: Operations) {
                                 // ... ⟦w.prototype⟧ ⊆ ⟦ct.prototype.[[Prototype]]⟧ (allows inheritance of instance properties)
                                 solver.addInherits(pt, solver.varProducer.objPropVar(w, "prototype"));
 
-                                // ... ⟦this_ct⟧ ⊆ ⟦this_w⟧
-                                solver.addSubsetConstraint(solver.varProducer.thisVar(constructor.node), solver.varProducer.thisVar(w.fun));
-
-                                // ... ⟦return_w⟧ ⊆ ⟦return_ct⟧
-                                solver.addSubsetConstraint(solver.varProducer.returnVar(w.fun), solver.varProducer.returnVar(ct.fun));
-
                             } else {
 
                                 const p = a.canonicalizeToken(new AccessPathToken(a.canonicalizeAccessPath(new PropertyAccessPath(eVar!, "prototype"))));
