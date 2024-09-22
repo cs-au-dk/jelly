@@ -695,6 +695,31 @@ describe("tests/micro", () => {
         oneCalleeCalls: 12,
     });
 
+    runTest("tests/micro", "super2.js", {
+        soundness: "tests/micro/super2.json",
+        funTotal: 5,
+        callTotal: 5,
+    });
+
+    runTest("tests/micro", "super3.js", {
+        options: {proto: true},
+        soundness: "tests/micro/super3.json",
+        numberOfFunctionToFunctionEdges: 4,
+        oneCalleeCalls: 4,
+    });
+
+    runTest("tests/micro", "super4.js", {
+        soundness: "tests/micro/super4.json",
+        funTotal: 6,
+        callTotal: 9,
+    });
+
+    runTest("tests/micro", "super5.js", {
+        soundness: "tests/micro/super5.json",
+        funTotal: 6,
+        callTotal: 6,
+    });
+
     runTest("tests/micro", "dpr-this.js", {
         soundness: "tests/micro/dpr-this.json",
         // TODO: patch dynamics heuristic does not kick in for dynamic property reads
@@ -785,12 +810,12 @@ describe("tests/micro", () => {
             functionInfos: 40,
             moduleInfos: 1,
             numberOfFunctionToFunctionEdges: callgraphNative? 54 : 25,
-            oneCalleeCalls: callgraphNative? 23 : 14,
+            oneCalleeCalls: callgraphNative ? 23 : 14,
             funFound: 24,
             funTotal: 28,
             callFound: 24,
             callTotal: 28,
-            reachableFound: callgraphNative? 32 : 1,
+            reachableFound: callgraphNative ? 32 : 1,
             reachableTotal: 33,
         });
     });
