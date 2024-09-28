@@ -40,7 +40,8 @@ export function runTest(basedir: string,
                             apiUsageAccessPathPatternsAtNodes?: number
                             vulnerabilities?: Array<Vulnerability>,
                             vulnerabilitiesMatches?: number,
-                            hasEdges?: Array<[string, string]>
+                            hasEdges?: Array<[string, string]>,
+                            containsTokens?: Array<[string, number]>
                         }) {
 
     const files = Array.isArray(app) ? app : [app];
@@ -206,6 +207,25 @@ export function runTest(basedir: string,
                     if (!hasEdge(solver.fragmentState, src, dst))
                         assert.fail(`Call edge missing: ${src} -> ${dst}`);
             });
+
+        if (args.containsTokens)
+            test("contains tokens", () => {
+                const allRepsAndTokens: Array<[string, number]> = [];
+                for (const [rep, _, actualSize] of solver.fragmentState.getAllVarsAndTokens())
+                    allRepsAndTokens.push([rep.toString(), actualSize]);
+                for (const [cvar, expectedSize] of args.containsTokens!) {
+                    let found = false;
+                    for (const [repString, actualSize] of allRepsAndTokens)
+                        if (repString.includes(cvar)) {
+                            expect(actualSize).toBe(expectedSize);
+                            found = true;
+                        }
+                    if (expectedSize === 0)
+                        expect(found).toBe(false);
+                    else if (!found)
+                        assert.fail(`Specified constraint variable ${cvar} was not found`);
+                }
+            })
     });
 }
 

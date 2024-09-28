@@ -629,7 +629,6 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
         return !this.redirections.has(v);
     }
 
-
     /**
      * Returns the tokens in the solution for the given constraint variable
      * (or empty if v is undefined).
