@@ -1,4 +1,4 @@
-import {ConstraintVar, ObjectPropertyVarObj} from "./constraintvars";
+import {AncestorsVar, ConstraintVar, ObjectPropertyVarObj} from "./constraintvars";
 import {AccessPathToken, ArrayToken, FunctionToken, ObjectToken, PackageObjectToken, Token} from "./tokens";
 import {DummyModuleInfo, FunctionInfo, ModuleInfo, PackageInfo} from "./infos";
 import {CallExpression, Function, Identifier, JSXIdentifier, NewExpression, Node, OptionalCallExpression, SourceLocation,} from "@babel/types";
@@ -771,6 +771,8 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
      * @return true if not already there, false if already there
      */
     addToken(t: Token, v: RVT): boolean {
+        if (v instanceof AncestorsVar && v.t === t)
+            return false;
         const ts = this.tokens.get(v);
         if (!ts)
             this.tokens.set(v, t);
