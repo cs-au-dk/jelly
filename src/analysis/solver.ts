@@ -175,11 +175,8 @@ export default class Solver {
      * Also enqueues notification of listeners and registers object properties and array entries from the constraint variable.
      */
     addToken(t: Token, toRep: RepresentativeVar): boolean {
-        assert(!this.isIgnoredVar(toRep));
         const f = this.fragmentState;
         if (f.addToken(t, toRep)) {
-            if (logger.isVerboseEnabled())
-                assert(!f.redirections.has(toRep));
             f.vars.add(toRep);
             this.tokenAdded(toRep, t);
             return true;
@@ -192,7 +189,6 @@ export default class Solver {
      * Also adds to worklist and notifies listeners.
      */
     private addTokens(ts: Iterable<Token> | Token, toRep: RepresentativeVar) {
-        assert(!this.isIgnoredVar(toRep));
         const f = this.fragmentState;
         f.vars.add(toRep);
         if (ts instanceof Token) {
@@ -237,6 +233,10 @@ export default class Solver {
     ): Array<Token> | Token | undefined {
         if (logger.isDebugEnabled())
             logger.debug(`Added token ${t} to ${toRep}`);
+        if (logger.isVerboseEnabled()) {
+            assert(!this.fragmentState.redirections.has(toRep));
+            assert(!this.isIgnoredVar(toRep));
+        }
         if (!ws)
             ws = this.unprocessedTokens.get(toRep);
         // add to worklist
@@ -310,6 +310,8 @@ export default class Solver {
     addSubsetConstraint(from: ConstraintVar | undefined, to: ConstraintVar | undefined) {
         if (from === undefined || to === undefined)
             return;
+        if (this.isIgnoredVar(from) || this.isIgnoredVar(to))
+            return;
         if (logger.isDebugEnabled())
             logger.debug(`Adding constraint ${from} \u2286 ${to}`);
         const f = this.fragmentState;
@@ -317,8 +319,6 @@ export default class Solver {
     }
 
     addSubsetEdge(fromRep: RepresentativeVar, toRep: RepresentativeVar) {
-        if (this.isIgnoredVar(fromRep) || this.isIgnoredVar(toRep))
-            return;
         if (fromRep !== toRep) {
             const f = this.fragmentState;
             const s = mapGetSet(f.subsetEdges, fromRep);
@@ -900,6 +900,10 @@ export default class Solver {
         }
     }
 
+    /**
+     * Checks whether the given constraint variable represents
+     * a getter/setter for a global native object.
+     */
     isIgnoredVar(v: ConstraintVar): boolean {
         return v instanceof ObjectPropertyVar && v.obj instanceof NativeObjectToken && !v.obj.moduleInfo && (v.accessor === "get" || v.accessor === "set");
     }

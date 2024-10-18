@@ -530,12 +530,10 @@ export class Operations {
         if (base instanceof FunctionToken && prop === "prototype") // function objects always have 'prototype', no need to consult prototype chain
             this.readPropertyBound(base, prop, dst, {t: base, s: prop}, base);
         else {
-            const basePropSpecial =
-                (base instanceof FunctionToken && STANDARD_METHODS.get("Function")!.has(prop)) ||
-                (base instanceof AllocationSiteToken && base.kind !== "Object" && STANDARD_METHODS.get(base.kind)?.has(prop));
+            const nativeProperty = this.isNativeProperty(base, prop);
             // constraint: ... ∀ ancestors t2 of t: ...
             this.solver.addForAllAncestorsConstraint(base, TokenListener.READ_ANCESTORS, {s: prop}, (t2: Token) => {
-                if (basePropSpecial && t2 === this.globalSpecialNatives.get(OBJECT_PROTOTYPE))
+                if (nativeProperty && t2 === this.globalSpecialNatives.get(OBJECT_PROTOTYPE))
                     return; // safe to skip properties at Object.prototype that are in {base.kind}.prototype
                 if (isObjectPropertyVarObj(t2))
                     this.readPropertyBound(t2, prop, dst, {t: base, s: prop}, base);
@@ -573,7 +571,7 @@ export class Operations {
         this.solver.addSubsetConstraint(this.solver.varProducer.objPropVar(t, prop), dst); // TODO: exclude AccessPathTokens?
 
         // constraint: ... ∀ functions t3 ∈ ⟦(get)t.p⟧: ⟦ret_t3⟧ ⊆ ⟦E.p⟧ (unless NativeObjectToken, "prototype", "toString", or array index)
-        if (!(t instanceof NativeObjectToken && !t.moduleInfo) && prop !== "prototype" && prop !== "toString" && !isArrayIndex(prop)) {
+        if (!(t instanceof NativeObjectToken && !t.moduleInfo) && prop !== INTERNAL_PROTOTYPE() && prop !== "prototype" && prop !== "toString" && !isArrayIndex(prop)) {
             const getter = this.solver.varProducer.objPropVar(t, prop, "get");
             this.solver.addForAllTokensConstraint(getter, TokenListener.READ_GETTER, dstkey,
                 (t3: Token) => readFromGetter(t3));
@@ -638,7 +636,7 @@ export class Operations {
 
         if (isObjectPropertyVarObj(base)) {
 
-            if (!options.nativeOverwrites && this.isNativeProperty(base, prop)) {
+            if (!options.nativeOverwrites && prop !== "toString" && this.isNativeProperty(base, prop)) {
                 this.solver.fragmentState.warnUnsupported(node, `Ignoring write to native property ${base}.${prop}`);
                 return;
             }
@@ -647,8 +645,8 @@ export class Operations {
             if (src)
                 this.solver.addSubsetConstraint(src, this.solver.varProducer.objPropVar(base, prop, ac));
 
-            if (invokeSetters && (prop !== INTERNAL_PROTOTYPE()))
-                if (!(base instanceof NativeObjectToken && !base.moduleInfo) && prop !== "prototype" && prop !== "toString" && !isArrayIndex(prop)) {
+            if (invokeSetters)
+                if (!(base instanceof NativeObjectToken && prop !== INTERNAL_PROTOTYPE() && !base.moduleInfo) && prop !== "prototype" && prop !== "toString" && !isArrayIndex(prop)) {
 
                     // constraint: ... ∀ ancestors anc of base: ... (unless NativeObjectToken, "prototype", "toString" or array index)
                     this.solver.addForAllAncestorsConstraint(base, TokenListener.WRITE_ANCESTORS, {n: node, s: prop}, (anc: Token) => {
@@ -1020,15 +1018,14 @@ export class Operations {
     }
 
     /**
-     * Returns true if 'base' is a native token or inherits from a native that has a property named 'prop' (excluding "toString").
+     * Returns true if 'base' is a native token or inherits from a native that has a property named 'prop'.
      */
     isNativeProperty(base: Token, prop: string): boolean {
         return Boolean((base instanceof NativeObjectToken &&
                 this.a.globalSpecialNatives?.has(base.name) && this.a.globalSpecialNatives?.has(`${base.name}.${prop}`)) ||
-            (prop !== "toString" && (
-                (base instanceof FunctionToken &&
-                    this.a.globalSpecialNatives?.has(`Function.prototype.${prop}`)) ||
+            ((base instanceof FunctionToken &&
+                    STANDARD_METHODS.get("Function")!.has(prop)) ||
                 ((base instanceof AllocationSiteToken || base instanceof PackageObjectToken) &&
-                    this.a.globalSpecialNatives?.has(`${base.kind}.prototype.${prop}`)))));
+                    STANDARD_METHODS.get(base.kind)?.has(prop)))); // same as this.a.globalSpecialNatives?.has(`${base.kind}.prototype.${prop}`)
     }
 }
