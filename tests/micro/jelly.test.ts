@@ -330,6 +330,7 @@ describe("tests/micro", () => {
     });
 
     runTest("tests/micro", "arrays5.js", {
+        options: {nativeOverwrites: true},
         soundness: "tests/micro/arrays5.json",
     });
 
