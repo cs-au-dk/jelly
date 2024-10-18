@@ -1,4 +1,11 @@
-import {ConstraintVar, IntermediateVar, isObjectPropertyVarObj, NodeVar, ObjectPropertyVarObj} from "./constraintvars";
+import {
+    ConstraintVar,
+    IntermediateVar,
+    isObjectPropertyVarObj,
+    NodeVar,
+    ObjectPropertyVar,
+    ObjectPropertyVarObj
+} from "./constraintvars";
 import logger, {GREY, isTTY, RESET, writeStdOut} from "../misc/logger";
 import {
     AccessPathToken,
@@ -6,6 +13,7 @@ import {
     ArrayToken,
     ClassToken,
     FunctionToken,
+    NativeObjectToken,
     ObjectToken,
     PackageObjectToken,
     PrototypeToken,
@@ -167,6 +175,7 @@ export default class Solver {
      * Also enqueues notification of listeners and registers object properties and array entries from the constraint variable.
      */
     addToken(t: Token, toRep: RepresentativeVar): boolean {
+        assert(!this.isIgnoredVar(toRep));
         const f = this.fragmentState;
         if (f.addToken(t, toRep)) {
             if (logger.isVerboseEnabled())
@@ -183,6 +192,7 @@ export default class Solver {
      * Also adds to worklist and notifies listeners.
      */
     private addTokens(ts: Iterable<Token> | Token, toRep: RepresentativeVar) {
+        assert(!this.isIgnoredVar(toRep));
         const f = this.fragmentState;
         f.vars.add(toRep);
         if (ts instanceof Token) {
@@ -307,6 +317,8 @@ export default class Solver {
     }
 
     addSubsetEdge(fromRep: RepresentativeVar, toRep: RepresentativeVar) {
+        if (this.isIgnoredVar(fromRep) || this.isIgnoredVar(toRep))
+            return;
         if (fromRep !== toRep) {
             const f = this.fragmentState;
             const s = mapGetSet(f.subsetEdges, fromRep);
@@ -393,6 +405,8 @@ export default class Solver {
     }
 
     private addForAllTokensConstraintPrivate(vRep: RepresentativeVar, id: ListenerID, key: TokenListener, listener: (t: Token) => void): boolean {
+        if (this.isIgnoredVar(vRep))
+            return false;
         const f = this.fragmentState;
         let bound = false;
         if (options.maxIndirections !== undefined)
@@ -884,6 +898,10 @@ export default class Solver {
             this.globalState.timeoutTimer.checkTimeout();
             this.printDiagnostics();
         }
+    }
+
+    isIgnoredVar(v: ConstraintVar): boolean {
+        return v instanceof ObjectPropertyVar && v.obj instanceof NativeObjectToken && !v.obj.moduleInfo && (v.accessor === "get" || v.accessor === "set");
     }
 
     /**
