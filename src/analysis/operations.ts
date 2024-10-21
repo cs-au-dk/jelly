@@ -571,7 +571,7 @@ export class Operations {
         // constraint: ... ⟦t.p⟧ ⊆ ⟦E.p⟧
         this.solver.addSubsetConstraint(this.solver.varProducer.objPropVar(t, prop), dst); // TODO: exclude AccessPathTokens?
 
-        // constraint: ... ∀ functions t3 ∈ ⟦(get)t.p⟧: ⟦ret_t3⟧ ⊆ ⟦E.p⟧ (unless NativeObjectToken, "prototype", "toString", or array index)
+        // constraint: ... ∀ functions t3 ∈ ⟦(get)t.p⟧: ⟦ret_t3⟧ ⊆ ⟦E.p⟧ (unless global native, [[Prototype]], "prototype", "toString", or array index)
         if (!(t instanceof NativeObjectToken && !t.moduleInfo) && prop !== INTERNAL_PROTOTYPE() && prop !== "prototype" && prop !== "toString" && !isArrayIndex(prop)) {
             const getter = this.solver.varProducer.objPropVar(t, prop, "get");
             this.solver.addForAllTokensConstraint(getter, TokenListener.READ_GETTER, dstkey,
@@ -647,9 +647,8 @@ export class Operations {
                 this.solver.addSubsetConstraint(src, this.solver.varProducer.objPropVar(base, prop, ac));
 
             if (invokeSetters)
-                if (!(base instanceof NativeObjectToken && prop !== INTERNAL_PROTOTYPE() && !base.moduleInfo) && prop !== "prototype" && prop !== "toString" && !isArrayIndex(prop)) {
-
-                    // constraint: ... ∀ ancestors anc of base: ... (unless NativeObjectToken, "prototype", "toString" or array index)
+                // constraint: ... ∀ ancestors anc of base: ... (unless global native, [[Prototype]], "prototype", "toString" or array index)
+                if (!(base instanceof NativeObjectToken && !base.moduleInfo) && prop !== INTERNAL_PROTOTYPE() && prop !== "prototype" && prop !== "toString" && !isArrayIndex(prop))
                     this.solver.addForAllAncestorsConstraint(base, TokenListener.WRITE_ANCESTORS, {n: node, s: prop}, (anc: Token) => {
                         if (isObjectPropertyVarObj(anc)) {
                             // constraint: ...: ∀ functions t2 ∈ ⟦(set)anc.p⟧: ⟦E2⟧ ⊆ ⟦x⟧ where x is the parameter of t2
@@ -658,7 +657,6 @@ export class Operations {
                             this.solver.addForAllTokensConstraint(setter, TokenListener.WRITE_SETTER_THIS, {t: base}, bindSetterThis);
                         }
                     });
-                }
 
             // values written to native object escape
             if (base instanceof NativeObjectToken && (base.moduleInfo || base.name === "globalThis")) // TODO: other natives? packageObjectTokens?
