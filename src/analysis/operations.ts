@@ -59,12 +59,12 @@ import {FilePath, getOrSet, isArrayIndex, Location, locationToString, locationTo
 import assert from "assert";
 import {
     INTERNAL_PROTOTYPE,
+    isNativeProperty,
     MAP_KEYS,
     MAP_VALUES,
     OBJECT_PROTOTYPE,
     PROMISE_FULFILLED_VALUES,
     SET_VALUES,
-    STANDARD_METHODS
 } from "../natives/ecmascript";
 import {CallNodePath, SpecialNativeObjects} from "../natives/nativebuilder";
 import {TokenListener} from "./listeners";
@@ -530,10 +530,11 @@ export class Operations {
         if (base instanceof FunctionToken && prop === "prototype") // function objects always have 'prototype', no need to consult prototype chain
             this.readPropertyBound(base, prop, dst, {t: base, s: prop}, base);
         else {
-            const nativeProperty = this.isNativeProperty(base, prop);
+            const nativeProperty = isNativeProperty(base, prop);
+            const objProto = this.globalSpecialNatives?.get(OBJECT_PROTOTYPE);
             // constraint: ... ∀ ancestors t2 of t: ...
             this.solver.addForAllAncestorsConstraint(base, TokenListener.READ_ANCESTORS, {s: prop}, (t2: Token) => {
-                if (nativeProperty && t2 === this.globalSpecialNatives.get(OBJECT_PROTOTYPE))
+                if (nativeProperty && t2 !== base && t2 === objProto)
                     return; // safe to skip properties at Object.prototype that are in {base.kind}.prototype
                 if (isObjectPropertyVarObj(t2))
                     this.readPropertyBound(t2, prop, dst, {t: base, s: prop}, base);
@@ -636,7 +637,7 @@ export class Operations {
 
         if (isObjectPropertyVarObj(base)) {
 
-            if (!options.nativeOverwrites && prop !== "toString" && this.isNativeProperty(base, prop)) {
+            if (!options.nativeOverwrites && prop !== "toString" && isNativeProperty(base, prop)) {
                 this.solver.fragmentState.warnUnsupported(node, `Ignoring write to native property ${base}.${prop}`);
                 return;
             }
@@ -1015,17 +1016,5 @@ export class Operations {
             else
                 this.solver.addTokenConstraint(t, res);
         });
-    }
-
-    /**
-     * Returns true if 'base' is a native token or inherits from a native that has a property named 'prop'.
-     */
-    isNativeProperty(base: Token, prop: string): boolean {
-        return Boolean((base instanceof NativeObjectToken &&
-                this.a.globalSpecialNatives?.has(base.name) && this.a.globalSpecialNatives?.has(`${base.name}.${prop}`)) ||
-            ((base instanceof FunctionToken &&
-                    STANDARD_METHODS.get("Function")!.has(prop)) ||
-                ((base instanceof AllocationSiteToken || base instanceof PackageObjectToken) &&
-                    STANDARD_METHODS.get(base.kind)?.has(prop)))); // same as this.a.globalSpecialNatives?.has(`${base.kind}.prototype.${prop}`)
     }
 }

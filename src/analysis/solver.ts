@@ -547,12 +547,12 @@ export default class Solver {
             this.callTokenListener(id, listener, t, true); // ancestry is reflexive
             const g = this.globalState.globalSpecialNatives;
             if (g) { // (not set when called from unit tests)
-                if (t instanceof ObjectToken)
+                if (t instanceof ObjectToken || t instanceof PrototypeToken)
                     this.callTokenListener(id, listener, g.get(OBJECT_PROTOTYPE)!);
                 else if (t instanceof ArrayToken) {
                     this.callTokenListener(id, listener, g.get(ARRAY_PROTOTYPE)!);
                     this.callTokenListener(id, listener, g.get(OBJECT_PROTOTYPE)!);
-                } else if (t instanceof FunctionToken || t instanceof PrototypeToken || t instanceof ClassToken) {
+                } else if (t instanceof FunctionToken || t instanceof ClassToken) {
                     this.callTokenListener(id, listener, g.get(FUNCTION_PROTOTYPE)!);
                     this.callTokenListener(id, listener, g.get(OBJECT_PROTOTYPE)!);
                 } else if (t instanceof AllocationSiteToken) {

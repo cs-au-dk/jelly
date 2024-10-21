@@ -41,7 +41,15 @@ import {
     widenArgument,
     generatorCall,
 } from "./nativehelpers";
-import {PackageObjectToken} from "../analysis/tokens";
+import {
+    AllocationSiteToken,
+    ClassToken,
+    FunctionToken,
+    NativeObjectToken,
+    ObjectKind,
+    PackageObjectToken,
+    Token
+} from "../analysis/tokens";
 import {isExpression, isNewExpression, isStringLiteral} from "@babel/types";
 import {NativeFunctionParams, NativeModel, NativeModelParams} from "./nativebuilder";
 import {TokenListener} from "../analysis/listeners";
@@ -87,6 +95,45 @@ export function isInternalProperty(prop: string): boolean {
     return prop === ARRAY_ALL || (prop === INTERNAL_PROTOTYPE() && !options.proto); // TODO: return prop.startsWith("%") ?
 }
 
+/**
+ * Returns the native type of objects represented by the given token, or undefined if unknown.
+ */
+function getNativeType(t: Token): ObjectKind | "Function" | undefined {
+    let k: ObjectKind | "Function" | undefined;
+    if (t instanceof AllocationSiteToken || t instanceof PackageObjectToken)
+        switch (t.kind) {
+            case "Object":
+            case "Prototype":
+                k = "Object";
+                break;
+            case "PromiseResolve":
+            case "PromiseReject":
+            case "Class":
+                k = "Function";
+                break;
+            default:
+                k = t.kind;
+                break;
+        }
+    else if (t instanceof FunctionToken || t instanceof ClassToken)
+        k = "Function";
+    else if (t instanceof NativeObjectToken)
+        if (METHODS.has(t.name) &&
+            !(t.name === "Reflect" || t.name === "Atomics" || t.name === "WebAssembly"))
+            k = "Function";
+        else
+            k = "Object";
+    return k;
+}
+
+/**
+ * Returns true if 't' inherits from a global native object that has a property named 'prop'.
+ */
+export function isNativeProperty(t: Token, prop: string): boolean {
+    const kind = getNativeType(t);
+    return Boolean(kind !== undefined && METHODS.get(kind)?.has(prop));
+}
+
 /*
  * Models of ECMAScript standard built-in objects.
  * See https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects
@@ -96,7 +143,6 @@ export function isInternalProperty(prop: string): boolean {
 export const ecmascriptModels: NativeModel = {
     name: "ecmascript",
     init: (p: NativeModelParams) => {
-        // establish essential inheritance relations
         const thePackageObjectToken = p.solver.globalState.canonicalizeToken(new PackageObjectToken(p.moduleInfo.packageInfo));
         const theArrayPackageObjectToken = p.solver.globalState.canonicalizeToken(new PackageObjectToken(p.moduleInfo.packageInfo, "Array"));
         const theDatePackageObjectToken = p.solver.globalState.canonicalizeToken(new PackageObjectToken(p.moduleInfo.packageInfo, "Date"));
@@ -1819,7 +1865,7 @@ export const ecmascriptModels: NativeModel = {
 /**
  * Map from class name to set of methods.
  */
-export const STANDARD_METHODS = new Map(ecmascriptModels.classes.map(c => [
+const METHODS = new Map(ecmascriptModels.classes.map(c => [
     c.name,
     new Set(c.methods?.map(m => m.name))
 ]));
