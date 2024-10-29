@@ -351,7 +351,7 @@ export function strHash(s: string): number {
  * Checks whether the given property name is an array index.
  */
 export function isArrayIndex(prop: string): boolean {
-    return Number.isSafeInteger(parseFloat(prop)) && parseInt(prop) >= 0; // TODO: more precise check for isArrayIndex?
+    return /^\d+$/.test(prop); // TODO: more precise check for isArrayIndex?
 }
 
 /**
