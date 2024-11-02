@@ -32,7 +32,15 @@ import {
     TSLibraryUsageResponse,
     TypeScriptRequest
 } from "./typings/ipc";
-import {COPYRIGHT, options, resetOptions, setDefaultTrackedModules, setOptions, setPatternProperties} from "./options";
+import {
+    COPYRIGHT,
+    options,
+    resetOptions,
+    resolveBaseDir,
+    setDefaultTrackedModules,
+    setOptions,
+    setPatternProperties
+} from "./options";
 import {autoDetectBaseDir, expand} from "./misc/files";
 import {analyzeFiles} from "./analysis/analyzer";
 import {TypeScriptTypeInferrer} from "./typescript/typeinferrer";
@@ -210,6 +218,7 @@ async function main() {
                 return prepareResponse(false, req, {message: "Analysis in progress"});
             files = req.arguments;
             autoDetectBaseDir(files);
+            resolveBaseDir();
             logger.info("Files selected");
             return prepareResponse(true, req);
         },

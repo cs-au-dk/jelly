@@ -1,6 +1,6 @@
 import {ChildProcess, fork} from "child_process";
 import logger from "../misc/logger";
-import {options, resolveBaseDir} from "../options";
+import {options} from "../options";
 import {HintsJSON, RequestType, ResponseType} from "../typings/hints";
 import {addPairArrayToMapSet, FilePath, LocationJSON, mapArraySize, percent, stringify} from "../misc/util";
 import {closeSync, openSync, writeSync} from "fs";
@@ -78,7 +78,6 @@ export class ProcessManager {
      * Starts approximate interpretation process.
      */
     constructor(readonly a: GlobalState = new GlobalState) {
-        resolveBaseDir();
         logger.verbose("Starting approximate interpretation process");
         // When running from test, __dirname is the .ts equivalent file so resolve this to the corresponding .js file.
         const resolvedDirname = __dirname.endsWith(".js") ? __dirname : `${__dirname}/../../lib/approx`

@@ -1,6 +1,7 @@
 import {OptionValues} from "commander";
 import {resolve} from "path";
 import logger from "./misc/logger";
+import {realpathSync} from "fs";
 
 export const VERSION = require("../package.json").version;
 export const COPYRIGHT = "Copyright (C) 2023-2024 Anders Møller & Oskar Haarklou Veileborg\n";
@@ -172,11 +173,11 @@ export function setOptions(opts: OptionValues & Partial<typeof options>) {
 }
 
 /**
- * Ensures that options.basedir is an absolute path.
+ * Ensures that options.basedir is an absolute path without symlinks.
  * Relative paths are resolved relative to the current working directory.
  */
 export function resolveBaseDir() {
-    options.basedir = resolve(process.cwd(), options.basedir);
+    options.basedir = realpathSync(resolve(process.cwd(), options.basedir));
 }
 
 const original = Object.assign({}, options);

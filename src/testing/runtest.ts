@@ -1,4 +1,4 @@
-import {options, resetOptions, setDefaultTrackedModules, setPatternProperties} from "../options";
+import {options, resetOptions, resolveBaseDir, setDefaultTrackedModules, setPatternProperties} from "../options";
 import {tapirLoadPatterns, tapirPatternMatch} from "../patternmatching/tapirpatterns";
 import {analyzeFiles} from "../analysis/analyzer";
 import assert from "assert";
@@ -62,6 +62,7 @@ export function runTest(basedir: string,
             Object.assign(options, args.options ?? {});
 
             options.basedir = basedir;
+            resolveBaseDir();
             options.patterns = args.patterns;
             options.soundness = args.soundness;
 

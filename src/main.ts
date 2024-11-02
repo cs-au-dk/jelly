@@ -4,7 +4,16 @@ import {analyzeFiles} from "./analysis/analyzer";
 import {closeSync, openSync, readdirSync, readFileSync, unlinkSync} from "fs";
 import {program} from "commander";
 import logger, {logToFile, setLogLevel} from "./misc/logger";
-import {COPYRIGHT, options, PKG, setDefaultTrackedModules, setOptions, setPatternProperties, VERSION} from "./options";
+import {
+    COPYRIGHT,
+    options,
+    PKG,
+    resolveBaseDir,
+    setDefaultTrackedModules,
+    setOptions,
+    setPatternProperties,
+    VERSION
+} from "./options";
 import {spawnSync} from "child_process";
 import path, {sep} from "path";
 import {autoDetectBaseDir, expand, writeStreamedStringify} from "./misc/files";
@@ -245,6 +254,7 @@ async function main() {
         try {
             if (!autoDetectBaseDir(program.args))
                 return;
+            resolveBaseDir();
             files = expand(program.args);
         } catch (e) {
             logger.info(`Error: ${e instanceof Error ? "code" in e && e.code === "ENOENT" && "path" in e ? `File not found ${e.path}` : e.message : "Unable to expand paths"}`);
