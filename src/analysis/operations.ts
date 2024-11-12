@@ -39,8 +39,27 @@ import {
     isMaybeUsedAsPromise,
     isParentExpressionStatement
 } from "../misc/asthelpers";
-import {AccessPathToken, AllocationSiteToken, ArrayToken, ClassToken, FunctionToken, NativeObjectToken, ObjectToken, PackageObjectToken, PrototypeToken, Token} from "./tokens";
-import {AccessorType, ConstraintVar, IntermediateVar, isObjectPropertyVarObj, NodeVar, ObjectPropertyVarObj, ReadResultVar} from "./constraintvars";
+import {
+    AccessPathToken,
+    AllocationSiteToken,
+    ArrayToken,
+    ClassToken,
+    FunctionToken,
+    NativeObjectToken,
+    ObjectToken,
+    PackageObjectToken,
+    PrototypeToken,
+    Token
+} from "./tokens";
+import {
+    AccessorType,
+    ConstraintVar,
+    IntermediateVar,
+    isObjectPropertyVarObj,
+    NodeVar,
+    ObjectPropertyVarObj,
+    ReadResultVar
+} from "./constraintvars";
 import {
     CallResultAccessPath,
     ComponentAccessPath,

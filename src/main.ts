@@ -301,12 +301,12 @@ async function main() {
                 logger.info(`Loading vulnerability patterns from ${options.vulnerabilities}`);
                 vulnerabilityDetector = new VulnerabilityDetector(JSON.parse(readFileSync(options.vulnerabilities, "utf8")) as Array<Vulnerability>); // TODO: use when setting globs and props? (see also server.ts)
                 const ps = vulnerabilityDetector.getPatterns();
-                addAll(getGlobs(ps), (globs = (globs ?? new Set<string>())));
-                addAll(getProperties(ps), (props = (props ?? new Set<string>())));
+                addAll(getGlobs(ps), (globs = globs ?? new Set<string>()));
+                addAll(getProperties(ps), (props = props ?? new Set<string>()));
             }
 
             setDefaultTrackedModules(globs);
-            setPatternProperties(options.apiUsage ? undefined : (props || new Set()));
+            setPatternProperties(options.apiUsage ? undefined : props ?? new Set());
 
             const solver = new Solver();
             const a = solver.globalState;

@@ -46,7 +46,13 @@ import {analyzeFiles} from "./analysis/analyzer";
 import {TypeScriptTypeInferrer} from "./typescript/typeinferrer";
 import {PatternWrapper, SemanticPatch} from "./typings/tapir";
 import {DetectionPattern} from "./patternmatching/patterns";
-import {convertTapirPatterns, getGlobs, getProperties, loadTapirDetectionPatternFiles, removeObsoletePatterns} from "./patternmatching/patternloader";
+import {
+    convertTapirPatterns,
+    getGlobs,
+    getProperties,
+    loadTapirDetectionPatternFiles,
+    removeObsoletePatterns
+} from "./patternmatching/patternloader";
 import {convertPatternMatchesToJSON, PatternMatcher} from "./patternmatching/patternmatcher";
 import {convertAPIUsageToJSON, getAPIUsage} from "./patternmatching/apiusage";
 import Solver, {AbortedException} from "./analysis/solver";

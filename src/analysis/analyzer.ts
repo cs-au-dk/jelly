@@ -68,7 +68,7 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
 
                 d.modules++;
                 if (!options.modulesOnly && options.printProgress)
-                    logger.info(`Analyzing module ${file} (${d.modules})`);
+                    logger.info(`Analyzing module ${moduleInfo} (${d.modules})`);
 
                 const str = fs.readFileSync(file, "utf8"); // TODO: OK to assume utf8? (ECMAScript says utf16??)
                 writeStdOutIfActive(`Parsing ${file} (${Math.ceil(str.length / 1024)}KB)...`);
