@@ -465,11 +465,14 @@ export class Operations {
             const f = this.solver.fragmentState;
             f.registerCall(node, caller, undefined, {external: true});
             f.registerCallEdge(node, caller, this.a.functionInfos.get(at.fun)!, {external: true});
-            for (let j = 0; j < at.fun.params.length; j++)
-                if (isIdentifier(at.fun.params[j])) // TODO: non-identifier parameters?
-                    this.solver.addAccessPath(UnknownAccessPath.instance, f.varProducer.nodeVar(at.fun.params[j]));
-            this.solver.addAccessPath(UnknownAccessPath.instance, f.varProducer.thisVar(at.fun));
-            // TODO: handle 'this' under --newobj?
+            if (!f.externalCallbacksProcessed.has(at)) {
+                f.externalCallbacksProcessed.add(at);
+                for (let j = 0; j < at.fun.params.length; j++)
+                    if (isIdentifier(at.fun.params[j])) // TODO: non-identifier parameters?
+                        this.solver.addAccessPath(UnknownAccessPath.instance, f.varProducer.nodeVar(at.fun.params[j]));
+                this.solver.addAccessPath(UnknownAccessPath.instance, f.varProducer.thisVar(at.fun));
+                // TODO: handle 'this' under --newobj?
+            }
         }
     }
 

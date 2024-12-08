@@ -1079,6 +1079,7 @@ export default class Solver {
         const f = this.fragmentState;
         // add processed listeners
         mapSetAddAll(s.listenersProcessed, f.listenersProcessed);
+        addAll(s.externalCallbacksProcessed, f.externalCallbacksProcessed);
         // merge redirections
         for (const [v, rep] of s.redirections) {
             const fRep = f.getRepresentative(v);
