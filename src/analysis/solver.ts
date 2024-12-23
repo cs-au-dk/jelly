@@ -20,7 +20,7 @@ import {
     Token
 } from "./tokens";
 import {GlobalState} from "./globalstate";
-import {PackageInfo} from "./infos";
+import {FunctionInfo, ModuleInfo, PackageInfo} from "./infos";
 import {
     addAll,
     addAllMapHybridSet,
@@ -252,9 +252,11 @@ export default class Solver {
      * Also collects information for PatternMatcher about where access paths are created.
      * @param ap    the access path to add
      * @param to    the AST node (constraint variable) where to add the token (if not an AssignmentExpression)
+     * @param node  AST node (for pattern matcher)
+     * @param encl  enclosing function (for pattern matcher)
      * @param subap access path of the sub-expression (for call or property access expressions)
      */
-    addAccessPath(ap: AccessPath, to: ConstraintVar | undefined, subap?: AccessPath) { // TODO: store access paths separately from other tokens?
+    addAccessPath(ap: AccessPath, to: ConstraintVar | undefined, node?: Node, encl?: FunctionInfo | ModuleInfo, subap?: AccessPath) { // TODO: store access paths separately from other tokens?
         if (!to)
             return;
         const abstractProp = ap instanceof PropertyAccessPath && !(subap instanceof ModuleAccessPath && ap.prop === "default") && patternProperties && !patternProperties.has(ap.prop);
@@ -267,17 +269,18 @@ export default class Solver {
         if (!asn)
             this.addToken(f.a.canonicalizeToken(new AccessPathToken(ap2)), f.getRepresentative(to));
         // collect information for PatternMatcher
-        const t = to instanceof IntermediateVar && to.label === "import" ? to.node : to instanceof NodeVar ? to.node : undefined; // special treatment of 'import' expressions
-        if (t !== undefined) {
+        if (!(ap2 instanceof UnknownAccessPath || ap2 instanceof IgnoredAccessPath) &&
+            (to instanceof NodeVar || (to instanceof IntermediateVar && to.label === "import"))) {
+            assert(node !== undefined && encl !== undefined);
             if (ap2 instanceof ModuleAccessPath)
-                mapGetSet(f.moduleAccessPaths, ap2).add(t);
+                mapGetMap(f.moduleAccessPaths, ap2).set(node, encl);
             else if (ap2 instanceof PropertyAccessPath)
-                mapGetMap(mapGetMap(asn ? f.propertyWriteAccessPaths : f.propertyReadAccessPaths, subap!), ap2.prop).set(t, {bp: ap2, sub: ap2.base});
+                mapGetMap(mapGetMap(asn ? f.propertyWriteAccessPaths : f.propertyReadAccessPaths, subap!), ap2.prop).set(node, {bp: ap2, sub: ap2.base, encl});
             else if (ap2 instanceof CallResultAccessPath)
-                mapGetMap(f.callResultAccessPaths, subap!).set(t, {bp: ap2, sub: ap2.caller});
+                mapGetMap(f.callResultAccessPaths, subap!).set(node, {bp: ap2, sub: ap2.caller, encl});
             else if (ap2 instanceof ComponentAccessPath)
-                mapGetMap(f.componentAccessPaths, subap!).set(t, {bp: ap2, sub: ap2.component});
-            else if (!(ap2 instanceof UnknownAccessPath || ap2 instanceof IgnoredAccessPath))
+                mapGetMap(f.componentAccessPaths, subap!).set(node, {bp: ap2, sub: ap2.component, encl});
+            else
                 assert.fail("Unexpected AccessPath");
         }
     }
@@ -1185,13 +1188,13 @@ export default class Solver {
         addAll(s.invokedExpressions, f.invokedExpressions);
         addAll(s.maybeEscaping, f.maybeEscaping);
         addAll(s.widened, f.widened);
-        mapSetAddAll(s.maybeEscapingToExternal, f.maybeEscapingToExternal);
+        mapMapSetAll(s.maybeEscapingToExternal, f.maybeEscapingToExternal);
         setAll(s.unhandledDynamicPropertyWrites, f.unhandledDynamicPropertyWrites);
         addAll(s.unhandledDynamicPropertyReads, f.unhandledDynamicPropertyReads);
         addAllMapHybridSet(s.errors, f.errors);
         addAllMapHybridSet(s.warnings, f.warnings);
         addAllMapHybridSet(s.warningsUnsupported, f.warningsUnsupported);
-        mapSetAddAll(s.moduleAccessPaths, f.moduleAccessPaths);
+        mapMapSetAll(s.moduleAccessPaths, f.moduleAccessPaths);
         mapMapMapSetAll(s.propertyReadAccessPaths, f.propertyReadAccessPaths);
         mapMapMapSetAll(s.propertyWriteAccessPaths, f.propertyWriteAccessPaths);
         mapMapSetAll(s.callResultAccessPaths, f.callResultAccessPaths);

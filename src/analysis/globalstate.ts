@@ -1,5 +1,5 @@
 import {Function, Identifier, Node} from "@babel/types";
-import {FilePath, getOrSet, Location, locationToString, strHash} from "../misc/util";
+import {FilePath, getOrSet, Location, locationToStringWithFile, strHash} from "../misc/util";
 import {
     AncestorsVar,
     ArgumentsVar,
@@ -329,12 +329,14 @@ export class GlobalState {
     /**
      * Finds the nearest enclosing function or module.
      */
-    getEnclosingFunctionOrModule(path: NodePath, moduleInfo: ModuleInfo): FunctionInfo | ModuleInfo {
+    getEnclosingFunctionOrModule(path: NodePath): FunctionInfo | ModuleInfo {
         const p = getEnclosingFunction(path);
-        const caller = p ? this.functionInfos.get(p)! : moduleInfo;
-        if (!caller)
-            assert.fail(`Function/module info not found at ${moduleInfo}:${locationToString(path.node.loc)}!?!`);
-        return caller;
+        if (p)
+            return this.functionInfos.get(p)!;
+        const loc = path.node.loc as Location;
+        if (!loc?.module)
+            assert.fail(`Function/module info not found at ${locationToStringWithFile(path.node.loc)}!?!`);
+        return loc.module;
     }
 
     /**

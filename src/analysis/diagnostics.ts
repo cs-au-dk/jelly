@@ -106,6 +106,8 @@ export default class AnalysisDiagnostics {
 
     patternMatchingTime: bigint = 0n;
 
+    vulnerabilityCollectionTime: bigint = 0n;
+
     unhandledDynamicPropertyWrites: number = 0;
 
     unhandledDynamicPropertyReads: number = 0;

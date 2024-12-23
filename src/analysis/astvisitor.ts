@@ -90,7 +90,7 @@ import {
     PackageObjectToken,
     Token
 } from "./tokens";
-import {FunctionInfo, ModuleInfo} from "./infos";
+import {ModuleInfo} from "./infos";
 import logger from "../misc/logger";
 import {locationToStringWithFile, mapArrayAdd} from "../misc/util";
 import assert from "assert";
@@ -99,7 +99,6 @@ import {PropertyAccessPath} from "./accesspaths";
 import {ConstraintVar, isObjectPropertyVarObj} from "./constraintvars";
 import {
     getClass,
-    getEnclosingFunction,
     getEnclosingNonArrowFunction,
     getExportName,
     getImportName,
@@ -703,7 +702,7 @@ export function visit(ast: File, op: Operations) {
                     if (isSpreadElement(p)) {
                         if (options.objSpread) {
                             // it's enticing to rewrite the AST to use Object.assign, but assign invokes setters on the target object
-                            const enclosing = currentFunctionInfo(path);
+                            const enclosing = a.getEnclosingFunctionOrModule(path);
                             const argVar = vp.expVar(p.argument, path);
                             solver.addForAllTokensConstraint(argVar, TokenListener.OBJECT_SPREAD, p, (t: Token) => {
                                 if (isObjectPropertyVarObj(t)) {
@@ -788,6 +787,7 @@ export function visit(ast: File, op: Operations) {
 
                 // constraint: ∀ objects t ∈ ⟦import...⟧: ⟦t.p⟧ ⊆ ⟦x⟧ where p is the property and x is the local identifier
                 // for each import specifier
+                const encl = a.getEnclosingFunctionOrModule(path);
                 solver.addForAllTokensConstraint(vp.nodeVar(path.node), TokenListener.IMPORT_BASE, path.node, (t: Token) => {
                     for (const imp of path.node.specifiers)
                         if (isImportSpecifier(imp) || isImportDefaultSpecifier(imp)) {
@@ -796,7 +796,7 @@ export function visit(ast: File, op: Operations) {
                             if (t instanceof AllocationSiteToken || t instanceof FunctionToken || t instanceof NativeObjectToken || t instanceof PackageObjectToken)
                                 solver.addSubsetConstraint(solver.varProducer.objPropVar(t, prop), dst);
                             else if (t instanceof AccessPathToken) // TODO: treat as object along with other tokens above?
-                                solver.addAccessPath(new PropertyAccessPath(solver.varProducer.nodeVar(path.node), prop), dst, t.ap); // TODO: describe this constraint...
+                                solver.addAccessPath(new PropertyAccessPath(solver.varProducer.nodeVar(path.node), prop), dst, imp.local, encl, t.ap); // TODO: describe this constraint...
                         }
                 });
             }
@@ -952,16 +952,6 @@ export function visit(ast: File, op: Operations) {
         if (isCalleeExpression(path))
             return; // don't perform a property read for method calls
 
-        op.readProperty(op.expVar(path.node.object, path), getProperty(path.node), dstVar, path.node, currentFunctionInfo(path));
-    }
-
-    /**
-     * Finds the FunctionInfo or ModuleInfo representing the function the given path belongs to.
-     */
-    function currentFunctionInfo(path: NodePath): FunctionInfo | ModuleInfo {
-        const f = getEnclosingFunction(path); // TODO: maintain during AST traversal?
-        const g = f ? a.functionInfos.get(f) : op.moduleInfo;
-        assert(g);
-        return g;
+        op.readProperty(op.expVar(path.node.object, path), getProperty(path.node), dstVar, path.node, a.getEnclosingFunctionOrModule(path));
     }
 }

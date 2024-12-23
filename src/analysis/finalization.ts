@@ -37,8 +37,8 @@ export function finalizeCallEdges(solver: Solver) {
 
     // getter calls
     const pm = new Map<RepresentativeVar, Map<string, Array<[Node, FunctionInfo | ModuleInfo]>>>();
-    for (const {base, prop, node, enclosing} of f.propertyReads)
-        mapGetArray(mapGetMap(pm, f.getRepresentative(base)), prop).push([node, enclosing]);
+    for (const {base, prop, node, encl} of f.propertyReads)
+        mapGetArray(mapGetMap(pm, f.getRepresentative(base)), prop).push([node, encl]);
     const tm = new Map<ObjectPropertyVarObj, Set<Map<string, Array<[Node, FunctionInfo | ModuleInfo]>>>>();
     for (const [base, ms] of pm)
         for (const t1 of f.getTokens(base)) {

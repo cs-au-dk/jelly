@@ -373,7 +373,8 @@ export function invokeCallback(kind: CallbackKind, p: NativeFunctionParams, arg:
                 invokeCallbackBound(kind, p, bt, ft);
 
                 if (ft instanceof AccessPathToken) {
-                    p.solver.fragmentState.registerEscapingToExternal(funVar, funarg);
+                    const caller = p.solver.globalState.getEnclosingFunctionOrModule(p.path);
+                    p.solver.fragmentState.registerEscapingToExternal(funVar, funarg, caller);
 
                     // TODO: see case AccessPathToken in Operations.callFunction
                 }
@@ -390,7 +391,7 @@ export function generatorCall(p: NativeFunctionParams) {
         const solver = p.solver;
         const f = solver.fragmentState;
         const a = solver.globalState;
-        const caller = a.getEnclosingFunctionOrModule(p.path, p.moduleInfo);
+        const caller = a.getEnclosingFunctionOrModule(p.path);
         f.registerCallEdge(p.path.node, caller, a.functionInfos.get(p.base.allocSite)!, {native: true});
     }
 }
@@ -403,7 +404,7 @@ export function invokeCallbackBound(kind: CallbackKind, p: NativeFunctionParams,
     const args = p.path.node.arguments;
     const arg1Var = isExpression(args[1]) ? vp.expVar(args[1], p.path) : undefined;
     const pResultVar = vp.expVar(p.path.node, p.path);
-    const caller = a.getEnclosingFunctionOrModule(p.path, p.moduleInfo);
+    const caller = a.getEnclosingFunctionOrModule(p.path);
 
     const modelCall = (args: Array<Token | ConstraintVar | undefined>, baseVar?: ConstraintVar, resultVar?: ConstraintVar) => {
         assert(ft instanceof FunctionToken);
@@ -585,7 +586,7 @@ export function invokeCallApplyBound(kind: CallApplyKind, p: NativeFunctionParam
     const vp = p.solver.varProducer;
     const args = p.path.node.arguments;
     const basearg = args[0];
-    const caller = a.getEnclosingFunctionOrModule(p.path, p.moduleInfo);
+    const caller = a.getEnclosingFunctionOrModule(p.path);
 
     let argVars: Array<ConstraintVar | undefined> = [];
     // TODO: also model conversion for basearg to objects, see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/call
@@ -724,7 +725,7 @@ export function callPromiseExecutor(p: NativeFunctionParams) {
     const args = p.path.node.arguments;
     if (args.length >= 1 && isExpression(args[0])) { // TODO: SpreadElement? non-MemberExpression?
         const funVar = p.solver.varProducer.expVar(args[0], p.path);
-        const caller = p.solver.globalState.getEnclosingFunctionOrModule(p.path, p.moduleInfo);
+        const caller = p.solver.globalState.getEnclosingFunctionOrModule(p.path);
         p.solver.addForAllTokensConstraint(funVar, TokenListener.CALL_PROMISE_EXECUTOR, p.path.node, (t: Token) => {
             if (t instanceof FunctionToken)
                 p.op.callFunctionTokenBound(t, undefined, caller, [
@@ -968,7 +969,7 @@ export function assignProperties(target: Expression, sources: Array<Node>, p: Na
     }
 
     const node = p.path.node;
-    const enclosing = p.solver.globalState.getEnclosingFunctionOrModule(p.path, p.moduleInfo);
+    const enclosing = p.solver.globalState.getEnclosingFunctionOrModule(p.path);
     p.solver.addForAllTokensConstraint(sVar, TokenListener.NATIVE_ASSIGN_PROPERTIES, node, (s: Token) => {
         if (isObjectPropertyVarObj(s))
             p.solver.addForAllObjectPropertiesConstraint(s, TokenListener.NATIVE_ASSIGN_PROPERTIES2, node, (prop: string) => {
@@ -1012,7 +1013,7 @@ export function prepareDefineProperty(
     if (!descriptor)
         return [];
 
-    const enclosing = p.solver.globalState.getEnclosingFunctionOrModule(p.path, p.moduleInfo);
+    const enclosing = p.solver.globalState.getEnclosingFunctionOrModule(p.path);
     return (["value", "get", "set"] as const).map(descriptorProp => {
         const ivar = p.solver.varProducer.intermediateVar(p.path.node, `${name} (${prop}.${descriptorProp})`);
         p.op.readProperty(descriptor, descriptorProp, ivar, p.path.node, enclosing, ivar.label);
@@ -1079,7 +1080,7 @@ export function defineProperties(
     if (ivars.length === 0)
         return;
 
-    const enclosing = p.solver.globalState.getEnclosingFunctionOrModule(p.path, p.moduleInfo);
+    const enclosing = p.solver.globalState.getEnclosingFunctionOrModule(p.path);
 
     function write(t: Token, lVar?: ConstraintVar) {
         for (const {prop, ac, ivar} of ivars)

@@ -146,6 +146,16 @@ export function mapGetSet<K, V>(m: Map<K, Set<V>>, k: K): Set<V> {
     return mt;
 }
 
+export function mapGetSetPair<K, V1, V2>(m: Map<K, [Set<V1>, V2]>, k: K, v: V2): Set<V1> {
+    let mt = m.get(k);
+    if (!mt) {
+        mt = [new Set, v];
+        m.set(k, mt);
+    }
+    const [ms] = mt;
+    return ms;
+}
+
 export function mapGetArray<K, V>(m: Map<K, Array<V>>, k: K): Array<V>
 export function mapGetArray<K extends object, V>(m: WeakMap<K, Array<V>>, k: K): Array<V>
 export function mapGetArray<K, V>(m: Map<K, Array<V>> | WeakMap<any, Array<V>>, k: K): Array<V> {
@@ -258,9 +268,10 @@ export function deleteAll<T>(xs: Iterable<T>, s: Set<T>) {
         s.delete(x);
 }
 
-export function deleteMapSetAll<K, V>(m: Map<K, Set<V>>, k: K, vs: Set<V>) {
-    const s = m.get(k);
-    if (s) {
+export function deleteMapSetPairAll<K, V1, V2>(m: Map<K, [Set<V1>, V2]>, k: K, vs: Set<V1>) {
+    const p = m.get(k);
+    if (p) {
+        const [s] = p;
         deleteAll(vs.values(), s);
         if (s.size === 0)
             m.delete(k);

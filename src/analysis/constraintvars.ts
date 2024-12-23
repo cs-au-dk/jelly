@@ -37,7 +37,7 @@ export abstract class ConstraintVar {
     abstract toString(): string
 
     /**
-     * Finds the AST node, function, module or package this constraint variable belongs to.
+     * Finds the AST node, module or package this constraint variable belongs to.
      */
     abstract getParent(): Node | PackageInfo | ModuleInfo | undefined
 

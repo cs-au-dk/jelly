@@ -3,7 +3,13 @@ import {AccessPathToken, ArrayToken, FunctionToken, ObjectToken, PackageObjectTo
 import {DummyModuleInfo, FunctionInfo, ModuleInfo, PackageInfo} from "./infos";
 import {CallExpression, Function, Identifier, JSXIdentifier, NewExpression, Node, OptionalCallExpression, SourceLocation,} from "@babel/types";
 import assert from "assert";
-import {addMapHybridSet, locationToStringWithFile, locationToStringWithFileAndEnd, mapGetSet} from "../misc/util";
+import {
+    addMapHybridSet,
+    locationToStringWithFile,
+    locationToStringWithFileAndEnd,
+    mapGetMap,
+    mapGetSet
+} from "../misc/util";
 import {AccessPath, CallResultAccessPath, ComponentAccessPath, ModuleAccessPath, PropertyAccessPath} from "./accesspaths";
 import {options} from "../options";
 import logger from "../misc/logger";
@@ -228,9 +234,9 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
 
     /**
      * Constraint variables whose values may escape to external code.
-     * The corresponding nodes are where the escaping occurs.
+     * The corresponding nodes (and enclosing functions) are where the escaping occurs.
      */
-    readonly maybeEscapingToExternal: Map<ConstraintVar, Set<Node>> = new Map;
+    readonly maybeEscapingToExternal: Map<ConstraintVar, Map<Node, FunctionInfo | ModuleInfo>> = new Map;
 
     /**
      * Unhandled dynamic property write operations.
@@ -258,42 +264,46 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
     warningsUnsupported: Map<Node, string | Set<string>> = new Map;
 
     /**
-     * 'require' expressions and import/export declarations/expressions where ModuleAccessPaths are created.
+     * 'require' expressions and import/export declarations/expressions (and enclosing functions) where ModuleAccessPaths are created.
      * Used by PatternMatcher.
      */
-    readonly moduleAccessPaths: Map<ModuleAccessPath, Set<Node>> = new Map;
+    readonly moduleAccessPaths: Map<ModuleAccessPath, Map<Node, FunctionInfo | ModuleInfo>> = new Map;
 
     /**
      * Property read expressions where PropertyAccessPaths are created.
-     * ap |-> prop |-> n |-> {bp, sub} means that ap appears at the base sub-expression of the property read expression n with
-     * property prop, bp is the access path for n, and sub is the constraint variable of the sub-expression.
+     * ap |-> prop |-> n |-> {bp, sub, encl} means that ap appears at the base sub-expression of the property read expression n with
+     * property prop, bp is the access path for n, sub is the constraint variable of the sub-expression,
+     * and encl is the enclosing function of n.
      * Used by PatternMatcher.
      */
-    readonly propertyReadAccessPaths: Map<AccessPath, Map<string, Map<Node, {bp: PropertyAccessPath, sub: ConstraintVar}>>> = new Map;
+    readonly propertyReadAccessPaths: Map<AccessPath, Map<string, Map<Node, {bp: PropertyAccessPath, sub: ConstraintVar, encl: FunctionInfo | ModuleInfo}>>> = new Map;
 
     /**
      * Property write expressions where PropertyAccessPaths are created.
-     * ap |-> prop |-> n |-> {bp, sub} means that ap appears at the base sub-expression of the property write expression n with
-     * property prop, bp is the access path for n, and sub is the constraint variable of the sub-expression.
+     * ap |-> prop |-> n |-> {bp, sub, encl} means that ap appears at the base sub-expression of the property write expression n with
+     * property prop, bp is the access path for n, sub is the constraint variable of the sub-expression,
+     * and encl is the enclosing function of n.
      * Used by PatternMatcher.
      */
-    readonly propertyWriteAccessPaths: Map<AccessPath, Map<string, Map<Node, {bp: PropertyAccessPath, sub: ConstraintVar}>>> = new Map;
+    readonly propertyWriteAccessPaths: Map<AccessPath, Map<string, Map<Node, {bp: PropertyAccessPath, sub: ConstraintVar, encl: FunctionInfo | ModuleInfo}>>> = new Map;
 
     /**
      * Expressions and associated CallResultAccessPaths where CallResultAccessPaths are created.
-     * ap |-> n |-> {bp, sub} means that ap appears at the function sub-expression of the call expression n,
-     * bp is the access path for n, and sub is the constraint variable of the sub-expression.
+     * ap |-> n |-> {bp, sub, encl} means that ap appears at the function sub-expression of the call expression n,
+     * bp is the access path for n, sub is the constraint variable of the sub-expression,
+     * and encl is the enclosing function of n.
      * Used by PatternMatcher.
      */
-    readonly callResultAccessPaths: Map<AccessPath, Map<Node, {bp: CallResultAccessPath, sub: ConstraintVar}>> = new Map;
+    readonly callResultAccessPaths: Map<AccessPath, Map<Node, {bp: CallResultAccessPath, sub: ConstraintVar, encl: FunctionInfo | ModuleInfo}>> = new Map;
 
     /**
      * Expressions and associated ComponentAccessPaths where ComponentAccessPaths are created.
-     * ap |-> n |-> {bp, sub} means that ap appears at the function sub-expression of the component creation expression n,
-     * bp is the access path for n, and sub is the constraint variable of the sub-expression.
+     * ap |-> n |-> {bp, sub, encl} means that ap appears at the function sub-expression of the component creation expression n,
+     * bp is the access path for n, sub is the constraint variable of the sub-expression,
+     * and encl is the enclosing function of n.
      * Used by PatternMatcher.
      */
-    readonly componentAccessPaths: Map<AccessPath, Map<Node, {bp: ComponentAccessPath, sub: ConstraintVar}>> = new Map;
+    readonly componentAccessPaths: Map<AccessPath, Map<Node, {bp: ComponentAccessPath, sub: ConstraintVar, encl: FunctionInfo | ModuleInfo}>> = new Map;
 
     /**
      * Map from identifier declarations at imports to uses.
@@ -304,7 +314,7 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
     /**
      * Property reads.
      */
-    propertyReads: Array<{base: ConstraintVar, prop: string, node: Node, enclosing: FunctionInfo | ModuleInfo}> = [];
+    propertyReads: Array<{base: ConstraintVar, prop: string, node: Node, encl: FunctionInfo | ModuleInfo}> = [];
 
     /**
      * Property reads that may have empty result.
@@ -456,11 +466,11 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
      * Registers a constraint variable whose values may escape to external code.
      * Ignored if options.externalMatches is disabled.
      */
-    registerEscapingToExternal(v: ConstraintVar | undefined, n: Node) {
+    registerEscapingToExternal(v: ConstraintVar | undefined, n: Node, encl: FunctionInfo | ModuleInfo) {
         if (v && options.externalMatches) {
             if (logger.isDebugEnabled())
                 logger.debug(`Values of ${v} escape to non-analyzed code at ${locationToStringWithFileAndEnd(n.loc)}`);
-            mapGetSet(this.maybeEscapingToExternal, v).add(n);
+            mapGetMap(this.maybeEscapingToExternal, v).set(n, encl);
         }
     }
 
@@ -501,11 +511,11 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
      * @param pck the current package object token
      * @param prop the property name
      * @param node AST node
-     * @param enclosing enclosing function or module
+     * @param encl enclosing function or module
      */
     registerPropertyRead(
         typ: "read" | "call", result: ConstraintVar | undefined, base: ConstraintVar | undefined,
-        pck: PackageObjectToken | undefined, prop: string | undefined, node: Node, enclosing: FunctionInfo | ModuleInfo
+        pck: PackageObjectToken | undefined, prop: string | undefined, node: Node, encl: FunctionInfo | ModuleInfo
     ) {
         if (typ === "read" && result && base && pck)
             this.maybeEmptyPropertyReads.push({typ, result, base, pck, prop});
@@ -514,7 +524,7 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
             // the property read for patching if the property is known
             this.maybeEmptyPropertyReads.push({typ, base, prop});
         if (base && prop)
-            this.propertyReads.push({base, prop, node, enclosing});
+            this.propertyReads.push({base, prop, node, encl});
     }
 
     /**

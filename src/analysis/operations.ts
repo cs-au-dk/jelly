@@ -155,12 +155,12 @@ export class Operations {
     callComponent(path: NodePath<JSXElement>) {
         const componentVar = this.expVar(path.node.openingElement.name, path);
         if (componentVar) {
-            const caller = this.a.getEnclosingFunctionOrModule(path, this.moduleInfo);
+            const caller = this.a.getEnclosingFunctionOrModule(path);
             const f = this.solver.fragmentState; // (don't use in callbacks)
             f.registerCall(path.node, caller, componentVar);
             this.solver.addForAllTokensConstraint(componentVar, TokenListener.JSX_ELEMENT, path.node, (t: Token) => {
                 if (t instanceof AccessPathToken)
-                    this.solver.addAccessPath(new ComponentAccessPath(componentVar), this.solver.varProducer.nodeVar(path.node), t.ap);
+                    this.solver.addAccessPath(new ComponentAccessPath(componentVar), this.solver.varProducer.nodeVar(path.node), path.node, caller, t.ap);
                 else if (t instanceof FunctionToken) {
                     const f = this.solver.fragmentState;
                     f.registerCallEdge(path.node, caller, this.a.functionInfos.get(t.fun)!);
@@ -178,7 +178,7 @@ export class Operations {
         const f = this.solver.fragmentState; // (don't use in callbacks)
         const vp = this.solver.varProducer; // (don't use in callbacks)
 
-        const caller = this.a.getEnclosingFunctionOrModule(path, this.moduleInfo);
+        const caller = this.a.getEnclosingFunctionOrModule(path);
 
         let p = path.get("callee");
         while (p.isParenthesizedExpression())
@@ -250,7 +250,7 @@ export class Operations {
                         assert(t instanceof AccessPathToken);
 
                         // constraint: ... if t is access path, @E0.p ∈ ⟦E0.p⟧
-                        this.solver.addAccessPath(new PropertyAccessPath(baseVar!, prop), calleeVar, t.ap);
+                        this.solver.addAccessPath(new PropertyAccessPath(baseVar!, prop), calleeVar, p.node, caller, t.ap);
                     }
                 } else if (t instanceof ArrayToken)
                     // TODO: ignoring reads from prototype chain
@@ -271,7 +271,7 @@ export class Operations {
 
                 if (t instanceof AccessPathToken)
                     if (prop === "call" || prop === "apply")
-                        this.solver.addAccessPath(new CallResultAccessPath(baseVar!), resultVar, t.ap);
+                        this.solver.addAccessPath(new CallResultAccessPath(baseVar!), resultVar, path.node, caller, t.ap);
                     else if (prop === "bind")
                         this.solver.addTokenConstraint(t, resultVar);
             });
@@ -302,7 +302,7 @@ export class Operations {
         path: CallNodePath,
     ) {
         const f = this.solver.fragmentState; // (don't use in callbacks)
-        const caller = this.a.getEnclosingFunctionOrModule(path, this.moduleInfo);
+        const caller = this.a.getEnclosingFunctionOrModule(path);
         const pars = getAdjustedCallNodePath(path);
         const args = path.node.arguments;
         const isNew = path.isNewExpression();
@@ -346,7 +346,7 @@ export class Operations {
 
             // constraint: add CallResultAccessPath
             assert(calleeVar);
-            this.solver.addAccessPath(new CallResultAccessPath(calleeVar), resultVar, t.ap);
+            this.solver.addAccessPath(new CallResultAccessPath(calleeVar), resultVar, path.node, caller, t.ap);
 
             for (let i = 0; i < argVars.length; i++) {
                 const argVar = argVars[i];
@@ -354,7 +354,7 @@ export class Operations {
                     // constraint: assign UnknownAccessPath to arguments to function arguments for external functions, also add (artificial) call edge
                     this.solver.addForAllTokensConstraint(argVar, TokenListener.CALL_EXTERNAL, pars.node, (at: Token) =>
                         this.invokeExternalCallback(at, pars.node, caller));
-                    f.registerEscapingToExternal(argVar, args[i]);
+                    f.registerEscapingToExternal(argVar, args[i], caller);
                 } else if (isSpreadElement(args[i]))
                     f.warnUnsupported(args[i], "SpreadElement in arguments to external function"); // TODO: SpreadElement in arguments to external function
             }
@@ -509,7 +509,7 @@ export class Operations {
                 } else if (t instanceof AccessPathToken) {
 
                     // constraint: ... if t is access path, @E.p ∈ ⟦E.p⟧
-                    this.solver.addAccessPath(new PropertyAccessPath(base!, prop), this.solver.varProducer.nodeVar(node), t.ap);
+                    this.solver.addAccessPath(new PropertyAccessPath(base!, prop), this.solver.varProducer.nodeVar(node), node, enclosing, t.ap);
 
                 }
             });
@@ -682,7 +682,7 @@ export class Operations {
 
             // values written to native object escape
             if (base instanceof NativeObjectToken && (base.moduleInfo || base.name === "globalThis")) // TODO: other natives? packageObjectTokens?
-                this.solver.fragmentState.registerEscapingToExternal(src, escapeNode);
+                this.solver.fragmentState.registerEscapingToExternal(src, escapeNode, enclosing);
 
             // if writing to module.exports, also write to %exports.default
             if (base instanceof NativeObjectToken && base.name === "module" && prop === "exports")
@@ -694,10 +694,10 @@ export class Operations {
             //     this.solver.addSubsetConstraint(src, this.solver.varProducer.packagePropVar(this.packageInfo, prop));
 
             // collect property write operation @E1.p
-            this.solver.addAccessPath(new PropertyAccessPath(lVar, prop), this.solver.varProducer.nodeVar(escapeNode), base.ap);
+            this.solver.addAccessPath(new PropertyAccessPath(lVar, prop), this.solver.varProducer.nodeVar(escapeNode), escapeNode, enclosing, base.ap);
 
             // values written to external objects escape
-            this.solver.fragmentState.registerEscapingToExternal(src, escapeNode);
+            this.solver.fragmentState.registerEscapingToExternal(src, escapeNode, enclosing);
 
             // TODO: the following apparently has no effect on call graph or pattern matching...
             // // constraint: assign UnknownAccessPath to arguments to function values for external functions
@@ -775,10 +775,10 @@ export class Operations {
                     const s = normalizeModuleName(str);
                     const tracked = options.trackedModules && options.trackedModules.find(e =>
                         micromatch.isMatch(m!.getOfficialName(), e) || micromatch.isMatch(s, e));
-                    this.solver.addAccessPath(tracked ? new ModuleAccessPath(m, s) : IgnoredAccessPath.instance, resultVar);
+                    this.solver.addAccessPath(tracked ? new ModuleAccessPath(m, s) : IgnoredAccessPath.instance, resultVar, path.node, this.a.getEnclosingFunctionOrModule(path));
                 }
 
-                f.registerRequireCall(path.node, this.a.getEnclosingFunctionOrModule(path, this.moduleInfo), m);
+                f.registerRequireCall(path.node, this.a.getEnclosingFunctionOrModule(path), m);
             }
         }
         return m;
@@ -811,7 +811,7 @@ export class Operations {
             if (!lVar)
                 return;
             const prop = getProperty(dst);
-            const enclosing = this.a.getEnclosingFunctionOrModule(path, this.moduleInfo);
+            const enclosing = this.a.getEnclosingFunctionOrModule(path);
 
             const assignRequireExtensions = (t: Token) => {
                 if (t instanceof NativeObjectToken && t.name === "require.extensions")
@@ -884,7 +884,7 @@ export class Operations {
                     if (prop) {
                         matched.add(prop);
                         // read the property using p for the temporary result
-                        this.readProperty(src, prop, vp.nodeVar(p), p, this.a.getEnclosingFunctionOrModule(path, this.moduleInfo));
+                        this.readProperty(src, prop, vp.nodeVar(p), p, this.a.getEnclosingFunctionOrModule(path));
                         // assign the temporary result at p to the locations represented by p.value
                         if (isLVal(p.value))
                             this.assign(vp.nodeVar(p), p.value, path);
@@ -913,7 +913,7 @@ export class Operations {
                         this.assign(vp.nodeVar(p), p.argument, path);
                     } else {
                         // read the property using p for the temporary result
-                        this.readProperty(src, String(i), vp.nodeVar(p), p, this.a.getEnclosingFunctionOrModule(path, this.moduleInfo));
+                        this.readProperty(src, String(i), vp.nodeVar(p), p, this.a.getEnclosingFunctionOrModule(path));
                         // assign the temporary result at p to the locations represented by p
                         this.assign(vp.nodeVar(p), p, path);
                     }

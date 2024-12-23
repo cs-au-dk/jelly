@@ -107,8 +107,8 @@ export function getAPIUsage(f: FragmentState): [AccessPathPatternToNodes, NodeTo
         }
     }
     // find imports
-    for (const [ap, ns] of f.moduleAccessPaths)
-        for (const n of ns)
+    for (const [ap, m] of f.moduleAccessPaths)
+        for (const n of m.keys())
             add("import", c.canonicalize(new ImportAccessPathPattern(ap.moduleInfo.getOfficialName())), ap, n); // TODO: technically, official-name is not a glob?
     // iteratively find property reads, writes, calls and components
     for (const [p, aps] of worklist)
