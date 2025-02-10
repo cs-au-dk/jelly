@@ -1,0 +1,6 @@
+{
+  "name": "packagealias",
+  "dependencies": {
+    "merge-value-alias": "npm:merge-value@1.0.0"
+  }
+}

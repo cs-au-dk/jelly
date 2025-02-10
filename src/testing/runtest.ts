@@ -29,6 +29,7 @@ export function runTest(basedir: string,
                             matches?: {total: number, low?: number},
                             functionInfos?: number,
                             moduleInfos?: number,
+                            packageInfos?: number,
                             numberOfFunctionToFunctionEdges?: number,
                             oneCalleeCalls?: number,
                             funFound?: number,
@@ -91,6 +92,8 @@ export function runTest(basedir: string,
                 expect(solver.globalState.functionInfos.size).toBe(args.functionInfos);
             if (args.moduleInfos !== undefined)
                 expect(solver.globalState.moduleInfos.size).toBe(args.moduleInfos);
+            if (args.packageInfos !== undefined)
+                expect(solver.globalState.packageInfos.size).toBe(args.packageInfos);
             if (args.numberOfFunctionToFunctionEdges !== undefined)
                 expect(solver.fragmentState.numberOfFunctionToFunctionEdges).toBe(args.numberOfFunctionToFunctionEdges);
             if (args.oneCalleeCalls !== undefined)

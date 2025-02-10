@@ -1,5 +1,5 @@
 import {FilePath, pushAll} from "./util";
-import {dirname, relative, resolve, sep} from "path";
+import {basename, dirname, relative, resolve} from "path";
 import {existsSync, readFileSync} from "fs";
 import logger from "./logger";
 import {options} from "../options";
@@ -44,34 +44,27 @@ export interface PackageJsonInfo {
  * Finds the enclosing package.json file if present.
  */
 export function findPackageJson(file: FilePath): {packageJson: FilePath, dir: FilePath} | undefined {
-    let dir = file;
+    let dir = dirname(file);
     while (true) {
-        if (doesDirContainPackageJsonForNpmPackage(dir))
-            return {packageJson: resolve(dir, "package.json"), dir};
-        const d = dirname(dir);
-        if (d === dir || (options.basedir && !d.startsWith(options.basedir)))
+        if (options.basedir && !dir.startsWith(options.basedir))
             return undefined;
-        dir = d;
+        const parentDir = dirname(dir);
+        const packageJson = resolve(dir, "package.json");
+        if (existsSync(packageJson)) { // ignore package.json if inside node_modules but not at package root (not perfect, but seems to work)
+            let ok = true;
+            if (dir.includes("node_modules")) {
+                const b = basename(parentDir);
+                ok = b === "node_modules" || (b.startsWith("@") && basename(dirname(parentDir)) === "node_modules");
+            }
+            if (ok)
+                return {packageJson, dir};
+            else
+                logger.warn(`Ignoring ${packageJson} in search for package.json`);
+        }
+        if (parentDir === dir)
+            return undefined;
+        dir = parentDir;
     }
-}
-
-/**
- * Checks whether dir has a package.json file and if dir is inside node_modules, it also checks
- * that the name of the package.json file matches the directory name relative to node_modules.
- * If dir is not inside node_modules, it is assumed that the package.json file is correct.
- */
-function doesDirContainPackageJsonForNpmPackage(dir: FilePath): boolean {
-    const packageJson = resolve(dir, "package.json");
-    if (!existsSync(packageJson))
-        return false;
-    // if package exists, check if it is the correct one, i.e., that the name matches the directory name relative to node_modules
-    const nodeModulesDirString = `node_modules${sep}`;
-    const lastIndexOfNodeModules = dir.lastIndexOf(nodeModulesDirString);
-    if (lastIndexOfNodeModules === -1)
-        return true;
-    const lastNodeModulesPath = dir.substring(0, lastIndexOfNodeModules + nodeModulesDirString.length);
-    const expectedNameOfPackage = relative(lastNodeModulesPath, dir);
-    return parsePackageJson(packageJson).name === expectedNameOfPackage;
 }
 
 /**

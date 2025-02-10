@@ -13,7 +13,7 @@ import traverse, {NodePath} from "@babel/traverse";
 import logger from "../misc/logger";
 import {options} from "../options";
 import Module from "module";
-import {requireResolve} from "../misc/files";
+import {isLocalRequire, requireResolve} from "../misc/files";
 import {ModuleInfo} from "./infos";
 import {FragmentState} from "./fragmentstate";
 
@@ -27,7 +27,7 @@ export function findModules(ast: File, file: FilePath, f: FragmentState, moduleI
             try {
                 const filepath = requireResolve(str, file, f.a, path.node, f);
                 if (filepath)
-                    f.a.reachedFile(filepath, moduleInfo);
+                    f.a.reachedFile(filepath, moduleInfo, isLocalRequire(str));
             } catch {
                 if (options.ignoreUnresolved || options.ignoreDependencies) {
                     if (logger.isVerboseEnabled())

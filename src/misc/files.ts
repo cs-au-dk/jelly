@@ -93,6 +93,10 @@ export function isShebang(path: string): boolean { // TODO: doesn't work with ha
     return str.startsWith("#!") && str.substring(0, str.indexOf("\n")).includes("node");
 }
 
+export function isLocalRequire(str: string): boolean {
+    return str.startsWith("./") || str.startsWith("../");
+}
+
 /**
  * Resolves a 'require' string to a file path.
  * @return resolved file path if successful, undefined if file type not analyzable

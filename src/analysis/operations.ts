@@ -72,7 +72,7 @@ import Solver, {ListenerKey} from "./solver";
 import {GlobalState} from "./globalstate";
 import {DummyModuleInfo, FunctionInfo, ModuleInfo, normalizeModuleName, PackageInfo} from "./infos";
 import logger from "../misc/logger";
-import {requireResolve} from "../misc/files";
+import {isLocalRequire, requireResolve} from "../misc/files";
 import {options} from "../options";
 import {FilePath, getOrSet, isArrayIndex, Location, locationToString, locationToStringWithFile} from "../misc/util";
 import assert from "assert";
@@ -738,7 +738,7 @@ export class Operations {
                 if (filepath) {
 
                     // register that the module is reached
-                    m = this.a.reachedFile(filepath, this.moduleInfo);
+                    m = this.a.reachedFile(filepath, this.moduleInfo, isLocalRequire(str));
 
                     // extend the require graph
                     const fp = getEnclosingFunction(path);

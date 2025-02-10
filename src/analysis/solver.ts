@@ -1033,7 +1033,7 @@ export default class Solver {
                         }
                     }
                     this.diagnostics.totalListenerCallTime += timer.elapsed();
-                    if (logger.isVerboseEnabled() || options.diagnostics)
+                    if (logger.isVerboseEnabled() || (options.diagnostics && options.printProgress))
                         logger.info(`Phase: ${this.phase}, round: ${round} completed after ${nanoToMs(this.timer.elapsed())} (call edges: ${f.numberOfCallToFunctionEdges}, vars: ${f.getNumberOfVarsWithTokens()}, tokens: ${f.numberOfTokens}, subsets: ${f.numberOfSubsetEdges})`);
                     round++;
                 }
@@ -1042,7 +1042,7 @@ export default class Solver {
                 logger.verbose(`Wave ${wave} completed after ${nanoToMs(this.timer.elapsed())}`);
             wave++;
         }
-        if (logger.isVerboseEnabled() || options.diagnostics)
+        if (logger.isVerboseEnabled() || (options.diagnostics && options.printProgress))
             logger.info(`${isTTY ? GREY : ""}Phase: ${this.phase}, completed after ${nanoToMs(this.timer.elapsed())} (call edges: ${f.numberOfCallToFunctionEdges}, vars: ${f.getNumberOfVarsWithTokens()}, tokens: ${f.numberOfTokens}, subsets: ${f.numberOfSubsetEdges})${isTTY ? RESET : ""}`);
         if (this.diagnostics.unprocessedTokensSize !== 0)
             assert.fail(`unprocessedTokensSize non-zero after propagate: ${this.diagnostics.unprocessedTokensSize}`);

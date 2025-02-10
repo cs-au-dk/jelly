@@ -989,7 +989,29 @@ describe("tests/micro", () => {
                 },
                 patterns: ["call <terser>.minify"],
             }],
+            vulnerabilitiesMatches: 1
+        }));
+
+    describe("packagealias", () =>
+        runTest("tests/micro/packagealias", "index.js", {
+            vulnerabilities: [{
+                osv: {
+                    cwe: [],
+                    cvss: {score: 1, vectorString: ""},
+                    dependency: "set-value",
+                    range: ">=3.0.0 <3.0.3 || >=4.0.0 <4.0.1 || <2.0.1",
+                    name: "terser",
+                    severity: "high",
+                    source: 1,
+                    title: "title",
+                    url: "url"
+                },
+                patterns: [
+                    "call <set-value>"
+                ]
+            }],
             vulnerabilitiesMatches: 1,
+            packageInfos: 3
         }));
 
     describe("twoversions", () =>

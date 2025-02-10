@@ -9,7 +9,7 @@ import {GlobalState} from "../analysis/globalstate";
 import {Hints} from "./hints";
 import Timer, {nanoToMs} from "../misc/timer";
 import {extname, resolve} from "path";
-import {isShebang, requireResolve, writeStreamedStringify} from "../misc/files";
+import {isLocalRequire, isShebang, requireResolve, writeStreamedStringify} from "../misc/files";
 import {ApproxDiagnostics} from "./diagnostics";
 
 /**
@@ -131,7 +131,7 @@ export class ProcessManager {
                     try {
                         const filepath = requireResolve(r, file, this.a);
                         if (filepath)
-                            this.a.reachedFile(filepath, m);
+                            this.a.reachedFile(filepath, m, isLocalRequire(r));
                     } catch {
                         logger.warn(`Unable to resolve module '${r}' from ${file}`);
                     }
