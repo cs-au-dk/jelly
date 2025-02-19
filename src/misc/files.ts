@@ -164,7 +164,7 @@ export function requireResolve(str: string, file: FilePath, a: GlobalState, node
         return undefined; // skip silently
     if (logger.isDebugEnabled())
         logger.debug(`Module '${str}' required from ${file} resolved to: ${filepath}`);
-    return filepath;
+    return realpathSync(filepath);
 }
 
 /**

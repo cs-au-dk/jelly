@@ -751,16 +751,17 @@ export class Operations {
                         this.solver.addSubsetConstraint(this.solver.varProducer.objPropVar(this.a.canonicalizeToken(new NativeObjectToken("module", m)), "exports"), resultVar);
                     }
                 }
-            } catch {
+            } catch (e: any) {
+                const ex = e.message ? ` (${e.message})` : "";
                 if (options.ignoreUnresolved || options.ignoreDependencies) {
                     if (logger.isVerboseEnabled())
                         logger.verbose(`Ignoring unresolved module '${str}' at ${locationToStringWithFile(path.node.loc)}`);
                 } else if (isInTryBlockOrBranch(path))
-                    f.warn(`Unable to resolve conditionally loaded module '${str}'`, path.node);
+                    f.warn(`Unable to resolve conditionally loaded module '${str}'${ex}`, path.node);
                 else if (path.isCallExpression() && !(isIdentifier(path.node.callee) && path.node.callee.name === "require"))
-                    f.warn(`Unable to resolve module '${str}' at indirect require call`, path.node);
+                    f.warn(`Unable to resolve module '${str}' at indirect require call${ex}`, path.node);
                 else
-                    f.error(`Unable to resolve module '${str}'`, path.node);
+                    f.error(`Unable to resolve module '${str}'${ex}`, path.node);
 
                 // couldn't find module file (probably hasn't been installed), use a DummyModuleInfo if absolute module name
                 if (!"./#".includes(str[0]))
