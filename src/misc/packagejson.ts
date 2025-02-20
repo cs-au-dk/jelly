@@ -1,6 +1,6 @@
 import {FilePath, pushAll} from "./util";
 import {basename, dirname, relative, resolve} from "path";
-import {existsSync, readFileSync} from "fs";
+import {existsSync, readFileSync, statSync} from "fs";
 import logger from "./logger";
 import {options} from "../options";
 
@@ -44,7 +44,7 @@ export interface PackageJsonInfo {
  * Finds the enclosing package.json file if present.
  */
 export function findPackageJson(file: FilePath): {packageJson: FilePath, dir: FilePath} | undefined {
-    let dir = dirname(file);
+    let dir = statSync(file).isDirectory() ? file : dirname(file);
     while (true) {
         if (options.basedir && !dir.startsWith(options.basedir))
             return undefined;
