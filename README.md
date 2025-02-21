@@ -3,7 +3,7 @@
 [![MIT License](https://img.shields.io/github/license/cs-au-dk/jelly)](LICENSE)
 [![npm version](https://img.shields.io/npm/v/@cs-au-dk/jelly)](https://www.npmjs.com/package/@cs-au-dk/jelly)
 
-#### Copyright © 2023-2024 Anders Møller & Oskar Haarklou Veileborg
+#### Copyright © 2023-2025 Anders Møller & Oskar Haarklou Veileborg
 
 Jelly is a static analyzer for performing
 

@@ -77,6 +77,7 @@ export function buildNatives(solver: Solver, moduleInfo: ModuleInfo): {globals: 
     const globalSpecialNatives: SpecialNativeObjects = new Map;
     const f = solver.fragmentState;
     const a = solver.globalState;
+    solver.phase = "init";
 
     const models = [ecmascriptModels, nodejsModels];
     for (const m of models) {

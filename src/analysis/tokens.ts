@@ -32,16 +32,17 @@ export class FunctionToken extends Token {
 /**
  * Object kinds, used by AllocationSiteToken and PackageObjectToken.
  *
- * Iterator represents an abstraction of Iterator, Iterable, IterableIterator, IteratorResult, Generator and AsyncGenerator
+ * Iterator represents an abstraction of Iterator, Iterable, IterableIterator and IteratorResult
  * (thus conflating the different kinds of objects).
  * It has a property 'value' holding the iterator values and a method 'next' that returns the abstract object itself.
+ * Similarly, Generator represents both Generator and AsyncGenerator as a subclass of Iterator.
  *
  * PromiseResolve and PromiseReject represent the resolve and reject function arguments of promise executors,
  * using the same allocation site as the promise they belong to.
  *
  * Prototype represents prototype objects associated with functions.
  */
-export type ObjectKind = "Object" | "Array" | "Class" | "Map" | "Set" | "WeakMap" | "WeakSet" | "WeakRef" | "Iterator" | "RegExp" | "Date" | "Promise" | "PromiseResolve" | "PromiseReject" | "Error" | "Prototype"; // XXX: "Class" only used if options.oldobj enabled
+export type ObjectKind = "Object" | "Array" | "Class" | "Map" | "Set" | "WeakMap" | "WeakSet" | "WeakRef" | "Iterator" | "Generator" | "RegExp" | "Date" | "Promise" | "PromiseResolve" | "PromiseReject" | "Error" | "Prototype"; // XXX: "Class" only used if options.oldobj enabled
 
 /**
  * Token that represents objects with a specific allocation site.

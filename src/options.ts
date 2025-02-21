@@ -4,7 +4,7 @@ import logger from "./misc/logger";
 import {realpathSync} from "fs";
 
 export const VERSION = require("../package.json").version;
-export const COPYRIGHT = "Copyright (C) 2023-2024 Anders Møller & Oskar Haarklou Veileborg\n";
+export const COPYRIGHT = "Copyright (C) 2023-2025 Anders Møller & Oskar Haarklou Veileborg\n";
 export const PKG = "pkg" in process;
 
 /**
@@ -37,7 +37,6 @@ export const options: {
     approx: boolean,
     approxOnly: string | undefined,
     approxLoad: string | undefined,
-    approxStore: string | undefined,
     npmTest: string | undefined,
     graalHome: string | undefined,
     testGraal: boolean,
@@ -110,7 +109,6 @@ export const options: {
     approx: false,
     approxOnly: undefined,
     approxLoad: undefined,
-    approxStore: undefined,
     npmTest: undefined,
     graalHome: undefined,
     testGraal: false,

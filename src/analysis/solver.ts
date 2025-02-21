@@ -132,7 +132,7 @@ export default class Solver {
         d.functions = a.functionInfos.size;
         d.vars = f.getNumberOfVarsWithTokens();
         d.listeners = [
-            f.tokenListeners, f.packageNeighborListeners,
+            f.tokenListeners, f.tokenListeners2, f.packageNeighborListeners,
             f.arrayEntriesListeners, f.objectPropertiesListeners,
         ].reduce((acc, l: Map<unknown, Map<unknown, unknown>>) => acc + mapMapSize(l), 0);
         d.tokens = f.numberOfTokens;

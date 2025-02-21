@@ -955,6 +955,7 @@ export class Operations {
                         this.solver.addSubsetConstraint(vp.objPropVar(t, MAP_VALUES), vp.objPropVar(pair, "1"));
                         break;
                     case "Iterator":
+                    case "Generator":
                         this.solver.addSubsetConstraint(vp.objPropVar(t, "value"), dst);
                         break;
                 } // TODO: also handle TypedArray (see also nativebuilder.ts:returnIterator)

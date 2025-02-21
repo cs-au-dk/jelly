@@ -24,7 +24,7 @@ export function patchDynamics(solver: Solver): boolean {
     f.maybeEmptyPropertyReads = f.maybeEmptyPropertyReads.filter(e => {
         const {typ, base} = e;
         const bs = f.getTokens(f.getRepresentative(base));
-        if (![...bs].some(t => dyns.has(t)))
+        if (!Array.from(bs).some(t => dyns.has(t)))
             return true; // base does not contain a token that is base of a dynamic property write
 
         if (typ === "read") {

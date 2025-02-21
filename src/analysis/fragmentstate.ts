@@ -223,9 +223,9 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
     readonly invokedExpressions: Set<Node> = new Set;
 
     /**
-     * Token values and constraint variables that represent expressions whose values may escape.
+     * Constraint variables that represent expressions whose values may escape.
      */
-    readonly maybeEscaping: Set<Token | ConstraintVar> = new Set;
+    readonly maybeEscaping: Set<ConstraintVar> = new Set;
 
     /**
      * Object tokens that have been widened.
@@ -455,9 +455,9 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
     }
 
     /**
-     * Registers that the token or values of the expression represented by the given constraint variable may escape.
+     * Registers that the values of the expression represented by the given constraint variable may escape.
      */
-    registerEscaping(v: Token | ConstraintVar | undefined) {
+    registerEscaping(v: ConstraintVar | undefined) {
         if (v)
             this.maybeEscaping.add(v);
     }

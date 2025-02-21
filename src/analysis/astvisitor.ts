@@ -238,9 +238,9 @@ export function visit(ast: File, op: Operations) {
                         // return E
                         let resVar;
                         if (fun.generator) {
-                            // find the iterator object (it is returned via Function)
-                            // constraint: ... ⊆ ⟦i.value⟧ where i is the iterator object for the function
-                            const iter = a.canonicalizeToken(new AllocationSiteToken("Iterator", fun));
+                            // find the generator object (it is returned via Function)
+                            // constraint: ... ⊆ ⟦i.value⟧ where i is the generator object for the function
+                            const iter = a.canonicalizeToken(new AllocationSiteToken("Generator", fun));
                             resVar = vp.objPropVar(iter, "value");
                         } else {
                             // constraint: ... ⊆ ⟦ret_f⟧ where f is the enclosing function (ignoring top-level returns)
@@ -303,8 +303,8 @@ export function visit(ast: File, op: Operations) {
 
                     // function*
 
-                    // constraint: %(Async)Generator.prototype.next ⊆ ⟦i.next⟧ where i is the iterator object for the function
-                    const iter = a.canonicalizeToken(new AllocationSiteToken("Iterator", fun));
+                    // constraint: %(Async)Generator.prototype.next ⊆ ⟦i.next⟧ where i is the generator object for the function
+                    const iter = a.canonicalizeToken(new AllocationSiteToken("Generator", fun));
                     const iterNext = vp.objPropVar(iter, "next"); // TODO: inherit from Generator.prototype or AsyncGenerator.prototype instead of copying properties
                     solver.addTokenConstraint(op.globalSpecialNatives.get(fun.async ? ASYNC_GENERATOR_PROTOTYPE_NEXT : GENERATOR_PROTOTYPE_NEXT)!, iterNext);
                     const iterReturn = vp.objPropVar(iter, "return");
@@ -312,7 +312,7 @@ export function visit(ast: File, op: Operations) {
                     const iterThrow = vp.objPropVar(iter, "throw");
                     solver.addTokenConstraint(op.globalSpecialNatives.get(fun.async ? ASYNC_GENERATOR_PROTOTYPE_THROW : GENERATOR_PROTOTYPE_THROW)!, iterThrow);
 
-                    // constraint i ∈ ⟦ret_f⟧ where i is the iterator object for the function
+                    // constraint i ∈ ⟦ret_f⟧ where i is the generator object for the function
                     solver.addTokenConstraint(iter, vp.returnVar(fun));
                 }
             }
@@ -557,7 +557,7 @@ export function visit(ast: File, op: Operations) {
                                         const pt = op.newPrototypeToken(constr);
                                         const dst = vp.objPropVar(pt, key, ac);
                                         solver.addTokenConstraint(t, dst);
-                                        // constraint: ⟦this_c⟧ ∈ ⟦this_t⟧
+                                        // constraint: ⟦this_c⟧ ⊆ ⟦this_t⟧
                                         solver.addSubsetConstraint(vp.thisVar(constr), vp.thisVar(path.node));
                                     }
                                 }
@@ -901,20 +901,20 @@ export function visit(ast: File, op: Operations) {
         YieldExpression(path: NodePath<YieldExpression>) {
             const fun = path.getFunctionParent()?.node;
             assert(fun, "yield not in function?!");
-            const iter = a.canonicalizeToken(new AllocationSiteToken("Iterator", fun));
+            const iter = a.canonicalizeToken(new AllocationSiteToken("Generator", fun));
             const iterValue = vp.objPropVar(iter, "value");
             if (path.node.argument) {
                 if (path.node.delegate) {
                     // yield* E
-                    // constraint: ∀ i2 ∈ ⟦iterators(E)⟧: ⟦i2.value⟧ ⊆ ⟦i.value⟧ where i is the iterator object for the function
+                    // constraint: ∀ i2 ∈ ⟦iterators(E)⟧: ⟦i2.value⟧ ⊆ ⟦i.value⟧ where i is the generator object for the function
                     op.readIteratorValue(op.expVar(path.node.argument, path), iterValue, fun.body);
                 } else {
                     // yield E
-                    // constraint: ⟦E⟧ ⊆ ⟦i.value⟧ where i is the iterator object for the function
+                    // constraint: ⟦E⟧ ⊆ ⟦i.value⟧ where i is the generator object for the function
                     solver.addSubsetConstraint(op.expVar(path.node.argument, path), iterValue);
                 }
             }
-            // constraint: ⟦i.value⟧ ⊆ ⟦yield(*) E⟧ where i is the iterator object for the function
+            // constraint: ⟦i.value⟧ ⊆ ⟦yield(*) E⟧ where i is the generator object for the function
             if (!isParentExpressionStatement(path))
                 solver.addSubsetConstraint(iterValue, vp.nodeVar(path.node));
         },

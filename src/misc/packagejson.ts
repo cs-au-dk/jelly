@@ -44,7 +44,7 @@ export interface PackageJsonInfo {
  * Finds the enclosing package.json file if present.
  */
 export function findPackageJson(file: FilePath): {packageJson: FilePath, dir: FilePath} | undefined {
-    let dir = statSync(file).isDirectory() ? file : dirname(file);
+    let dir = statSync(file, {throwIfNoEntry: false})?.isDirectory() ? file : dirname(file);
     while (true) {
         if (options.basedir && !dir.startsWith(options.basedir))
             return undefined;
@@ -59,7 +59,7 @@ export function findPackageJson(file: FilePath): {packageJson: FilePath, dir: Fi
             if (ok)
                 return {packageJson, dir};
             else
-                logger.warn(`Ignoring ${packageJson} in search for package.json`);
+                logger.verbose(`Ignoring ${packageJson} in search for package.json`);
         }
         if (parentDir === dir)
             return undefined;

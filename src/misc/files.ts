@@ -1,12 +1,12 @@
 import {
     closeSync,
     existsSync,
-    lstatSync,
     openSync,
     readdirSync,
     readFileSync,
     readSync,
     realpathSync,
+    statSync,
     writeSync
 } from "fs";
 import {basename, dirname, extname, relative, resolve, sep} from "path";
@@ -51,31 +51,49 @@ function* expandRec(path: string, sub: boolean, visited: Set<string>): Generator
         if (visited.has(path))
             return;
         visited.add(path);
-        const stat = lstatSync(path);
+        const stat = statSync(path);
         const inNodeModules = options.library || path.includes("node_modules");
         if (stat.isDirectory()) {
             const base = basename(path);
-            if (!sub ||
-                !(["node_modules", ".git", ".yarn"].includes(base) ||
-                    (!inNodeModules && ["out", "build", "dist", "generated", "compiled"].includes(base)))) {
+            if (!sub || !(
+                /* skip sub-directories with these names */
+                ["node_modules", ".git", ".yarn"].includes(base) ||
+                (inNodeModules &&
+                    /* skip sub-directories with these names if inside node_modules */
+                    ["test"].includes(base)) ||
+                (!inNodeModules &&
+                    /* skip sub-directories with these names if not inside node_modules */
+                    ["out", "build", "dist", "generated", "compiled"].includes(base))
+            )) {
                 const files = readdirSync(path); // TODO: use withFileTypes and dirent.isdirectory()
                 if (!sub || inNodeModules || !files.includes("package.json"))
                     for (const file of files.map(f => resolve(path, f)).sort((f1, f2) => {
                         // make sure files are ordered before directories
-                        return (lstatSync(f1).isDirectory() ? 1 : 0) - (lstatSync(f2).isDirectory() ? 1 : 0) || f1.localeCompare(f2);
+                        return (statSync(f1).isDirectory() ? 1 : 0) - (statSync(f2).isDirectory() ? 1 : 0) || f1.localeCompare(f2);
                     }))
                         yield* expandRec(file, true, visited);
                 else
                     logger.debug(`Skipping directory ${path}`);
             } else
                 logger.debug(`Skipping directory ${path}`);
-        } else if (stat.isFile() && !path.endsWith(".d.ts") &&
-            (!inNodeModules || !(path.endsWith(".min.js") || path.endsWith(".bundle.js"))) &&
-            (path.endsWith(".js") || path.endsWith(".jsx") || path.endsWith(".es") || path.endsWith(".mjs") || path.endsWith(".cjs") || path.endsWith(".ts") || path.endsWith(".tsx") || path.endsWith(".mts") || path.endsWith(".cts")
-                || isShebang(path)))
+        } else if (stat.isFile() &&
+            /* skip files with this extension */
+            !path.endsWith(".d.ts") &&
+            (!inNodeModules || !(
+                /* skip files with these extensions if inside node_modules */
+                path.endsWith(".min.js") || path.endsWith(".bundle.js") || path.endsWith(".spec.js")
+            )) &&
+            /* include files with these extensions */
+            (path.endsWith(".js") || path.endsWith(".es") || path.endsWith(".mjs") || path.endsWith(".cjs") ||
+                (!inNodeModules && (
+                    /* include files with these extensions if not inside node_modules */
+                    path.endsWith(".jsx") || path.endsWith(".ts") || path.endsWith(".tsx") || path.endsWith(".mts") || path.endsWith(".cts") ||
+                    /* include shebang files if not inside node_modules */
+                    isShebang(path)
+                ))))
             yield relative(options.basedir, path);
         else
-            (sub ? logger.debug : logger.warn)(`Skipping file ${path}, doesn't look like a JavaScript/TypeScript file`);
+            (sub ? logger.debug : logger.warn)(`Skipping file ${path}`);
     } catch {
         logger.error(`Error: Unable to read ${path}`);
     }
@@ -176,7 +194,7 @@ export function requireResolve(str: string, file: FilePath, a: GlobalState, node
  */
 export function autoDetectBaseDir(paths: Array<string>): boolean {
     if (options.basedir) {
-        if (!lstatSync(options.basedir).isDirectory()) {
+        if (!statSync(options.basedir).isDirectory()) {
             logger.info(`Error: basedir ${options.basedir} is not a directory, aborting`);
             return false;
         }
@@ -184,8 +202,10 @@ export function autoDetectBaseDir(paths: Array<string>): boolean {
     }
     if (paths.length === 0)
         return true;
-    const t = findPackageJson(resolve(process.cwd(), longestCommonPrefix(paths.map(p =>
-        lstatSync(p).isDirectory() ? p : dirname(p)))));
+    const t = findPackageJson(longestCommonPrefix(paths.map(p => {
+        const p2 = resolve(process.cwd(), p);
+        return statSync(p2).isDirectory() ? p2 : dirname(p2);
+    })));
     if (!t) {
         logger.info("Can't auto-detect basedir, package.json not found (use option -b), aborting");
         return false;

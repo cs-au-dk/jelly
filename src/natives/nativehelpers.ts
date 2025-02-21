@@ -387,7 +387,8 @@ export function invokeCallback(kind: CallbackKind, p: NativeFunctionParams, arg:
  * Models a call into a generator.
  */
 export function generatorCall(p: NativeFunctionParams) {
-    if (p.base instanceof AllocationSiteToken && isFunction(p.base.allocSite)) {
+    if (p.base instanceof AllocationSiteToken && p.base.kind === "Generator") {
+        assert(isFunction(p.base.allocSite));
         const solver = p.solver;
         const f = solver.fragmentState;
         const a = solver.globalState;

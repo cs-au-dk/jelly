@@ -170,7 +170,7 @@ export class Patching {
             for (const fun of mod.functions)
                 checkFunctionVisited(fun);
         const patch = (dstVar: ConstraintVar, valToken: Token, hint: ReadHint | WriteHint): boolean => {
-            if (options.diagnostics)
+            if (options.diagnostics || options.diagnosticsJson)
                 this.usedHints.add(hint); // static analysis handles dynamic accesses with constant strings, so don't count those as added (but still count as used)
             const repVar = solver.fragmentState.getRepresentative(dstVar);
             if (!solver.fragmentState.hasToken(repVar, valToken) &&
@@ -259,7 +259,7 @@ export class Patching {
                     }
                 }
         }
-        if (options.diagnostics) {
+        if (options.diagnostics || options.diagnosticsJson) {
             for (const hs of this.hints.reads.values())
                 for (const hint of hs)
                     if (!this.usedHints.has(hint)) {
