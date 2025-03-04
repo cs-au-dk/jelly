@@ -7,7 +7,7 @@ import {SPECIALS} from "./transform";
  */
 export const WHITELISTED = new Set([ // TODO: white-list some more standard library modules?
     "events", "buffer", "assert", "assert/strict", "constants", "crypto", "module",
-    "zlib", "string_decoder", "util", "util/types", "path", "url", "tty", "sys"
+    "string_decoder", "util", "util/types", "path", "url", "tty", "sys"
 ]);
 
 /**
