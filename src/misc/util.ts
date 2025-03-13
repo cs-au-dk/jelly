@@ -29,7 +29,7 @@ export type Location = SimpleLocation & {
     unbound?: boolean;
 };
 
-export type LocationJSON = string; // format: "<file index>:<start line>:<start column>:<end line>:<end column>"
+export type LocationJSON = string; // format: "<module index>:<start line>:<start column>:<end line>:<end column>"
 
 /**
  * Normalized path to a file or directory.

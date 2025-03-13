@@ -272,7 +272,7 @@ async function main() {
             try {
                 await p.analyzeFiles(files);
             } finally {
-                p.saveHintsToFile(options.approxOnly);
+                p.hints.saveToFile(options.approxOnly);
                 if (options.diagnostics)
                     p.printDiagnostics();
                 if (options.diagnosticsJson)

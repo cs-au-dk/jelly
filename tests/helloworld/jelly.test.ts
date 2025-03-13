@@ -24,13 +24,13 @@ describe("tests/helloworld-approx", () => {
         soundness: "tests/helloworld/app.json",
         functionInfos: 775,
         moduleInfos: 94,
-        numberOfFunctionToFunctionEdges: 1109,
-        oneCalleeCalls: 993,
+        numberOfFunctionToFunctionEdges: 998,
+        oneCalleeCalls: 1012,
         funFound: 136,
         funTotal: 138,
         callFound: 201,
         callTotal: 204,
-        reachableFound: 186,
+        reachableFound: 185,
         reachableTotal: 189,
     });
 });

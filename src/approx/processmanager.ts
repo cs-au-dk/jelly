@@ -2,14 +2,14 @@ import {ChildProcess, fork} from "child_process";
 import logger from "../misc/logger";
 import {options} from "../options";
 import {HintsJSON, RequestType, ResponseType} from "../typings/hints";
-import {addPairArrayToMapSet, FilePath, LocationJSON, mapArraySize, percent, stringify} from "../misc/util";
+import {addPairArrayToMapSet, FilePath, mapArraySize, percent, stringify} from "../misc/util";
 import {closeSync, openSync, writeSync} from "fs";
 import {checkFile} from "./transform";
 import {GlobalState} from "../analysis/globalstate";
 import {Hints} from "./hints";
 import Timer, {nanoToMs} from "../misc/timer";
 import {extname, resolve} from "path";
-import {isLocalRequire, isShebang, requireResolve, writeStreamedStringify} from "../misc/files";
+import {isLocalRequire, isShebang, requireResolve} from "../misc/files";
 import {ApproxDiagnostics} from "./diagnostics";
 
 /**
@@ -80,7 +80,7 @@ export class ProcessManager {
     constructor(readonly a: GlobalState = new GlobalState) {
         logger.verbose("Starting approximate interpretation process");
         // When running from test, __dirname is the .ts equivalent file so resolve this to the corresponding .js file.
-        const resolvedDirname = __dirname.endsWith(".js") ? __dirname : `${__dirname}/../../lib/approx`
+        const resolvedDirname = __dirname.endsWith(".js") ? __dirname : `${__dirname}/../../lib/approx`;
         this.p = fork(`${resolvedDirname}/approx.js`, [JSON.stringify(options)], {stdio: "inherit"});
         this.p.on('message', (msg: ResponseType) => {
             if (!this.resultPromiseResolve) {
@@ -108,20 +108,19 @@ export class ProcessManager {
      */
     async analyzeFiles(files: Array<string>) {
         for (const file of files)
-            this.a.reachedFile(resolve(options.basedir, file));
+            this.a.reachedFile(resolve(options.basedir, file), true);
         while (this.a.pendingFiles.length > 0) {
             const file = this.a.pendingFiles.shift()!;
             const m = this.a.getModuleInfo(file);
             if (this.hints.moduleIndex.has(m.toString())) {
                 if (logger.isDebugEnabled())
-                    logger.debug(`Skipping ${file}, module already visited`);
+                    logger.debug(`Skipping ${m}, module already visited`);
             } else if (!([".js", ".jsx", ".es", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts"].includes(extname(file)) ||
                 (extname(file) === "" && isShebang(file)))) {
-                logger.info(`Skipping ${file}, unsupported extension`);
+                logger.info(`Skipping ${m}, unsupported extension`);
             } else {
                 if (options.printProgress)
-                    logger.info(`Analyzing ${file}`);
-                this.numExecutions++;
+                    logger.info(`Analyzing ${m}`);
                 await this.execute(file);
             }
             // include static requires found in the ASTs of the module and the modules reached dynamically
@@ -131,7 +130,7 @@ export class ProcessManager {
                     try {
                         const filepath = requireResolve(r, file, this.a);
                         if (filepath)
-                            this.a.reachedFile(filepath, m, isLocalRequire(r));
+                            this.a.reachedFile(filepath, false, m, isLocalRequire(r));
                     } catch {
                         logger.warn(`Unable to resolve module '${r}' from ${file}`);
                     }
@@ -153,6 +152,7 @@ export class ProcessManager {
     async execute(file: FilePath) {
         checkFile(file);
         this.timer = new Timer();
+        this.numExecutions++;
         return new Promise<void>((resolve) => {
             this.resultPromiseResolve = resolve;
             this.p.send({file} satisfies RequestType);
@@ -163,62 +163,16 @@ export class ProcessManager {
      * Adds the given hints.
      */
     add(newHints: HintsJSON) {
-        const moduleReindex = new Map<number, number>();
-        for (const [i, s] of newHints.modules.entries()) {
-            let m: string;
+        for (const [i, s] of newHints.modules.entries())
             if (s[0] === "/") {
                 // convert file name to module name and register the file as reached
-                const i = s.indexOf(":eval["),
-                    file = i === -1 ? s : s.substring(0, i),
-                    rest = i === -1 ? "" : s.substring(i);
-                const mod = this.a.reachedFile(file);
-                m = mod.toString() + rest;
-            } else
-                m = s;
-            moduleReindex.set(i, this.hints.addModule(m));
-        }
-        const convert = (loc: LocationJSON): LocationJSON => `${moduleReindex.get(parseInt(loc))}${loc.substring(loc.indexOf(":"))}`;
-        for (const f of newHints.functions)
-            this.hints.addFunction(convert(f)!);
-        for (const {loc, prop, valLoc, valType} of newHints.reads) {
-            this.hints.addReadHint({
-                loc: convert(loc)!,
-                prop,
-                valLoc: convert(valLoc),
-                valType
-            });
-        }
-        for (const {type, loc, baseLoc, baseType, prop, valLoc, valType} of newHints.writes) {
-            this.hints.addWriteHint({
-                type,
-                loc: convert(loc)!,
-                baseLoc: convert(baseLoc),
-                baseType,
-                prop,
-                valLoc: convert(valLoc),
-                valType
-            });
-        }
-        for (const {loc, str} of newHints.requires)
-            this.hints.addRequireHint({
-                loc: convert(loc)!,
-                str
-            });
-        for (const {loc, str} of newHints.evals)
-            this.hints.addEvalHint({
-                loc: convert(loc)!,
-                str
-            });
-    }
-
-    /**
-     * Saves the hints to a file.
-     */
-    saveHintsToFile(file: string) {
-        const fd = openSync(file, "w");
-        writeStreamedStringify(this.hints.toJSON(), fd);
-        closeSync(fd);
-        logger.info(`Approximate interpretation hints written to ${file}`);
+                const j = s.indexOf(":eval["),
+                    file = j === -1 ? s : s.substring(0, j),
+                    rest = j === -1 ? "" : s.substring(j);
+                const mod = this.a.reachedFile(file, false);
+                newHints.modules[i] = mod.toString() + rest;
+            }
+        this.hints.add(newHints);
     }
 
     /**

@@ -48,7 +48,7 @@ export type HintsJSON = {
     writes: Array<WriteHint>,
 
     // require hints
-    requires: Array<RequireHint>
+    requires: Array<RequireHint>,
 
     // eval hints
     evals: Array<EvalHint>
@@ -79,7 +79,7 @@ export interface WriteHint {
     // source location of the operation
     loc: LocationJSON, // used for reporting unhandled/patched write operations but not for actual patching
 
-    // source location of the base object ("<file index>:-1:-1:-1:-1" represents the module exports object)
+    // source location of the base object ("<module index>:-1:-1:-1:-1" represents the module exports object)
     baseLoc: LocationJSON,
 
     // type of the base object

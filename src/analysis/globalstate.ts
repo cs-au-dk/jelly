@@ -250,7 +250,7 @@ export class GlobalState {
     /**
      * Records that the given file has been reached, and returns its ModuleInfo.
      */
-    reachedFile(tofile: FilePath, from?: ModuleInfo, local?: boolean): ModuleInfo {
+    reachedFile(tofile: FilePath, entry: boolean, from?: ModuleInfo, local?: boolean): ModuleInfo {
         let moduleInfo;
         if (this.reachedFiles.has(tofile))
             moduleInfo = this.moduleInfosByPath.get(tofile)!;
@@ -278,7 +278,7 @@ export class GlobalState {
                 if (!packageInfo) {
 
                     // package has not been reached before (also not in another directory)
-                    packageInfo = new PackageInfo(p.name, p.version, p.main, p.dir, from === undefined);
+                    packageInfo = new PackageInfo(p.name, p.version, p.main, p.dir, entry);
                     this.packageInfos.set(p.packagekey, packageInfo);
                     if (!options.modulesOnly && !options.approxOnly && options.printProgress && logger.isVerboseEnabled())
                         logger.verbose(`Reached package ${packageInfo} at ${p.dir}`);

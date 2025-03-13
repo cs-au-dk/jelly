@@ -32,11 +32,6 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
         a.approx = new ProcessManager(a);
         a.patching = new Patching(a.approx.hints);
         d.patching = new PatchingDiagnostics();
-        if (options.approxLoad) {
-            if (options.printProgress)
-                logger.info(`Loading ${options.approxLoad}`);
-            a.approx!.add(JSON.parse(readFileSync(options.approxLoad, "utf-8")));
-        }
     }
 
     function merge(mp: ModuleInfo | PackageInfo) {
@@ -58,7 +53,12 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
             for (const file of files)
                 a.entryFiles.add(resolve(options.basedir, file)); // TODO: optionally resolve using require.resolve instead?
             for (const file of a.entryFiles)
-                a.reachedFile(file);
+                a.reachedFile(file, true); // entry packages must be reached before approx.add
+            if (options.approxLoad) {
+                if (options.printProgress)
+                    logger.info(`Loading ${options.approxLoad}`);
+                a.approx!.add(JSON.parse(readFileSync(options.approxLoad, "utf-8")));
+            }
             while (a.pendingFiles.length > 0) {
                 const file = a.pendingFiles.shift()!;
                 const moduleInfo = a.getModuleInfo(file);
@@ -278,10 +278,10 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
                 logger.info(`Patching time escape: ${nanoToMs(d.totalEscapePatchingTime)}, approx: ${nanoToMs(d.totalApproxPatchingTime)}, other: ${nanoToMs(d.totalOtherPatchingTime)}`);
                 if (options.cycleElimination)
                     logger.info(`Cycle elimination: ${nanoToMs(d.totalCycleEliminationTime)}, runs: ${d.totalCycleEliminationRuns}, nodes removed: ${f.redirections.size}`);
-                if ((options.approx || options.approxLoad) && options.diagnostics) {
+                if (options.approx)
                     a.approx!.printDiagnostics();
+                if (options.approx || options.approxLoad)
                     a.patching!.printDiagnostics(solver);
-                }
             }
         }
     }

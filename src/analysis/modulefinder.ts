@@ -27,7 +27,7 @@ export function findModules(ast: File, file: FilePath, f: FragmentState, moduleI
             try {
                 const filepath = requireResolve(str, file, f.a, path.node, f);
                 if (filepath)
-                    f.a.reachedFile(filepath, moduleInfo, isLocalRequire(str));
+                    f.a.reachedFile(filepath, false, moduleInfo, isLocalRequire(str));
             } catch {
                 if (options.ignoreUnresolved || options.ignoreDependencies) {
                     if (logger.isVerboseEnabled())

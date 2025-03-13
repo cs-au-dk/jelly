@@ -1,6 +1,9 @@
-import {ReadHint, HintsJSON, WriteHint, RequireHint, EvalHint} from "../typings/hints";
+import {EvalHint, HintsJSON, ReadHint, RequireHint, WriteHint} from "../typings/hints";
 import {getOrSet, LocationJSON, mapArrayAddNoDuplicates} from "../misc/util";
 import {APPROX_READ, APPROX_WRITE} from "./patching";
+import {closeSync, openSync} from "fs";
+import {writeStreamedStringify} from "../misc/files";
+import logger from "../misc/logger";
 
 export class Hints {
 
@@ -43,7 +46,7 @@ export class Hints {
         return getOrSet(this.moduleIndex, m, () => {
             this.modules.push(m);
             return this.modules.length - 1;
-        })
+        });
     }
 
     addFunction(f: LocationJSON) {
@@ -77,6 +80,44 @@ export class Hints {
         );
     }
 
+    add(newHints: HintsJSON) {
+        const moduleReindex = new Map<number, number>();
+        for (const [i, s] of newHints.modules.entries())
+            moduleReindex.set(i, this.addModule(s));
+        const convert = (loc: LocationJSON): LocationJSON => `${moduleReindex.get(parseInt(loc))}${loc.substring(loc.indexOf(":"))}`;
+        for (const f of newHints.functions)
+            this.addFunction(convert(f)!);
+        for (const {loc, prop, valLoc, valType} of newHints.reads) {
+            this.addReadHint({
+                loc: convert(loc)!,
+                prop,
+                valLoc: convert(valLoc),
+                valType
+            });
+        }
+        for (const {type, loc, baseLoc, baseType, prop, valLoc, valType} of newHints.writes) {
+            this.addWriteHint({
+                type,
+                loc: convert(loc)!,
+                baseLoc: convert(baseLoc),
+                baseType,
+                prop,
+                valLoc: convert(valLoc),
+                valType
+            });
+        }
+        for (const {loc, str} of newHints.requires)
+            this.addRequireHint({
+                loc: convert(loc)!,
+                str
+            });
+        for (const {loc, str} of newHints.evals)
+            this.addEvalHint({
+                loc: convert(loc)!,
+                str
+            });
+    }
+
     toJSON(): HintsJSON {
         return {
             modules: this.modules,
@@ -86,6 +127,13 @@ export class Hints {
             requires: Array.from(this.requires.values()).flat(),
             evals: Array.from(this.evals.values()).flat()
         }
+    }
+
+    saveToFile(file: string) {
+        const fd = openSync(file, "w");
+        writeStreamedStringify(this.toJSON(), fd);
+        closeSync(fd);
+        logger.info(`Approximate interpretation hints written to ${file}`);
     }
 
     clearHints() {

@@ -325,7 +325,7 @@ function callPost(mod: string, loc: string, fun: any, args: Array<any>, val: any
             for (const arg of args.slice(1, args.length))
                 for (const [prop, val] of Object.entries(Object.getOwnPropertyDescriptors(arg)))
                     if (val.enumerable)
-                        copyFromDescriptor(target, prop, val)
+                        copyFromDescriptor(target, prop, val);
             break;
         }
         case Object.defineProperty: {
@@ -334,8 +334,7 @@ function callPost(mod: string, loc: string, fun: any, args: Array<any>, val: any
         }
         case Object.defineProperties: {
             const target = args.at(0);
-            const descriptors = Object.entries(args.at(1) as { [x: string]: PropertyDescriptor });
-            for (const [prop, val] of descriptors)
+            for (const [prop, val] of Object.entries(args.at(1) as { [x: string]: PropertyDescriptor }))
                 copyFromDescriptor(target, prop, val);
             break;
         }
@@ -462,7 +461,7 @@ for (const [name, val] of Object.entries({
         const i = hints.addModule(mod);
         if (logger.isDebugEnabled())
             logger.debug(`$start ${mod}: ${i}`);
-        if (modobj && modobj.exports) {// undefined for ESM modules (don't have dynamic exports anyway)
+        if (modobj && modobj.exports) { // undefined for ESM modules (don't have dynamic exports anyway)
             objLoc.set(modobj.exports, [`${i}:-1:-1:-1:-1`, "Object"]); // allocation site for module.exports
             return makeModuleProxy(modobj);
         }
@@ -512,7 +511,7 @@ for (const [name, val] of Object.entries({
                     let baseLoc = s, baseType: AllocType | undefined;
                     if (typeof obj === "function") { // class
                         baseType = c.isStatic ? "Class" : "Prototype";
-                        const desc = Object.getOwnPropertyDescriptor(c.kind === "field" ? obj : obj.prototype, c.prop);
+                        const desc = Object.getOwnPropertyDescriptor(c.isStatic ? obj : obj.prototype, c.prop);
                         switch (c.kind) {
                             case "field":
                                 if (!c.isStatic) {

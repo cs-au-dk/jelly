@@ -738,7 +738,7 @@ export class Operations {
                 if (filepath) {
 
                     // register that the module is reached
-                    m = this.a.reachedFile(filepath, this.moduleInfo, isLocalRequire(str));
+                    m = this.a.reachedFile(filepath, false, this.moduleInfo, isLocalRequire(str));
 
                     // extend the require graph
                     const fp = getEnclosingFunction(path);

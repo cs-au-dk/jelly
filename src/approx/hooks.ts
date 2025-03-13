@@ -21,7 +21,7 @@ const responsePromiseResolves = new Map<FilePath, (transformed: string) => void>
 /**
  * Module hooks initialization.
  * (Registered in approx.ts.)
-*/
+ */
 export async function initialize({opts, port2: p2}: {opts: Partial<typeof options>, port2: MessagePort}) {
     setOptions(opts);
     port2 = p2;

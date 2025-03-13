@@ -488,6 +488,7 @@ export const ecmascriptModels: NativeModel = {
             invoke: (p: NativeFunctionParams) => {
                 warnNativeUsed("BigInt", p); // TODO
             },
+            methods: []
             // TODO
         },
         {
@@ -519,7 +520,8 @@ export const ecmascriptModels: NativeModel = {
             name: "DataView",
             invoke: (p: NativeFunctionParams) => {
                 warnNativeUsed("DataView", p); // TODO
-            }
+            },
+            methods: []
             // TODO
         },
         {
@@ -694,6 +696,14 @@ export const ecmascriptModels: NativeModel = {
             methods: [
                 {
                     name: "toString"
+                }
+            ],
+            staticMethods: [
+                {
+                    name: "captureStackTrace"
+                },
+                {
+                    name: "prepareStackTrace"
                 }
             ],
             invoke: (p: NativeFunctionParams) => {
@@ -1699,7 +1709,8 @@ export const ecmascriptModels: NativeModel = {
             name: "Symbol",
             invoke: (p: NativeFunctionParams) => {
                 warnNativeUsed("Symbol", p); // TODO
-            }
+            },
+            methods: []
             // TODO
         },
         {
@@ -1771,9 +1782,6 @@ export const ecmascriptModels: NativeModel = {
                 returnToken(t, p);
             },
             methods: [
-                {
-                    name: "clear"
-                },
                 {
                     name: "delete"
                 },
