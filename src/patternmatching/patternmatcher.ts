@@ -3,6 +3,8 @@ import {
     AccessPathPattern,
     CallDetectionPattern,
     CallResultAccessPathPattern,
+    ComponentAccessPathPattern,
+    ComponentDetectionPattern,
     DetectionPattern,
     DisjunctionAccessPathPattern,
     ExclusionAccessPathPattern,
@@ -51,6 +53,7 @@ import {ConstraintVar, NodeVar} from "../analysis/constraintvars";
 import {
     AccessPath,
     CallResultAccessPath,
+    ComponentAccessPath,
     ModuleAccessPath,
     PropertyAccessPath,
     UnknownAccessPath
@@ -203,8 +206,8 @@ export class PatternMatcher {
              */
             function addMatches(level: ConfidenceLevel,
                                 ap: AccessPath,
-                                q: Map<Node, {bp: PropertyAccessPath | CallResultAccessPath, sub: ConstraintVar, encl: Encl}> | undefined,
-                                tmp: Map<Node, [Set<PropertyAccessPath | CallResultAccessPath>, Encl]>,
+                                q: Map<Node, {bp: PropertyAccessPath | CallResultAccessPath | ComponentAccessPath, sub: ConstraintVar, encl: Encl}> | undefined,
+                                tmp: Map<Node, [Set<PropertyAccessPath | CallResultAccessPath | ComponentAccessPath>, Encl]>,
                                 subvs: Map<Node, ConstraintVar>,
                                 exclude?: Map<Node, [Set<AccessPath>, Encl]>) {
                 if (q)
@@ -229,7 +232,7 @@ export class PatternMatcher {
              */
             function transfer(level: ConfidenceLevel,
                               sub: AccessPathPatternMatches,
-                              tmp: Map<Node, [Set<PropertyAccessPath | CallResultAccessPath>, FunctionInfo | ModuleInfo]>,
+                              tmp: Map<Node, [Set<PropertyAccessPath | CallResultAccessPath | ComponentAccessPath>, FunctionInfo | ModuleInfo]>,
                               subvs: Map<Node, ConstraintVar>,
                               nextsub?: AccessPathPatternMatches) {
                 // find sub-expressions that are fully matched
@@ -331,6 +334,18 @@ export class PatternMatcher {
                     for (const [aps] of sub[level].values())
                         for (const ap of aps) {
                             addMatches(level, ap, f.callResultAccessPaths.get(ap), tmp, subvs);
+                            addEscapingToExternal(ap);
+                        }
+                    transfer(level, sub, tmp, subvs);
+                }
+            } else if (p instanceof ComponentAccessPathPattern) {
+                const sub = this.findAccessPathPatternMatches(p.component, moduleFilter);
+                for (const level of confidenceLevels) {
+                    const tmp = new Map<Node, [Set<ComponentAccessPath>, FunctionInfo | ModuleInfo]>();
+                    const subvs = new Map<Node, ConstraintVar>();
+                    for (const [aps] of sub[level].values())
+                        for (const ap of aps) {
+                            addMatches(level, ap, f.componentAccessPaths.get(ap), tmp, subvs);
                             addEscapingToExternal(ap);
                         }
                     transfer(level, sub, tmp, subvs);
@@ -625,6 +640,45 @@ export class PatternMatcher {
                                 }
                         res.push({exp, encl, uncertainties});
                     }
+                }
+        } else if (d instanceof ComponentDetectionPattern) {
+            // 'component' patterns match entire call expressions but refer only to the functions being called,
+            // so we wrap the access path pattern in a ComponentAccessPathPattern
+            const sub = this.findAccessPathPatternMatches(new ComponentAccessPathPattern(d.ap), moduleFilter);
+            for (const level of confidenceLevels)
+                matches: for (const [exp, [, encl]] of sub[level]) {
+                    assert(encl); // only undefined at PotentiallyUnknownAccessPathPattern matches
+                    const uncertainties: Array<Uncertainty> = [];
+                    if (level === "low" && !d.filters?.some(f => f instanceof TypeFilter && f.selector.head === "base")) // if uncertain and there is a base filter, an Uncertainty will be added below so skip here
+                        uncertainties.push("accessPath");
+                    if (d.filters)
+                        for (const f of d.filters)
+                            if (!(level === "high" && f instanceof TypeFilter && f.selector.head === "base")) { // skip base type filters if the access path match is certain
+                                const [t, arg] = this.filterMatches(exp, f);
+                                switch (t) {
+                                    case Ternary.False:
+                                        continue matches;
+                                    case Ternary.Maybe:
+                                        if (f instanceof NumArgsCallFilter)
+                                            uncertainties.push({
+                                                type: "numArg",
+                                                exp,
+                                                numMinArgs: f.minArgs,
+                                                numMaxArgs: f.maxArgs
+                                            });
+                                        else if (f instanceof TypeFilter)
+                                            uncertainties.push({
+                                                type: "type",
+                                                exp: arg,
+                                                kind: f.selector.head,
+                                                typesToMatch: f.types
+                                            }); // FIXME: f.arg.props not used?
+                                        else
+                                            throw new Error("Unexpected Filter");
+                                        break;
+                                }
+                            }
+                    res.push({exp, encl, uncertainties});
                 }
         } else
             assert.fail("Unexpected DetectionPattern");

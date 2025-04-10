@@ -2,6 +2,7 @@ import {
     AccessPathPattern,
     CallDetectionPattern,
     CallResultAccessPathPattern,
+    ComponentDetectionPattern,
     DetectionPattern,
     DisjunctionAccessPathPattern,
     ExclusionAccessPathPattern,
@@ -376,6 +377,16 @@ export function parseDetectionPattern(pattern: string, c: AccessPathPatternCanon
             filters.push(filter);
         }
         res = new CallDetectionPattern(p, onlyReturnChanged, onlyWhenUsedAsPromise, onlyNonNewCalls, filters.length > 0 ? filters : undefined);
+    } else if (([b, pos] = parseOptionalKeyword(pos, "component")) && b) {
+        pos = parseSpace(pos, false);
+        [p, pos] = parseAccessPathPattern(pos);
+        const filters: Array<Filter> = [];
+        while (pos < pattern.length) {
+            let filter;
+            [filter, pos] = parseFilter(pos);
+            filters.push(filter);
+        }
+        res = new ComponentDetectionPattern(p, filters.length > 0 ? filters : undefined);
     } else
         throw 0;
     pos = parseSpace(pos);

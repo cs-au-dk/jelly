@@ -57,7 +57,7 @@ export class WriteDetectionPattern extends DetectionPattern {
     }
 }
 
-export class CallDetectionPattern extends DetectionPattern { // TODO: introduce ComponentDetectionPattern? (see ComponentAccessPathPattern)
+export class CallDetectionPattern extends DetectionPattern {
 
     constructor(
         ap: AccessPathPattern,
@@ -71,6 +71,20 @@ export class CallDetectionPattern extends DetectionPattern { // TODO: introduce 
 
     toString(): string {
         return `call${this.onlyReturnChanged ? "R" : this.onlyWhenUsedAsPromise ? "Promise" : this.onlyNonNewCalls ? "NotNew" : ""} ${this.ap}${this.filters && this.filters.length > 0 ? " " + this.filters.join(" ") : ""}`;
+    }
+}
+
+export class ComponentDetectionPattern extends DetectionPattern {
+
+    constructor(
+        ap: AccessPathPattern,
+        readonly filters: Array<Filter> | undefined
+    ) {
+        super(ap);
+    }
+
+    toString(): string {
+        return `component ${this.ap}${this.filters && this.filters.length > 0 ? " " + this.filters.join(" ") : ""}`;
     }
 }
 
