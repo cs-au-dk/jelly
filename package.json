@@ -1,17 +1,17 @@
 {
-  "name": "@cs-au-dk/jelly",
+  "name": "@nuanced-dev/jellycg",
   "version": "0.10.0",
   "description": "Jelly - call graph and library usage analyzer for JavaScript",
   "author": "Anders Møller <amoeller@cs.au.dk>",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/cs-au-dk/jelly.git"
+    "url": "git+https://github.com/nuanced-dev/jellycg.git"
   },
   "engines": {
     "node": ">=20.0.0"
   },
-  "homepage": "https://github.com/cs-au-dk/jelly#readme",
+  "homepage": "https://github.com/nuanced-dev/jellycg#readme",
   "keywords": [
     "call graph",
     "library usage",
@@ -23,9 +23,11 @@
     "bin",
     "resources"
   ],
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
   "bin": {
-    "jelly": "lib/main.js",
-    "jelly-server": "lib/server.js"
+    "jellycg": "lib/main.js",
+    "jellycg-server": "lib/server.js"
   },
   "scripts": {
     "build": "npm run chmod; tsc --build tsconfig-build.json",
@@ -35,10 +37,11 @@
     "tests-install": "tests/install.sh",
     "test": "jest --selectProjects default",
     "differential": "jest --selectProjects differential",
-    "pkg": "npm run clean; npm run build; pkg lib/main.js -C Brotli --options \"expose-gc,max-old-space-size=8192\" -c package.json -o dist/jelly; pkg lib/server.js -C Brotli --options \"expose-gc,max-old-space-size=8192\" -c package.json -o dist/jelly-server",
-    "clean": "rm -rf lib dist tmp/tsbuildinfo tmp/coverage tests/node_modules/jelly-previous",
+    "pkg": "npm run clean; npm run build; pkg lib/main.js -C Brotli --options \"expose-gc,max-old-space-size=8192\" -c package.json -o dist/jellycg; pkg lib/server.js -C Brotli --options \"expose-gc,max-old-space-size=8192\" -c package.json -o dist/jellycg-server",
+    "clean": "rm -rf lib dist tmp/tsbuildinfo tmp/coverage tests/node_modules/jellycg-previous",
     "build-docker": "npm run build && docker build -t jelly .",
-    "jelly-docker": "./bin/jelly-docker"
+    "jellycg-docker": "./bin/jellycg-docker",
+    "prepare": "npm run build"
   },
   "dependencies": {
     "@babel/core": "^7.24.8",

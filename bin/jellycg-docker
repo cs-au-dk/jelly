@@ -10,4 +10,4 @@ else
     OPTS="--user $(id -u):$(id -g) -e HOME=/tmp"
 fi
 
-exec docker run --rm --name jelly $OPTS --network none -v "$(readlink -f "$1")":/workspace -w /workspace jelly "${@:2}"
+exec docker run --rm --name jellycg $OPTS --network none -v "$(readlink -f "$1")":/workspace -w /workspace jellycg "${@:2}"
