@@ -240,29 +240,19 @@ function getVisualizerCallGraph(f: FragmentState, vulnerabilities: Vulnerability
             }
             x[kind].add(p);
         }
-        for (const ts of vulnerabilities.package.values())
-            for (const vs of ts.values())
-                addAll(vs, relevant);
-        for (const [src, m] of vulnerabilities.package)
-            for (const [dst, vs] of m)
-                for (const v of vs) {
-                    add(v, src, "package", sources);
-                    add(v, dst, "package", targets);
-                }
+        for (const vs of vulnerabilities.package.values())
+            addAll(vs, relevant);
+        for (const [src, vs] of vulnerabilities.package)
+            for (const v of vs)
+                add(v, src, "package", sources);
         if (vulnerabilities.module)
-            for (const [src, m] of vulnerabilities.module)
-                for (const [dst, vs] of m)
-                    for (const v of vs) {
-                        add(v, src, "module", sources);
-                        add(v, dst, "module", targets);
-                    }
+            for (const [src, vs] of vulnerabilities.module)
+                for (const v of vs)
+                    add(v, src, "module", sources);
         if (vulnerabilities.function)
-            for (const [src, m] of vulnerabilities.function)
-                for (const [dst, vs] of m)
-                    for (const v of vs) {
-                        add(v, src, "function", sources);
-                        add(v, dst, "function", targets);
-                    }
+            for (const [src, vs] of vulnerabilities.function)
+                for (const v of vs)
+                    add(v, src, "function", sources);
         vuls = [];
         for (const v of relevant) {
             const x: NonNullable<VisualizerGraphs["graphs"][number]["vulnerabilities"]>[number] = {

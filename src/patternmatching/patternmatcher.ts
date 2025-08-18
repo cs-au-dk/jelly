@@ -420,7 +420,7 @@ export class PatternMatcher {
         }
         if (logger.isDebugEnabled())
             for (const level of confidenceLevels)
-                for (const [e, aps] of res[level])
+                for (const [e, [aps]] of res[level])
                     for (const ap of aps)
                         logger.debug(`Pattern ${p} matched access path ${ap} at ${locationToStringWithFileAndEnd(e.loc)} (confidence: ${level})`);
         return res;

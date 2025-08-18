@@ -8,12 +8,9 @@ import {
     isImport,
     isStringLiteral
 } from "@babel/types";
-import {FilePath, locationToStringWithFile} from "../misc/util";
+import {FilePath} from "../misc/util";
 import traverse, {NodePath} from "@babel/traverse";
-import logger from "../misc/logger";
-import {options} from "../options";
 import Module from "module";
-import {isLocalRequire, requireResolve} from "../misc/files";
 import {ModuleInfo} from "./infos";
 import {FragmentState} from "./fragmentstate";
 
@@ -24,17 +21,7 @@ export function findModules(ast: File, file: FilePath, f: FragmentState, moduleI
 
     function requireModule(str: string, path: NodePath) { // see requireModule in operations.ts
         if (!Module.isBuiltin(str))
-            try {
-                const filepath = requireResolve(str, file, f.a, path.node, f);
-                if (filepath)
-                    f.a.reachedFile(filepath, false, moduleInfo, isLocalRequire(str));
-            } catch {
-                if (options.ignoreUnresolved || options.ignoreDependencies) {
-                    if (logger.isVerboseEnabled())
-                        logger.verbose(`Ignoring unresolved module '${str}' at ${locationToStringWithFile(path.node.loc)}`);
-                } else// TODO: special warning if the require/import is placed in a try-block, an if statement, or a switch case?
-                    f.warn(`Unable to resolve module '${str}'`, path.node);
-            }
+            f.requireModule(str, path, file, moduleInfo)
     }
 
     traverse(ast, {

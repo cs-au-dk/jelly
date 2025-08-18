@@ -5,6 +5,8 @@ import {CallExpression, Function, Identifier, JSXIdentifier, NewExpression, Node
 import assert from "assert";
 import {
     addMapHybridSet,
+    FilePath,
+    getOrSet,
     locationToStringWithFile,
     locationToStringWithFileAndEnd,
     mapGetMap,
@@ -19,6 +21,7 @@ import {ConstraintVarProducer} from "./constraintvarproducer";
 import Solver from "./solver";
 import {MaybeEmptyPropertyRead} from "../patching/patchdynamics";
 import {getEnclosingNonArrowFunction} from "../misc/asthelpers";
+import {isLocalRequire, requireResolve2} from "../misc/files";
 
 export type ListenerID = bigint;
 
@@ -841,5 +844,18 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
             return this.a.canonicalizeToken(new PackageObjectToken(t.getPackageInfo(), t.kind));
         else
             return t;
+    }
+
+    /**
+     * Resolves a 'require' string and returns a ModuleInfo or DummyModuleInfo (or undefined if resolution fails).
+     */
+    requireModule(str: string, path: NodePath, file: FilePath, moduleInfo: ModuleInfo): ModuleInfo | DummyModuleInfo | undefined {
+        let m: ModuleInfo | DummyModuleInfo | undefined;
+        const filepath = requireResolve2(str, path, file, this);
+        if (filepath)
+            m = this.a.reachedFile(filepath, false, moduleInfo, isLocalRequire(str));
+        else if (!"./#".includes(str[0])) // couldn't find module file (probably hasn't been installed), use a DummyModuleInfo if absolute module name
+            m = getOrSet(this.a.dummyModuleInfos, str, () => new DummyModuleInfo(str));
+        return m;
     }
 }

@@ -59,8 +59,7 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
                     logger.info(`Loading ${options.approxLoad}`);
                 a.approx!.add(JSON.parse(readFileSync(options.approxLoad, "utf-8")));
             }
-            while (a.pendingFiles.length > 0) {
-                const file = a.pendingFiles.shift()!;
+            for (const file of a.pendingFiles) {
                 const moduleInfo = a.getModuleInfo(file);
 
                 // initialize analysis state for the module
@@ -198,7 +197,7 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
                     d.totalOtherPatchingTime += t.elapsed();
                 }
 
-                if (a.pendingFiles.length !== 0)
+                if (a.pendingFiles.isNonEmpty())
                     solver.fragmentState.warn("Unexpected module"); // (new modules shouldn't be discovered in the second phase, unless terminating early)
                 solver.updateDiagnostics();
             }

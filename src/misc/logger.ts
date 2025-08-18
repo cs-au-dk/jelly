@@ -3,6 +3,7 @@ import winston from "winston";
 import * as Transport from 'winston-transport';
 import {options} from "../options";
 import {sep} from "path";
+import {truncateSync} from "node:fs";
 
 export const RED = "\x1b[31m";
 export const YELLOW = "\x1b[33m";
@@ -43,6 +44,10 @@ export function setLogLevel(level: string) {
 }
 
 export function logToFile(file?: string): Transport {
+    if (file)
+        try {
+            truncateSync(file, 0);
+        } catch {}
     const t = new winston.transports.File({
         filename: file ?? `${tmpdir()}${sep}jelly-${process.pid}.log`
     });

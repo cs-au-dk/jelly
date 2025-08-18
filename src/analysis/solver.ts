@@ -1029,7 +1029,7 @@ export default class Solver {
             wave++;
         }
         if (logger.isVerboseEnabled() || (options.diagnostics && options.printProgress))
-            logger.info(`${isTTY ? GREY : ""}Completed after ${nanoToMs(this.timer.elapsed())} (call edges: ${f.numberOfCallToFunctionEdges}, vars: ${f.getNumberOfVarsWithTokens()}, tokens: ${f.numberOfTokens}, subsets: ${f.numberOfSubsetEdges})${isTTY ? RESET : ""}`);
+            logger.info(`${isTTY ? GREY : ""}${phase} completed after ${nanoToMs(this.timer.elapsed())} (call edges: ${f.numberOfCallToFunctionEdges}, vars: ${f.getNumberOfVarsWithTokens()}, tokens: ${f.numberOfTokens}, subsets: ${f.numberOfSubsetEdges})${isTTY ? RESET : ""}`);
         if (this.diagnostics.unprocessedTokensSize !== 0)
             assert.fail(`unprocessedTokensSize non-zero after propagate: ${this.diagnostics.unprocessedTokensSize}`);
     }

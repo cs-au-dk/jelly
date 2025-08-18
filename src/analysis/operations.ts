@@ -3,6 +3,7 @@ import {
     Function,
     isArrayPattern,
     isAssignmentPattern,
+    isExportAllDeclaration,
     isExportDeclaration,
     isExpression,
     isIdentifier,
@@ -35,7 +36,6 @@ import {
     getEnclosingNonArrowFunction,
     getKey,
     getProperty,
-    isInTryBlockOrBranch,
     isMaybeUsedAsPromise,
     isParentExpressionStatement
 } from "../misc/asthelpers";
@@ -72,9 +72,8 @@ import Solver, {ListenerKey} from "./solver";
 import {GlobalState} from "./globalstate";
 import {DummyModuleInfo, FunctionInfo, ModuleInfo, normalizeModuleName, PackageInfo} from "./infos";
 import logger from "../misc/logger";
-import {isLocalRequire, requireResolve} from "../misc/files";
 import {options} from "../options";
-import {FilePath, getOrSet, isArrayIndex, Location, locationToString, locationToStringWithFile} from "../misc/util";
+import {FilePath, isArrayIndex, Location, locationToString, locationToStringWithFile} from "../misc/util";
 import assert from "assert";
 import {
     INTERNAL_PROTOTYPE,
@@ -730,45 +729,22 @@ export class Operations {
                 // TODO: models for parts of the standard library
             } else
                 f.warnUnsupported(path.node, `Ignoring re-export from built-in module '${str}'`); // TODO: re-exporting from built-in module
+
         } else {
-            try {
 
-                // try to locate the module
-                const filepath = requireResolve(str, this.file, f.a, path.node, f);
-                if (filepath) {
+            // try to locate the module
+            m = f.requireModule(str, path, this.file, this.moduleInfo);
+            if (m instanceof ModuleInfo && m.isIncluded) {
 
-                    // register that the module is reached
-                    m = this.a.reachedFile(filepath, false, this.moduleInfo, isLocalRequire(str));
+                // extend the require graph
+                const fp = getEnclosingFunction(path);
+                const from = fp ? this.a.functionInfos.get(fp)! : this.moduleInfo;
+                f.registerRequireEdge(from, m);
 
-                    // extend the require graph
-                    const fp = getEnclosingFunction(path);
-                    const from = fp ? this.a.functionInfos.get(fp)! : this.moduleInfo;
-                    const to = this.a.moduleInfosByPath.get(filepath)!;
-                    assert(to === m); // XXX: ?
-                    f.registerRequireEdge(from, to);
-
-                    if (!reexport) {
-                        // constraint: ⟦module_m.exports⟧ ⊆ ⟦require(...)⟧ where m denotes the module being loaded
-                        this.solver.addSubsetConstraint(this.solver.varProducer.objPropVar(this.a.canonicalizeToken(new NativeObjectToken("module", m)), "exports"), resultVar);
-                    }
-                }
-            } catch (e: any) {
-                const ex = e.message ? ` (${e.message})` : "";
-                if (options.ignoreUnresolved || options.ignoreDependencies) {
-                    if (logger.isVerboseEnabled())
-                        logger.verbose(`Ignoring unresolved module '${str}' at ${locationToStringWithFile(path.node.loc)}`);
-                } else if (isInTryBlockOrBranch(path))
-                    f.warn(`Unable to resolve conditionally loaded module '${str}'${ex}`, path.node);
-                else if (path.isCallExpression() && !(isIdentifier(path.node.callee) && path.node.callee.name === "require"))
-                    f.warn(`Unable to resolve module '${str}' at indirect require call${ex}`, path.node);
-                else
-                    f.error(`Unable to resolve module '${str}'${ex}`, path.node);
-
-                // couldn't find module file (probably hasn't been installed), use a DummyModuleInfo if absolute module name
-                if (!"./#".includes(str[0]))
-                    m = getOrSet(this.a.dummyModuleInfos, str, () => new DummyModuleInfo(str));
+                // constraint: ⟦module_m.exports⟧ ⊆ ⟦require(...)⟧ where m denotes the module being loaded
+                if (m instanceof ModuleInfo && !reexport)
+                    this.solver.addSubsetConstraint(this.solver.varProducer.objPropVar(this.a.canonicalizeToken(new NativeObjectToken("module", m)), "exports"), resultVar);
             }
-
             if (m) {
 
                 // add access path token
@@ -777,7 +753,10 @@ export class Operations {
                     const s = normalizeModuleName(str);
                     const tracked = options.trackedModules && options.trackedModules.find(e =>
                         micromatch.isMatch(m!.getOfficialName(), e) || micromatch.isMatch(s, e));
-                    this.solver.addAccessPath(tracked ? new ModuleAccessPath(m, s) : IgnoredAccessPath.instance, resultVar, path.node, this.a.getEnclosingFunctionOrModule(path));
+                    const ap = tracked ? new ModuleAccessPath(m, s) : IgnoredAccessPath.instance;
+                    this.solver.addAccessPath(ap, resultVar, path.node, this.a.getEnclosingFunctionOrModule(path));
+                    if (isExportAllDeclaration(path.node))
+                        this.solver.addAccessPath(ap, this.solver.varProducer.objPropVar(this.a.canonicalizeToken(new NativeObjectToken("module", this.moduleInfo)), "exports"));
                 }
 
                 f.registerRequireCall(path.node, this.a.getEnclosingFunctionOrModule(path), m);

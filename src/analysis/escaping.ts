@@ -45,7 +45,7 @@ export function findEscapingObjects(ms: ModuleInfo | Array<ModuleInfo>, solver: 
         }
     const w2: Array<ObjectPropertyVarObj> = [];
     while (worklist.length !== 0) {
-        const t = worklist.shift()!; // breadth-first
+        const t = worklist.pop()!;
         if (t instanceof FunctionToken)
             w2.push(t);
         else if (t instanceof ObjectToken || (t instanceof NativeObjectToken && t.name === "exports"))
@@ -67,7 +67,7 @@ export function findEscapingObjects(ms: ModuleInfo | Array<ModuleInfo>, solver: 
 
     // second round, find objects that are accessible externally via functions and expressions found in first round
     while (worklist.length !== 0) {
-        const t = worklist.shift()!; // breadth-first
+        const t = worklist.pop()!;
         if (t instanceof ObjectToken) {
             if (logger.isDebugEnabled())
                 logger.debug(`Escaping object: ${t}`);

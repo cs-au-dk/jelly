@@ -59,7 +59,7 @@ export function tapirPatternMatch(tapirPatterns: Array<PatternWrapper | Semantic
         missesParseErrors = 0, missesFileNotAnalyzed = 0;
     const expectedRemaining = Array.from(expected || []);
     function isTapirFalsePositive(q: PatchType | Match) {
-        return "questions" in q && q.questions.find(e => e.answer === "no" && !["transformation", "extra", "ask-before-patch"].includes(e.type));
+        return "questions" in q && q.questions.some(e => e.answer === "no" && !["transformation", "extra", "ask-before-patch"].includes(e.type));
     }
     function isHigh(m: DetectionPatternMatch): boolean {
         return !m.uncertainties?.length;
@@ -148,14 +148,14 @@ export function tapirPatternMatch(tapirPatterns: Array<PatternWrapper | Semantic
             const tapirFalsePositive = isTapirFalsePositive(q);
             const id = "classification" in q ? q.classification : q.semanticPatchId;
             const version = "semanticPatchVersion" in q ? ` (version ${q.semanticPatchVersion})` : "";
-            const fileAnalyzed = solver.globalState.filesAnalyzed.find(f => f.endsWith(q.file)) !== undefined;
+            const fileAnalyzed = solver.globalState.filesAnalyzed.some(f => f.endsWith(q.file));
             logger.warn(`Missed match for pattern #${id}${version} at ${q.file}:${"lineNumber" in q ? q.lineNumber : q.loc}` +
                 (tapirFalsePositive ? " (TAPIR false positive)" : "") +
                 ("highConfidence" in q ? ` (${q.highConfidence ? "high" : "low"} confidence)` : "") +
                 (fileAnalyzed ? "" : " (file not analyzed)"));
             if (tapirFalsePositive)
                 missesTapirFalsePositives++;
-            if (solver.globalState.filesWithParseErrors.find(f => f.endsWith(q.file)))
+            if (solver.globalState.filesWithParseErrors.some(f => f.endsWith(q.file)))
                 missesParseErrors++;
             if (!fileAnalyzed)
                 missesFileNotAnalyzed++;

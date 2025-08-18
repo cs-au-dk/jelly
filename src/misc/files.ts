@@ -13,13 +13,21 @@ import {basename, dirname, extname, relative, resolve, sep} from "path";
 import module from "module";
 import {options} from "../options";
 import micromatch from "micromatch";
-import {FilePath, Location, locationToStringWithFileAndEnd, longestCommonPrefix} from "./util";
+import {
+    FilePath,
+    Location,
+    locationToStringWithFile,
+    locationToStringWithFileAndEnd,
+    longestCommonPrefix
+} from "./util";
 import logger from "./logger";
-import {Node} from "@babel/types";
+import {isIdentifier, Node} from "@babel/types";
 import stringify from "stringify2stream";
-import {FragmentState} from "../analysis/fragmentstate";
+import {FragmentState, MergeRepresentativeVar, RepresentativeVar} from "../analysis/fragmentstate";
 import {findPackageJson} from "./packagejson";
 import {GlobalState} from "../analysis/globalstate";
+import {NodePath} from "@babel/traverse";
+import {isInTryBlockOrBranch} from "./asthelpers";
 
 /**
  * Expands the given list of file paths.
@@ -118,10 +126,35 @@ export function isLocalRequire(str: string): boolean {
 
 /**
  * Resolves a 'require' string to a file path.
+ * @return resolved file path if successful, undefined if file type not analyzable or module not found
+ */
+export function requireResolve2(str: string, path: NodePath, file: FilePath, f: FragmentState<RepresentativeVar | MergeRepresentativeVar>): FilePath | undefined {
+    try {
+        return requireResolve(str, file, f.a, path.node, f);
+    } catch (e: any) {
+        if (options.ignoreUnresolved || options.ignoreDependencies ||
+            (!"./#".includes(str[0]) && (options.includePackages && !options.includePackages.includes(str) || options.excludePackages?.includes(str)))) {
+            if (logger.isVerboseEnabled())
+                logger.verbose(`Ignoring unresolved module '${str}' at ${locationToStringWithFile(path.node.loc)}`);
+        } else {
+            const ex = e.message ? ` (${e.message})` : "";
+            if (isInTryBlockOrBranch(path))
+                f.warn(`Unable to resolve conditionally loaded module '${str}'${ex}`, path.node);
+            else if (path.isCallExpression() && !(isIdentifier(path.node.callee) && path.node.callee.name === "require"))
+                f.warn(`Unable to resolve module '${str}' at indirect require call${ex}`, path.node);
+            else
+                f.error(`Unable to resolve module '${str}'${ex}`, path.node);
+        }
+        return undefined;
+    }
+}
+
+/**
+ * Resolves a 'require' string to a file path.
  * @return resolved file path if successful, undefined if file type not analyzable
  * @throws exception if the module is not found
  */
-export function requireResolve(str: string, file: FilePath, a: GlobalState, node?: Node, f?: FragmentState): FilePath | undefined {
+export function requireResolve(str: string, file: FilePath, a: GlobalState, node?: Node, f?: FragmentState<RepresentativeVar | MergeRepresentativeVar>): FilePath | undefined {
     if (str.endsWith(".less") || str.endsWith(".svg") || str.endsWith(".png") || str.endsWith(".css") || str.endsWith(".scss")) {
         logger.verbose(`Ignoring module '${str}' with special extension`);
         return undefined;
@@ -171,7 +204,8 @@ export function requireResolve(str: string, file: FilePath, a: GlobalState, node
     if (!filepath.startsWith(options.basedir) && !filepath.replaceAll("/", "\\").startsWith(options.basedir)) {
         const msg = `Found module at ${filepath}, but not in basedir`;
         logger.debug(msg);
-        throw new Error(msg);
+        return undefined; // skip silently
+        // throw new Error(msg);
     }
     if (filepath.endsWith(".d.ts") || ![".js", ".jsx", ".es", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts"].includes(extname(filepath))) {
         f?.warn(`Module '${filepath}' has unrecognized extension, skipping it`, node);

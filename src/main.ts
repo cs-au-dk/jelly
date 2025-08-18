@@ -116,6 +116,7 @@ program
     .option("--obj-spread", "enable model of spread syntax for object literals ({...obj})")
     .option("--native-overwrites", "allow overwriting of native object properties")
     .option("--ignore-imprecise-native-calls", "ignore imprecise native calls")
+    .option("--vulnerabilities-full", "full report of vulnerabilities")
     .usage("[options] [files]")
     .addHelpText("after",
         "\nAll modules reachable by require/import from the given files are included in the analysis\n" +
@@ -340,6 +341,8 @@ async function main() {
                 typer = new TypeScriptTypeInferrer(files);
 
             const vr = vulnerabilityDetector?.collectAllVulnerabilityResults(solver, typer) ?? {};
+            if (options.vulnerabilitiesFull)
+                vulnerabilityDetector?.reportResults(f, vr);
 
             if (options.callgraphHtml) {
                 const file = options.callgraphHtml;

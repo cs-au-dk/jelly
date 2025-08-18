@@ -26,6 +26,7 @@ import {ProcessManager} from "../approx/processmanager";
 import {Patching} from "../approx/patching";
 import {isDummyConstructor} from "../parsing/extras";
 import {getEnclosingFunction} from "../misc/asthelpers";
+import {Worklist} from "../misc/worklist";
 
 /**
  * Global analysis state.
@@ -110,7 +111,7 @@ export class GlobalState {
     /**
      * Files reached and waiting to be analyzed.
      */
-    readonly pendingFiles: Array<FilePath> = [];
+    readonly pendingFiles = new Worklist<FilePath>();
 
     /**
      * Files that could not be parsed.
@@ -311,7 +312,7 @@ export class GlobalState {
                 if (ignoreModule)
                     logger.info(`Ignoring module ${moduleInfo}`);
                 else
-                    this.pendingFiles.push(tofile);
+                    this.pendingFiles.enqueue(tofile);
                 if (this.vulnerabilities)
                     this.vulnerabilities.reachedModule(moduleInfo);
 
@@ -325,14 +326,20 @@ export class GlobalState {
             this.moduleInfos.set(moduleInfo.toString(), moduleInfo);
         }
 
-        // unless this is an entry file, extend the package dependencies and dependents
+        // unless this is an entry file, extend the package and module dependencies
         if (from) {
             const pf = from.packageInfo;
-            const pt = this.moduleInfosByPath.get(tofile)!.packageInfo;
+            const mt = this.moduleInfosByPath.get(tofile)!;
+            const pt = mt.packageInfo;
             if (pf !== pt && !pf.directDependencies.has(pt)) {
                 pf.directDependencies.add(pt);
                 if (logger.isDebugEnabled())
                     logger.debug(`Package ${pf} depends on ${pt}`);
+            }
+            if (!mt.directDependents.has(from)) {
+                mt.directDependents.add(from);
+                if (logger.isDebugEnabled())
+                    logger.debug(`Module ${from} depends on ${mt}`);
             }
         }
         return moduleInfo;

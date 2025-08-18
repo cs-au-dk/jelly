@@ -83,6 +83,7 @@ export const options: {
     objSpread: boolean,
     nativeOverwrites: boolean,
     ignoreImpreciseNativeCalls: boolean,
+    vulnerabilitiesFull: boolean,
 } = {
     callgraphHtml: undefined,
     dataflowHtml: undefined,
@@ -155,7 +156,8 @@ export const options: {
     proto: false,
     objSpread: false,
     nativeOverwrites: false,
-    ignoreImpreciseNativeCalls: false
+    ignoreImpreciseNativeCalls: false,
+    vulnerabilitiesFull: false
 };
 
 export function setOptions(opts: OptionValues & Partial<typeof options>) {

@@ -40,6 +40,8 @@ export class ModuleInfo {
 
     readonly hash: number;
 
+    readonly directDependents: Set<ModuleInfo> = new Set; // modules that directly depend on this module
+
     constructor(
         readonly relativePath: string, // path relative to the package root
         readonly packageInfo: PackageInfo, // package containing this module

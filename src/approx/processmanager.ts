@@ -109,8 +109,7 @@ export class ProcessManager {
     async analyzeFiles(files: Array<string>) {
         for (const file of files)
             this.a.reachedFile(resolve(options.basedir, file), true);
-        while (this.a.pendingFiles.length > 0) {
-            const file = this.a.pendingFiles.shift()!;
+        for (const file of this.a.pendingFiles) {
             const m = this.a.getModuleInfo(file);
             if (this.hints.moduleIndex.has(m.toString())) {
                 if (logger.isDebugEnabled())

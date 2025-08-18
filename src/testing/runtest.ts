@@ -196,6 +196,7 @@ export function runTest(basedir: string,
                         options.cycleElimination = false;
 
                         const solver2 = new Solver();
+                        solver2.globalState.vulnerabilities = solver.globalState.vulnerabilities;
                         await analyzeFiles(files, solver2);
 
                         expect(solver2).toMatchAnalysisResults(solver);
