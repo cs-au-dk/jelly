@@ -129,7 +129,9 @@ export function locationIn(loc1: SimpleLocation, loc2: SimpleLocation | undefine
     return start && end;
 }
 
-export function mapGetMap<K1, K2, V>(m: Map<K1, Map<K2, V>>, k: K1): Map<K2, V> {
+export function mapGetMap<K1, K2, V>(m: Map<K1, Map<K2, V>>, k1: K1): Map<K2, V>
+export function mapGetMap<K1 extends object, K2, V>(m: WeakMap<K1, Map<K2, V>>, k1: K1): Map<K2, V>
+export function mapGetMap<K1, K2, V>(m: Map<K1, Map<K2, V>> | WeakMap<any, Map<K2, V>>, k: K1): Map<K2, V> {
     let mt = m.get(k);
     if (!mt) {
         mt = new Map();
