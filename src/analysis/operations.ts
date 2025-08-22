@@ -18,7 +18,7 @@ import {
     isStringLiteral,
     isSuper,
     isTSParameterProperty,
-    isTypeCastExpression,
+    isTypeCastExpression, isVoidPattern,
     JSXElement,
     JSXIdentifier,
     JSXMemberExpression,
@@ -892,7 +892,7 @@ export class Operations {
                         this.solver.addTokenConstraint(t, vp.nodeVar(p));
                         // assign the array to the sub-l-value
                         this.assign(vp.nodeVar(p), p.argument, path);
-                    } else {
+                    } else if (!isVoidPattern(p)) {
                         // read the property using p for the temporary result
                         this.readProperty(src, String(i), vp.nodeVar(p), p, this.a.getEnclosingFunctionOrModule(path));
                         // assign the temporary result at p to the locations represented by p

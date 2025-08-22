@@ -33,7 +33,7 @@ export const isTTY = stdout.isTTY;
 const logger = winston.createLogger({
     level: "info",
     format: winston.format.printf(({level, message}) =>
-        isTTY && options?.tty && !options.logfile ? colors[level] + message + RESET + CLEAR : message),
+        isTTY && options?.tty && !options.logfile ? colors[level] + message + RESET + CLEAR : message as string),
     transports: new winston.transports.Stream({stream: stdout})
 });
 

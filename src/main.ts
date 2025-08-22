@@ -40,6 +40,9 @@ import {getAPIExported, reportAccessPaths, reportAPIExportedFunctions} from "./p
 import {merge} from "./output/merge";
 import {CallGraph} from "./typings/callgraph";
 import {ProcessManager} from "./approx/processmanager";
+import semver from "semver";
+
+const ENGINES_NODE = require("../package.json")?.engines?.node;
 
 program
     .name("jelly")
@@ -136,6 +139,11 @@ async function main() {
         logToFile(options.logfile);
     setLogLevel(options.loglevel);
 
+    if (ENGINES_NODE && !semver.satisfies(process.version, ENGINES_NODE)) {
+        logger.error(`Error: Node.js ${ENGINES_NODE} is required, you are running ${process.version}`);
+        process.exitCode = -1;
+        return;
+    }
     if (PKG)
         for (const opt of ["dynamic"] as const)
             if (options[opt]) {

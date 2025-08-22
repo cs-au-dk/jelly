@@ -764,7 +764,7 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
      * Replaces tokens for a constraint variable.
      */
     replaceTokens(v: RVT, ts: Set<Token>, old: number) {
-        this.tokens.set(v, ts.size === 1 ? ts.values().next().value : ts);
+        this.tokens.set(v, ts.size === 1 ? ts.values().next().value as Token : ts);
         this.numberOfTokens += ts.size - old;
     }
 

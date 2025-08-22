@@ -4,15 +4,9 @@ import {CodeSnippetLocation, SourceObject} from "../typings/jalangi";
 import assert from "assert";
 import path from "path";
 import fs from "fs";
-import {SourceMap, SourceMapping} from "node:module";
+import {SourceMap} from "node:module";
 
 const SOURCE_FILE_MAP: Map<string, SourceMap> = new Map();
-
-function locIsValid(src: SourceMapping) {
-    assert(src, `startLoc is null`);
-    assert(src.hasOwnProperty("originalLine"), `loc is null`);
-    assert(src.hasOwnProperty("originalColumn"), `loc is null`);
-}
 
 /**
  * Map source memoryLocation in memory to original memoryLocation in disk source file.
@@ -22,7 +16,7 @@ function locIsValid(src: SourceMapping) {
 export function mapToOriginalLocation(sourceMap: SourceMap, memoryLocation: CodeSnippetLocation): CodeSnippetLocation {
     const startLoc = sourceMap.findEntry(memoryLocation.start.line - 1, memoryLocation.start.column - 1);
     // findEntry of Graaljs may produce invalid source memoryLocation so verify it.
-    locIsValid(startLoc);
+    assert("originalLine" in startLoc);
     // source mappings line numbers are starting from 0, so plus 1 line
     const startLine = startLoc.originalLine + 1;
     const startColumn = startLoc.originalColumn + 1;
@@ -30,7 +24,7 @@ export function mapToOriginalLocation(sourceMap: SourceMap, memoryLocation: Code
     assert(!Number.isNaN(startColumn), `startLoc is null`);
     // because in memory is [start, end) so for end column we have to +1 at first, so it is memoryLocation.end.column + 1 -1, which is memoryLocation.end.column
     const endLoc = sourceMap.findEntry(memoryLocation.end.line - 1, memoryLocation.end.column);
-    locIsValid(endLoc);
+    assert("originalLine" in endLoc);
     const endLine = endLoc.originalLine + 1;
     const endColumn = endLoc.originalColumn;
     assert(!Number.isNaN(endLine), `endLoc is null`);

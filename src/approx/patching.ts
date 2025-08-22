@@ -122,7 +122,7 @@ export class Patching {
         const d = solver.diagnostics.patching!;
         d.totalHints = mapArraySize(this.hints.reads) + mapArraySize(this.hints.writes) + mapArraySize(this.hints.requires) + mapArraySize(this.hints.evals);
         d.modulesNotAnalyzed = 0;
-        const mods = new Set(Array.from(solver.globalState.moduleInfos.values()).filter(m => m.loc));
+        const mods = new Set(solver.globalState.moduleInfos.values().filter(m => m.loc));
         const fileToModule = this.hints.modules.map(m => {
             const mod = solver.globalState.moduleInfos.get(m);
             if (!mod) {

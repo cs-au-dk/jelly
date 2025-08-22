@@ -56,7 +56,7 @@ import {
     isRestElement,
     isSpreadElement,
     isStaticBlock,
-    isVariableDeclaration,
+    isVariableDeclaration, isVoidPattern,
     JSXElement,
     JSXMemberExpression,
     LogicalExpression,
@@ -76,7 +76,7 @@ import {
     TaggedTemplateExpression,
     ThisExpression,
     ThrowStatement,
-    VariableDeclarator,
+    VariableDeclarator, VoidPattern,
     WithStatement,
     YieldExpression
 } from "@babel/types";
@@ -284,8 +284,10 @@ export function visit(ast: File, op: Operations) {
                     const paramVar = op.solver.varProducer.nodeVar(param);
                     if (isIdentifier(param))
                         f.registerFunctionParameter(paramVar, path.node);
-                    else
+                    else {
+                        assert(!isVoidPattern(param));
                         op.assign(paramVar, param, path);
+                    }
                 }
 
                 if (!options.oldobj) {
@@ -405,6 +407,7 @@ export function visit(ast: File, op: Operations) {
 
                     // var/let/const X = E
                     // constraint: ⟦E⟧ ⊆ ⟦X⟧ (if X is a simple identifier...)
+                    assert(!isVoidPattern(path.node.id));
                     op.assign(op.expVar(path.node.init, path), path.node.id, path);
                 }
             }
@@ -820,7 +823,7 @@ export function visit(ast: File, op: Operations) {
                                 break;
                             }
                             case "VariableDeclaration": { // example: export var x = ... (local declaration and init value handled at rule VariableDeclarator)
-                                function exportDeclared(lval: LVal) {
+                                function exportDeclared(lval: LVal | VoidPattern) {
                                     if (isIdentifier(lval))
                                         solver.addSubsetConstraint(vp.nodeVar(lval), vp.objPropVar(op.exportsObjectToken, lval.name));
                                     else if (isAssignmentPattern(lval))
@@ -841,7 +844,7 @@ export function visit(ast: File, op: Operations) {
                                                     exportDeclared(p.argument);
                                                 else
                                                     exportDeclared(p);
-                                    } else
+                                    } else if (!isVoidPattern(lval))
                                         assert.fail(`Unexpected LVal type ${lval.type}`);
                                 }
                                 for (const decl2 of decl.declarations)
@@ -894,6 +897,7 @@ export function visit(ast: File, op: Operations) {
             // assign the temporary result to the l-value
             const lval = isVariableDeclaration(path.node.left) ? path.node.left.declarations.length === 1 ? path.node.left.declarations[0]?.id : undefined : path.node.left;
             assert(lval, "Unexpected number of declarations at for-of");
+            assert(!isVoidPattern(lval));
             op.assign(vp.nodeVar(path.node), lval, path);
             // note: 'for await' is handled trivially because the same abstract object is used for the AsyncGenerator and the iterator objects
         },

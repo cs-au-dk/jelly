@@ -447,7 +447,7 @@ export class AnalysisStateReporter {
      * Returns the entry modules.
      */
     getEntryModules(): Set<ModuleInfo> {
-        return new Set(Array.from(this.a.moduleInfos.values()).filter(m => m.isEntry));
+        return new Set(this.a.moduleInfos.values().filter(m => m.isEntry));
     }
 
     /**
