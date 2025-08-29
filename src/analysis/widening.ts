@@ -5,7 +5,6 @@ import {AncestorsVar, ConstraintVar, ObjectPropertyVar, ReadResultVar} from "./c
 import {addAll, getOrSet, mapGetMap} from "../misc/util";
 import Timer, {nanoToMs} from "../misc/timer";
 import {CallResultAccessPath, ComponentAccessPath, PropertyAccessPath} from "./accesspaths";
-import assert from "assert";
 
 // TODO: OK to assume that all tokens in widened belong to the current fragment?
 // TODO: measure effect of widening...
@@ -119,7 +118,6 @@ export function widenObjects(widened: Set<ObjectToken>, solver: Solver) {
 
     // update the tokens
     [solver.unprocessedTokens, solver.diagnostics.unprocessedTokensSize] = widenTokenMapArrayValues(solver.unprocessedTokens);
-    assert(solver.nodesWithNewEdges.size === 0);
     solver.replaceTokens(tokenMap);
 
     // remove token listeners that use widened tokens as keys

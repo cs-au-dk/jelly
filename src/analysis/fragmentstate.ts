@@ -131,6 +131,10 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
 
     readonly postponedListenerCalls2: Array<PostponedListenerCall> = [];
 
+    readonly nodesWithNewEdges: Set<ConstraintVar> = new Set;
+
+    prevNumEdges = 0;
+
     /**
      * Map that provides for each function/module the set of modules being required.
      */

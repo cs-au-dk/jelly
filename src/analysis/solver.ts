@@ -84,6 +84,16 @@ import {
 } from "../natives/ecmascript";
 import {ConstraintVarProducer} from "./constraintvarproducer";
 
+/**
+ * Only perform cycle elimination if at least this number of subset edges.
+ */
+const CYCLE_ELIMINATION_MINIMUM = 100;
+
+/**
+ * Only perform cycle elimination if at least this increase in number of subset edges since last run.
+ */
+const CYCLE_ELIMINATION_FACTOR = 1.2;
+
 export class AbortedException extends Error {}
 
 export type ListenerKey = {l: TokenListener, n?: Node, t?: Token, s?: string};
@@ -101,8 +111,6 @@ export default class Solver {
     }
 
     unprocessedTokens: Map<RepresentativeVar, Array<Token> | Token> = new Map;
-
-    readonly nodesWithNewEdges: Set<ConstraintVar> = new Set;
 
     restored: Set<ConstraintVar> = new Set;
 
@@ -341,7 +349,8 @@ export default class Solver {
                     this.addTokens(ts, toRep);
                     this.incrementPropagations();
                 }
-                this.nodesWithNewEdges.add(fromRep);
+                if (options.cycleElimination)
+                    f.nodesWithNewEdges.add(fromRep);
             }
         }
     }
@@ -758,7 +767,7 @@ export default class Solver {
         // set rep as new representative for v
         f.redirections.set(v, rep);
         // ignore v's new outgoing subset edges
-        this.nodesWithNewEdges.delete(v);
+        f.nodesWithNewEdges.delete(v);
         // propagate v's worklist tokens (assuming there is a subset path from v to rep)
         this.processTokens(v);
         const [size, has] = this.fragmentState.getSizeAndHas(v);
@@ -909,9 +918,9 @@ export default class Solver {
         f.a.timeoutTimer.checkTimeout();
         await this.checkAbort();
         if (logger.isVerboseEnabled())
-            logger.verbose(`Propagating (tokens: ${this.unprocessedTokens.size}, nodes: ${this.nodesWithNewEdges.size}, restored: ${this.restored.size}, non-bounded: ${f.postponedListenerCalls.length}, bounded: ${f.postponedListenerCalls2.length})`);
+            logger.verbose(`Propagating (tokens: ${this.unprocessedTokens.size}, restored: ${this.restored.size}, non-bounded: ${f.postponedListenerCalls.length}, bounded: ${f.postponedListenerCalls2.length})`);
         let wave = 1, round = 1;
-        while (this.unprocessedTokens.size > 0 || this.nodesWithNewEdges.size > 0 || this.restored.size > 0 || f.postponedListenerCalls.length > 0 || f.postponedListenerCalls2.length > 0) {
+        while (this.unprocessedTokens.size > 0 || this.restored.size > 0 || f.postponedListenerCalls.length > 0 || f.postponedListenerCalls2.length > 0) {
             this.diagnostics.wave = wave;
             this.diagnostics.round = round;
             if (logger.isVerboseEnabled())
@@ -921,30 +930,34 @@ export default class Solver {
                 this.diagnostics.waveLimitReached++;
                 this.diagnostics.unprocessedTokensSize = 0;
                 this.unprocessedTokens.clear();
-                this.nodesWithNewEdges.clear();
+                f.nodesWithNewEdges.clear();
                 this.restored.clear();
                 f.postponedListenerCalls.length = 0;
                 break;
             }
-            if (this.unprocessedTokens.size > 0 || this.nodesWithNewEdges.size > 0 || this.restored.size > 0) {
-                if (options.cycleElimination) {
+            if (this.unprocessedTokens.size > 0 || this.restored.size > 0) {
+                if (options.cycleElimination && f.numberOfSubsetEdges >= CYCLE_ELIMINATION_MINIMUM && f.numberOfSubsetEdges >= f.prevNumEdges * CYCLE_ELIMINATION_FACTOR) {
                     // find vars that are end points of new or restored subset edges
                     const nodes = new Set<RepresentativeVar>();
-                    for (const v of this.nodesWithNewEdges)
+                    for (const v of f.nodesWithNewEdges)
                         nodes.add(f.getRepresentative(v));
                     for (const v of this.restored)
                         nodes.add(f.getRepresentative(v));
                     if (nodes.size > 0) {
                         // find strongly connected components
+                        const edgesBefore = f.numberOfSubsetEdges;
                         const timer1 = new Timer();
                         const [reps, repmap] = nuutila(nodes, (v: RepresentativeVar) => f.subsetEdges.get(v)); // TODO: only consider new edges for entry nodes?
                         if (logger.isVerboseEnabled())
-                            logger.verbose(`Cycle detection nodes: ${f.vars.size}, roots: ${nodes.size}, components: ${reps.length}`);
+                            logger.verbose(`Cycle detection roots: ${nodes.size}, components: ${reps.length}`);
                         // cycle elimination
                         for (const [v, rep] of repmap)
                             this.redirect(v, rep); // TODO: this includes processing pending edges and tokens for v, which may be unnecessary?
+                        f.prevNumEdges = f.numberOfSubsetEdges;
                         this.diagnostics.totalCycleEliminationTime += timer1.elapsed();
                         this.diagnostics.totalCycleEliminationRuns++;
+                        if (logger.isVerboseEnabled())
+                            logger.verbose(`Cycle detection roots: ${nodes.size} roots, edges: ${edgesBefore} -> ${f.numberOfSubsetEdges} (${nanoToMs(timer1.elapsed())})`);
                         const timer2 = new Timer();
                         // process new tokens for the component representatives in topological order
                         if (logger.isVerboseEnabled())
@@ -955,7 +968,7 @@ export default class Solver {
                             await this.checkAbort(true);
                         }
                         this.diagnostics.totalPropagationTime += timer2.elapsed();
-                        this.nodesWithNewEdges.clear();
+                        f.nodesWithNewEdges.clear();
                         this.restored.clear();
                     }
                     // process remaining tokens outside the sub-graph reachable via the new edges
@@ -968,7 +981,6 @@ export default class Solver {
                     if (logger.isVerboseEnabled())
                         logger.verbose(`Processing ${this.diagnostics.unprocessedTokensSize} new token${this.diagnostics.unprocessedTokensSize !== 1 ? "s" : ""}`);
                     const timer = new Timer();
-                    this.nodesWithNewEdges.clear();
                     this.restored.clear();
                     for (const v of this.unprocessedTokens.keys()) {
                         this.processTokens(v);
@@ -977,8 +989,8 @@ export default class Solver {
                     this.diagnostics.totalPropagationTime += timer.elapsed();
                 }
             }
-            if (this.unprocessedTokens.size !== 0 || this.diagnostics.unprocessedTokensSize !== 0 || this.nodesWithNewEdges.size !== 0 || this.restored.size !== 0)
-                assert.fail(`worklist non-empty: unprocessedTokens.size: ${this.unprocessedTokens.size}, unprocessedTokensSize: ${this.diagnostics.unprocessedTokensSize}, nodesWithNewEdges.size: ${this.nodesWithNewEdges.size}, restored.size: ${this.restored.size}`);
+            if (this.unprocessedTokens.size !== 0 || this.diagnostics.unprocessedTokensSize !== this.unprocessedTokens.size || this.restored.size !== 0)
+                assert.fail(`worklist non-empty: unprocessedTokens.size: ${this.unprocessedTokens.size}, unprocessedTokensSize: ${this.diagnostics.unprocessedTokensSize}, restored.size: ${this.restored.size}`);
             if (f.postponedListenerCalls.length > 0) {
                 // process all enqueued non-bounded listener calls (including those created during the processing)
                 if (logger.isVerboseEnabled())
@@ -999,7 +1011,7 @@ export default class Solver {
                     this.diagnostics.indirectionsLimitReached++;
                     this.diagnostics.unprocessedTokensSize = 0;
                     this.unprocessedTokens.clear();
-                    this.nodesWithNewEdges.clear();
+                    f.nodesWithNewEdges.clear();
                     this.restored.clear();
                     f.postponedListenerCalls.length = 0;
                     f.postponedListenerCalls2.length = 0;
