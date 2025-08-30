@@ -1,4 +1,5 @@
 import {ApproxDiagnostics, PatchingDiagnostics} from "../approx/diagnostics";
+import {VulnerabilityDiagnostics} from "../patternmatching/diagnostics";
 
 export default class AnalysisDiagnostics {
 
@@ -106,11 +107,11 @@ export default class AnalysisDiagnostics {
 
     patternMatchingTime: bigint = 0n;
 
-    vulnerabilityCollectionTime: bigint = 0n;
-
     unhandledDynamicPropertyWrites: number = 0;
 
     unhandledDynamicPropertyReads: number = 0;
+
+    vulnerabilities?: VulnerabilityDiagnostics; // set if --vulnerabilities enabled
 
     approx?: ApproxDiagnostics; // set when analysis is completed if --approx enabled
 

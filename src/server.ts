@@ -255,6 +255,7 @@ async function main() {
             try {
                 solver = new Solver(() => aborting);
                 solver.globalState.vulnerabilities = vulnerabilityDetector;
+                solver.diagnostics.vulnerabilities = vulnerabilityDetector?.diagnostics;
                 await analyzeFiles(files, solver);
                 logger.info(`Analysis completed${solver.diagnostics.aborted ? " (aborted)" : solver.diagnostics.timeout ? " (timeout)" : ""}`);
                 return prepareResponse(true, req);

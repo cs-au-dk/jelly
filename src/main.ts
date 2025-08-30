@@ -340,6 +340,7 @@ async function main() {
             const solver = new Solver();
             const a = solver.globalState;
             a.vulnerabilities = vulnerabilityDetector;
+            solver.diagnostics.vulnerabilities = vulnerabilityDetector?.diagnostics;
             await analyzeFiles(files, solver);
             const f = solver.fragmentState;
             const out = new AnalysisStateReporter(f);
