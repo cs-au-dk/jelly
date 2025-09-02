@@ -552,12 +552,12 @@ export class Operations {
         if (base instanceof FunctionToken && prop === "prototype") // function objects always have 'prototype', no need to consult prototype chain
             this.readPropertyBound(base, prop, dst, {t: base, s: prop}, base);
         else {
-            const nativeProperty = isNativeProperty(base, prop);
+            const nativeProperty = isNativeProperty(base, prop, true);
             const objProto = this.globalSpecialNatives?.get(OBJECT_PROTOTYPE);
             // constraint: ... ∀ ancestors t2 of t: ...
             this.solver.addForAllAncestorsConstraint(base, TokenListener.READ_ANCESTORS, {s: prop}, (t2: Token) => {
                 if (nativeProperty && t2 !== base && t2 === objProto)
-                    return; // safe to skip properties at Object.prototype that are in {base.kind}.prototype
+                    return; // safe to skip dummy methods at Object.prototype that are in {base.kind}.prototype
                 if (isObjectPropertyVarObj(t2))
                     this.readPropertyBound(t2, prop, dst, {t: base, s: prop}, base);
             });

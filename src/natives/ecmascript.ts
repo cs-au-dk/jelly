@@ -12,6 +12,7 @@ import {
     assignParameterToThisProperty,
     assignProperties,
     callPromiseExecutor,
+    defineGetterSetter,
     defineProperties,
     functionBind,
     generatorCall,
@@ -127,11 +128,14 @@ function getNativeType(t: Token): ObjectKind | "Function" | undefined {
 }
 
 /**
- * Returns true if 't' inherits from a global native object that has a property named 'prop'.
+ * Returns true if 't' inherits from a global native object that has a method named 'prop'.
+ * @param dummyOnly If true, only return true if the method is a dummy (unmodeled) method.
  */
-export function isNativeProperty(t: Token, prop: string): boolean {
+export function isNativeProperty(t: Token, prop: string, dummyOnly: boolean = false): boolean {
     const kind = getNativeType(t);
-    return Boolean(kind !== undefined && METHODS.get(kind)?.has(prop));
+    if (!kind) return false;
+    const ms = METHODS.get(kind);
+    return Boolean(ms?.has(prop) && (!dummyOnly || ms.get(prop) === undefined));
 }
 
 /*
@@ -1204,8 +1208,7 @@ export const ecmascriptModels: NativeModel = {
                             }
 
                             // model the part of Object.create's logic that is similar to Object.defineProperties
-                            const ivars = prepareDefineProperties("Object.create", args[1], p);
-                            defineProperties(obj, TokenListener.NATIVE_OBJECT_CREATE, ivars, p);
+                            defineProperties(obj, prepareDefineProperties("Object.create", args[1], p), p);
                         }
                     }
                 },
@@ -1222,7 +1225,7 @@ export const ecmascriptModels: NativeModel = {
                         }
 
                         const ivars = prepareDefineProperties("Object.defineProperties", args[1], p);
-                        defineProperties(args[0], TokenListener.NATIVE_OBJECT_DEFINE_PROPERTIES, ivars, p);
+                        defineProperties([args[0], TokenListener.NATIVE_OBJECT_DEFINE_PROPERTIES], ivars, p);
                     }
                 },
                 {
@@ -1243,7 +1246,7 @@ export const ecmascriptModels: NativeModel = {
                         }
 
                         const ivars = prepareDefineProperty("Object.defineProperty", args[1].value, p.op.expVar(args[2], p.path), p);
-                        defineProperties(args[0], TokenListener.NATIVE_OBJECT_DEFINE_PROPERTY, ivars, p);
+                        defineProperties([args[0], TokenListener.NATIVE_OBJECT_DEFINE_PROPERTY], ivars, p);
                     }
                 },
                 {
@@ -1349,7 +1352,19 @@ export const ecmascriptModels: NativeModel = {
                 },
                 {
                     name: "valueOf"
-                }
+                },
+                {
+                    name: "__defineGetter__",
+                    invoke: (p: NativeFunctionParams) => {
+                        defineGetterSetter("get", p);
+                    },
+                },
+                {
+                    name: "__defineSetter__",
+                    invoke: (p: NativeFunctionParams) => {
+                        defineGetterSetter("set", p);
+                    },
+                },
             ]
         },
         {
@@ -1884,5 +1899,5 @@ export const ecmascriptModels: NativeModel = {
  */
 const METHODS = new Map(ecmascriptModels.classes.map(c => [
     c.name,
-    new Set(c.methods?.map(m => m.name))
-]));
+    new Map(c.methods?.map(m => [m.name, m.invoke]))
+] as const));

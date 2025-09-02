@@ -5,7 +5,8 @@ import {
     isFunction,
     isIdentifier,
     isObjectExpression,
-    isObjectProperty
+    isObjectProperty,
+    isStringLiteral
 } from "@babel/types";
 import {AccessPathToken, AllocationSiteToken, ArrayToken, ClassToken, FunctionToken, NativeObjectToken, ObjectKind, ObjectToken, PackageObjectToken, PrototypeToken, Token} from "../analysis/tokens";
 import {getKey, isParentExpressionStatement} from "../misc/asthelpers";
@@ -38,7 +39,7 @@ import {TokenListener} from "../analysis/listeners";
 import assert from "assert";
 import {NodePath} from "@babel/traverse";
 import {Operations} from "../analysis/operations";
-import {AccessorType, ConstraintVar, IntermediateVar, isObjectPropertyVarObj, ObjectPropertyVarObj} from "../analysis/constraintvars";
+import {AccessorType, ConstraintVar, isObjectPropertyVarObj, ObjectPropertyVarObj} from "../analysis/constraintvars";
 import {UnknownAccessPath} from "../analysis/accesspaths";
 
 /**
@@ -989,7 +990,7 @@ export function assignProperties(target: Expression, sources: Array<Node>, p: Na
 type PreparedDefineProperty = {
     prop: string,
     ac: AccessorType,
-    ivar: IntermediateVar
+    ivar: ConstraintVar,
 };
 
 /**
@@ -1061,15 +1062,13 @@ export function prepareDefineProperties(
 }
 
 /**
- * Assigns values collected from property descriptors to the objects in the given constraint variable.
+ * Assigns values collected from property descriptors to the objects in the given expression or object token.
  * @param obj the object token or the expression that holds objects that properties should be written to
- * @param key TokenListener to use for the constraint
  * @param ivars prepared values from property descriptors
  * @param p NativeFunctionParams
  */
 export function defineProperties(
-    obj: Expression | ObjectPropertyVarObj,
-    key: TokenListener,
+    obj: [Expression, TokenListener] | ObjectPropertyVarObj,
     ivars: Array<PreparedDefineProperty>,
     p: NativeFunctionParams,
 ) {
@@ -1086,7 +1085,31 @@ export function defineProperties(
     if (obj instanceof Token)
         write(obj);
     else {
-        const lVar = p.op.expVar(obj, p.path);
+        const [expr, key] = obj;
+        const lVar = p.op.expVar(expr, p.path);
         p.solver.addForAllTokensConstraint(lVar, key, p.path.node, (t: Token) => write(t, lVar));
     }
+}
+
+/**
+ * Models the behavior of Object.prototype.__defineGetter__ & Object.prototype.__defineSetter__.
+ */
+export function defineGetterSetter(ac: "get" | "set", p: NativeFunctionParams) {
+    const args = p.path.node.arguments;
+    if (args.length < 2 || !p.base)
+        return;
+
+    if (!isStringLiteral(args[0])) {
+        warnNativeUsed(`Object.__define${ac === "get" ? "G" : "S"}etter__`, p, "with dynamic property name");
+        return;
+    }
+
+    if (!isExpression(args[1])) {
+        warnNativeUsed(`Object.__define${ac === "get" ? "G" : "S"}etter__`, p, `with non-expression as ${ac}ter`);
+        return;
+    }
+
+    const ivar = p.op.expVar(args[1], p.path);
+    if (ivar)
+        defineProperties(p.base, [{prop: args[0].value, ac, ivar}], p);
 }
