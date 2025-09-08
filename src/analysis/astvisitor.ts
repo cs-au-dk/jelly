@@ -56,7 +56,8 @@ import {
     isRestElement,
     isSpreadElement,
     isStaticBlock,
-    isVariableDeclaration, isVoidPattern,
+    isVariableDeclaration,
+    isVoidPattern,
     JSXElement,
     JSXMemberExpression,
     LogicalExpression,
@@ -76,7 +77,8 @@ import {
     TaggedTemplateExpression,
     ThisExpression,
     ThrowStatement,
-    VariableDeclarator, VoidPattern,
+    VariableDeclarator,
+    VoidPattern,
     WithStatement,
     YieldExpression
 } from "@babel/types";

@@ -33,9 +33,9 @@
     "start": "node lib/main.js",
     "chmod": "mkdir -p lib; touch lib/main.js lib/server.js; chmod +x lib/main.js lib/server.js",
     "tests-install": "tests/install.sh",
-    "test": "jest --selectProjects default",
+    "test": "jest",
     "pkg": "npm run clean; npm run build; pkg lib/main.js -C Brotli --options \"expose-gc,max-old-space-size=8192\" -c package.json -o dist/jelly; pkg lib/server.js -C Brotli --options \"expose-gc,max-old-space-size=8192\" -c package.json -o dist/jelly-server",
-    "clean": "rm -rf lib dist tmp/tsbuildinfo tmp/coverage tests/node_modules/jelly-previous",
+    "clean": "rm -rf lib dist tmp/tsbuildinfo tmp/coverage",
     "build-docker": "npm run build && docker build -t jelly .",
     "jelly-docker": "./bin/jelly-docker"
   },

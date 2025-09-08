@@ -1,5 +1,5 @@
 {
-  "include": ["src/**/*", "tests/**/*", "./jest.config.ts"],
+  "include": ["src/**/*", "tests/**/*"],
   "files": ["node_modules/jest-expect-message/types/index.d.ts"],
   "compilerOptions": {
     /* Basic Options */

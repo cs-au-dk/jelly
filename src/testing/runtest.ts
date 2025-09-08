@@ -47,8 +47,8 @@ export function runTest(basedir: string,
 
     const files = Array.isArray(app) ? app : [app];
 
-    // remove extension from file
-    describe(files[0].replace(/\..*/, ""), () => {
+    // remove extension from each file
+    describe(files.map(f => f.replace(/\..*/, "")).join(","), () => {
 
         type TapirT = ReturnType<typeof tapirLoadPatterns>;
         let tapirPatterns: TapirT[0], detectionPatterns: TapirT[1];
@@ -87,17 +87,17 @@ export function runTest(basedir: string,
             await analyzeFiles(files, solver);
         });
 
-        test("analysis facts", () => {
+        describe("analysis facts", () => {
             if (args.functionInfos !== undefined)
-                expect(solver.globalState.functionInfos.size).toBe(args.functionInfos);
+                test("functionInfos", () => expect(solver.globalState.functionInfos.size).toBe(args.functionInfos));
             if (args.moduleInfos !== undefined)
-                expect(solver.globalState.moduleInfos.size).toBe(args.moduleInfos);
+                test("moduleInfos", () => expect(solver.globalState.moduleInfos.size).toBe(args.moduleInfos));
             if (args.packageInfos !== undefined)
-                expect(solver.globalState.packageInfos.size).toBe(args.packageInfos);
+                test("packageInfos", () => expect(solver.globalState.packageInfos.size).toBe(args.packageInfos));
             if (args.numberOfFunctionToFunctionEdges !== undefined)
-                expect(solver.fragmentState.numberOfFunctionToFunctionEdges).toBe(args.numberOfFunctionToFunctionEdges);
+                test("numberOfFunctionToFunctionEdges", () => expect(solver.fragmentState.numberOfFunctionToFunctionEdges).toBe(args.numberOfFunctionToFunctionEdges));
             if (args.oneCalleeCalls !== undefined)
-                expect(new AnalysisStateReporter(solver.fragmentState).getOneCalleeCalls()).toBe(args.oneCalleeCalls);
+                test("oneCalleeCalls", () => expect(new AnalysisStateReporter(solver.fragmentState).getOneCalleeCalls()).toBe(args.oneCalleeCalls));
         });
 
         test("merge regression", () => {
@@ -230,7 +230,7 @@ export function runTest(basedir: string,
                     else if (!found)
                         assert.fail(`Specified constraint variable ${cvar} was not found`);
                 }
-            })
+            });
     });
 }
 
