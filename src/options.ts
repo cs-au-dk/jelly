@@ -83,8 +83,8 @@ export const options: {
     nativeOverwrites: boolean,
     ignoreImpreciseNativeCalls: boolean,
     fs: {
-        statSync: typeof fs.statSync,
-        readFileSync: typeof fs.readFileSync,
+        statSync(path: string): fs.Stats,
+        readFileSync(path: string, options: BufferEncoding): string;
     } | undefined,
 } = {
     callgraphHtml: undefined,
