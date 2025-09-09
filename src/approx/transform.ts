@@ -328,8 +328,15 @@ export function approxTransform(ast: File, str: string, file: string, mode: "com
     function visitClassDeclaration(path: NodePath<ClassDeclaration>, id: string) {
         const p = isExportDeclaration(path.parent) ? path.parentPath : path;
         p.insertBefore(INIT());
+        let constructor: NodePath<ClassMethod> | undefined;
+        for (const b of path.get("body.body") as Array<NodePath>)
+            if (isClassMethod(b.node) && b.node.kind === "constructor") {
+                constructor = b as NodePath<ClassMethod>;
+                break;
+            }
+        assert(constructor); // see extras.ts
         p.insertAfter(ALLOC({
-            LOC: getLoc(path.node.loc),
+            LOC: getLoc(constructor.node.loc),
             VAL: identifier(id)
         }));
     }
@@ -445,18 +452,17 @@ export function approxTransform(ast: File, str: string, file: string, mode: "com
 
     function visitFunction(path: NodePath<Function>) {
         numStaticFunctions++;
-        const isConstructor = isClassMethod(path.node) && path.node.kind === "constructor";
-        const loc = isConstructor ? path.parentPath.parent.loc : path.node.loc;
         const e = ENTER({
-            LOC: getLoc(loc)
+            LOC: getLoc(path.node.loc)
         });
         if (isArrowFunctionExpression(path.node) && !isBlockStatement(path.node.body))
             path.get("body").replaceWith(blockStatement([expressionStatement(e), returnStatement(path.node.body)]));
         else {
+            const isConstructor = isClassMethod(path.node) && path.node.kind === "constructor";
             const body = (path.node.body as BlockStatement).body;
             if ((!isConstructor || !(path.parentPath?.parent as ClassDeclaration)?.superClass) && !isArrowFunctionExpression(path.node))
                 body.unshift(expressionStatement(THIS({
-                    LOC: getLoc(loc),
+                    LOC: getLoc(path.node.loc),
                     NEWTARGET: conditionalExpression(memberExpression(identifier("new"), identifier("target")), thisExpression(), nullLiteral())
                 })));
             body.unshift(expressionStatement(e));

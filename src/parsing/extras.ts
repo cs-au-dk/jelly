@@ -124,13 +124,9 @@ export function preprocessAst(ast: File, module?: ModuleInfo, globals?: Array<Id
     let nextNodeID = 0;
 
     function register(n: Node) {
-        (n as any)[JELLY_NODE_ID] = nextNodeID++;
+        if ((n as any)[JELLY_NODE_ID] === undefined)
+            (n as any)[JELLY_NODE_ID] = nextNodeID++;
     }
-
-    // assign unique index to each identifier in globals and globalsHidden
-    if (globals && globalsHidden)
-        for (const n of [...globals, ...globalsHidden])
-            register(n);
 
     // artificially declare all native globals in the program scope (if not already declared)
     if (globals)
@@ -144,7 +140,7 @@ export function preprocessAst(ast: File, module?: ModuleInfo, globals?: Array<Id
                     });
                 const d = variableDeclaration("var", decls);
                 (d.loc as Location) = {start: {line: 0, column: 0}, end: {line: 0, column: 0}, native: "%ecmascript"};
-                path.scope.registerDeclaration(path.unshiftContainer("body", d)[0]);
+                path.scope.registerDeclaration(path.pushContainer("body", d)[0]);
                 path.stop();
             }
         });
@@ -153,9 +149,8 @@ export function preprocessAst(ast: File, module?: ModuleInfo, globals?: Array<Id
         enter(path: NodePath) {
             const n = path.node;
 
-            // assign unique index to each node (globals and globalsHidden are handled above)
-            if ((n as any)[JELLY_NODE_ID] === undefined)
-                register(n);
+            // assign unique index to each node (globals and globalsHidden are handled below)
+            register(n);
 
             // workaround to ensure that AST nodes with undefined location (caused by desugaring) can be identified uniquely
             if (!n.loc) {
@@ -164,12 +159,8 @@ export function preprocessAst(ast: File, module?: ModuleInfo, globals?: Array<Id
                     assert(p.parentPath);
                     p = p.parentPath;
                 }
-                n.loc = {start: p?.node.loc?.start, end: p?.node.loc?.end, nodeIndex: (n as any)[JELLY_NODE_ID]} as unknown as SourceLocation; // see locationToString
+                n.loc = {filename: ast.loc?.filename, start: p?.node.loc?.start, end: p?.node.loc?.end, nodeIndex: (n as any)[JELLY_NODE_ID]} as unknown as SourceLocation; // see locationToString
             }
-
-            // set module (if not already set and not native)
-            if (module && (n.loc as Location).module === undefined && (n.loc as Location).native === undefined)
-                (n.loc as Location).module = module;
 
             // workarounds to match dyn.ts source locations
             if (((isClassMethod(n) || isClassPrivateMethod(n)) && n.kind === "constructor") ||
@@ -178,12 +169,18 @@ export function preprocessAst(ast: File, module?: ModuleInfo, globals?: Array<Id
                 // for constructors and artificial super calls, use the class source location
                 const cls = getClass(path);
                 assert(cls);
-                n.loc = cls.loc;
+                n.loc = {filename: ast.loc?.filename, start: cls.loc?.start, end: cls.loc?.end} as unknown as SourceLocation;
+                if (isCallExpression(n))
+                    n.loc.end = n.loc.start; // ensures that the source location for the super call is different from the one for the constructor
             } else if ((isClassMethod(n) || isClassPrivateMethod(n) || isClassPrivateProperty(n)) && n.static) {
                 // for static methods and properties, use the identifier start location
                 assert(n.loc && n.key.loc);
                 n.loc.start = n.key.loc!.start;
             }
+
+            // set module (if not already set and not native)
+            if (module && (n.loc as Location).module === undefined && (n.loc as Location).native === undefined)
+                (n.loc as Location).module = module;
 
             // add bindings in global scope for identifiers with missing binding
             if (module &&
@@ -205,7 +202,7 @@ export function preprocessAst(ast: File, module?: ModuleInfo, globals?: Array<Id
                 const ps = path.scope.getProgramParent();
                 if (!ps.getBinding(n.name)?.identifier) {
                     const d = identifier(n.name);
-                    (d.loc as Location) = {start: {line: 0, column: 0}, end: {line: 0, column: 0}, module, unbound: true}; // unbound used by expVar
+                    d.loc = {filename: ast.loc?.filename, start: {line: 0, column: 0}, end: {line: 0, column: 0}, module, unbound: true} as unknown as SourceLocation; // unbound used by expVar
                     register(d);
                     ps.push({id: d});
                     if (logger.isDebugEnabled())
@@ -214,4 +211,9 @@ export function preprocessAst(ast: File, module?: ModuleInfo, globals?: Array<Id
             }
         }
     });
+
+    // assign unique index to each identifier in globals and globalsHidden
+    if (globals && globalsHidden)
+        for (const n of [...globals, ...globalsHidden])
+            register(n);
 }

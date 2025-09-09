@@ -10,7 +10,7 @@ function approxLoad(app: string) {
     });
 }
 
-describe("approx", () => {
+describe("tests/approx-load", () => {
     approxLoad("simple.js");
     approxLoad("natives.js");
     approxLoad("dynamic.js");
@@ -22,7 +22,7 @@ describe("approx", () => {
     approxLoad("function.js");
     approxLoad("newNative.js");
     approxLoad("deconstruction.js");
-})
+});
 
 function assertHints(name: string, expected: { modules: number, functions: number, reads: number, writes: number, evals?: number}) {
     const noExtension = name.split(".")[0];
@@ -41,7 +41,7 @@ function assertHints(name: string, expected: { modules: number, functions: numbe
 /** Ensures the correct amount of entries in the hint file. Use this suite when call graph generation is non-trivial
  * (e.g., if testing sandbox where the dynamic call graph analysis will behave differently from
  * approximate interpretation due to monkey patching of functions, or if testing forced executions). */
-describe("amount of hints", () => {
+describe("tests/approx-hints", () => {
     assertHints("sandbox.js", {
         modules: 1,
         functions: 7,
@@ -128,4 +128,4 @@ describe("amount of hints", () => {
         writes: 1,
         evals: 0
     });
-})
+});

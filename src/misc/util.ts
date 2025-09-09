@@ -30,7 +30,12 @@ export type Location = SimpleLocation & {
     unbound?: boolean;
 };
 
-export type LocationJSON = string; // format: "<module index>:<start line>:<start column>:<end line>:<end column>"
+/**
+ * String representation of source location for JSON files.
+ * The ordinary format is "<module index>:<start line>:<start column>:<end line>:<end column>"
+ * but "$<index>" may be appended for disambiguation.
+ */
+export type LocationJSON = string;
 
 /**
  * Normalized path to a file or directory.
@@ -405,7 +410,6 @@ export class SourceLocationsToJSON {
         const [_, _fileIndex, startLine, startCol, endLine, endCol] = /^(\d+):(\d+|\?):(\d+|\?):(\d+|\?):(\d+|\?)/.exec(loc)!;
         const fileIndex = Number(_fileIndex);
         assert(fileIndex < this.files.length);
-
         if (startLine === "?") {
             assert(startCol === "?" && endLine === "?" && endCol === "?");
             return {
@@ -413,11 +417,10 @@ export class SourceLocationsToJSON {
                 file: this.files[fileIndex],
             };
         }
-
         return {
             loc: {
-                start: {line: Number(startLine), column: Number(startCol)-1},
-                end: {line: Number(endLine), column: Number(endCol)-1},
+                start: {line: Number(startLine), column: Number(startCol) - 1},
+                end: {line: Number(endLine), column: Number(endCol) - 1},
             },
             fileIndex,
             file: this.files[fileIndex],
