@@ -1,4 +1,4 @@
-import fs, {readFileSync, statSync} from "fs";
+import sysfs from "fs";
 import {resolve} from "path";
 import logger, {writeStdOutIfActive} from "../misc/logger";
 import Solver, {AbortedException} from "./solver";
@@ -24,6 +24,7 @@ import {Patching} from "../approx/patching";
 import {PatchingDiagnostics} from "../approx/diagnostics";
 
 export async function analyzeFiles(files: Array<string>, solver: Solver) {
+    const fs = options.fs || sysfs;
     const a = solver.globalState;
     const d = solver.diagnostics;
     const timer = new Timer();
@@ -57,7 +58,7 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
             if (options.approxLoad) {
                 if (options.printProgress)
                     logger.info(`Loading ${options.approxLoad}`);
-                a.approx!.add(JSON.parse(readFileSync(options.approxLoad, "utf-8")));
+                a.approx!.add(JSON.parse(fs.readFileSync(options.approxLoad, "utf-8")));
             }
             while (a.pendingFiles.length > 0) {
                 const file = a.pendingFiles.shift()!;
@@ -79,7 +80,7 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
                 }
                 moduleInfo.loc = ast.program.loc!;
                 a.filesAnalyzed.push(file);
-                const fileSize = statSync(file).size;
+                const fileSize = fs.statSync(file).size;
                 d.codeSize += fileSize;
                 if (moduleInfo.packageInfo.isEntry)
                     d.codeSizeMain += fileSize;

@@ -1,7 +1,7 @@
 import {OptionValues} from "commander";
 import {resolve} from "path";
 import logger from "./misc/logger";
-import {realpathSync} from "fs";
+import {realpathSync, Stats} from "fs";
 
 export const VERSION = require("../package.json").version;
 export const COPYRIGHT = "Copyright (C) 2023-2025 Anders Møller & Oskar Haarklou Veileborg\n";
@@ -82,6 +82,10 @@ export const options: {
     objSpread: boolean,
     nativeOverwrites: boolean,
     ignoreImpreciseNativeCalls: boolean,
+    fs: {
+        statSync(path: string): Stats,
+        readFileSync(path: string, options: BufferEncoding): string;
+    } | undefined,
 } = {
     callgraphHtml: undefined,
     dataflowHtml: undefined,
@@ -153,7 +157,8 @@ export const options: {
     proto: false,
     objSpread: false,
     nativeOverwrites: false,
-    ignoreImpreciseNativeCalls: false
+    ignoreImpreciseNativeCalls: false,
+    fs: undefined,
 };
 
 export function setOptions(opts: OptionValues & Partial<typeof options>) {
