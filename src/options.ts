@@ -1,7 +1,7 @@
 import {OptionValues} from "commander";
 import {resolve} from "path";
 import logger from "./misc/logger";
-import fs, {realpathSync} from "fs";
+import {realpathSync, Stats} from "fs";
 
 export const VERSION = require("../package.json").version;
 export const COPYRIGHT = "Copyright (C) 2023-2025 Anders Møller & Oskar Haarklou Veileborg\n";
@@ -83,7 +83,7 @@ export const options: {
     nativeOverwrites: boolean,
     ignoreImpreciseNativeCalls: boolean,
     fs: {
-        statSync(path: string): fs.Stats,
+        statSync(path: string): Stats,
         readFileSync(path: string, options: BufferEncoding): string;
     } | undefined,
 } = {
