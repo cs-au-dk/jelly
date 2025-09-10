@@ -253,12 +253,11 @@ export class GlobalState {
     /**
      * Registers a new FunctionInfo for a function/method/constructor.
      */
-    registerFunctionInfo(file: FilePath, path: NodePath<Function>, name: string | undefined) {
+    registerFunctionInfo(m: ModuleInfo, path: NodePath<Function>, name: string | undefined) {
         const fun = path.node;
-        const m = this.moduleInfosByPath.get(file)!;
         const f = new FunctionInfo(name, fun.loc!, m, isDummyConstructor(fun));
         this.functionInfos.set(fun, f);
-        const parent = getEnclosingFunction(path);
+        const parent = getEnclosingFunction(path)?.node;
         (parent ? this.functionInfos.get(parent)!.functions : m.functions).add(f);
         this.vulnerabilities?.reachedFunction(path, f); // TODO: move to FragmentState?
     }
@@ -282,7 +281,7 @@ export class GlobalState {
                 packageInfo = from.packageInfo;
                 rel = relative(packageInfo.dir, tofile);
                 if (rel.startsWith("../"))
-                    throw new Error(`Relative module reference to ${from.getPath()} outside current package ${packageInfo}`);
+                    throw new Error(`Relative module reference ${rel} from ${from.getPath()} outside current package ${packageInfo}`);
             } else {
 
                 // module in other package
@@ -365,7 +364,7 @@ export class GlobalState {
      * Finds the nearest enclosing function or module.
      */
     getEnclosingFunctionOrModule(path: NodePath): FunctionInfo | ModuleInfo {
-        const p = getEnclosingFunction(path);
+        const p = getEnclosingFunction(path)?.node;
         if (p)
             return this.functionInfos.get(p)!;
         const loc = path.node.loc as Location;

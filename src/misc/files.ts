@@ -179,7 +179,7 @@ export function requireResolve(str: string, file: FilePath, a: GlobalState, node
         } catch {
             // see if the string refers to a package that is among those analyzed (and not in node_modules)
             for (const p of a.packageInfos.values())
-                if (p.name === str && 
+                if (p.name === str &&
                     !(basename(dirname(p.dir)) === "node_modules" || basename(dirname(p.dir)).startsWith("@") && basename(dirname(dirname(p.dir))) === "node_modules"))
                     if (filepath) {
                         f?.error(`Multiple packages named ${str} found, skipping module load`, node);

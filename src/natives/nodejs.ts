@@ -10,8 +10,10 @@ import {invokeCallback} from "./nativehelpers";
 export const nodejsModels: NativeModel = {
     name: "nodejs",
     init: (p: NativeModelParams) => {
-        // module.exports = exports
-        p.solver.addTokenConstraint(p.moduleSpecialNatives.get("exports")!, p.solver.varProducer.objPropVar(p.moduleSpecialNatives.get("module")!, "exports"));
+        // module.exports = exports (when writing to module.exports, also write to %exports.default)
+        const exp = p.moduleSpecialNatives.get("exports")!;
+        p.solver.addTokenConstraint(exp, p.solver.varProducer.objPropVar(p.moduleSpecialNatives.get("module")!, "exports"));
+        p.solver.addTokenConstraint(exp, p.solver.varProducer.objPropVar(p.moduleSpecialNatives.get("exports")!, "default"));
         // TODO: model module.require?
         const a = p.solver.globalState;
         const rt = a.canonicalizeToken(new NativeObjectToken("require", p.moduleInfo));

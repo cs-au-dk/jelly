@@ -98,7 +98,7 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
                 if (options.modulesOnly) {
 
                     // find modules only, no actual analysis
-                    findModules(ast, file, solver.fragmentState, moduleInfo);
+                    findModules(ast, solver.fragmentState, moduleInfo);
 
                 } else {
 
@@ -113,7 +113,7 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
                     // traverse the AST
                     writeStdOutIfActive("Traversing AST...");
                     solver.fragmentState.maybeEscaping.clear();
-                    visit(ast, new Operations(file, solver, moduleSpecialNatives));
+                    visit(ast, new Operations(moduleInfo, solver, moduleSpecialNatives));
 
                     // propagate tokens until fixpoint reached for the module
                     await solver.propagate("module");

@@ -8,7 +8,6 @@ import {
     isImport,
     isStringLiteral
 } from "@babel/types";
-import {FilePath} from "../misc/util";
 import traverse, {NodePath} from "@babel/traverse";
 import Module from "module";
 import {ModuleInfo} from "./infos";
@@ -17,11 +16,11 @@ import {FragmentState} from "./fragmentstate";
 /**
  * Scans AST for 'require', 'import' and 'export' only (no proper analysis).
  */
-export function findModules(ast: File, file: FilePath, f: FragmentState, moduleInfo: ModuleInfo) {
+export function findModules(ast: File, f: FragmentState, moduleInfo: ModuleInfo) {
 
     function requireModule(str: string, path: NodePath) { // see requireModule in operations.ts
         if (!Module.isBuiltin(str))
-            f.requireModule(str, path, file, moduleInfo)
+            f.requireModule(str, path, moduleInfo);
     }
 
     traverse(ast, {

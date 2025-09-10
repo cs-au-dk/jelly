@@ -26,12 +26,14 @@ import {
     isArrowFunctionExpression,
     isAssignmentExpression,
     isBlockStatement,
+    isCallExpression,
+    isCatchClause,
     isClassExpression,
     isClassMethod,
     isClassProperty,
     isExportDeclaration,
-    isExportDefaultDeclaration,
     isExpression,
+    isFunction,
     isIdentifier,
     isImport,
     isMemberExpression,
@@ -41,6 +43,7 @@ import {
     isOptionalCallExpression,
     isOptionalMemberExpression,
     isPrivateName,
+    isProgram,
     isStringLiteral,
     isSuper,
     Loop,
@@ -68,6 +71,8 @@ import {FilePath, locationToString} from "../misc/util";
 import {dirname, resolve} from "path";
 import Module from "module";
 import assert from "assert";
+import {isMemberRead, skipParenthesizedParents, skipParenthesizedChildren} from "../misc/asthelpers";
+import {getConstructor} from "../misc/asthelpers";
 
 export const PREFIX = "_J$"; // prefix for special global variables
 
@@ -202,9 +207,10 @@ export function approxTransform(ast: File, str: string, file: string, mode: "com
                 },
                 AssignmentExpression: {
                     exit(path: NodePath<AssignmentExpression>) {
-                        if ((isMemberExpression(path.node.left) || isOptionalMemberExpression(path.node.left)) &&
-                            !isPrivateName(path.node.left.property) && !isSuper(path.node.left.object)) // TODO: currently not producing hints for super[...] = ...
-                            visitPropertyWrite(path, path.node.left.object, path.node.left.property, path.node.right, path.node.left.computed);
+                        const left = skipParenthesizedChildren(path.get("left")).node;
+                        if ((isMemberExpression(left) || isOptionalMemberExpression(left)) &&
+                            !isPrivateName(left.property) && !isSuper(left.object)) // TODO: currently not producing hints for super[...] = ...
+                            visitPropertyWrite(path, left.object, left.property, path.node.right, left.computed);
                     }
                 },
                 MemberExpression: {
@@ -312,7 +318,18 @@ export function approxTransform(ast: File, str: string, file: string, mode: "com
     }
 
     function visitFunctionDeclaration(path: NodePath<FunctionDeclaration>, id: string) {
-        (isExportDefaultDeclaration(path.parent) ? path.parentPath.getSibling(0) : path.getSibling(0)).insertBefore(FUNDECL({ // placing at top to account for hoisting
+        const encl = path.scope.parent.block;
+        let body;
+        if (isProgram(encl))
+            body = encl.body;
+        else if (isFunction(encl) || isCatchClause(encl)) {
+            assert(isBlockStatement(encl.body));
+            body = encl.body.body;
+        } else {
+            assert(isBlockStatement(encl), encl.type);
+            body = encl.body;
+        }
+        body.unshift(FUNDECL({ // placing at top to account for hoisting
             LOC: getLoc(path.node.loc),
             VAL: identifier(id)
         }));
@@ -322,21 +339,14 @@ export function approxTransform(ast: File, str: string, file: string, mode: "com
         for (const m of path.node.body.body)
             if (isClassMethod(m) && m.kind === "constructor")
                 return;
-        numStaticFunctions++; // a dummy constructor is made for classes without explicit construct
+        numStaticFunctions++; // a dummy constructor is made for classes without explicit constructor
     }
 
     function visitClassDeclaration(path: NodePath<ClassDeclaration>, id: string) {
         const p = isExportDeclaration(path.parent) ? path.parentPath : path;
         p.insertBefore(INIT());
-        let constructor: NodePath<ClassMethod> | undefined;
-        for (const b of path.get("body.body") as Array<NodePath>)
-            if (isClassMethod(b.node) && b.node.kind === "constructor") {
-                constructor = b as NodePath<ClassMethod>;
-                break;
-            }
-        assert(constructor); // see extras.ts
         p.insertAfter(ALLOC({
-            LOC: getLoc(constructor.node.loc),
+            LOC: getLoc(getConstructor(path).node.loc),
             VAL: identifier(id)
         }));
     }
@@ -353,16 +363,21 @@ export function approxTransform(ast: File, str: string, file: string, mode: "com
     }
 
     function visitPropertyRead(path: NodePath<MemberExpression | OptionalMemberExpression>) {
-        if (path.node.computed && !isPrivateName(path.node.property) && !isSuper(path.node.object) && // TODO: currently not producing hints for super[...]
-            !(isAssignmentExpression(path.parent) && path.parent.left === path.node))
-            visitDynamicPropertyRead(path, path.node.object, path.node.property);
-    }
-
-    function visitDynamicPropertyRead(path: NodePath<MemberExpression | OptionalMemberExpression>, base: Expression, prop: Expression | Identifier) {
+        if (!path.node.computed || !isMemberRead(path))
+            return;
+        const [p, c] = skipParenthesizedParents(path);
+        if (p && (isCallExpression(p.node) || isOptionalCallExpression(p.node)) && p.node.callee === c.node)
+            return; // getters at method calls handled by visitMethodCall
+        if (p && isAssignmentExpression(p.node) && p.node.left === c.node) // TODO: currently not producing hints for x.f ??= ... etc.
+            return;
+        if (isSuper(path.node.object)) // TODO: currently not producing hints for super[...]
+            return;
+        if (isPrivateName(path.node.property)) // TODO: currently not producing hints for x.#f
+            return;
         path.replaceWith(DPR({
             LOC: getLoc(path.node.loc),
-            BASE: base,
-            PROP: prop
+            BASE: path.node.object,
+            PROP: path.node.property
         }));
         path.skip();
     }
@@ -488,6 +503,7 @@ export function approxTransform(ast: File, str: string, file: string, mode: "com
         path.get("body").replaceWith(LOOP({
             BODY: path.node.body
         }));
+        path.skip();
     }
 
     function visitRequireOrImport(path: NodePath<CallExpression | OptionalCallExpression>) {

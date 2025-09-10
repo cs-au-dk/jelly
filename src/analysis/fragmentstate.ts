@@ -5,7 +5,6 @@ import {CallExpression, Function, Identifier, JSXIdentifier, NewExpression, Node
 import assert from "assert";
 import {
     addMapHybridSet,
-    FilePath,
     getOrSet,
     locationToStringWithFile,
     locationToStringWithFileAndEnd,
@@ -853,9 +852,9 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
     /**
      * Resolves a 'require' string and returns a ModuleInfo or DummyModuleInfo (or undefined if resolution fails).
      */
-    requireModule(str: string, path: NodePath, file: FilePath, moduleInfo: ModuleInfo): ModuleInfo | DummyModuleInfo | undefined {
+    requireModule(str: string, path: NodePath, moduleInfo: ModuleInfo): ModuleInfo | DummyModuleInfo | undefined {
         let m: ModuleInfo | DummyModuleInfo | undefined;
-        const filepath = requireResolve2(str, path, file, this);
+        const filepath = requireResolve2(str, path, moduleInfo.getPath(), this);
         if (filepath)
             m = this.a.reachedFile(filepath, false, moduleInfo, isLocalRequire(str));
         else if (!"./#".includes(str[0])) // couldn't find module file (probably hasn't been installed), use a DummyModuleInfo if absolute module name

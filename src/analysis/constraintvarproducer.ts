@@ -33,7 +33,7 @@ import {
     ThisVar
 } from "./constraintvars";
 import {ArrayToken, ObjectToken, PackageObjectToken} from "./tokens";
-import {FilePath, Location} from "../misc/util";
+import {Location} from "../misc/util";
 import {PackageInfo} from "./infos";
 import {GlobalState} from "./globalstate";
 import {FragmentState, MergeRepresentativeVar, RepresentativeVar} from "./fragmentstate";
@@ -129,8 +129,8 @@ export class ConstraintVarProducer<RVT extends RepresentativeVar | MergeRepresen
     /**
      * Finds the constraint variable for an object property for a package.
      */
-    packagePropVar(pck: FilePath | PackageInfo, prop: string, accessor: AccessorType = "normal"): ObjectPropertyVar {
-        return this.objPropVar(this.a.canonicalizeToken(new PackageObjectToken(pck instanceof PackageInfo ? pck : this.a.getModuleInfo(pck).packageInfo)), prop, accessor);
+    packagePropVar(pck: PackageInfo, prop: string, accessor: AccessorType = "normal"): ObjectPropertyVar {
+        return this.objPropVar(this.a.canonicalizeToken(new PackageObjectToken(pck)), prop, accessor);
     }
 
     /**

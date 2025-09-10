@@ -217,7 +217,7 @@ export function registerArtificialClassPropertyInitializer(f: FragmentState, pat
  * Positions in computed function names belong to the enclosing function of the function being defined.
  * Positions in instance member initializers belong to the class constructor.
  */
-export function getEnclosingFunctionPath(path: NodePath): NodePath<Function> | null {
+export function getEnclosingFunction(path: NodePath): NodePath<Function> | null {
     let p: NodePath | null = path, c: Node | undefined = undefined, cc: Node | undefined = undefined;
     do {
         cc = c;
@@ -239,14 +239,77 @@ export function getEnclosingFunctionPath(path: NodePath): NodePath<Function> | n
 export function getEnclosingNonArrowFunction(path: NodePath): Function | undefined {
     let p: NodePath | null = path;
     do {
-        p = getEnclosingFunctionPath(p!);
+        p = getEnclosingFunction(p!);
     } while (p && isArrowFunctionExpression(p.node));
     return p?.node as Function | undefined;
 }
 
 /**
- * Returns the enclosing function, or undefined if no such function.
+ * Searches downward to the nearest non-parenthesized-expression.
  */
-export function getEnclosingFunction(path: NodePath): Function | undefined {
-    return getEnclosingFunctionPath(path)?.node;
+export function skipParenthesizedChildren(path: NodePath): NodePath {
+    while (path.isParenthesizedExpression() || path.isTSAsExpression() || path.isTSTypeAssertion() || path.isTSNonNullExpression() || path.isTypeCastExpression())
+        path = path.get("expression") as NodePath;
+    return path;
+}
+
+/**
+ * Searches upward to the nearest non-parenthesized-expression,
+ * returns paths to that node and to the child it came from.
+ */
+export function skipParenthesizedParents(path: NodePath): [NodePath | null, NodePath] {
+    let p = path.parentPath, c = path;
+    while (p?.isParenthesizedExpression() || p?.isTSAsExpression() || p?.isTSTypeAssertion() || p?.isTypeCastExpression() || p?.isTSNonNullExpression()) {
+        c = p;
+        p = p.parentPath;
+    }
+    return [p, c];
+}
+
+/**
+ * Returns true if the given member expression is in read position.
+ */
+export function isMemberRead(path: NodePath<MemberExpression | OptionalMemberExpression | JSXMemberExpression>): boolean {
+    const [p, c] = skipParenthesizedParents(path);
+    assert(p);
+
+    // simple assignment => not a read
+    if (p.isAssignmentExpression({ operator: "=" }) && p.get("left") === c)
+        return false;
+
+    // delete => not a read
+    if (p.isUnaryExpression({ operator: "delete" }) && p.get("argument") === c)
+        return false;
+
+    // for-in/of left target => not a read
+    if ((p.isForInStatement() || p.isForOfStatement()) && p.get("left") === c)
+        return false;
+
+    //  object destructuring target => not a read
+    if (p.isObjectProperty() && p.get("value") === c && p.parentPath?.isObjectPattern()) {
+        const pp = p.parentPath.parentPath;
+        if (pp && (pp.isAssignmentExpression() || pp.isVariableDeclarator() || pp.isForInStatement() || pp.isForOfStatement()))
+            return false;
+    }
+
+    // array destructuring target => not a read
+    if (p.isArrayPattern()) {
+        const pp = p.parentPath;
+        if (pp && (pp.isAssignmentExpression() || pp.isVariableDeclarator() || pp.isForInStatement() || pp.isForOfStatement()))
+            return false;
+    }
+
+    // everything else => read
+    return true;
+}
+
+/**
+ * Returns the constructor for the given class.
+ * (See replaceTypeScriptImportExportAssignmentsAndAddConstructors.)
+ */
+export function getConstructor(path: NodePath<Class>): NodePath<ClassMethod> {
+    for (const b of path.get("body.body") as Array<NodePath>)
+        if (isClassMethod(b.node) && b.node.kind === "constructor")
+            return b as NodePath<ClassMethod>;
+    assert.fail(`Constructor not found for class ${locationToStringWithFileAndEnd(path.node.loc)}`);
 }

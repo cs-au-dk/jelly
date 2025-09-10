@@ -74,7 +74,7 @@ import {GlobalState} from "./globalstate";
 import {DummyModuleInfo, FunctionInfo, ModuleInfo, normalizeModuleName, PackageInfo} from "./infos";
 import logger from "../misc/logger";
 import {options} from "../options";
-import {FilePath, isArrayIndex, Location, locationToString, locationToStringWithFile} from "../misc/util";
+import {isArrayIndex, Location, locationToString, locationToStringWithFile} from "../misc/util";
 import assert from "assert";
 import {
     INTERNAL_PROTOTYPE,
@@ -100,25 +100,19 @@ export class Operations {
 
     readonly a: GlobalState; // shortcut to this.solver.globalState
 
-    readonly moduleInfo: ModuleInfo;
-
-    readonly packageInfo: PackageInfo;
-
     readonly packageObjectToken: PackageObjectToken;
 
     readonly exportsObjectToken: NativeObjectToken;
 
     constructor(
-        readonly file: FilePath,
+        readonly moduleInfo: ModuleInfo,
         readonly solver: Solver,
         readonly moduleSpecialNatives: SpecialNativeObjects
     ) {
         this.globalSpecialNatives = this.solver.globalState.globalSpecialNatives!;
         this.a = this.solver.globalState;
 
-        this.moduleInfo = this.a.getModuleInfo(file);
-        this.packageInfo = this.moduleInfo.packageInfo;
-        this.packageObjectToken = this.a.canonicalizeToken(new PackageObjectToken(this.packageInfo));
+        this.packageObjectToken = this.a.canonicalizeToken(new PackageObjectToken(this.moduleInfo.packageInfo));
         this.exportsObjectToken = this.a.canonicalizeToken(new NativeObjectToken("exports", this.moduleInfo));
         this.a.patching?.registerAllocationSite(this.exportsObjectToken);
     }
@@ -734,11 +728,11 @@ export class Operations {
         } else {
 
             // try to locate the module
-            m = f.requireModule(str, path, this.file, this.moduleInfo);
+            m = f.requireModule(str, path, this.moduleInfo);
             if (m instanceof ModuleInfo && m.isIncluded) {
 
                 // extend the require graph
-                const fp = getEnclosingFunction(path);
+                const fp = getEnclosingFunction(path)?.node;
                 const from = fp ? this.a.functionInfos.get(fp)! : this.moduleInfo;
                 f.registerRequireEdge(from, m);
 
@@ -788,7 +782,7 @@ export class Operations {
             }
 
         } else if (isMemberExpression(dst) || isOptionalMemberExpression(dst)) {
-            const e = getEnclosingFunction(path);
+            const e = getEnclosingFunction(path)?.node;
             const lVar = isSuper(dst.object) ? e ? this.solver.varProducer.thisVar(e) : undefined : this.expVar(dst.object, path);
             if (!lVar)
                 return;
@@ -997,7 +991,7 @@ export class Operations {
      * Creates a PackageObjectToken of kind RegExp.
      */
     newRegExpToken(): PackageObjectToken {
-        return this.a.canonicalizeToken(new PackageObjectToken(this.packageInfo, "RegExp"));
+        return this.a.canonicalizeToken(new PackageObjectToken(this.moduleInfo.packageInfo, "RegExp"));
     }
 
     /**

@@ -27,7 +27,6 @@ import {
     ImportDeclaration,
     isArrayPattern,
     isArrowFunctionExpression,
-    isAssignmentExpression,
     isAssignmentPattern,
     isCallExpression,
     isClassAccessorProperty,
@@ -49,9 +48,11 @@ import {
     isImportDefaultSpecifier,
     isImportSpecifier,
     isLVal,
+    isMemberExpression,
     isObjectMethod,
     isObjectPattern,
     isObjectProperty,
+    isOptionalMemberExpression,
     isPattern,
     isRestElement,
     isSpreadElement,
@@ -107,6 +108,7 @@ import {
     getKey,
     getProperty,
     isCalleeExpression,
+    isMemberRead,
     isParentExpressionStatement,
     registerArtificialClassPropertyInitializer,
 } from "../misc/asthelpers";
@@ -136,7 +138,7 @@ export function visit(ast: File, op: Operations) {
 
     // traverse the AST and extend the analysis result with information about the current module
     if (logger.isVerboseEnabled())
-        logger.verbose(`Traversing AST of ${op.file}`);
+        logger.verbose(`Traversing AST of ${op.moduleInfo}`);
     traverse(ast, {
 
         ThisExpression(path: NodePath<ThisExpression>) {
@@ -277,7 +279,7 @@ export function visit(ast: File, op: Operations) {
                 if (logger.isVerboseEnabled())
                     logger.verbose(`Reached function ${msg} at ${locationToStringWithFile(fun.loc)}`);
                 if (!cls) // FunctionInfos for constructors need to be generated early, see Class
-                    a.registerFunctionInfo(op.file, path, name);
+                    a.registerFunctionInfo(op.moduleInfo, path, name);
                 if (!name && !anon)
                     f.warnUnsupported(fun, `Dynamic ${isFunctionDeclaration(path.node) || isFunctionExpression(path.node) ? "function" : "method"} name`); // TODO: handle functions/methods with unknown name?
 
@@ -510,7 +512,7 @@ export function visit(ast: File, op: Operations) {
                                 dst = vp.objPropVar(a.canonicalizeToken(new ClassToken(cls)), key);
                             } else {
                                 // constraint: ⟦E⟧ ⊆ ⟦k.p⟧ where k is the current package
-                                dst = vp.packagePropVar(op.file, key);
+                                dst = vp.packagePropVar(op.moduleInfo.packageInfo, key);
                             }
                             solver.addSubsetConstraint(rightvar, dst);
                         }
@@ -587,7 +589,7 @@ export function visit(ast: File, op: Operations) {
                                 } else {
                                     // constraint: t ∈ ⟦(ac)k.p⟧ where t denotes the function and k is the current package,
                                     // and (ac) specifies whether it is a getter, setter or normal property
-                                    dst = vp.packagePropVar(op.file, key, ac);
+                                    dst = vp.packagePropVar(op.moduleInfo.packageInfo, key, ac);
                                 }
                                 solver.addTokenConstraint(t, dst);
                             }
@@ -622,7 +624,7 @@ export function visit(ast: File, op: Operations) {
                 }
             assert(constructor); // see extras.ts
             class2constructor.set(path.node, constructor.node);
-            a.registerFunctionInfo(op.file, constructor, path.node?.id?.name); // for constructors, use the class name if present
+            a.registerFunctionInfo(op.moduleInfo, constructor, path.node?.id?.name); // for constructors, use the class name if present
 
             const exported = isExportDeclaration(path.parent);
 
@@ -950,14 +952,13 @@ export function visit(ast: File, op: Operations) {
      * Visits a MemberExpression or OptionalMemberExpression.
      */
     function visitMemberExpression(path: NodePath<MemberExpression | OptionalMemberExpression | JSXMemberExpression>) {
-        const dstVar = isParentExpressionStatement(path) ? undefined : vp.nodeVar(path.node);
-        // Record dynamic read for approximate interpretation
-        a.patching?.recordDynamicRead(path.node, dstVar);
-        if (isAssignmentExpression(path.parent) && path.parent.left === path.node)
+        if (!isMemberRead(path))
             return; // don't treat left-hand-sides of assignments as expressions
+        const dstVar = isParentExpressionStatement(path) ? undefined : vp.nodeVar(path.node);
+        if ((isMemberExpression(path.node) || isOptionalMemberExpression(path.node)) && path.node.computed)
+            a.patching?.recordDynamicRead(path.node, dstVar);
         if (isCalleeExpression(path))
-            return; // don't perform a property read for method calls
-
+            return; // property read for method calls handled at Operations.callFunction
         op.readProperty(op.expVar(path.node.object, path), getProperty(path.node), dstVar, path.node, a.getEnclosingFunctionOrModule(path));
     }
 }

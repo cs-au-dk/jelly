@@ -1045,4 +1045,9 @@ describe("tests/micro", () => {
         patterns: ["tests/micro/callapplymatch-patterns.json"],
         matches: {total: 3},
     });
+
+    runTest("tests/micro/mods", "main.js", {
+        functionInfos: 8,
+        numberOfFunctionToFunctionEdges: 10,
+    });
 });
