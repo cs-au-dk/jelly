@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+
+set -eu
+
+echo "Starting release process..."
+
+# Read package name and version from package.json
+package_name=$(node -p "require('./package.json').name")
+version=$(node -p "require('./package.json').version")
+echo "Package: $package_name@$version"
+
+# Verify that the git working directory is not dirty
+echo "Checking git working directory..."
+if ! status="$(git status --porcelain)" || [ -n "$status" ]; then
+    echo "Error: Git working directory is dirty. Please commit or stash your changes."
+    exit 1
+fi
+
+# Check permissions
+scopes=" $(gh api -i user | grep X-Oauth-Scopes | cut -c17-),"
+if ! echo "$scopes" | grep -q ' repo,'; then
+    echo "Error: gh is missing 'repo' permission"
+    exit 1
+fi
+if ! echo "$scopes" | grep -q ' workflow,'; then
+    echo "Error: gh is missing 'workflow' permission"
+    exit 1
+fi
+
+# Install locked npm dependencies
+echo "Installing locked npm dependencies..."
+npm ci
+
+# Run npm pack and capture the resulting tgz filename
+echo "Creating package..."
+temp_dir=$(mktemp -d)
+function cleanup {
+    echo Removing "$temp_dir"
+    rm -rf "$temp_dir"
+}
+trap cleanup EXIT
+original_file=$(npm pack --pack-destination="$temp_dir" | tail -n 1)
+original_path="$temp_dir/$original_file"
+echo "Package created at: $original_path"
+
+# Rename the tgz to packageName-version.tar.gz
+new_file="${package_name##*/}-${version}.tar.gz"
+new_path="$temp_dir/$new_file"
+mv "$original_path" "$new_path"
+echo "Package renamed to: $new_path"
+
+# Create a GitHub release using gh
+echo "Creating GitHub release..."
+release_tag="v$version"
+gh release create "$release_tag" "$new_path" \
+    --title "Release $version" \
+    --generate-notes \
+    --latest
+echo "Release $version created successfully!"
+echo "Package uploaded: $new_file"

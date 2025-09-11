@@ -41,7 +41,7 @@
     "clean": "rm -rf lib dist tmp/tsbuildinfo tmp/coverage tests/node_modules/jellycg-previous",
     "build-docker": "npm run build && docker build -t jelly .",
     "jellycg-docker": "./bin/jellycg-docker",
-    "prepare": "npm run build"
+    "prepare": "npm run clean; npm run build"
   },
   "dependencies": {
     "@babel/core": "^7.24.8",
