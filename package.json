@@ -3,7 +3,7 @@
   "version": "0.10.0",
   "description": "Jelly - call graph and library usage analyzer for JavaScript",
   "author": "Anders Møller <amoeller@cs.au.dk>",
-  "license": "MIT",
+  "license": "BSD-3-Clause",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/cs-au-dk/jelly.git"
