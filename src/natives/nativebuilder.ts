@@ -70,9 +70,8 @@ export type SpecialNativeObjects = Map<string, NativeObjectToken>;
  * Prepares models for the ECMAScript and Node.js native declarations.
  * Returns the global identifiers and the tokens for special native objects.
  */
-export function buildNatives(solver: Solver, moduleInfo: ModuleInfo): {globals: Array<Identifier>, globalsHidden: Array<Identifier>, moduleSpecialNatives: SpecialNativeObjects, globalSpecialNatives: SpecialNativeObjects} {
+export function buildNatives(solver: Solver, moduleInfo: ModuleInfo): {globals: Array<Identifier>, moduleSpecialNatives: SpecialNativeObjects, globalSpecialNatives: SpecialNativeObjects} {
     const globals: Array<Identifier> = [];
-    const globalsHidden: Array<Identifier> = [];
     const moduleSpecialNatives: SpecialNativeObjects = new Map;
     const globalSpecialNatives: SpecialNativeObjects = new Map;
     const f = solver.fragmentState;
@@ -95,19 +94,21 @@ export function buildNatives(solver: Solver, moduleInfo: ModuleInfo): {globals: 
          */
         function defineGlobal(name: string, moduleSpecific: boolean = false, invoke?: NativeFunctionAnalyzer, constr: boolean = false, hidden: boolean = false, init?: NativeVariableInitializer) {
             if (options.natives || m.name === "ecmascript" || (m.name === "nodejs" && ["exports", "module"].includes(name))) {
-                let id = solver.globalState.canonicalGlobals.get(name);
-                if (!id) {
-                    id = identifier(name);
-                    id.loc = (moduleSpecific ? moduleLoc : globalLoc) as SourceLocation; // ignoring filename, identifierName, start.index, end.index
-                    if (!moduleSpecific)
-                        solver.globalState.canonicalGlobals.set(name, id);
-                }
-                (hidden ? globalsHidden : globals).push(id);
                 const t = init
                     ? init({solver, moduleInfo, moduleSpecialNatives, globalSpecialNatives})
                     : a.canonicalizeToken(new NativeObjectToken(name, moduleSpecific ? moduleInfo : undefined, invoke, constr));
-                solver.addTokenConstraint(t, f.varProducer.nodeVar(id));
                 (moduleSpecific ? moduleSpecialNatives : globalSpecialNatives).set(name, t);
+                if (!hidden) {
+                    let id = solver.globalState.canonicalGlobals.get(name);
+                    if (!id) {
+                        id = identifier(name);
+                        id.loc = (moduleSpecific ? moduleLoc : globalLoc) as SourceLocation; // ignoring filename, identifierName, start.index, end.index
+                        if (!moduleSpecific)
+                            solver.globalState.canonicalGlobals.set(name, id);
+                    }
+                    globals.push(id);
+                    solver.addTokenConstraint(t, f.varProducer.nodeVar(id));
+                }
             }
         }
 
@@ -210,5 +211,5 @@ export function buildNatives(solver: Solver, moduleInfo: ModuleInfo): {globals: 
     if (logger.isVerboseEnabled())
         logger.verbose("Adding natives completed");
 
-    return {globals, globalsHidden, moduleSpecialNatives, globalSpecialNatives};
+    return {globals, moduleSpecialNatives, globalSpecialNatives};
 }

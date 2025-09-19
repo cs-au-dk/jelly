@@ -200,15 +200,14 @@ export function requireResolve(str: string, file: FilePath, a: GlobalState, node
         logger.debug(`Skipping binary addon file '${str}'`);
         return undefined;
     }
-    if (!filepath.startsWith(options.basedir) && !filepath.replaceAll("/", "\\").startsWith(options.basedir)) {
-        const msg = `Found module at ${filepath}, but not in basedir`;
-        logger.debug(msg);
-        return undefined; // skip silently
-        // throw new Error(msg);
-    }
     if (filepath.endsWith(".d.ts") || ![".js", ".jsx", ".es", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts"].includes(extname(filepath))) {
         f?.warn(`Module '${filepath}' has unrecognized extension, skipping it`, node);
         return undefined;
+    }
+    if (!filepath.startsWith(options.basedir) && !filepath.replaceAll("/", "\\").startsWith(options.basedir)) {
+        const msg = `Found module at ${filepath}, but not in basedir`;
+        logger.debug(msg);
+        throw new Error(msg);
     }
     if (options.excludeEntries &&
         a.getModuleInfo(file).packageInfo.isEntry &&

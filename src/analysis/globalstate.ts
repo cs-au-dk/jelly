@@ -273,17 +273,20 @@ export class GlobalState {
 
             // find package.json and extract name, version, and main file
             let packageInfo: PackageInfo | undefined;
-            let rel: string | undefined;
+            let rel = "";
             let otherfile: string | undefined;
             if (from && local) {
 
-                // module in same package
+                // expect module to be in the same package
                 packageInfo = from.packageInfo;
                 rel = relative(packageInfo.dir, tofile);
-                if (rel.startsWith("../"))
-                    throw new Error(`Relative module reference ${rel} from ${from.getPath()} outside current package ${packageInfo}`);
-            } else {
+                if (rel.startsWith("../")) {
+                    packageInfo = undefined;
+                    logger.warn(`Relative module reference from ${from.getPath()} to ${rel} outside current package ${packageInfo}`);
+                }
+            }
 
+            if (!packageInfo) {
                 // module in other package
                 const p = getOrSet(this.packageJsonInfos, dirname(tofile), () => getPackageJsonInfo(tofile));
                 rel = relative(p.dir, tofile);

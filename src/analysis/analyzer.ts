@@ -104,11 +104,11 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
 
                     // add model of native library
                     writeStdOutIfActive("Initializing...");
-                    const {globals, globalsHidden, moduleSpecialNatives, globalSpecialNatives} = buildNatives(solver, moduleInfo);
+                    const {globals, moduleSpecialNatives, globalSpecialNatives} = buildNatives(solver, moduleInfo);
                     a.globalSpecialNatives = globalSpecialNatives;
 
                     // preprocess the AST
-                    preprocessAst(ast, moduleInfo, globals, globalsHidden);
+                    preprocessAst(ast, moduleInfo, globals);
 
                     // traverse the AST
                     writeStdOutIfActive("Traversing AST...");

@@ -120,7 +120,7 @@ export const JELLY_NODE_ID = Symbol("JELLY_NODE_ID");
 /**
  * Preprocesses the given AST.
  */
-export function preprocessAst(ast: File, module?: ModuleInfo, globals?: Array<Identifier>, globalsHidden?: Array<Identifier>) {
+export function preprocessAst(ast: File, module?: ModuleInfo, globals?: Array<Identifier>) {
     let nextNodeID = 0;
 
     function register(n: Node) {
@@ -149,7 +149,7 @@ export function preprocessAst(ast: File, module?: ModuleInfo, globals?: Array<Id
         enter(path: NodePath) {
             const n = path.node;
 
-            // assign unique index to each node (globals and globalsHidden are handled below)
+            // assign unique index to each existing node
             register(n);
 
             // workaround to ensure that AST nodes with undefined location (caused by desugaring) can be identified uniquely
@@ -202,8 +202,8 @@ export function preprocessAst(ast: File, module?: ModuleInfo, globals?: Array<Id
                 const ps = path.scope.getProgramParent();
                 if (!ps.getBinding(n.name)?.identifier) {
                     const d = identifier(n.name);
-                    d.loc = {filename: ast.loc?.filename, start: {line: 0, column: 0}, end: {line: 0, column: 0}, module, unbound: true} as unknown as SourceLocation; // unbound used by expVar
                     register(d);
+                    d.loc = {filename: ast.loc?.filename, start: {line: 0, column: 0}, end: {line: 0, column: 0}, module, nodeIndex: (n as any)[JELLY_NODE_ID], unbound: true} as unknown as SourceLocation; // unbound used by expVar
                     ps.push({id: d});
                     if (logger.isDebugEnabled())
                         logger.debug(`No binding for identifier ${n.name} (parent: ${path.parent.type}), creating one in program scope`);
@@ -211,9 +211,4 @@ export function preprocessAst(ast: File, module?: ModuleInfo, globals?: Array<Id
             }
         }
     });
-
-    // assign unique index to each identifier in globals and globalsHidden
-    if (globals && globalsHidden)
-        for (const n of [...globals, ...globalsHidden])
-            register(n);
 }

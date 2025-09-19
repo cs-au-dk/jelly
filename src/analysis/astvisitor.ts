@@ -161,8 +161,11 @@ export function visit(ast: File, op: Operations) {
                     // constraint: ⟦this_f⟧ ⊆ ⟦this⟧ where f is the enclosing function (excluding arrow functions)
                     solver.addSubsetConstraint(vp.thisVar(fun), vp.nodeVar(path.node));
                 } else {
-                    // constraint %globalThis ∈ ⟦this⟧
-                    solver.addTokenConstraint(op.globalSpecialNatives.get("globalThis")!, vp.nodeVar(path.node));
+                    // // constraint %globalThis ∈ ⟦this⟧
+                    // solver.addTokenConstraint(op.globalSpecialNatives.get("globalThis")!, vp.nodeVar(path.node));
+
+                    // constraint ⟦module.exports⟧ ⊆ ⟦this⟧
+                    solver.addSubsetConstraint(solver.varProducer.objPropVar(a.canonicalizeToken(new NativeObjectToken("module", op.moduleInfo)), "exports"), vp.nodeVar(path.node));
                 }
             }
             if (options.oldobj) {
@@ -786,7 +789,7 @@ export function visit(ast: File, op: Operations) {
                 const refs = path.scope.getBinding(imp.local.name)?.referencePaths;
                 if (refs)
                     for (const ref of refs)
-                        if ((ref.node as any)[JELLY_NODE_ID]) // @babel/plugin-transform-typescript removes type annotations, so skip identifier uses with no JELLY_NODE_ID
+                        if ((ref.node as any)[JELLY_NODE_ID] !== undefined) // @babel/plugin-transform-typescript removes type annotations but not bindings, so skip identifier uses with no JELLY_NODE_ID
                             mapArrayAdd(imp.local, ref.node, f.importDeclRefs);
             }
             // bind each module export object property to the local identifier
