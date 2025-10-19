@@ -1731,11 +1731,19 @@ export const ecmascriptModels: NativeModel = {
             staticMethods: [
                 {
                     name: "for"
+                },
+                {
+                    name: "keyFor"
                 }
-                // TODO
             ],
-            methods: []
-            // TODO
+            methods: [
+                {
+                    name: "toString"
+                },
+                {
+                    name: "valueOf"
+                }
+            ]
         },
         {
             name: "SyntaxError",

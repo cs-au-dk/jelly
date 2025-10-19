@@ -13,6 +13,7 @@ import {
     ImportDefaultSpecifier,
     ImportSpecifier,
     isArrowFunctionExpression,
+    isBigIntLiteral,
     isCallExpression,
     isClass,
     isClassMethod,
@@ -79,7 +80,7 @@ export function getKey(node: ObjectProperty | ClassProperty | ClassAccessorPrope
         return node.key.name;
     else if (isStringLiteral(node.key))
         return node.key.value;
-    else if (isNumericLiteral(node.key))
+    else if (isNumericLiteral(node.key) || isBigIntLiteral(node.key))
         return node.key.value.toString();
     return undefined;
 }
