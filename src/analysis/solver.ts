@@ -1201,6 +1201,7 @@ export default class Solver {
         pushAll(s.propertyReads, f.propertyReads);
         pushAll(s.maybeEmptyPropertyReads, f.maybeEmptyPropertyReads);
         addAll(s.dynamicPropertyWrites, f.dynamicPropertyWrites);
+        addAll(s.functionTokens, f.functionTokens);
         this.printDiagnostics();
         this.diagnostics.totalFragmentMergeTime += timer.elapsed();
     }

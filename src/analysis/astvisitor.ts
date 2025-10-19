@@ -271,6 +271,8 @@ export function visit(ast: File, op: Operations) {
 
                 // record that a function/method/constructor/getter/setter has been reached, connect to its enclosing function or module
                 const fun = path.node;
+                const ft = op.newFunctionToken(fun);
+                f.functionTokens.add(ft);
                 let cls: Class | undefined;
                 if (isClassMethod(fun) && fun.kind === "constructor")
                     cls = getClass(path);
@@ -301,7 +303,6 @@ export function visit(ast: File, op: Operations) {
                     if (isFunctionDeclaration(path.node) || isFunctionExpression(path.node) || isClassMethod(path.node) || isClassPrivateMethod(path.node)) {
 
                         // connect function object and its prototype object
-                        const ft = op.newFunctionToken(fun);
                         const pt = op.newPrototypeToken(fun);
                         solver.addTokenConstraint(pt, vp.objPropVar(ft, "prototype"));
                         solver.addTokenConstraint(ft, vp.objPropVar(pt, "constructor"));

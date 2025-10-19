@@ -346,6 +346,11 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
         caller: ModuleInfo | FunctionInfo
     }> = new Map;
 
+    /**
+     * Set of all function tokens.
+     */
+    readonly functionTokens: Set<FunctionToken> = new Set;
+
     constructor(s: Solver) {
         this.a = s.globalState;
         this.varProducer = new ConstraintVarProducer(s, this);
@@ -706,6 +711,13 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
             }
         }
         return FragmentState.emptySizeAndHas;
+    }
+
+    /**
+     * Checks whether the given constraint variable has any tokens.
+     */
+    isEmpty(v: RVT): boolean {
+        return !this.tokens.has(v);
     }
 
     private static emptyHas = (_t: Token) => false;

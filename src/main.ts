@@ -114,6 +114,7 @@ program
     .option("--no-patch-escaping", "disable patching using escape analysis")
     .option("--patch-dynamics", "enable dynamic property access patching heuristic")
     .option("--patch-method-calls", "enable method call patching heuristic")
+    .option("--no-patch-this", "disable 'this' patching heuristic")
     .option("--read-neighbors", "enable package neighbor heuristic")
     .option("--proto", "enable model of assignments to the __proto__ property")
     .option("--obj-spread", "enable model of spread syntax for object literals ({...obj})")
