@@ -164,8 +164,8 @@ export function visit(ast: File, op: Operations) {
                     // // constraint %globalThis ∈ ⟦this⟧
                     // solver.addTokenConstraint(op.globalSpecialNatives.get("globalThis")!, vp.nodeVar(path.node));
 
-                    // constraint ⟦module.exports⟧ ⊆ ⟦this⟧
-                    solver.addSubsetConstraint(solver.varProducer.objPropVar(a.canonicalizeToken(new NativeObjectToken("module", op.moduleInfo)), "exports"), vp.nodeVar(path.node));
+                    // constraint %exports ∈ ⟦this⟧
+                    solver.addTokenConstraint(op.exportsObjectToken, vp.nodeVar(path.node));
                 }
             }
             if (options.oldobj) {
