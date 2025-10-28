@@ -79,8 +79,8 @@ export class ProcessManager {
      */
     constructor(readonly a: GlobalState = new GlobalState) {
         logger.verbose("Starting approximate interpretation process");
-        // When running from test, __dirname is the .ts equivalent file so resolve this to the corresponding .js file.
-        const resolvedDirname = __dirname.endsWith(".js") ? __dirname : `${__dirname}/../../lib/approx`;
+        // When running from test, __filename is the .ts equivalent file so resolve this to the corresponding .js file.
+        const resolvedDirname = __filename.endsWith(".js") ? __dirname : `${__dirname}/../../lib/approx`;
         this.p = fork(`${resolvedDirname}/approx.js`, [JSON.stringify(options)], {stdio: "inherit"});
         this.p.on('message', (msg: ResponseType) => {
             if (!this.resultPromiseResolve) {

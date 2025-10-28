@@ -1,9 +1,28 @@
 import {File} from "@babel/types";
 import logger from "../misc/logger";
-import {transformFromAstSync} from "@babel/core";
+import {loadOptions, transformFromAstSync, TransformOptions} from "@babel/core";
 import {parse, ParserOptions} from "@babel/parser";
 import {replaceTypeScriptImportExportAssignmentsAndAddConstructors} from "./extras";
 import {FragmentState} from "../analysis/fragmentstate";
+
+// Pre-load transform options for both cases of fragmentState being defined or not
+const transformOptions = [false, true].map((fragmentStateDefined) =>
+    loadOptions({
+        cloneInputAst: false,
+        plugins: [
+            replaceTypeScriptImportExportAssignmentsAndAddConstructors,
+            ['@babel/plugin-transform-typescript', {
+                onlyRemoveTypeImports: fragmentStateDefined,
+                allowDeclareFields: fragmentStateDefined,
+            }],
+            ['@babel/plugin-transform-template-literals', {loose: true}]
+        ],
+        cwd: __dirname,
+        babelrc: false,
+        configFile: false,
+        ast: true,
+    }) as TransformOptions
+);
 
 /**
  * Parses and desugars the given file.
@@ -32,7 +51,7 @@ export function parseAndDesugar(str: string, file: string, f?: FragmentState): F
             plugins: [
                 "typescript",
                 "exportDefaultFrom", // https://github.com/leebyron/ecmascript-export-default-from
-                ["decorators", { decoratorsBeforeExport: false }] // TODO: decorators?
+                ["decorators", {decoratorsBeforeExport: false}] // TODO: decorators?
             ]
         };
         try {
@@ -56,22 +75,10 @@ export function parseAndDesugar(str: string, file: string, f?: FragmentState): F
     let res;
     const p = Error.prepareStackTrace;
     const cw = console.warn;
-    console.warn = function() {}; // throw away warnings from babel-plugin-transform-typescript
+    console.warn = function () {}; // throw away warnings from babel-plugin-transform-typescript
     try {
-        res = transformFromAstSync(originalAst, str, {
-            plugins: [
-                replaceTypeScriptImportExportAssignmentsAndAddConstructors,
-                ["@babel/plugin-transform-typescript", {
-                    onlyRemoveTypeImports: f !== undefined,
-                    allowDeclareFields: f !== undefined
-                }],
-                ["@babel/plugin-transform-template-literals", { loose: true }]
-            ],
-            cwd: __dirname,
-            configFile: false,
-            ast: true,
-            code: logger.isDebugEnabled()
-        });
+        const opts = transformOptions[f ? 1 : 0];
+        res = transformFromAstSync(originalAst, str, logger.isDebugEnabled() ? {...opts, code: true} : opts);
     } catch (e) {
         f?.error(`Babel transformation failed for ${file}${e instanceof Error ? `: ${e.message}` : ""}`);
         return null;
