@@ -77,13 +77,24 @@ import {options} from "../options";
 import {isArrayIndex, Location, locationToString, locationToStringWithFile} from "../misc/util";
 import assert from "assert";
 import {
+    ARRAY_PROTOTYPE,
+    DATE_PROTOTYPE,
+    ERROR_PROTOTYPE,
+    FUNCTION_PROTOTYPE,
     INTERNAL_PROTOTYPE,
     isNativeProperty,
     MAP_KEYS,
+    MAP_PROTOTYPE,
     MAP_VALUES,
     OBJECT_PROTOTYPE,
     PROMISE_FULFILLED_VALUES,
+    PROMISE_PROTOTYPE,
+    REGEXP_PROTOTYPE,
+    SET_PROTOTYPE,
     SET_VALUES,
+    WEAKMAP_PROTOTYPE,
+    WEAKREF_PROTOTYPE,
+    WEAKSET_PROTOTYPE,
 } from "../natives/ecmascript";
 import {CallNodePath, SpecialNativeObjects} from "../natives/nativebuilder";
 import {TokenListener} from "./listeners";
@@ -545,6 +556,8 @@ export class Operations {
         const dst = this.solver.varProducer.readResultVar(base, prop);
         if (base instanceof FunctionToken && prop === "prototype") // function objects always have 'prototype', no need to consult prototype chain
             this.readPropertyBound(base, prop, dst, {t: base, s: prop}, base);
+        else if (options.proto && prop === INTERNAL_PROTOTYPE()) // all objects have __proto__
+            this.readProto(base, dst);
         else {
             const nativeProperty = isNativeProperty(base, prop, true);
             const objProto = this.globalSpecialNatives?.get(OBJECT_PROTOTYPE);
@@ -557,6 +570,40 @@ export class Operations {
             });
         }
         return dst;
+    }
+
+    readProto(t: ObjectPropertyVarObj, dst: ConstraintVar) {
+        this.solver.addSubsetConstraint(this.solver.varProducer.objPropVar(t, INTERNAL_PROTOTYPE()), dst);
+        if (t instanceof ObjectToken)
+            this.solver.addTokenConstraint(this.globalSpecialNatives.get(OBJECT_PROTOTYPE)!, dst);
+        else if (t instanceof ArrayToken)
+            this.solver.addTokenConstraint(this.globalSpecialNatives.get(ARRAY_PROTOTYPE)!, dst);
+        else if (t instanceof FunctionToken || t instanceof PrototypeToken || t instanceof ClassToken)
+            this.solver.addTokenConstraint(this.globalSpecialNatives.get(FUNCTION_PROTOTYPE)!, dst);
+        else if (t instanceof AllocationSiteToken) {
+            if (t.kind === "Promise")
+                this.solver.addTokenConstraint(this.globalSpecialNatives.get(PROMISE_PROTOTYPE)!, dst);
+            else if (t.kind === "Date")
+                this.solver.addTokenConstraint(this.globalSpecialNatives.get(DATE_PROTOTYPE)!, dst);
+            else if (t.kind === "RegExp")
+                this.solver.addTokenConstraint(this.globalSpecialNatives.get(REGEXP_PROTOTYPE)!, dst);
+            else if (t.kind === "Error")
+                this.solver.addTokenConstraint(this.globalSpecialNatives.get(ERROR_PROTOTYPE)!, dst);
+            else if (t.kind === "Map")
+                this.solver.addTokenConstraint(this.globalSpecialNatives.get(MAP_PROTOTYPE)!, dst);
+            else if (t.kind === "Set")
+                this.solver.addTokenConstraint(this.globalSpecialNatives.get(SET_PROTOTYPE)!, dst);
+            else if (t.kind === "WeakMap")
+                this.solver.addTokenConstraint(this.globalSpecialNatives.get(WEAKMAP_PROTOTYPE)!, dst);
+            else if (t.kind === "WeakSet")
+                this.solver.addTokenConstraint(this.globalSpecialNatives.get(WEAKSET_PROTOTYPE)!, dst);
+            else if (t.kind === "WeakRef")
+                this.solver.addTokenConstraint(this.globalSpecialNatives.get(WEAKREF_PROTOTYPE)!, dst);
+            else if (t.kind === "PromiseResolve" || t.kind === "PromiseReject")
+                this.solver.addTokenConstraint(this.globalSpecialNatives.get(FUNCTION_PROTOTYPE)!, dst);
+            else
+                this.solver.addTokenConstraint(this.globalSpecialNatives.get(OBJECT_PROTOTYPE)!, dst);
+        }
     }
 
     /**

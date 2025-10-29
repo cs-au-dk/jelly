@@ -8,31 +8,28 @@ import {
     isObjectProperty,
     isStringLiteral
 } from "@babel/types";
-import {AccessPathToken, AllocationSiteToken, ArrayToken, ClassToken, FunctionToken, NativeObjectToken, ObjectKind, ObjectToken, PackageObjectToken, PrototypeToken, Token} from "../analysis/tokens";
+import {
+    AccessPathToken,
+    AllocationSiteToken,
+    ArrayToken,
+    FunctionToken,
+    NativeObjectToken,
+    ObjectKind,
+    ObjectToken,
+    PackageObjectToken,
+    Token
+} from "../analysis/tokens";
 import {getKey, isParentExpressionStatement} from "../misc/asthelpers";
 import {Node} from "@babel/core";
 import {
-    ARRAY_PROTOTYPE,
-    DATE_PROTOTYPE,
-    ERROR_PROTOTYPE,
-    FUNCTION_PROTOTYPE,
     GENERATOR_PROTOTYPE_NEXT,
     GENERATOR_PROTOTYPE_RETURN,
     GENERATOR_PROTOTYPE_THROW,
-    INTERNAL_PROTOTYPE,
     MAP_KEYS,
-    MAP_PROTOTYPE,
     MAP_VALUES,
-    OBJECT_PROTOTYPE,
     PROMISE_FULFILLED_VALUES,
-    PROMISE_PROTOTYPE,
     PROMISE_REJECTED_VALUES,
-    REGEXP_PROTOTYPE,
-    SET_PROTOTYPE,
-    SET_VALUES,
-    WEAKMAP_PROTOTYPE,
-    WEAKREF_PROTOTYPE,
-    WEAKSET_PROTOTYPE
+    SET_VALUES
 } from "./ecmascript";
 import {NativeFunctionParams} from "./nativebuilder";
 import {TokenListener} from "../analysis/listeners";
@@ -889,39 +886,8 @@ export function returnPrototypeOf(p: NativeFunctionParams) {
     const arg = p.path.node.arguments[0], dst = p.solver.varProducer.expVar(p.path.node, p.path);
     if (isExpression(arg) && !isParentExpressionStatement(p.path) && dst !== undefined) // TODO: non-Expression arguments?
         p.solver.addForAllTokensConstraint(p.solver.varProducer.expVar(arg, p.path), TokenListener.NATIVE_RETURN_PROTOTYPE_OF, p.path.node, (t: Token) => {
-            if (isObjectPropertyVarObj(t)) {
-                p.solver.addSubsetConstraint(p.solver.varProducer.objPropVar(t, INTERNAL_PROTOTYPE()), dst);
-                if (t instanceof ObjectToken)
-                    p.solver.addTokenConstraint(p.globalSpecialNatives.get(OBJECT_PROTOTYPE)!, dst);
-                else if (t instanceof ArrayToken)
-                    p.solver.addTokenConstraint(p.globalSpecialNatives.get(ARRAY_PROTOTYPE)!, dst);
-                else if (t instanceof FunctionToken || t instanceof PrototypeToken || t instanceof ClassToken)
-                    p.solver.addTokenConstraint(p.globalSpecialNatives.get(FUNCTION_PROTOTYPE)!, dst);
-                else if (t instanceof AllocationSiteToken) {
-                    if (t.kind === "Promise")
-                        p.solver.addTokenConstraint(p.globalSpecialNatives.get(PROMISE_PROTOTYPE)!, dst);
-                    else if (t.kind === "Date")
-                        p.solver.addTokenConstraint(p.globalSpecialNatives.get(DATE_PROTOTYPE)!, dst);
-                    else if (t.kind === "RegExp")
-                        p.solver.addTokenConstraint(p.globalSpecialNatives.get(REGEXP_PROTOTYPE)!, dst);
-                    else if (t.kind === "Error")
-                        p.solver.addTokenConstraint(p.globalSpecialNatives.get(ERROR_PROTOTYPE)!, dst);
-                    else if (t.kind === "Map")
-                        p.solver.addTokenConstraint(p.globalSpecialNatives.get(MAP_PROTOTYPE)!, dst);
-                    else if (t.kind === "Set")
-                        p.solver.addTokenConstraint(p.globalSpecialNatives.get(SET_PROTOTYPE)!, dst);
-                    else if (t.kind === "WeakMap")
-                        p.solver.addTokenConstraint(p.globalSpecialNatives.get(WEAKMAP_PROTOTYPE)!, dst);
-                    else if (t.kind === "WeakSet")
-                        p.solver.addTokenConstraint(p.globalSpecialNatives.get(WEAKSET_PROTOTYPE)!, dst);
-                    else if (t.kind === "WeakRef")
-                        p.solver.addTokenConstraint(p.globalSpecialNatives.get(WEAKREF_PROTOTYPE)!, dst);
-                    else if (t.kind === "PromiseResolve" || t.kind === "PromiseReject")
-                        p.solver.addTokenConstraint(p.globalSpecialNatives.get(FUNCTION_PROTOTYPE)!, dst);
-                    else
-                        p.solver.addTokenConstraint(p.globalSpecialNatives.get(OBJECT_PROTOTYPE)!, dst);
-                }
-            }
+            if (isObjectPropertyVarObj(t))
+                p.op.readProto(t, dst);
         });
 }
 
