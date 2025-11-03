@@ -21,13 +21,11 @@ export type SimpleLocation = {
  * 'module' is set if the location belongs to a specific module, and undefined for globals.
  * 'native' is set if the location comes from a native model.
  * 'nodeIndex' is set by AST preprocessing at nodes with missing source location (see locationToString).
- * 'unbound' is set to true if this is a location for an artificially declared unbound identifier.
  */
 export type Location = SimpleLocation & {
     module?: ModuleInfo;
     native?: string;
     nodeIndex?: number;
-    unbound?: boolean;
 };
 
 /**

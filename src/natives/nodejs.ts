@@ -11,9 +11,9 @@ export const nodejsModels: NativeModel = {
     name: "nodejs",
     init: (p: NativeModelParams) => {
         // module.exports = exports (when writing to module.exports, also write to %exports.default)
-        const exp = p.moduleSpecialNatives.get("exports")!;
-        p.solver.addTokenConstraint(exp, p.solver.varProducer.objPropVar(p.moduleSpecialNatives.get("module")!, "exports"));
-        p.solver.addTokenConstraint(exp, p.solver.varProducer.objPropVar(p.moduleSpecialNatives.get("exports")!, "default"));
+        const exp = p.moduleSpecialNatives["exports"];
+        p.solver.addTokenConstraint(exp, p.solver.varProducer.objPropVar(p.moduleSpecialNatives["module"], "exports"));
+        p.solver.addTokenConstraint(exp, p.solver.varProducer.objPropVar(p.moduleSpecialNatives["exports"], "default"));
         // TODO: model module.require?
         const a = p.solver.globalState;
         const rt = a.canonicalizeToken(new NativeObjectToken("require", p.moduleInfo));
@@ -47,17 +47,17 @@ export const nodejsModels: NativeModel = {
         {
             name: "global",
             init: (p: NativeModelParams) => {
-                return p.globalSpecialNatives.get("globalThis")!; // TODO: 'global' is actually a property on globalThis
+                return p.globalSpecialNatives["globalThis"];
             }
         },
         {
-            name: "performance"// TODO: 'performance' is actually a property on globalThis
+            name: "performance"// TODO: 'performance' is a property on globalThis
         },
         {
             name: "process" // TODO: see https://nodejs.org/api/process.html#process
         }
     ],
-    functions: [ // TODO: these are actually properties on globalThis, see also 'fetch'
+    functions: [ // TODO: these are properties on globalThis, see also 'fetch'
         {
             name: "atob"
         },
@@ -163,3 +163,5 @@ export const nodejsModels: NativeModel = {
         }
     ]
 };
+
+export const MODULE_PARAMETERS = nodejsModels.params!.map(p => p.name);

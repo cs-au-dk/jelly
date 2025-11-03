@@ -1,6 +1,7 @@
 import {
     Expression,
     Function,
+    Identifier,
     isArrayPattern,
     isAssignmentPattern,
     isExportAllDeclaration,
@@ -57,7 +58,6 @@ import {
     ConstraintVar,
     IntermediateVar,
     isObjectPropertyVarObj,
-    NodeVar,
     ObjectPropertyVarObj,
     ReadResultVar
 } from "./constraintvars";
@@ -133,14 +133,10 @@ export class Operations {
      * Also adds @Unknown and a subset constraint for globalThis.E if the given expression E is an implicitly declared global variable.
      */
     expVar(exp: Expression | JSXIdentifier | JSXMemberExpression | JSXNamespacedName, path: NodePath): ConstraintVar | undefined {
-        const v = this.solver.varProducer.expVar(exp, path);
+        const {v, unbound} = this.solver.varProducer.expVar2(exp, path);
 
-        // if the expression is a variable that has not been declared normally... (unbound set by preprocessAst)
-        if (v instanceof NodeVar && isIdentifier(v.node) && (v.node.loc as Location).unbound) {
-
-            // the variable may be a property of globalThis
-            // constraint: globalThis.X ∈ ⟦X⟧
-            this.solver.addSubsetConstraint(this.solver.varProducer.objPropVar(this.globalSpecialNatives.get("globalThis")!, v.node.name), v);
+        // if the expression is a variable that has not been declared normally and is not a native global...
+        if (unbound && !this.a.globalSpecialNatives![(exp as Identifier | JSXIdentifier).name]) {
 
             // the variable may be declared explicitly by unknown code
             // constraint: @Unknown ∈ ⟦X⟧
@@ -560,7 +556,7 @@ export class Operations {
             this.readProto(base, dst);
         else {
             const nativeProperty = isNativeProperty(base, prop, true);
-            const objProto = this.globalSpecialNatives?.get(OBJECT_PROTOTYPE);
+            const objProto = this.globalSpecialNatives?.[OBJECT_PROTOTYPE];
             // constraint: ... ∀ ancestors t2 of t: ...
             this.solver.addForAllAncestorsConstraint(base, TokenListener.READ_ANCESTORS, {s: prop}, (t2: Token) => {
                 if (nativeProperty && t2 !== base && t2 === objProto)
@@ -575,34 +571,34 @@ export class Operations {
     readProto(t: ObjectPropertyVarObj, dst: ConstraintVar) {
         this.solver.addSubsetConstraint(this.solver.varProducer.objPropVar(t, INTERNAL_PROTOTYPE()), dst);
         if (t instanceof ObjectToken)
-            this.solver.addTokenConstraint(this.globalSpecialNatives.get(OBJECT_PROTOTYPE)!, dst);
+            this.solver.addTokenConstraint(this.globalSpecialNatives[OBJECT_PROTOTYPE], dst);
         else if (t instanceof ArrayToken)
-            this.solver.addTokenConstraint(this.globalSpecialNatives.get(ARRAY_PROTOTYPE)!, dst);
+            this.solver.addTokenConstraint(this.globalSpecialNatives[ARRAY_PROTOTYPE], dst);
         else if (t instanceof FunctionToken || t instanceof PrototypeToken || t instanceof ClassToken)
-            this.solver.addTokenConstraint(this.globalSpecialNatives.get(FUNCTION_PROTOTYPE)!, dst);
+            this.solver.addTokenConstraint(this.globalSpecialNatives[FUNCTION_PROTOTYPE], dst);
         else if (t instanceof AllocationSiteToken) {
             if (t.kind === "Promise")
-                this.solver.addTokenConstraint(this.globalSpecialNatives.get(PROMISE_PROTOTYPE)!, dst);
+                this.solver.addTokenConstraint(this.globalSpecialNatives[PROMISE_PROTOTYPE], dst);
             else if (t.kind === "Date")
-                this.solver.addTokenConstraint(this.globalSpecialNatives.get(DATE_PROTOTYPE)!, dst);
+                this.solver.addTokenConstraint(this.globalSpecialNatives[DATE_PROTOTYPE], dst);
             else if (t.kind === "RegExp")
-                this.solver.addTokenConstraint(this.globalSpecialNatives.get(REGEXP_PROTOTYPE)!, dst);
+                this.solver.addTokenConstraint(this.globalSpecialNatives[REGEXP_PROTOTYPE], dst);
             else if (t.kind === "Error")
-                this.solver.addTokenConstraint(this.globalSpecialNatives.get(ERROR_PROTOTYPE)!, dst);
+                this.solver.addTokenConstraint(this.globalSpecialNatives[ERROR_PROTOTYPE], dst);
             else if (t.kind === "Map")
-                this.solver.addTokenConstraint(this.globalSpecialNatives.get(MAP_PROTOTYPE)!, dst);
+                this.solver.addTokenConstraint(this.globalSpecialNatives[MAP_PROTOTYPE], dst);
             else if (t.kind === "Set")
-                this.solver.addTokenConstraint(this.globalSpecialNatives.get(SET_PROTOTYPE)!, dst);
+                this.solver.addTokenConstraint(this.globalSpecialNatives[SET_PROTOTYPE], dst);
             else if (t.kind === "WeakMap")
-                this.solver.addTokenConstraint(this.globalSpecialNatives.get(WEAKMAP_PROTOTYPE)!, dst);
+                this.solver.addTokenConstraint(this.globalSpecialNatives[WEAKMAP_PROTOTYPE], dst);
             else if (t.kind === "WeakSet")
-                this.solver.addTokenConstraint(this.globalSpecialNatives.get(WEAKSET_PROTOTYPE)!, dst);
+                this.solver.addTokenConstraint(this.globalSpecialNatives[WEAKSET_PROTOTYPE], dst);
             else if (t.kind === "WeakRef")
-                this.solver.addTokenConstraint(this.globalSpecialNatives.get(WEAKREF_PROTOTYPE)!, dst);
+                this.solver.addTokenConstraint(this.globalSpecialNatives[WEAKREF_PROTOTYPE], dst);
             else if (t.kind === "PromiseResolve" || t.kind === "PromiseReject")
-                this.solver.addTokenConstraint(this.globalSpecialNatives.get(FUNCTION_PROTOTYPE)!, dst);
+                this.solver.addTokenConstraint(this.globalSpecialNatives[FUNCTION_PROTOTYPE], dst);
             else
-                this.solver.addTokenConstraint(this.globalSpecialNatives.get(OBJECT_PROTOTYPE)!, dst);
+                this.solver.addTokenConstraint(this.globalSpecialNatives[OBJECT_PROTOTYPE], dst);
         }
     }
 
@@ -727,7 +723,7 @@ export class Operations {
 
             // if writing to module.exports, also write to %exports.default
             if (base instanceof NativeObjectToken && base.name === "module" && prop === "exports")
-                this.solver.addSubsetConstraint(src, this.solver.varProducer.objPropVar(this.moduleSpecialNatives.get("exports")!, "default", ac));
+                this.solver.addSubsetConstraint(src, this.solver.varProducer.objPropVar(this.moduleSpecialNatives["exports"], "default", ac));
 
         } else if (lVar && base instanceof AccessPathToken) {
             // constraint: ...: ⟦E2⟧ ⊆ ⟦k.p⟧ where k is the current PackageObjectToken
@@ -820,13 +816,6 @@ export class Operations {
             // constraint: ⟦E⟧ ⊆ ⟦X⟧
             const lVar = vp.identVar(dst, path);
             this.solver.addSubsetConstraint(src, lVar);
-
-            // if the variable has not been declared normally... (unbound set by preprocessAst)
-            if (lVar instanceof NodeVar && (lVar.node.loc as Location).unbound) {
-
-                // constraint: ⟦E⟧ ⊆ ⟦globalThis.X⟧
-                this.solver.addSubsetConstraint(src, this.solver.varProducer.objPropVar(this.globalSpecialNatives.get("globalThis")!, dst.name));
-            }
 
         } else if (isMemberExpression(dst) || isOptionalMemberExpression(dst)) {
             const e = getEnclosingFunction(path)?.node;

@@ -159,7 +159,7 @@ describe("tests/unit/analysis", () => {
             solver.addTokenConstraint(ft, g2);
             solver.addTokenConstraint(at, solver.varProducer.returnVar(fun0));
 
-            const op = new Operations(m, solver, new Map());
+            const op = new Operations(m, solver, {});
             const r2 = op.readPropertyFromChain(ot2, "A")!;
             await solver.propagate("test");
             expect(getTokens(r2)).toEqual([at]);

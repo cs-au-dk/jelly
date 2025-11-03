@@ -255,11 +255,11 @@ export function returnIterator(kind: IteratorKind, p: NativeFunctionParams) { //
             const iter = a.canonicalizeToken(new AllocationSiteToken("Iterator", t.allocSite));
             p.solver.addTokenConstraint(iter, vp.expVar(p.path.node, p.path));
             const iterNext = vp.objPropVar(iter, "next"); // TODO: inherit from Generator.prototype instead of copying properties
-            p.solver.addTokenConstraint(p.globalSpecialNatives.get(GENERATOR_PROTOTYPE_NEXT)!, iterNext);
+            p.solver.addTokenConstraint(p.globalSpecialNatives[GENERATOR_PROTOTYPE_NEXT], iterNext);
             const iterReturn = vp.objPropVar(iter, "return");
-            p.solver.addTokenConstraint(p.globalSpecialNatives.get(GENERATOR_PROTOTYPE_RETURN)!, iterReturn);
+            p.solver.addTokenConstraint(p.globalSpecialNatives[GENERATOR_PROTOTYPE_RETURN], iterReturn);
             const iterThrow = vp.objPropVar(iter, "throw");
-            p.solver.addTokenConstraint(p.globalSpecialNatives.get(GENERATOR_PROTOTYPE_THROW)!, iterThrow);
+            p.solver.addTokenConstraint(p.globalSpecialNatives[GENERATOR_PROTOTYPE_THROW], iterThrow);
             switch (kind) {
                 case "ArrayKeys": {
                     if (t.kind !== "Array")

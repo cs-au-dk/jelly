@@ -1050,4 +1050,8 @@ describe("tests/micro", () => {
         functionInfos: 8,
         numberOfFunctionToFunctionEdges: 10,
     });
+
+    runTest("tests/micro", "undeclared.js", {
+        numberOfCallToFunctionEdges: 5,
+    });
 });

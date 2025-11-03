@@ -1,4 +1,4 @@
-import {CallExpression, identifier, Identifier, NewExpression, OptionalCallExpression, SourceLocation} from "@babel/types";
+import {CallExpression, Identifier, NewExpression, OptionalCallExpression} from "@babel/types";
 import Solver from "../analysis/solver";
 import {NativeObjectToken} from "../analysis/tokens";
 import {ModuleInfo} from "../analysis/infos";
@@ -8,7 +8,6 @@ import {nodejsModels} from "./nodejs";
 import {options} from "../options";
 import logger from "../misc/logger";
 import {Operations} from "../analysis/operations";
-import {Location} from "../misc/util";
 import {ObjectPropertyVarObj} from "../analysis/constraintvars";
 
 export type CallNodePath = NodePath<CallExpression | OptionalCallExpression | NewExpression>;
@@ -64,24 +63,24 @@ export type NativeClassModel = {
     methods?: Array<NativeFunctionModel>
 };
 
-export type SpecialNativeObjects = Map<string, NativeObjectToken>;
+export type SpecialNativeObjects = Record<string, NativeObjectToken>;
 
 /**
  * Prepares models for the ECMAScript and Node.js native declarations.
- * Returns the global identifiers and the tokens for special native objects.
+ * Returns the tokens for special native objects.
  */
-export function buildNatives(solver: Solver, moduleInfo: ModuleInfo): {globals: Array<Identifier>, moduleSpecialNatives: SpecialNativeObjects, globalSpecialNatives: SpecialNativeObjects} {
-    const globals: Array<Identifier> = [];
-    const moduleSpecialNatives: SpecialNativeObjects = new Map;
-    const globalSpecialNatives: SpecialNativeObjects = new Map;
+export function buildNatives(solver: Solver, moduleInfo: ModuleInfo, moduleParams: Map<string, Identifier>): {
+    moduleSpecialNatives: SpecialNativeObjects,
+    globalSpecialNatives: SpecialNativeObjects
+} {
+    const moduleSpecialNatives: SpecialNativeObjects = {};
+    const globalSpecialNatives: SpecialNativeObjects = {};
     const f = solver.fragmentState;
     const a = solver.globalState;
     solver.phase = "init";
 
     const models = [ecmascriptModels, nodejsModels];
     for (const m of models) {
-        const moduleLoc: Location = {start: {line: 0, column: 0}, end: {line: 0, column: 0}, module: moduleInfo, native: `%${m.name}`};
-        const globalLoc: Location = {start: {line: 0, column: 0}, end: {line: 0, column: 0}, native: `%${m.name}`}; // dummy location for global identifiers
 
         /**
          * Adds an identifier to the global scope.
@@ -97,18 +96,13 @@ export function buildNatives(solver: Solver, moduleInfo: ModuleInfo): {globals: 
                 const t = init
                     ? init({solver, moduleInfo, moduleSpecialNatives, globalSpecialNatives})
                     : a.canonicalizeToken(new NativeObjectToken(name, moduleSpecific ? moduleInfo : undefined, invoke, constr));
-                (moduleSpecific ? moduleSpecialNatives : globalSpecialNatives).set(name, t);
-                if (!hidden) {
-                    let id = solver.globalState.canonicalGlobals.get(name);
-                    if (!id) {
-                        id = identifier(name);
-                        id.loc = (moduleSpecific ? moduleLoc : globalLoc) as SourceLocation; // ignoring filename, identifierName, start.index, end.index
-                        if (!moduleSpecific)
-                            solver.globalState.canonicalGlobals.set(name, id);
-                    }
-                    globals.push(id);
-                    solver.addTokenConstraint(t, f.varProducer.nodeVar(id));
-                }
+                (moduleSpecific ? moduleSpecialNatives : globalSpecialNatives)[name] = t;
+                if (!hidden)
+                    solver.addTokenConstraint(t,
+                        moduleSpecific ?
+                        f.varProducer.nodeVar(moduleParams.get(name)!) :
+                        f.varProducer.objPropVar(globalSpecialNatives["globalThis"], name)
+                    );
             }
         }
 
@@ -125,9 +119,9 @@ export function buildNatives(solver: Solver, moduleInfo: ModuleInfo): {globals: 
         function definePrototypeObject(name: string): NativeObjectToken {
             const t = a.canonicalizeToken(new NativeObjectToken(`${name}.prototype`));
             if (m.name === "ecmascript")
-                globalSpecialNatives.set(t.name, t);
+                globalSpecialNatives[t.name] = t;
             if (options.natives || m.name === "ecmascript")
-                solver.addTokenConstraint(t, f.varProducer.objPropVar(globalSpecialNatives.get(name)!, "prototype"));
+                solver.addTokenConstraint(t, f.varProducer.objPropVar(globalSpecialNatives[name], "prototype"));
             return t;
         }
 
@@ -145,8 +139,8 @@ export function buildNatives(solver: Solver, moduleInfo: ModuleInfo): {globals: 
             if (options.natives) {
                 const t = a.canonicalizeToken(new NativeObjectToken(`${x.name}.${nf.name}`, undefined, nf.invoke));
                 if (m.name === "ecmascript")
-                    globalSpecialNatives.set(t.name, t);
-                solver.addTokenConstraint(t, f.varProducer.objPropVar(globalSpecialNatives.get(x.name)!, nf.name));
+                    globalSpecialNatives[t.name] = t;
+                solver.addTokenConstraint(t, f.varProducer.objPropVar(globalSpecialNatives[x.name], nf.name));
             }
         }
 
@@ -157,7 +151,7 @@ export function buildNatives(solver: Solver, moduleInfo: ModuleInfo): {globals: 
             if (options.natives) {
                 const t = a.canonicalizeToken(new NativeObjectToken(`${x.name}.prototype.${nf.name}`, undefined, nf.invoke));
                 if (m.name === "ecmascript")
-                    globalSpecialNatives.set(t.name, t);
+                    globalSpecialNatives[t.name] = t;
                 solver.addTokenConstraint(t, f.varProducer.objPropVar(pro, nf.name));
             }
         }
@@ -211,5 +205,5 @@ export function buildNatives(solver: Solver, moduleInfo: ModuleInfo): {globals: 
     if (logger.isVerboseEnabled())
         logger.verbose("Adding natives completed");
 
-    return {globals, moduleSpecialNatives, globalSpecialNatives};
+    return {moduleSpecialNatives, globalSpecialNatives};
 }

@@ -31,6 +31,7 @@ export function runTest(basedir: string,
                             moduleInfos?: number,
                             packageInfos?: number,
                             numberOfFunctionToFunctionEdges?: number,
+                            numberOfCallToFunctionEdges?: number,
                             oneCalleeCalls?: number,
                             funFound?: number,
                             funTotal?: number,
@@ -96,6 +97,8 @@ export function runTest(basedir: string,
                 test("packageInfos", () => expect(solver.globalState.packageInfos.size).toBe(args.packageInfos));
             if (args.numberOfFunctionToFunctionEdges !== undefined)
                 test("numberOfFunctionToFunctionEdges", () => expect(solver.fragmentState.numberOfFunctionToFunctionEdges).toBe(args.numberOfFunctionToFunctionEdges));
+            if (args.numberOfCallToFunctionEdges !== undefined)
+                test("numberOfCallToFunctionEdges", () => expect(solver.fragmentState.numberOfCallToFunctionEdges).toBe(args.numberOfCallToFunctionEdges));
             if (args.oneCalleeCalls !== undefined)
                 test("oneCalleeCalls", () => expect(new AnalysisStateReporter(solver.fragmentState).getOneCalleeCalls()).toBe(args.oneCalleeCalls));
         });

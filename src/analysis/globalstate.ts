@@ -1,4 +1,4 @@
-import {Function, Identifier, Node} from "@babel/types";
+import {Function, Node} from "@babel/types";
 import {FilePath, getOrSet, Location, locationToStringWithFile, mapGetMap, strHash} from "../misc/util";
 import {
     AccessorType,
@@ -73,11 +73,6 @@ export class GlobalState {
      * Map from access path string hash to canonical AccessPath object.
      */
     readonly canonicalAccessPaths: Map<string, AccessPath> = new Map;
-
-    /**
-     * Canonical global identifiers (excluding module-specific).
-     */
-    readonly canonicalGlobals: Map<string, Identifier> = new Map;
 
     /**
      * Map from "name@version" to package info, "<main>" is used for entry files if no package.json is found.

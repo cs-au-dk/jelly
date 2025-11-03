@@ -33,11 +33,9 @@ import {
     ThisVar
 } from "./constraintvars";
 import {ArrayToken, ObjectToken, PackageObjectToken} from "./tokens";
-import {Location} from "../misc/util";
 import {PackageInfo} from "./infos";
 import {GlobalState} from "./globalstate";
 import {FragmentState, MergeRepresentativeVar, RepresentativeVar} from "./fragmentstate";
-import assert from "assert";
 import Solver from "./solver";
 import {ARRAY_ALL, ARRAY_UNKNOWN} from "../natives/ecmascript";
 import {options} from "../options";
@@ -57,48 +55,51 @@ export class ConstraintVarProducer<RVT extends RepresentativeVar | MergeRepresen
      * Finds the constraint variable for the given expression in the current module.
      * For parenthesized expressions, the inner expression is used.
      * If the expression definitely cannot evaluate to a function value, undefined is returned.
-     * For Identifier expressions, the declaration node is used as constraint variable;
-     * For Super expressions, a ClassExtendsVar is used.
+     * For Identifier expressions, the declaration node is used as constraint variable.
      * For other expressions, the expression itself is used.
      */
     expVar(exp: Expression | JSXIdentifier | JSXMemberExpression | JSXNamespacedName, path: NodePath): ConstraintVar | undefined {
+        return this.expVar2(exp, path).v;
+    }
+
+    expVar2(exp: Expression | JSXIdentifier | JSXMemberExpression | JSXNamespacedName, path: NodePath): {
+        v: ConstraintVar | undefined,
+        unbound?: boolean
+    } {
         while (isParenthesizedExpression(exp))
             exp = exp.expression; // for parenthesized expressions, use the inner expression
         if (isJSXIdentifier(exp) && exp.name[0] !== exp.name[0].toUpperCase()) // component names always start with capital letter
-            return undefined;
+            return {v: undefined};
         if (isIdentifier(exp) || isJSXIdentifier(exp)) {
-            const id = this.identVar(exp, path);
-            if (id instanceof NodeVar && exp.name === "undefined" && (id.node?.loc as Location)?.native === "%ecmascript")
-                return undefined;
-            return id;
+            if (exp.name === "undefined" && !path.scope.getBinding(exp.name)) // 'undefined' is non-writable and non-configurable
+                return {v: undefined};
+            return this.identVar2(exp, path);
         } else if (isNumericLiteral(exp) || isBigIntLiteral(exp) || isNullLiteral(exp) || isBooleanLiteral(exp) ||
             isStringLiteral(exp) || // note: currently skipping string literals
             isUnaryExpression(exp) || isBinaryExpression(exp) || isUpdateExpression(exp))
-            return undefined; // those expressions never evaluate to functions or objects and can safely be skipped
-        return this.nodeVar(exp); // other expressions are already canonical
+            return {v: undefined}; // those expressions never evaluate to functions or objects and can safely be skipped
+        return {v: this.nodeVar(exp)};
     }
 
     /**
      * Finds the constraint variable for the given identifier in the current module.
-     * If not found, it is added to the program scope (except for 'arguments').
      */
     identVar(id: Identifier | JSXIdentifier, path: NodePath): ConstraintVar {
+        return this.identVar2(id, path).v;
+    }
+
+    identVar2(id: Identifier | JSXIdentifier, path: NodePath): {
+        v: ConstraintVar,
+        unbound?: boolean
+    } {
         const binding = path.scope.getBinding(id.name);
-        let d;
         if (binding)
-            d = binding.identifier;
-        else {
-            if (id.name === "arguments") {
-                const fun = this.f.registerArguments(path);
-                return fun ? this.argumentsVar(fun) : this.nodeVar(id); // using the identifier itself as fallback if no enclosing function
-            } else {
-                const ps = path.scope.getProgramParent();
-                d = ps.getBinding(id.name)?.identifier;
-                if (!d)
-                    assert.fail(`No binding for identifier ${id.name}, should be set by preprocessAst`);
-            }
-        }
-        return this.nodeVar(d);
+            return {v: this.nodeVar(binding.identifier)};
+        else if (id.name === "arguments") {
+            const fun = this.f.registerArguments(path);
+            return {v: fun ? this.argumentsVar(fun) : this.nodeVar(id)}; // FIXME: currently using the identifier itself as fallback if no enclosing function (should instead model arguments to module wrapper)
+        } else
+            return {v: this.objPropVar(this.a.globalSpecialNatives!["globalThis"], id.name), unbound: true};
     }
 
     /**

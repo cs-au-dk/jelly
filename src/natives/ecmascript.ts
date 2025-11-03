@@ -152,11 +152,11 @@ export const ecmascriptModels: NativeModel = {
         const theDatePackageObjectToken = p.solver.globalState.canonicalizeToken(new PackageObjectToken(p.moduleInfo.packageInfo, "Date"));
         const theRegExpPackageObjectToken = p.solver.globalState.canonicalizeToken(new PackageObjectToken(p.moduleInfo.packageInfo, "RegExp"));
         const theErrorPackageObjectToken = p.solver.globalState.canonicalizeToken(new PackageObjectToken(p.moduleInfo.packageInfo, "Error"));
-        p.solver.addInherits(thePackageObjectToken, p.globalSpecialNatives.get(OBJECT_PROTOTYPE)!);
-        p.solver.addInherits(theArrayPackageObjectToken, p.globalSpecialNatives.get(ARRAY_PROTOTYPE)!);
-        p.solver.addInherits(theDatePackageObjectToken, p.globalSpecialNatives.get(DATE_PROTOTYPE)!);
-        p.solver.addInherits(theRegExpPackageObjectToken, p.globalSpecialNatives.get(REGEXP_PROTOTYPE)!);
-        p.solver.addInherits(theErrorPackageObjectToken, p.globalSpecialNatives.get(ERROR_PROTOTYPE)!);
+        p.solver.addInherits(thePackageObjectToken, p.globalSpecialNatives[OBJECT_PROTOTYPE]);
+        p.solver.addInherits(theArrayPackageObjectToken, p.globalSpecialNatives[ARRAY_PROTOTYPE]);
+        p.solver.addInherits(theDatePackageObjectToken, p.globalSpecialNatives[DATE_PROTOTYPE]);
+        p.solver.addInherits(theRegExpPackageObjectToken, p.globalSpecialNatives[REGEXP_PROTOTYPE]);
+        p.solver.addInherits(theErrorPackageObjectToken, p.globalSpecialNatives[ERROR_PROTOTYPE]);
         // TODO: all NativeObjectToken objects and AccessPathToken objects should also inherit from Object.prototype, Array.prototype and Function.prototype?
     },
     variables: [

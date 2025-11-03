@@ -13,24 +13,10 @@ import {
     File,
     Identifier,
     identifier,
-    isBreakStatement,
     isCallExpression,
     isClassMethod,
     isClassPrivateMethod,
     isClassPrivateProperty,
-    isClassProperty,
-    isContinueStatement,
-    isIdentifier,
-    isImportSpecifier,
-    isJSXAttribute,
-    isJSXIdentifier,
-    isJSXMemberExpression,
-    isLabeledStatement,
-    isMemberExpression,
-    isObjectMethod,
-    isObjectProperty,
-    isOptionalMemberExpression,
-    isPrivateName,
     isSuper,
     isTSExternalModuleReference,
     Node,
@@ -46,11 +32,11 @@ import {
     variableDeclarator
 } from '@babel/types';
 import traverse from "@babel/traverse";
-import logger from "../misc/logger";
 import {getClass} from "../misc/asthelpers";
 import assert from "assert";
 import {Location} from "../misc/util";
 import {ModuleInfo} from "../analysis/infos";
+import {MODULE_PARAMETERS} from "../natives/nodejs";
 
 /**
  * Replaces TypeScript "export =" and "import =" syntax and creates default constructors.
@@ -120,7 +106,7 @@ export const JELLY_NODE_ID = Symbol("JELLY_NODE_ID");
 /**
  * Preprocesses the given AST.
  */
-export function preprocessAst(ast: File, module?: ModuleInfo, globals?: Array<Identifier>) {
+export function preprocessAst(ast: File, module?: ModuleInfo): Map<string, Identifier> {
     let nextNodeID = 0;
 
     function register(n: Node) {
@@ -128,22 +114,25 @@ export function preprocessAst(ast: File, module?: ModuleInfo, globals?: Array<Id
             (n as any)[JELLY_NODE_ID] = nextNodeID++;
     }
 
-    // artificially declare all native globals in the program scope (if not already declared)
-    if (globals)
-        traverse(ast, {
-            Program(path: NodePath<Program>) {
-                const decls = globals.filter(d => path.scope.getBinding(d.name) === undefined)
-                    .map(id => {
-                        const d = variableDeclarator(id);
-                        d.loc = id.loc;
-                        return d;
-                    });
-                const d = variableDeclaration("var", decls);
-                (d.loc as Location) = {start: {line: 0, column: 0}, end: {line: 0, column: 0}, native: "%ecmascript"};
-                path.scope.registerDeclaration(path.pushContainer("body", d)[0]);
-                path.stop();
-            }
-        });
+    // artificially declare all module parameters in the program scope (if not already declared)
+    const moduleLoc: Location = {start: {line: 0, column: 0}, end: {line: 0, column: 0}, module, native: "%nodejs"};
+    const moduleParams = new Map<string, Identifier>();
+    traverse(ast, {
+        Program(path: NodePath<Program>) {
+            const d = variableDeclaration("var",
+                MODULE_PARAMETERS.filter(p => path.scope.getBinding(p) === undefined).map(p => {
+                    const id = identifier(p);
+                    (id.loc as Location) = moduleLoc;
+                    moduleParams.set(p, id);
+                    const d = variableDeclarator(id);
+                    (d.loc as Location) = moduleLoc;
+                    return d;
+                }));
+            (d.loc as Location) = moduleLoc;
+            path.scope.registerDeclaration(path.pushContainer("body", d)[0]);
+            path.stop();
+        }
+    });
 
     traverse(ast, {
         enter(path: NodePath) {
@@ -181,34 +170,8 @@ export function preprocessAst(ast: File, module?: ModuleInfo, globals?: Array<Id
             // set module (if not already set and not native)
             if (module && (n.loc as Location).module === undefined && (n.loc as Location).native === undefined)
                 (n.loc as Location).module = module;
-
-            // add bindings in global scope for identifiers with missing binding
-            if (module &&
-                (isIdentifier(n) || isJSXIdentifier(n)) &&
-                n.name !== "arguments" && !path.scope.getBinding(n.name) &&
-                !((isMemberExpression(path.parent) || isOptionalMemberExpression(path.parent) || isJSXMemberExpression(path.parent)) &&
-                    path.parent.property === path.node) &&
-                !(isObjectProperty(path.parent) && path.parent.key === n) &&
-                !(isObjectMethod(path.parent) && path.parent.key === n) &&
-                !(isClassProperty(path.parent) && path.parent.key === n) &&
-                !(isClassMethod(path.parent) && path.parent.key === n) &&
-                !(isPrivateName(path.parent) && isClassPrivateProperty(path.parentPath?.parent) && path.parentPath?.parent?.key === path.parent) &&
-                !(isPrivateName(path.parent) && isClassPrivateMethod(path.parentPath?.parent) && path.parentPath?.parent?.key === path.parent) &&
-                !(isLabeledStatement(path.parent) && path.parent.label === n) &&
-                !isContinueStatement(path.parent) &&
-                !isBreakStatement(path.parent) &&
-                !isImportSpecifier(path.parent) &&
-                !isJSXAttribute(path.parent)) {
-                const ps = path.scope.getProgramParent();
-                if (!ps.getBinding(n.name)?.identifier) {
-                    const d = identifier(n.name);
-                    register(d);
-                    d.loc = {filename: ast.loc?.filename, start: {line: 0, column: 0}, end: {line: 0, column: 0}, module, nodeIndex: (n as any)[JELLY_NODE_ID], unbound: true} as unknown as SourceLocation; // unbound used by expVar
-                    ps.push({id: d});
-                    if (logger.isDebugEnabled())
-                        logger.debug(`No binding for identifier ${n.name} (parent: ${path.parent.type}), creating one in program scope`);
-                }
-            }
         }
     });
+
+    return moduleParams;
 }

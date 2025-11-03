@@ -546,35 +546,35 @@ export default class Solver {
             const g = this.globalState.globalSpecialNatives;
             if (g) { // (not set when called from unit tests)
                 if (t instanceof ObjectToken || t instanceof PrototypeToken)
-                    this.callTokenListener(id, listener, g.get(OBJECT_PROTOTYPE)!);
+                    this.callTokenListener(id, listener, g[OBJECT_PROTOTYPE]);
                 else if (t instanceof ArrayToken) {
-                    this.callTokenListener(id, listener, g.get(ARRAY_PROTOTYPE)!);
-                    this.callTokenListener(id, listener, g.get(OBJECT_PROTOTYPE)!);
+                    this.callTokenListener(id, listener, g[ARRAY_PROTOTYPE]);
+                    this.callTokenListener(id, listener, g[OBJECT_PROTOTYPE]);
                 } else if (t instanceof FunctionToken || t instanceof ClassToken) {
-                    this.callTokenListener(id, listener, g.get(FUNCTION_PROTOTYPE)!);
-                    this.callTokenListener(id, listener, g.get(OBJECT_PROTOTYPE)!);
+                    this.callTokenListener(id, listener, g[FUNCTION_PROTOTYPE]);
+                    this.callTokenListener(id, listener, g[OBJECT_PROTOTYPE]);
                 } else if (t instanceof AllocationSiteToken) {
                     if (t.kind === "Promise")
-                        this.callTokenListener(id, listener, g.get(PROMISE_PROTOTYPE)!);
+                        this.callTokenListener(id, listener, g[PROMISE_PROTOTYPE]);
                     else if (t.kind === "Date")
-                        this.callTokenListener(id, listener, g.get(DATE_PROTOTYPE)!);
+                        this.callTokenListener(id, listener, g[DATE_PROTOTYPE]);
                     else if (t.kind === "RegExp")
-                        this.callTokenListener(id, listener, g.get(REGEXP_PROTOTYPE)!);
+                        this.callTokenListener(id, listener, g[REGEXP_PROTOTYPE]);
                     else if (t.kind === "Error")
-                        this.callTokenListener(id, listener, g.get(ERROR_PROTOTYPE)!);
+                        this.callTokenListener(id, listener, g[ERROR_PROTOTYPE]);
                     else if (t.kind === "Map")
-                        this.callTokenListener(id, listener, g.get(MAP_PROTOTYPE)!);
+                        this.callTokenListener(id, listener, g[MAP_PROTOTYPE]);
                     else if (t.kind === "Set")
-                        this.callTokenListener(id, listener, g.get(SET_PROTOTYPE)!);
+                        this.callTokenListener(id, listener, g[SET_PROTOTYPE]);
                     else if (t.kind === "WeakMap")
-                        this.callTokenListener(id, listener, g.get(WEAKMAP_PROTOTYPE)!);
+                        this.callTokenListener(id, listener, g[WEAKMAP_PROTOTYPE]);
                     else if (t.kind === "WeakSet")
-                        this.callTokenListener(id, listener, g.get(WEAKSET_PROTOTYPE)!);
+                        this.callTokenListener(id, listener, g[WEAKSET_PROTOTYPE]);
                     else if (t.kind === "WeakRef")
-                        this.callTokenListener(id, listener, g.get(WEAKREF_PROTOTYPE)!);
+                        this.callTokenListener(id, listener, g[WEAKREF_PROTOTYPE]);
                     else if (t.kind === "PromiseResolve" || t.kind === "PromiseReject")
-                        this.callTokenListener(id, listener, g.get(FUNCTION_PROTOTYPE)!);
-                    this.callTokenListener(id, listener, g.get(OBJECT_PROTOTYPE)!);
+                        this.callTokenListener(id, listener, g[FUNCTION_PROTOTYPE]);
+                    this.callTokenListener(id, listener, g[OBJECT_PROTOTYPE]);
                 }
             }
         }
