@@ -78,6 +78,7 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
                     continue;
                 }
                 moduleInfo.loc = ast.program.loc!;
+                a.modules.set(moduleInfo, ast.program);
                 a.filesAnalyzed.push(file);
                 const fileSize = statSync(file).size;
                 d.codeSize += fileSize;

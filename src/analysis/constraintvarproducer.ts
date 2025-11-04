@@ -16,7 +16,8 @@ import {
     JSXIdentifier,
     JSXMemberExpression,
     JSXNamespacedName,
-    Node
+    Node,
+    Program
 } from "@babel/types";
 import {NodePath} from "@babel/traverse";
 import {
@@ -95,9 +96,9 @@ export class ConstraintVarProducer<RVT extends RepresentativeVar | MergeRepresen
         const binding = path.scope.getBinding(id.name);
         if (binding)
             return {v: this.nodeVar(binding.identifier)};
-        else if (id.name === "arguments") {
+        else if (id.name === "arguments") { // FIXME: 'arguments' should be defined on all non-arrow functions
             const fun = this.f.registerArguments(path);
-            return {v: fun ? this.argumentsVar(fun) : this.nodeVar(id)}; // FIXME: currently using the identifier itself as fallback if no enclosing function (should instead model arguments to module wrapper)
+            return {v: this.argumentsVar(fun ?? path.findParent(p => p.isProgram())!.node as Program)};
         } else
             return {v: this.objPropVar(this.a.globalSpecialNatives!["globalThis"], id.name), unbound: true};
     }
@@ -151,7 +152,7 @@ export class ConstraintVarProducer<RVT extends RepresentativeVar | MergeRepresen
     /**
      * Finds the constraint variable representing 'arguments' for the given function.
      */
-    argumentsVar(fun: Function): ArgumentsVar {
+    argumentsVar(fun: Function | Program): ArgumentsVar {
         return this.a.canonicalizeVar(new ArgumentsVar(fun));
     }
 

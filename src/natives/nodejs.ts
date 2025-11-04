@@ -1,5 +1,5 @@
 import {NativeFunctionParams, NativeModel, NativeModelParams} from "./nativebuilder";
-import {NativeObjectToken} from "../analysis/tokens";
+import {ArrayToken, NativeObjectToken} from "../analysis/tokens";
 import {invokeCallback} from "./nativehelpers";
 
 /*
@@ -10,18 +10,25 @@ import {invokeCallback} from "./nativehelpers";
 export const nodejsModels: NativeModel = {
     name: "nodejs",
     init: (p: NativeModelParams) => {
+        const a = p.solver.globalState;
+        const vp = p.solver.varProducer;
         // module.exports = exports (when writing to module.exports, also write to %exports.default)
         const exp = p.moduleSpecialNatives["exports"];
-        p.solver.addTokenConstraint(exp, p.solver.varProducer.objPropVar(p.moduleSpecialNatives["module"], "exports"));
-        p.solver.addTokenConstraint(exp, p.solver.varProducer.objPropVar(p.moduleSpecialNatives["exports"], "default"));
-        // TODO: model module.require?
-        const a = p.solver.globalState;
-        const rt = a.canonicalizeToken(new NativeObjectToken("require", p.moduleInfo));
-        // add a special object representing the value of require.extensions
-        // to the extensions property of the require variable
-        p.solver.addTokenConstraint(
-            a.canonicalizeToken(new NativeObjectToken("require.extensions", p.moduleInfo)),
-            p.solver.varProducer.objPropVar(rt, "extensions"));
+        const req = a.canonicalizeToken(new NativeObjectToken("require", p.moduleInfo));
+        const mod = p.moduleSpecialNatives["module"];
+        p.solver.addTokenConstraint(exp, vp.objPropVar(mod, "exports"));
+        p.solver.addTokenConstraint(exp, vp.objPropVar(exp, "default"));
+        // model 'arguments' of module wrapper function
+        const prog = a.modules.get(p.moduleInfo)!;
+        const args = a.canonicalizeToken(new ArrayToken(prog));
+        p.solver.addTokenConstraint(args, vp.argumentsVar(prog));
+        p.solver.addTokenConstraint(exp, vp.objPropVar(args, "0"));
+        p.solver.addTokenConstraint(req, vp.objPropVar(args, "1"));
+        p.solver.addTokenConstraint(mod, vp.objPropVar(args, "2"));
+        // model require.extensions
+        const reqext = a.canonicalizeToken(new NativeObjectToken("require.extensions", p.moduleInfo));
+        p.solver.addTokenConstraint(reqext, vp.objPropVar(req, "extensions"));
+        // TODO: model module.require? (resolves relative to that module!)
     },
     params: [
         {

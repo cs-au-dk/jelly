@@ -1,4 +1,4 @@
-import {Function, isIdentifier, Node} from "@babel/types";
+import {Function, isIdentifier, Node, Program} from "@babel/types";
 import {nodeToString, locationToStringWithFileAndEnd} from "../misc/util";
 import {
     AccessPathToken,
@@ -157,7 +157,7 @@ export class ThisVar extends ConstraintVar {
  */
 export class ArgumentsVar extends ConstraintVar {
 
-    constructor(readonly fun: Function) {
+    constructor(readonly fun: Function | Program) {
         super();
     }
 
