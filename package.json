@@ -30,6 +30,7 @@
   "scripts": {
     "build": "npm run chmod; tsc --build tsconfig-build.json",
     "build-watch": "npm run chmod; tsc --build tsconfig-build.json -w",
+    "build-watch-tsgo": "npm run chmod; tsgo --build tsconfig-build.json -w",
     "start": "node lib/main.js",
     "chmod": "mkdir -p lib; touch lib/main.js lib/server.js; chmod +x lib/main.js lib/server.js",
     "tests-install": "tests/install.sh",
