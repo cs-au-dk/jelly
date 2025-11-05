@@ -305,6 +305,27 @@ export function isMemberRead(path: NodePath<MemberExpression | OptionalMemberExp
 }
 
 /**
+ * Returns true if the given identifier is a variable reference.
+ */
+export function isIdentifierReference(path: NodePath<Identifier>): boolean {
+    const p = path.parentPath!;
+    const n = path.node;
+    return !(
+        ((p.isObjectProperty({key: n}) || p.isObjectMethod({key: n})) && !p.node.computed) ||
+        (p.isMemberExpression() && p.node.property === n && !p.node.computed) ||
+        (p.isClassMethod() && p.node.key === n && !p.node.computed) ||
+        (p.isClassProperty() && isIdentifier(p.node.key) && p.node.key === n && !p.node.computed) ||
+        p.isLabeledStatement({label: n}) ||
+        p.isMetaProperty({property: n}) ||
+        p.isImportDefaultSpecifier({local: n}) ||
+        p.isImportNamespaceSpecifier({local: n}) ||
+        p.isImportSpecifier({imported: n}) ||
+        p.isExportSpecifier({exported: n}) ||
+        (p.isObjectProperty() && p.parentPath?.isObjectPattern() && p.node.key === n && !p.node.computed)
+    );
+}
+
+/**
  * Returns the constructor for the given class.
  * (See replaceTypeScriptImportExportAssignmentsAndAddConstructors.)
  */

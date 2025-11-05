@@ -40,6 +40,7 @@ import {FragmentState, MergeRepresentativeVar, RepresentativeVar} from "./fragme
 import Solver from "./solver";
 import {ARRAY_ALL, ARRAY_UNKNOWN} from "../natives/ecmascript";
 import {options} from "../options";
+import {getEnclosingNonArrowFunction} from "../misc/asthelpers";
 
 export class ConstraintVarProducer<RVT extends RepresentativeVar | MergeRepresentativeVar = RepresentativeVar> {
 
@@ -96,10 +97,9 @@ export class ConstraintVarProducer<RVT extends RepresentativeVar | MergeRepresen
         const binding = path.scope.getBinding(id.name);
         if (binding)
             return {v: this.nodeVar(binding.identifier)};
-        else if (id.name === "arguments") { // FIXME: 'arguments' should be defined on all non-arrow functions
-            const fun = this.f.registerArguments(path);
-            return {v: this.argumentsVar(fun ?? path.findParent(p => p.isProgram())!.node as Program)};
-        } else
+        else if (id.name === "arguments")
+            return {v: this.argumentsVar(getEnclosingNonArrowFunction(path) ?? path.findParent(p => p.isProgram())!.node as Program)};
+        else
             return {v: this.objPropVar(this.a.globalSpecialNatives!["globalThis"], id.name), unbound: true};
     }
 

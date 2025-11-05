@@ -108,6 +108,7 @@ import {
     getKey,
     getProperty,
     isCalleeExpression,
+    isIdentifierReference,
     isMemberRead,
     isParentExpressionStatement,
     registerArtificialClassPropertyInitializer,
@@ -207,8 +208,8 @@ export function visit(ast: File, op: Operations) {
         },
 
         Identifier(path: NodePath<Identifier>) {
-            if (path.node.name === "arguments") // registers use of 'arguments'
-                vp.identVar(path.node, path); // FIXME: registerArguments may be called too late if the function is recursive
+            if (path.node.name === "arguments" && !path.scope.getBinding(path.node.name) && isIdentifierReference(path))
+                f.registerArguments(path); // FIXME: registerArguments may be called too late if the function is recursive
 
             if (options.variableKinds) {
                 const binding = path.scope.getBinding(path.node.name);
