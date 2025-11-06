@@ -285,6 +285,8 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
                     a.approx!.printDiagnostics();
                 if (options.approx || options.approxLoad)
                     a.patching!.printDiagnostics(solver);
+                if (options.vulnerabilitiesFull)
+                    logger.info(`Vulnerability collection: ${nanoToMs(d.vulnerabilities!.vulnerabilityCollectionTime)}`);
             }
         }
     }

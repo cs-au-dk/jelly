@@ -256,7 +256,7 @@ export class GlobalState {
         this.functionInfos.set(fun, f);
         const parent = getEnclosingFunction(path)?.node;
         (parent ? this.functionInfos.get(parent)!.functions : m.functions).add(f);
-        this.vulnerabilities?.reachedFunction(path, f); // TODO: move to FragmentState?
+        this.vulnerabilities?.reachedFunction(f); // TODO: move to FragmentState?
     }
 
     /**

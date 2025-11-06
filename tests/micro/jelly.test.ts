@@ -977,18 +977,9 @@ describe("tests/micro", () => {
     describe("packagejson", () =>
         runTest("tests/micro/packagejson", "index.js", {
             vulnerabilities: [{
-                osv: {
-                    cvss: {
-                        score: 1,
-                        vectorString: null,
-                    },
-                    cwe: ["1"],
-                    dependency: "terser",
+                npm: {
                     name: "terser",
                     range: "<2.0.0",
-                    severity: "high",
-                    source: 1,
-                    title: "title",
                     url: "url",
                 },
                 patterns: ["call <terser>.minify"],
@@ -999,15 +990,9 @@ describe("tests/micro", () => {
     describe("packagealias", () =>
         runTest("tests/micro/packagealias", "index.js", {
             vulnerabilities: [{
-                osv: {
-                    cwe: [],
-                    cvss: {score: 1, vectorString: ""},
-                    dependency: "set-value",
+                npm: {
+                    name: "set-value",
                     range: ">=3.0.0 <3.0.3 || >=4.0.0 <4.0.1 || <2.0.1",
-                    name: "terser",
-                    severity: "high",
-                    source: 1,
-                    title: "title",
                     url: "url"
                 },
                 patterns: [
@@ -1021,18 +1006,9 @@ describe("tests/micro", () => {
     describe("twoversions", () =>
         runTest("tests/micro/twoversions", "index.js", {
             vulnerabilities: [{
-                osv: {
-                    cvss: {
-                        score: 1,
-                        vectorString: null,
-                    },
-                    cwe: ["1"],
-                    dependency: "ansi-regex",
+                npm: {
                     name: "ansi-regex",
                     range: ">=3.0.0",
-                    severity: "high",
-                    source: 1,
-                    title: "title",
                     url: "url",
                 },
                 patterns: ["call <ansi-regex>"],
