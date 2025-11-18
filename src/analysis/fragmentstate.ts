@@ -1,7 +1,10 @@
 import {AncestorsVar, ConstraintVar, ObjectPropertyVarObj} from "./constraintvars";
 import {AccessPathToken, ArrayToken, FunctionToken, ObjectToken, PackageObjectToken, Token} from "./tokens";
 import {DummyModuleInfo, FunctionInfo, ModuleInfo, PackageInfo} from "./infos";
-import {CallExpression, Function, Identifier, JSXIdentifier, NewExpression, Node, OptionalCallExpression, SourceLocation,} from "@babel/types";
+import {
+    CallExpression, Function, Identifier,
+    isIdentifier, JSXIdentifier, NewExpression, Node, OptionalCallExpression, SourceLocation,
+} from "@babel/types";
 import assert from "assert";
 import {
     addMapHybridSet,
@@ -19,8 +22,8 @@ import {GlobalState} from "./globalstate";
 import {ConstraintVarProducer} from "./constraintvarproducer";
 import Solver from "./solver";
 import {MaybeEmptyPropertyRead} from "../patching/patchdynamics";
-import {getEnclosingNonArrowFunction} from "../misc/asthelpers";
-import {isLocalRequire, requireResolve2} from "../misc/files";
+import {getEnclosingNonArrowFunction, isInTryBlockOrBranch} from "../misc/asthelpers";
+import {isAbsoluteModuleName, isLocalRequire, resolveModule} from "../misc/files";
 
 export type ListenerID = bigint;
 
@@ -862,14 +865,38 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
     }
 
     /**
-     * Resolves a 'require' string and returns a ModuleInfo or DummyModuleInfo (or undefined if resolution fails).
+     * Resolves a require/import and adds the module for analysis.
+     * @param mode "commonjs" for require, "module" for import/export
+     * @param str require/import string
+     * @param path AST path
+     * @param moduleInfo current module
+     * @return ModuleInfo or DummyModuleInfo (or undefined if resolution fails)
      */
-    requireModule(str: string, path: NodePath, moduleInfo: ModuleInfo): ModuleInfo | DummyModuleInfo | undefined {
+    loadModule(mode: "commonjs" | "module", str: string, path: NodePath, moduleInfo: ModuleInfo): ModuleInfo | DummyModuleInfo | undefined {
         let m: ModuleInfo | DummyModuleInfo | undefined;
-        const filepath = requireResolve2(str, path, moduleInfo.getPath(), this);
+        let filepath
+        try {
+            filepath = resolveModule(mode, str, moduleInfo.getPath(), this.a);
+            if (filepath !== undefined && !filepath.startsWith(options.basedir) && !filepath.startsWith(options.basedir)) {
+                this.warn(`Skipping module '${str}' at ${filepath} outside basedir`, path.node);
+                filepath = undefined;
+            }
+        } catch (e: any) {
+            if (options.ignoreUnresolved || options.ignoreDependencies ||
+                (isAbsoluteModuleName(str) && (options.includePackages && !options.includePackages.includes(str) || options.excludePackages?.includes(str)))) {
+                if (logger.isVerboseEnabled())
+                    logger.verbose(`Ignoring unresolved module '${str}' at ${locationToStringWithFile(path.node.loc)}`);
+            } else
+                if (isInTryBlockOrBranch(path))
+                    this.warn(`Unable to resolve conditionally loaded module '${str}' (${e.message})`, path.node);
+                else if (path.isCallExpression() && !(isIdentifier(path.node.callee) && path.node.callee.name === "require"))
+                    this.warn(`Unable to resolve module '${str}' at indirect require call (${e.message})`, path.node);
+                else
+                    this.error(`Unable to resolve module '${str}' (${e.message})`, path.node);
+        }
         if (filepath)
             m = this.a.reachedFile(filepath, false, moduleInfo, isLocalRequire(str));
-        else if (!"./#".includes(str[0])) // couldn't find module file (probably hasn't been installed), use a DummyModuleInfo if absolute module name
+        else if (isAbsoluteModuleName(str)) // couldn't find module file (probably hasn't been installed), use a DummyModuleInfo if absolute module name
             m = getOrSet(this.a.dummyModuleInfos, str, () => new DummyModuleInfo(str));
         return m;
     }

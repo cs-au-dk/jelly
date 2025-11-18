@@ -286,7 +286,7 @@ export class Operations {
             if (ss.length === 0)
                 f.warnUnsupported(path.node, `Unhandled 'import'${this.a.patching ? " (no hints found)" : ""}`);
             for (const str of ss)
-                this.requireModule(str, v, path);
+                this.loadModule("module", str, v, path);
             const promise = this.newPromiseToken(path.node);
             this.solver.addTokenConstraint(promise, this.expVar(path.node, path));
             this.solver.addSubsetConstraint(v, this.solver.varProducer.objPropVar(promise, PROMISE_FULFILLED_VALUES));
@@ -333,7 +333,7 @@ export class Operations {
                 if (ss.length === 0)
                     f.warnUnsupported(path.node, `Unhandled 'require'${this.a.patching ? " (no hints found)" : ""}`);
                 for (const str of ss)
-                    this.requireModule(str, resultVar, path);
+                    this.loadModule("commonjs", str, resultVar, path);
             }
 
         } else if (t instanceof AllocationSiteToken && (t.kind === "PromiseResolve" || t.kind === "PromiseReject") && !isNew) {
@@ -754,7 +754,7 @@ export class Operations {
      * If path denotes an ExportDeclaration, no constraints are generated.
      * Returns the module info object, or undefined if not available.
      */
-    requireModule(str: string, resultVar: ConstraintVar | undefined, path: NodePath): ModuleInfo | DummyModuleInfo | undefined { // see requireModule in modulefinder.ts
+    loadModule(mode: "commonjs" | "module", str: string, resultVar: ConstraintVar | undefined, path: NodePath): ModuleInfo | DummyModuleInfo | undefined { // see loadModule in modulefinder.ts
         const f = this.solver.fragmentState; // (don't use in callbacks)
         const reexport = isExportDeclaration(path.node);
         let m: ModuleInfo | DummyModuleInfo | undefined;
@@ -771,7 +771,7 @@ export class Operations {
         } else {
 
             // try to locate the module
-            m = f.requireModule(str, path, this.moduleInfo);
+            m = f.loadModule(mode, str, path, this.moduleInfo);
             if (m instanceof ModuleInfo && m.isIncluded) {
 
                 // extend the require graph
@@ -780,7 +780,7 @@ export class Operations {
                 f.registerRequireEdge(from, m);
 
                 // constraint: ⟦module_m.exports⟧ ⊆ ⟦require(...)⟧ where m denotes the module being loaded
-                if (m instanceof ModuleInfo && !reexport)
+                if (!reexport)
                     this.solver.addSubsetConstraint(this.solver.varProducer.objPropVar(this.a.canonicalizeToken(new NativeObjectToken("module", m)), "exports"), resultVar);
             }
             if (m) {

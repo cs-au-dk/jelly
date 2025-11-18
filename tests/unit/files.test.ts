@@ -2,8 +2,7 @@ import os from "node:os";
 import fs from "node:fs/promises";
 import path from "node:path";
 
-import {Node} from "@babel/types";
-import {requireResolve} from "../../src/misc/files";
+import {resolveModule} from "../../src/misc/files";
 import {options, resetOptions} from "../../src/options";
 import {FilePath} from "../../src/misc/util";
 import logger from "../../src/misc/logger";
@@ -26,6 +25,7 @@ describe("tests/unit/files/requireResolve", () => {
 		requireStr: string,
 		fromFile: FilePath,
 		expected?: string,
+		mode?: "commonjs" | "module",
 	}
 
 	const tsProjectCJS: NestedDirectoryJSON = {
@@ -371,6 +371,76 @@ describe("tests/unit/files/requireResolve", () => {
 			fromFile: "node_modules/some-lib/index.js",
 			expected: "node_modules/jquery/index.js",
 		},
+		// TODO: currently ignoring required file extensions
+		// {
+		// 	// with moduleResolution: "nodenext", a file extension is required when the file compiles to an ES module
+		// 	name: "ts/esm/relative/no extension",
+		// 	vol: tsProjectESM,
+		// 	requireStr: "./lib",
+		// 	fromFile: "index.ts",
+		// },
+		{
+			name: "exports import",
+			vol: {
+				...tsProjectESM,
+				"./node_modules": {
+					"./throttle-debounce": {
+						"./package.json": JSON.stringify({
+							name: "throttle-debounce",
+							type: "module",
+							exports: {
+								".": {
+									"import": "./esm/index.js",
+									"require": "./cjs/index.js"
+								},
+							},
+						}),
+						"./esm": {
+							"./index.js": ""
+						},
+						"./cjs": {
+							"./index.js": ""
+						}
+					},
+				},
+				"./index.js": "",
+			},
+			requireStr: "throttle-debounce",
+			mode: "module",
+			fromFile: "index.js",
+			expected: "node_modules/throttle-debounce/esm/index.js",
+		},
+		{
+			name: "exports require",
+			vol: {
+				...tsProjectESM,
+				"./node_modules": {
+					"./throttle-debounce": {
+						"./package.json": JSON.stringify({
+							name: "throttle-debounce",
+							type: "module",
+							exports: {
+								".": {
+									"import": "./esm/index.js",
+									"require": "./cjs/index.js"
+								},
+							},
+						}),
+						"./esm": {
+							"./index.js": ""
+						},
+						"./cjs": {
+							"./index.js": ""
+						}
+					},
+				},
+				"./index.js": "",
+			},
+			requireStr: "throttle-debounce",
+			mode: "commonjs",
+			fromFile: "index.js",
+			expected: "node_modules/throttle-debounce/cjs/index.js",
+		},
 	];
 
 	const bugs: testdata[] = [
@@ -398,26 +468,19 @@ describe("tests/unit/files/requireResolve", () => {
 			// should be expected in this case
 			// expected: "matcher.cjs",
 		},
-		{
-			// with moduleResolution: "nodenext", a file extension is required when the file compiles to an ES module
-			name: "ts/esm/relative/no extension",
-			vol: tsProjectESM,
-			requireStr: "./lib",
-			fromFile: "index.ts",
-		},
 	];
 
-	test.each(tests)("$name", testRequireResolve);
-	test.failing.each(bugs)("bug: $name", testRequireResolve);
+	test.each(tests)("$name", testResolveModule);
+	test.failing.each(bugs)("bug: $name", testResolveModule);
 
-	async function testRequireResolve(data: testdata) {
+	async function testResolveModule(data: testdata) {
 		// set up temporary filesystem
 		const basedir = options.basedir = await setUpTmpDir(data.vol);
 
 		try {
 			const from = path.resolve(basedir, data.fromFile);
 			const solver = new Solver();
-			const resolve = () => requireResolve(data.requireStr, from, solver.globalState, {} as Node, solver.fragmentState);
+			const resolve = () => resolveModule(data.mode ?? "commonjs", data.requireStr, from, solver.globalState);
 			if ("expected" in data)
 				expect(resolve()).toBe(data.expected && path.resolve(basedir, data.expected));
 			else

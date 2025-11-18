@@ -770,8 +770,7 @@ export function visit(ast: File, op: Operations) {
 
         ImportDeclaration(path: NodePath<ImportDeclaration>) {
 
-            // model 'import' like 'require'
-            op.requireModule(path.node.source.value, vp.nodeVar(path.node), path); // TODO: see TODO in requireResolve about using import.meta.resolve
+            op.loadModule("module", path.node.source.value, vp.nodeVar(path.node), path); // TODO: see TODO in requireResolve about using import.meta.resolve
 
             let any = false;
             for (const imp of path.node.specifiers) {
@@ -873,7 +872,7 @@ export function visit(ast: File, op: Operations) {
                             assert.fail(`Unexpected node type ${path.node.type}`);
                         const node = path.node;
                         function getExportVar(name: string): ConstraintVar | undefined {
-                            const m = node.source ? op.requireModule(node.source.value, vp.nodeVar(node), path) : undefined;
+                            const m = node.source ? op.loadModule("module", node.source.value, vp.nodeVar(node), path) : undefined;
                             return m instanceof ModuleInfo ? vp.objPropVar(a.canonicalizeToken(new NativeObjectToken("exports", m)), name) : undefined;
                         }
                         for (const spec of path.node.specifiers)
@@ -890,7 +889,7 @@ export function visit(ast: File, op: Operations) {
                     }
                     break;
                 case "ExportAllDeclaration": // example: export * from "m"
-                    const m = op.requireModule(path.node.source.value, vp.nodeVar(path.node), path);
+                    const m = op.loadModule("module", path.node.source.value, vp.nodeVar(path.node), path);
                     if (m instanceof ModuleInfo) {
                         const t = a.canonicalizeToken(new NativeObjectToken("exports", m));
                         solver.addForAllObjectPropertiesConstraint(t, TokenListener.EXPORT_BASE, path.node, (prop: string) => // TODO: only exporting explicitly defined properties, not unknown computed

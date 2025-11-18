@@ -14,7 +14,7 @@ export class PackageInfo {
         readonly name: string, // package name, "<main>" is used for entry files if no package.json is found
         readonly version: string | undefined, // package version, undefined if not available
         readonly main: string | undefined, // package main file, undefined if not available
-        readonly dir: FilePath, // absolute path to representative package root directory, or current working directory if no package.json is found for the entry files (transient)
+        readonly dir: FilePath, // absolute path to representative package root directory, or current working directory if no package.json is found for the entry files
         readonly isEntry: boolean // true for entry packages
     ) {}
 

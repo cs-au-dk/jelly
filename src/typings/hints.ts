@@ -23,8 +23,8 @@ export type ResponseType = {
     // number of functions transformed for dynamically generated/loaded code
     numStaticFunctions: number,
 
-    // map from module name to static requires in the module
-    staticRequires: Array<[string, string]>,
+    // map from module name to static requires/imports in the module
+    staticModuleLoads: Record<"commonjs" | "module", Array<[string, string]>>
 
     // total code size (excluding dynamically generated code)
     totalCodeSize: number

@@ -1,6 +1,5 @@
 import {
     closeSync,
-    existsSync,
     openSync,
     readdirSync,
     readFileSync,
@@ -13,21 +12,14 @@ import {basename, dirname, extname, relative, resolve, sep} from "path";
 import module from "module";
 import {options} from "../options";
 import micromatch from "micromatch";
-import {
-    FilePath,
-    Location,
-    locationToStringWithFile,
-    locationToStringWithFileAndEnd,
-    longestCommonPrefix
-} from "./util";
+import {FilePath, Location, locationToStringWithFileAndEnd, longestCommonPrefix} from "./util";
 import logger from "./logger";
-import {isIdentifier, Node} from "@babel/types";
 import stringify from "stringify2stream";
-import {FragmentState, MergeRepresentativeVar, RepresentativeVar} from "../analysis/fragmentstate";
 import {findPackageJson} from "./packagejson";
 import {GlobalState} from "../analysis/globalstate";
-import {NodePath} from "@babel/traverse";
-import {isInTryBlockOrBranch} from "./asthelpers";
+import {fileURLToPath, pathToFileURL} from "url";
+import {resolveESM} from "./esm";
+import assert from "assert";
 
 /**
  * Expands the given list of file paths.
@@ -77,7 +69,7 @@ function* expandRec(path: string, sub: boolean, visited: Set<string>): Generator
                 if (!sub || inNodeModules || !files.includes("package.json"))
                     for (const file of files.map(f => resolve(path, f)).sort((f1, f2) => {
                         // make sure files are ordered before directories
-                        return (statSync(f1).isDirectory() ? 1 : 0) - (statSync(f2).isDirectory() ? 1 : 0) || f1.localeCompare(f2);
+                        return (isDir(f1) ? 1 : 0) - (isDir(f2) ? 1 : 0) || f1.localeCompare(f2);
                     }))
                         yield* expandRec(file, true, visited);
                 else
@@ -124,97 +116,84 @@ export function isLocalRequire(str: string): boolean {
     return str.startsWith("./") || str.startsWith("../");
 }
 
-/**
- * Resolves a 'require' string to a file path.
- * @return resolved file path if successful, undefined if file type not analyzable or module not found
- */
-export function requireResolve2(str: string, path: NodePath, file: FilePath, f: FragmentState<RepresentativeVar | MergeRepresentativeVar>): FilePath | undefined {
-    try {
-        return requireResolve(str, file, f.a, path.node, f);
-    } catch (e: any) {
-        if (options.ignoreUnresolved || options.ignoreDependencies ||
-            (!"./#".includes(str[0]) && (options.includePackages && !options.includePackages.includes(str) || options.excludePackages?.includes(str)))) {
-            if (logger.isVerboseEnabled())
-                logger.verbose(`Ignoring unresolved module '${str}' at ${locationToStringWithFile(path.node.loc)}`);
-        } else {
-            const ex = e.message ? ` (${e.message})` : "";
-            if (isInTryBlockOrBranch(path))
-                f.warn(`Unable to resolve conditionally loaded module '${str}'${ex}`, path.node);
-            else if (path.isCallExpression() && !(isIdentifier(path.node.callee) && path.node.callee.name === "require"))
-                f.warn(`Unable to resolve module '${str}' at indirect require call${ex}`, path.node);
-            else
-                f.error(`Unable to resolve module '${str}'${ex}`, path.node);
-        }
-        return undefined;
-    }
+export function isAbsoluteModuleName(str: string): boolean {
+    return !"./#".includes(str[0]);
 }
 
 /**
- * Resolves a 'require' string to a file path.
- * @return resolved file path if successful, undefined if file type not analyzable
- * @throws exception if the module is not found
+ * Resolves a require/import string to a file path.
+ * @param mode "commonjs" for require, "module" for import/export
+ * @param str require/import string
+ * @param file file path of current module
+ * @param a analysis state
+ * @return resolved file path if successful, undefined if file should be ignored
+ * @throws exception if an error occurred
  */
-export function requireResolve(str: string, file: FilePath, a: GlobalState, node?: Node, f?: FragmentState<RepresentativeVar | MergeRepresentativeVar>): FilePath | undefined {
-    if (str.endsWith(".less") || str.endsWith(".svg") || str.endsWith(".png") || str.endsWith(".css") || str.endsWith(".scss")) {
+export function resolveModule(mode: "commonjs" | "module", str: string, file: FilePath, a: GlobalState): FilePath | undefined {
+    if ([".less", ".svg", ".png", ".css", ".scss", ".json", ".node"].includes(extname(str)))  {
         logger.verbose(`Ignoring module '${str}' with special extension`);
         return undefined;
-    } else if (str[0] === "/") {
-        f?.error(`Ignoring absolute module path '${str}'`, node);
-        return undefined;
-    }
-    let filepath;
-    try {
-        filepath = a.tsModuleResolver.resolveModuleName(str, file);
-        // TypeScript prioritizes .ts over .js, overrule if coming from a .js file
-        if (file.endsWith(".js") && filepath.endsWith(".ts") && !str.endsWith(".ts")) {
-            const p = filepath.substring(0, filepath.length - 3) + ".js";
-            if (existsSync(p))
-                filepath = p;
-        }
-    } catch (e) {
-        logger.debug(`Could not resolve module '${str}' required from ${file} with TS compiler`);
+    } else if (str[0] === "/")
+        throw new Error("Ignoring absolute module path");
+    let filepath: string;
+    if ([".ts", ".tsx", ".mts", ".cts"].includes(extname(file))) {
         try {
-            // try to resolve the module using require's logic
-            filepath = module.createRequire(file).resolve(str);
-        } catch {
-            // see if the string refers to a package that is among those analyzed (and not in node_modules)
-            for (const p of a.packageInfos.values())
-                if (p.name === str &&
-                    !(basename(dirname(p.dir)) === "node_modules" || basename(dirname(p.dir)).startsWith("@") && basename(dirname(dirname(p.dir))) === "node_modules"))
-                    if (filepath) {
-                        f?.error(`Multiple packages named ${str} found, skipping module load`, node);
-                        throw e;
-                    } else {
-                        filepath = resolve(p.dir, p.main || "index.js"); // https://nodejs.org/dist/latest-v8.x/docs/api/modules.html#modules_all_together
-                        if (!existsSync(filepath))
-                            filepath = undefined;
-                    }
-            if (!filepath)
-                throw e;
+            filepath = a.tsModuleResolver.resolveModuleName(str, file);
+        } catch (e) {
+            logger.debug(`TypeScript resolver failed to resolve '${str}' from ${file}: ${e}`);
+            throw new Error("TypeScript");
         }
-    }
+    } else
+        switch (mode) {
+            case "commonjs":
+                try {
+                    // try to resolve the module using require's logic
+                    filepath = module.createRequire(file).resolve(str);
+                } catch (e) {
+                    logger.debug(`CommonJS resolver failed to resolve '${str}' from ${file}: ${e}`);
+                    throw new Error("CommonJS");
+                }
+                break;
+            case "module":
+                try {
+                    const r = resolveESM(str, pathToFileURL(file).href);
+                    if (r.startsWith("file:"))
+                        filepath = fileURLToPath(r);
+                    else {
+                        logger.debug(`Ignoring unexpected URL from resolveESM: ${str} ${file} -> ${r}`);
+                        return undefined;
+                    }
+                } catch (e) {
+                    logger.debug(`ESM resolver failed to resolve '${str}' from ${file}: ${e}`);
+                    try { // retry using commonjs (for Flow and Babel)
+                        filepath = module.createRequire(file).resolve(str);
+                    } catch {
+                        throw new Error("ESM");
+                    }
+                }
+                break;
+            default:
+                mode satisfies never;
+                assert.fail();
+        }
     if (filepath.endsWith(".json")) {
-        logger.debug(`Skipping JSON file '${str}'`); // TODO: analyze JSON files?
+        logger.debug(`Skipping JSON file '${filepath}'`); // TODO: analyze JSON files? (see also above)
         return undefined;
-    } else if (filepath.endsWith(".node")) {
-        logger.debug(`Skipping binary addon file '${str}'`);
+    }
+    if (filepath.endsWith(".node")) {
+        logger.debug(`Skipping binary addon file '${filepath}'`);
         return undefined;
     }
     if (filepath.endsWith(".d.ts") || ![".js", ".jsx", ".es", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts"].includes(extname(filepath))) {
-        f?.warn(`Module '${filepath}' has unrecognized extension, skipping it`, node);
+        logger.debug(`Skipping module with unrecognized extension '${filepath}'`);
         return undefined;
-    }
-    if (!filepath.startsWith(options.basedir) && !filepath.replaceAll("/", "\\").startsWith(options.basedir)) {
-        const msg = `Found module at ${filepath}, but not in basedir`;
-        logger.debug(msg);
-        throw new Error(msg);
     }
     if (options.excludeEntries &&
         a.getModuleInfo(file).packageInfo.isEntry &&
         micromatch.isMatch(filepath, options.excludeEntries))
         return undefined; // skip silently
     if (logger.isDebugEnabled())
-        logger.debug(`Module '${str}' required from ${file} resolved to: ${filepath}`);
+        logger.debug(`Module '${str}' loaded by ${file} resolved to: ${filepath}`);
     return realpathSync(filepath);
 }
 
@@ -227,7 +206,7 @@ export function requireResolve(str: string, file: FilePath, a: GlobalState, node
  */
 export function autoDetectBaseDir(paths: Array<string>): boolean {
     if (options.basedir) {
-        if (!statSync(options.basedir).isDirectory()) {
+        if (!isDir(options.basedir)) {
             logger.info(`Error: basedir ${options.basedir} is not a directory, aborting`);
             return false;
         }
@@ -237,7 +216,7 @@ export function autoDetectBaseDir(paths: Array<string>): boolean {
         return true;
     const t = findPackageJson(longestCommonPrefix(paths.map(p => {
         const p2 = resolve(process.cwd(), p);
-        return statSync(p2).isDirectory() ? p2 : dirname(p2);
+        return isDir(p2) ? p2 : dirname(p2);
     })));
     if (!t) {
         logger.info("Can't auto-detect basedir, package.json not found (use option -b), aborting");
@@ -302,4 +281,28 @@ export function writeStreamedStringify(value: any,
         if (chunk)
             writeSync(fd, chunk);
     }, replacer, space);
+}
+
+export function isFile(p: string): boolean {
+    try {
+        return statSync(p).isFile();
+    } catch {
+        return false;
+    }
+}
+
+export function isDir(p: string): boolean {
+    try {
+        return statSync(p).isDirectory();
+    } catch {
+        return false;
+    }
+}
+
+export function readJSON(p: string): unknown {
+    try {
+        return JSON.parse(String(readFileSync(p, "utf8")));
+    } catch {
+        return null;
+    }
 }

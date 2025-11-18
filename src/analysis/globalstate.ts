@@ -278,8 +278,8 @@ export class GlobalState {
                 packageInfo = from.packageInfo;
                 rel = relative(packageInfo.dir, tofile);
                 if (rel.startsWith("../")) {
-                    packageInfo = undefined;
                     logger.warn(`Relative module reference from ${from.getPath()} to ${rel} outside current package ${packageInfo}`);
+                    packageInfo = undefined;
                 }
             }
 

@@ -18,38 +18,38 @@ import {FragmentState} from "./fragmentstate";
  */
 export function findModules(ast: File, f: FragmentState, moduleInfo: ModuleInfo) {
 
-    function requireModule(str: string, path: NodePath) { // see requireModule in operations.ts
+    function loadModule(mode: "commonjs" | "module", str: string, path: NodePath) { // see loadModule in operations.ts
         if (!Module.isBuiltin(str))
-            f.requireModule(str, path, moduleInfo);
+            f.loadModule(mode, str, path, moduleInfo);
     }
 
     traverse(ast, {
 
         CallExpression(path: NodePath<CallExpression>) {
-            if (((isIdentifier(path.node.callee) &&
-                        path.node.callee.name === "require" &&
-                        !path.scope.getBinding(path.node.callee.name)) ||
-                    isImport(path.node.callee)) &&
+            const imp = isImport(path.node.callee);
+            if ((imp || (isIdentifier(path.node.callee) &&
+                    path.node.callee.name === "require" &&
+                    !path.scope.getBinding(path.node.callee.name))) &&
                 path.node.arguments.length >= 1) {
                 const arg = path.node.arguments[0];
                 if (isStringLiteral(arg))
-                    requireModule(arg.value, path);
+                    loadModule(imp ? "module" : "commonjs", arg.value, path);
                 else
                     f.warnUnsupported(path.node, "Unhandled 'require'");
             }
         },
 
         ImportDeclaration(path: NodePath<ImportDeclaration>) {
-            requireModule(path.node.source.value, path);
+            loadModule("module", path.node.source.value, path);
         },
 
         ExportAllDeclaration(path: NodePath<ExportAllDeclaration>) {
-            requireModule(path.node.source.value, path);
+            loadModule("module", path.node.source.value, path);
         },
 
         ExportNamedDeclaration(path: NodePath<ExportNamedDeclaration>) {
             if (path.node.source)
-                requireModule(path.node.source.value, path);
+                loadModule("module", path.node.source.value, path);
         }
     });
 }

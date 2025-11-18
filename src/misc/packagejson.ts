@@ -1,8 +1,9 @@
 import {FilePath, pushAll} from "./util";
 import {basename, dirname, relative, resolve} from "path";
-import {existsSync, readFileSync, statSync} from "fs";
+import {existsSync, readFileSync} from "fs";
 import logger from "./logger";
 import {options} from "../options";
+import {isDir} from "./files";
 
 /**
  * Information about a package.json file.
@@ -44,7 +45,7 @@ export interface PackageJsonInfo {
  * Finds the enclosing package.json file if present.
  */
 export function findPackageJson(file: FilePath): {packageJson: FilePath, dir: FilePath} | undefined {
-    let dir = statSync(file, {throwIfNoEntry: false})?.isDirectory() ? file : dirname(file);
+    let dir = isDir(file) ? file : dirname(file);
     while (true) {
         if (options.basedir && !dir.startsWith(options.basedir))
             return undefined;
@@ -70,7 +71,7 @@ export function findPackageJson(file: FilePath): {packageJson: FilePath, dir: Fi
 /**
  * Loads and parses the given package.json file.
  */
-function parsePackageJson(packageJson: FilePath): any {
+function parsePackageJson(packageJson: FilePath): unknown {
     return JSON.parse(readFileSync(packageJson, {encoding: "utf8"}));
 }
 
@@ -78,9 +79,9 @@ function parsePackageJson(packageJson: FilePath): any {
  * Extracts PackageJsonInfo for the package containing the given file.
  */
 export function getPackageJsonInfo(tofile: FilePath): PackageJsonInfo {
-    let packagekey, name, version, main, dir, exports;
+    let packagekey, name: string, version: string | undefined, main: string | undefined, dir: string, exports: Array<string> | undefined;
     const p = findPackageJson(tofile); // TODO: add command-line option to skip search for package.json for entry files?
-    let f;
+    let f: unknown;
     if (p) {
         try {
             f = parsePackageJson(p.packageJson);
@@ -90,14 +91,18 @@ export function getPackageJsonInfo(tofile: FilePath): PackageJsonInfo {
     }
     if (p && f) {
         dir = p.dir;
-        if (!f.name)
+        if (typeof f === "object" && "name" in f && typeof f.name === "string")
+            name = f.name;
+        else {
             logger.verbose(`Package name missing in ${p.packageJson}`);
-        name = f.name || "<anonymous>";
-        if (!f.version)
+            name = "<anonymous>";
+        }
+        if (typeof f === "object" && "version" in f && typeof f.version === "string")
+            version = f.version;
+        else
             logger.verbose(`Package version missing in ${p.packageJson}`);
-        version = f.version;
         packagekey = `${name}@${version ?? "?"}`;
-        if (f.main) {
+        if (typeof f === "object" && "main" in f && typeof f.main === "string") {
             try {
                 // normalize main file path
                 main = relative(dir, require.resolve("./".includes(f.main[0]) ? f.main : "./" + f.main, {paths: [dir]}));
@@ -106,12 +111,12 @@ export function getPackageJsonInfo(tofile: FilePath): PackageJsonInfo {
                 main = undefined;
             }
         }
-        if (f.exports) {
+        if (typeof f === "object" && "exports" in f) {
             // This documentation is better than the NodeJS documentation: https://webpack.js.org/guides/package-exports/
             // TODO: negative patterns, e.g., {"./test/*": null}
             exports = [];
-            if (f.main)
-                exports.push(f.main);
+            if (main)
+                exports.push(main);
             const queue = [f.exports];
             while (queue.length > 0) {
                 const exp = queue.pop();

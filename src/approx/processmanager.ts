@@ -9,7 +9,7 @@ import {GlobalState} from "../analysis/globalstate";
 import {Hints} from "./hints";
 import Timer, {nanoToMs} from "../misc/timer";
 import {extname, resolve} from "path";
-import {isLocalRequire, isShebang, requireResolve} from "../misc/files";
+import {isLocalRequire, isShebang, resolveModule} from "../misc/files";
 import {ApproxDiagnostics} from "./diagnostics";
 
 /**
@@ -52,7 +52,10 @@ export class ProcessManager {
     /**
      * Map from module name to set of statically resolvable requires (excluding built-ins and aliases).
      */
-    staticRequires = new Map<string, Set<string>>();
+    staticModuleLoads = {
+        "commonjs": new Map<string, Set<string>>(),
+        "module": new Map<string, Set<string>>()
+    };
 
     /**
      * Time (nanoseconds) spent on approximate interpretation.
@@ -94,7 +97,8 @@ export class ProcessManager {
             this.numForcedExceptions += msg.numForcedExceptions;
             this.numModuleExceptions += msg.moduleException ? 1 : 0;
             this.numStaticFunctions += msg.numStaticFunctions;
-            addPairArrayToMapSet(msg.staticRequires, this.staticRequires);
+            for (const mode of ["commonjs", "module"] as const)
+                addPairArrayToMapSet(msg.staticModuleLoads[mode], this.staticModuleLoads[mode]);
             this.totalCodeSize = msg.totalCodeSize;
             this.resultPromiseResolve();
             this.resultPromiseResolve = undefined;
@@ -122,17 +126,23 @@ export class ProcessManager {
                     logger.info(`Analyzing ${m}`);
                 await this.execute(file);
             }
-            // include static requires found in the ASTs of the module and the modules reached dynamically
-            const rs = this.staticRequires.get(file);
-            if (rs)
-                for (const r of rs)
-                    try {
-                        const filepath = requireResolve(r, file, this.a);
-                        if (filepath)
-                            this.a.reachedFile(filepath, false, m, isLocalRequire(r));
-                    } catch {
-                        logger.warn(`Unable to resolve module '${r}' from ${file}`);
-                    }
+            // include static requires/imports found in the ASTs of the module and the modules reached dynamically
+            for (const mode of ["commonjs", "module"] as const) {
+                const rs = this.staticModuleLoads[mode].get(file);
+                if (rs)
+                    for (const r of rs)
+                        try {
+                            const filepath = resolveModule(mode, r, file, this.a);
+                            if (filepath) {
+                                if (!filepath.startsWith(options.basedir) && !filepath.startsWith(options.basedir))
+                                    logger.warning(`Warning: Skipping module '${r}' at ${filepath} outside basedir`);
+                                else
+                                    this.a.reachedFile(filepath, false, m, isLocalRequire(r));
+                            }
+                        } catch (e) {
+                            logger.warn(`Unable to resolve module '${r}' from ${file}: ${e}`);
+                        }
+            }
         }
     }
 

@@ -101,9 +101,12 @@ let numStaticFunctions = 0;
 let totalCodeSize = 0;
 
 /**
- * Map from module name to set of statically resolvable requires (excluding built-ins and aliases).
+ * Map from module name to set of statically resolvable requires/imports (excluding built-ins and aliases).
  */
-const staticRequires = new Map<string, Set<string>>();
+const staticModuleLoads = {
+    "commonjs": new Map<string, Set<string>>(),
+    "module": new Map<string, Set<string>>()
+}
 
 const NATIVE_CONSTRUCTORS = new Set([
     Object, Boolean, Error, AggregateError, EvalError, RangeError, ReferenceError, SyntaxError, TypeError,
@@ -401,7 +404,7 @@ function transform(mod: string, loc: string | undefined, code: string, mode: "co
         if (!loc) // eval code doesn't count in numStaticFunctions
             numStaticFunctions += nsf;
         for (const req of sr)
-            mapGetSet(staticRequires, mod).add(req);
+            mapGetSet(staticModuleLoads[mode], mod).add(req);
         return transformed;
     } catch (err) {
         logger.error(`Error: Instrumentation failed for ${name}, ${err instanceof Error ? err.stack : err}`);
@@ -1053,11 +1056,13 @@ process.on('message', async (msg: RequestType) => {
         moduleException,
         numStaticFunctions,
         totalCodeSize,
-        staticRequires: mapSetToPairArray(staticRequires)
+        staticModuleLoads: Object.fromEntries((["commonjs", "module"] as const).map(mode =>
+            [mode, mapSetToPairArray(staticModuleLoads[mode])])) as ResponseType["staticModuleLoads"]
     } satisfies ResponseType);
     hints.clearHints(); // keeping visited modules and functions, but the hints are no longer needed in this process
     numStaticFunctions = 0;
-    staticRequires.clear();
+    for (const mode of ["commonjs", "module"] as const)
+        staticModuleLoads[mode].clear();
 });
 
 // sandbox global builtins

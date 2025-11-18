@@ -1,88 +1,89 @@
-import {basename, dirname, join} from "node:path";
-import fs from "node:fs";
-import ts from "typescript";
 import {FilePath} from "../misc/util";
-import {options} from "../options";
-import logger from "../misc/logger";
+import * as path from "path";
+import ts from "typescript";
 
-const host = ts.createCompilerHost({});
-
-const parseConfigHost: ts.ParseConfigHost = {
-    fileExists: host.fileExists,
-    readDirectory: ts.sys.readDirectory,
-    readFile: host.readFile,
-    useCaseSensitiveFileNames: host.useCaseSensitiveFileNames(),
-};
+interface Project {
+    options: ts.CompilerOptions;
+    cache: ts.ModuleResolutionCache;
+    host: ts.ModuleResolutionHost;
+    configDir: string;
+}
 
 /**
  * Resolves module names using the TypeScript compiler.
- * The class caches lookups for tsconfig.json files.
  */
 export class TSModuleResolver {
-    // maps directories to compiler options or undefined
-    private readonly tsconfigCache = new Map<FilePath, ts.CompilerOptions>();
 
-    private getTSOptions(file: FilePath): ts.CompilerOptions {
-        let opts: ts.CompilerOptions = {
-            module: ts.ModuleKind.NodeNext,
-        };
+    private projects = new Map<string, Project>();
 
-        // find the nearest tsconfig.json file
-        // TODO: perhaps we should only use tsconfig.json options when resolving from TypeScript files?
-        const misses = [];
-        let dir = file;
-        while ((dir = dirname(dir)).startsWith(options.basedir)) {
-            const cached = this.tsconfigCache.get(dir);
-            if (cached !== undefined) {
-                opts = cached;
-                break;
-            }
+    private fileToConfig = new Map<FilePath, FilePath | null>();
 
-            misses.push(dir);
+    private results = new Map<string, FilePath>();
 
-            const tsconfig = join(dir, "tsconfig.json");
-            if (fs.existsSync(tsconfig)) {
-                const res = ts.readConfigFile(tsconfig, host.readFile);
-                if (!res.error)
-                    opts = ts.parseJsonConfigFileContent(res.config, parseConfigHost, dir).options;
-                else
-                    logger.warn(`Warning: Unable to read ${tsconfig} (${ts.formatDiagnostic(res.error, host)})`);
+    private canonical = ts.sys.useCaseSensitiveFileNames ?
+        (s: string) => s :
+        (s: string) => s.toLowerCase();
 
-                break;
-            }
-
-            // stop at the filesystem root or when traversing a node_modules directory
-            if (dir == dirname(dir) || basename(dir) === "node_modules")
-                break;
-        }
-
-        // opts.traceResolution = true;
-        opts.allowJs = true;
-        opts.checkJs = true;
-        opts.noDtsResolution = true; // if not enabled, .d.ts files take priority over .js files
-
-        // populate cache
-        for (const miss of misses)
-            this.tsconfigCache.set(miss, opts);
-
-        return opts;
+    resolveModuleName(spec: string, file: FilePath): FilePath {
+        const abs = path.resolve(file);
+        const key = `${abs}::${spec}`;
+        const cached = this.results.get(key);
+        if (cached)
+            return cached;
+        const project = this.getProject(abs);
+        const res = ts.resolveModuleName(spec, abs, project.options, project.host, project.cache).resolvedModule;
+        if (!res)
+            throw new Error(`Cannot resolve "${spec}" from "${file}"`);
+        this.results.set(key, res.resolvedFileName);
+        return res.resolvedFileName;
     }
 
-    /**
-     * Resolves a module name using the TypeScript compiler.
-     * @param str module name
-     * @param file current file path
-     * @return resolved file path if successful
-     * @throws exception if the module is not found
-     */
-    resolveModuleName(str: string, file: FilePath): FilePath {
-        const opts = this.getTSOptions(file);
-        const resolutionMode = ts.getImpliedNodeFormatForFile(file as ts.Path, undefined, host, opts);
-        const t = str.endsWith(".ts") && resolutionMode !== ts.ModuleKind.ESNext ? str.substring(0, str.length - 3) : str;
-        const filepath = ts.resolveModuleName(t, file, opts, host, undefined, undefined, resolutionMode).resolvedModule?.resolvedFileName;
-        // TS does not always respect noDtsResolution=true when the enclosing package has a 'typesVersions' field
-        if (!filepath || (filepath.endsWith(".d.ts") && !str.endsWith(".d.ts")))
-            throw new Error();
-        return filepath;
+    private getProject(file: FilePath): Project {
+        const configPath = this.getConfigPath(file);
+        const key = configPath ?? "__no_config__";
+        const existing = this.projects.get(key);
+        if (existing)
+            return existing;
+        const {options, configDir} = configPath ?
+            this.loadTsConfig(configPath) :
+            { options: {} as ts.CompilerOptions, configDir: ts.sys.getCurrentDirectory() };
+        const host: ts.ModuleResolutionHost = {
+            ...ts.sys,
+            fileExists: (fn) => {
+                if (fn.endsWith(".d.ts"))
+                    return false; // hide .d.ts files (in libraries and in application code) from resolver
+                if (fn.includes(`${path.sep}node_modules${path.sep}`))
+                    if (/\.(ts|tsx|mts|cts)$/.test(fn))
+                        return false; // hide TS files in libraries from resolver
+                return ts.sys.fileExists(fn);
+            }
+        };
+        const cache = ts.createModuleResolutionCache(configDir, this.canonical, options);
+        const project = {options, cache, host, configDir};
+        this.projects.set(key, project);
+        return project;
+    }
+
+    private getConfigPath(file: FilePath): FilePath | null {
+        const cached = this.fileToConfig.get(file);
+        if (cached !== undefined)
+            return cached;
+        const dir = path.dirname(file);
+        const found = ts.findConfigFile(dir, ts.sys.fileExists) ?? null;
+        this.fileToConfig.set(file, found);
+        return found;
+    }
+
+    private loadTsConfig(configPath: string) {
+        const configDir = path.dirname(configPath);
+        const loaded = ts.readConfigFile(configPath, ts.sys.readFile);
+        if (loaded.error)
+            throw new Error(ts.formatDiagnostics([loaded.error], {
+                getCanonicalFileName: this.canonical,
+                getCurrentDirectory: ts.sys.getCurrentDirectory,
+                getNewLine: () => ts.sys.newLine
+            }));
+        const parsed = ts.parseJsonConfigFileContent(loaded.config, ts.sys, configDir);
+        return {options: parsed.options, configDir};
     }
 }

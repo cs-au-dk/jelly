@@ -25,7 +25,7 @@ export class ModuleAccessPath extends AccessPath {
         requireName: string
     ) {
         const t = !"./#".includes(requireName[0]) && requireName !== moduleInfo.getOfficialName() ? requireName : undefined; // only use require name if not relative and different from official name
-        super(`<${moduleInfo.getOfficialName()}${moduleInfo instanceof ModuleInfo ? `@${moduleInfo.packageInfo.version}` : ''}${t ? `(${t})` : ""}>`);
+        super(`<${moduleInfo.getOfficialName()}${moduleInfo instanceof ModuleInfo ? `@${moduleInfo.packageInfo.version}` : ""}${t ? `(${t})` : ""}>`);
         this.requireName = t;
     }
 }
