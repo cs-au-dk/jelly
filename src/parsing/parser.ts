@@ -21,6 +21,7 @@ const transformOptions = [false, true].map((fragmentStateDefined) =>
         babelrc: false,
         configFile: false,
         ast: true,
+        compact: true,
     }) as TransformOptions
 );
 
