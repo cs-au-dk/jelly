@@ -41,6 +41,19 @@ export default logger;
 
 export function setLogLevel(level: string) {
     logger.level = options.loglevel = level;
+
+    // Shortcut `is{Level}Enabled` methods to avoid overhead of winston's isLevelEnabled
+    // Transports added later should not have individual levels to ensure this works correctly
+    for (const lvl of Object.keys(colors)) {
+        const fnName = `is${lvl.charAt(0).toUpperCase() + lvl.slice(1)}Enabled`;
+        delete (logger as any)[fnName];  // Remove existing own property, if any
+        Object.defineProperty(logger, fnName, {
+            value: logger.isLevelEnabled(lvl) ? () => true : () => false,
+            writable: false,
+            configurable: true,
+            enumerable: false
+        });
+    }
 }
 
 export function logToFile(file?: string): Transport {

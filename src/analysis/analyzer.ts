@@ -102,6 +102,9 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
                     // find modules only, no actual analysis
                     findModules(ast, solver.fragmentState, moduleInfo);
 
+                    if (d.modules % 16 === 0)
+                        a.timeoutTimer.checkTimeout();
+
                 } else {
 
                     // preprocess the AST

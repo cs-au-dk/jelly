@@ -20,8 +20,9 @@ const transformOptions = [false, true].map((fragmentStateDefined) =>
         cwd: __dirname,
         babelrc: false,
         configFile: false,
+        browserslistConfigFile: false,
         ast: true,
-        compact: true,
+        code: false,
     }) as TransformOptions
 );
 

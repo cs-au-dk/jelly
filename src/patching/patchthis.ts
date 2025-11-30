@@ -7,7 +7,7 @@ import {isObjectPropertyVarObj, ObjectPropertyVarObj} from "../analysis/constrai
 import {locationToStringWithFileAndEnd, mapGetSet} from "../misc/util";
 
 /**
- * Patches 'this' for each function its ThisVar is empty and has listeners or outgoing subset edges,
+ * Patches 'this' for each function where ThisVar is empty and has listeners or outgoing subset edges,
  * unless it's a method (in which case it's typically not supposed to be instantiated)
  * or some other function inherits from it (in which case we'll instantiate that function).
  */
