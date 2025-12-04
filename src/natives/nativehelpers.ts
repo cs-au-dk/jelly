@@ -13,6 +13,7 @@ import {
     AllocationSiteToken,
     ArrayToken,
     FunctionToken,
+    IteratorKind,
     NativeObjectToken,
     ObjectKind,
     ObjectToken,
@@ -161,14 +162,6 @@ export function returnPackageObject(p: NativeFunctionParams, kind: ObjectKind = 
 }
 
 /**
- * Ensures that objects at the given expression are widened to field-based analysis.
- */
-export function widenArgument(arg: Node, p: NativeFunctionParams) {
-    if (isExpression(arg)) // TODO: non-Expression arguments?
-        p.solver.fragmentState.registerEscaping(p.solver.varProducer.expVar(arg, p.path)); // triggers widening to field-based
-}
-
-/**
  * Models flow from the given expression to the function return.
  */
 export function returnArgument(arg: Node, p: NativeFunctionParams) {
@@ -177,12 +170,10 @@ export function returnArgument(arg: Node, p: NativeFunctionParams) {
 }
 
 /**
- * Creates a new object represented by an ObjectToken or PackageObjectToken.
+ * Creates a new object represented by an ObjectToken.
  */
-export function newObject(p: NativeFunctionParams): ObjectToken | PackageObjectToken {
-    const t = p.op.newObjectToken(p.path.node);
-    p.solver.globalState.patching?.registerAllocationSite(t);
-    return t;
+export function newObject(p: NativeFunctionParams): ObjectToken {
+    return p.op.newObjectToken(p.path.node);
 }
 
 /**
@@ -233,16 +224,6 @@ export function returnUnknown(p: NativeFunctionParams) {
     p.solver.addAccessPath(UnknownAccessPath.instance, p.solver.varProducer.expVar(p.path.node, p.path));
 }
 
-type IteratorKind =
-    "ArrayKeys" |
-    "ArrayValues" |
-    "ArrayEntries" |
-    "SetValues" |
-    "SetEntries" |
-    "MapKeys" |
-    "MapValues" |
-    "MapEntries";
-
 /**
  * Models returning an Iterator object for the given kind of base object.
  */
@@ -252,7 +233,7 @@ export function returnIterator(kind: IteratorKind, p: NativeFunctionParams) { //
         const t = p.base;
         const vp = p.solver.varProducer; // (don't use in callbacks)
         if (t instanceof AllocationSiteToken) {
-            const iter = a.canonicalizeToken(new AllocationSiteToken("Iterator", t.allocSite));
+            const iter = a.canonicalizeToken(new AllocationSiteToken(kind, t.allocSite));
             p.solver.addTokenConstraint(iter, vp.expVar(p.path.node, p.path));
             const iterNext = vp.objPropVar(iter, "next"); // TODO: inherit from Generator.prototype instead of copying properties
             p.solver.addTokenConstraint(p.globalSpecialNatives[GENERATOR_PROTOTYPE_NEXT], iterNext);

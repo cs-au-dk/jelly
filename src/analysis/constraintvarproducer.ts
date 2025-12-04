@@ -33,25 +33,19 @@ import {
     ReadResultVar,
     ThisVar
 } from "./constraintvars";
-import {ArrayToken, ObjectToken, PackageObjectToken} from "./tokens";
-import {PackageInfo} from "./infos";
+import {ArrayToken} from "./tokens";
 import {GlobalState} from "./globalstate";
-import {FragmentState, MergeRepresentativeVar, RepresentativeVar} from "./fragmentstate";
+import {MergeRepresentativeVar, RepresentativeVar} from "./fragmentstate";
 import Solver from "./solver";
 import {ARRAY_ALL, ARRAY_UNKNOWN} from "../natives/ecmascript";
-import {options} from "../options";
 import {getEnclosingNonArrowFunction} from "../misc/asthelpers";
 
 export class ConstraintVarProducer<RVT extends RepresentativeVar | MergeRepresentativeVar = RepresentativeVar> {
 
-    private readonly a: GlobalState;
-
     constructor(
         private readonly s: Solver,
-        private readonly f: FragmentState<RVT>,
-    ) {
-        this.a = f.a;
-    }
+        private readonly a: GlobalState,
+    ) {}
 
     /**
      * Finds the constraint variable for the given expression in the current module.
@@ -108,8 +102,6 @@ export class ConstraintVarProducer<RVT extends RepresentativeVar | MergeRepresen
      * The (obj, prop) pair is registered on the provided solver instance and listener calls may be enqueued.
      */
     objPropVar(obj: ObjectPropertyVarObj, prop: string, accessor: AccessorType = "normal"): ObjectPropertyVar {
-        if (options.widening && obj instanceof ObjectToken && this.f.widened.has(obj))
-            return this.packagePropVar(obj.getPackageInfo(), prop, accessor);
         return this.a.canonicalizeVar(ObjectPropertyVar.make(this.s, obj, prop, accessor));
     }
 
@@ -126,13 +118,6 @@ export class ConstraintVarProducer<RVT extends RepresentativeVar | MergeRepresen
      */
     arrayAllVar(arr: ArrayToken): ObjectPropertyVar {
         return this.objPropVar(arr, ARRAY_ALL);
-    }
-
-    /**
-     * Finds the constraint variable for an object property for a package.
-     */
-    packagePropVar(pck: PackageInfo, prop: string, accessor: AccessorType = "normal"): ObjectPropertyVar {
-        return this.objPropVar(this.a.canonicalizeToken(new PackageObjectToken(pck)), prop, accessor);
     }
 
     /**
@@ -172,14 +157,10 @@ export class ConstraintVarProducer<RVT extends RepresentativeVar | MergeRepresen
     }
 
     ancestorsVar(t: ObjectPropertyVarObj): AncestorsVar {
-        if (options.widening && t instanceof ObjectToken && this.f.widened.has(t))
-            t = this.a.canonicalizeToken(new PackageObjectToken(t.getPackageInfo()));
         return this.a.canonicalizeVar(new AncestorsVar(t));
     }
 
     readResultVar(t: ObjectPropertyVarObj, prop: string): ReadResultVar {
-        if (options.widening && t instanceof ObjectToken && this.f.widened.has(t))
-            t = this.a.canonicalizeToken(new PackageObjectToken(t.getPackageInfo()));
         return this.a.canonicalizeVar(new ReadResultVar(t, prop));
     }
 }

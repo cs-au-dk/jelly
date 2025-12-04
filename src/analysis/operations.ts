@@ -8,6 +8,7 @@ import {
     isExportDeclaration,
     isExpression,
     isIdentifier,
+    isImport,
     isLVal,
     isMemberExpression,
     isMetaProperty,
@@ -45,7 +46,6 @@ import {
     AccessPathToken,
     AllocationSiteToken,
     ArrayToken,
-    ClassToken,
     FunctionToken,
     NativeObjectToken,
     ObjectToken,
@@ -71,7 +71,7 @@ import {
 } from "./accesspaths";
 import Solver, {ListenerKey} from "./solver";
 import {GlobalState} from "./globalstate";
-import {DummyModuleInfo, FunctionInfo, ModuleInfo, normalizeModuleName, PackageInfo} from "./infos";
+import {DummyModuleInfo, FunctionInfo, ModuleInfo, normalizeModuleName} from "./infos";
 import logger from "../misc/logger";
 import {options} from "../options";
 import {isArrayIndex, Location, locationToString, locationToStringWithFile} from "../misc/util";
@@ -81,8 +81,9 @@ import {
     DATE_PROTOTYPE,
     ERROR_PROTOTYPE,
     FUNCTION_PROTOTYPE,
+    getNativeType,
     INTERNAL_PROTOTYPE,
-    isNativeProperty,
+    isNativeMethod,
     MAP_KEYS,
     MAP_PROTOTYPE,
     MAP_VALUES,
@@ -180,6 +181,7 @@ export class Operations {
         const vp = this.solver.varProducer; // (don't use in callbacks)
 
         const caller = this.a.getEnclosingFunctionOrModule(path);
+        const args = path.node.arguments;
 
         let p = path.get("callee");
         while (p.isParenthesizedExpression())
@@ -197,8 +199,39 @@ export class Operations {
             f.registerCallWithResultMaybeUsedAsPromise(path.node);
         f.registerInvokedExpression(path.node.callee);
 
+        let strs: Array<string> | undefined;
+        const strings = () =>
+            strs ??= args.length >= 1 && isStringLiteral(args[0]) ? [args[0].value] : this.getRequireHints(pars) ?? [];
+
+        // 'import' expression
+        if (isImport(p.node)) {
+            f.registerCall(pars.node, caller, undefined, {native: true});
+            const v = this.a.canonicalizeVar(new IntermediateVar(path.node, "import"));
+            const ss = strings();
+            if (ss.length === 0)
+                f.warnUnsupported(path.node, `Unhandled 'import'${this.a.patching ? " (no hints found)" : ""}`);
+            for (const str of ss)
+                this.loadModule("module", str, v, path);
+            const promise = this.newPromiseToken(path.node);
+            this.solver.addTokenConstraint(promise, this.expVar(path.node, path));
+            this.solver.addSubsetConstraint(v, this.solver.varProducer.objPropVar(promise, PROMISE_FULFILLED_VALUES));
+            return;
+        }
+
         const resultVar = vp.nodeVar(path.node);
-        const args = path.node.arguments;
+
+        // direct 'require' call
+        if (isIdentifier(p.node) && p.node.name === "require" &&
+            (path.scope.getBinding(p.node.name)?.identifier.loc as Location)?.native === "%nodejs") {
+            f.registerCall(pars.node, caller, undefined, {native: true});
+            const ss = strings();
+            if (ss.length === 0)
+                f.warnUnsupported(path.node, `Unhandled 'require'${this.a.patching ? " (no hints found)" : ""}`);
+            for (const str of ss)
+                this.loadModule("commonjs", str, resultVar, path);
+            return;
+        }
+
         const argVars = args.map(arg => {
             if (isExpression(arg))
                 return this.expVar(arg, path);
@@ -277,20 +310,6 @@ export class Operations {
                         this.solver.addTokenConstraint(t, resultVar);
             });
         }
-        const strings = args.length >= 1 && isStringLiteral(args[0]) ? [args[0].value] : [];
-
-        // 'import' expression
-        if (path.get("callee").isImport() && args.length >= 1) {
-            const v = this.a.canonicalizeVar(new IntermediateVar(path.node, "import"));
-            const ss = strings.length > 0 ? strings : this.getRequireHints(p) ?? [];
-            if (ss.length === 0)
-                f.warnUnsupported(path.node, `Unhandled 'import'${this.a.patching ? " (no hints found)" : ""}`);
-            for (const str of ss)
-                this.loadModule("module", str, v, path);
-            const promise = this.newPromiseToken(path.node);
-            this.solver.addTokenConstraint(promise, this.expVar(path.node, path));
-            this.solver.addSubsetConstraint(v, this.solver.varProducer.objPropVar(promise, PROMISE_FULFILLED_VALUES));
-        }
     }
 
     callFunctionBound(
@@ -299,7 +318,7 @@ export class Operations {
         calleeVar: ConstraintVar | undefined,
         argVars: Array<ConstraintVar | undefined>,
         resultVar: ConstraintVar | undefined,
-        strings: Array<string>,
+        strings: () => Array<string>,
         path: CallNodePath,
     ) {
         const f = this.solver.fragmentState; // (don't use in callbacks)
@@ -307,8 +326,6 @@ export class Operations {
         const pars = getAdjustedCallNodePath(path);
         const args = path.node.arguments;
         const isNew = path.isNewExpression();
-        if (base)
-            base = f.maybeWidened(base);
         if (t instanceof FunctionToken)
             this.callFunctionTokenBound(t, base, caller, argVars, resultVar, isNew, path);
         else if (t instanceof NativeObjectToken) {
@@ -329,7 +346,7 @@ export class Operations {
             if (t.name === "require") {
 
                 // require(...)
-                const ss = strings.length > 0 ? strings : this.getRequireHints(pars) ?? [];
+                const ss = strings();
                 if (ss.length === 0)
                     f.warnUnsupported(path.node, `Unhandled 'require'${this.a.patching ? " (no hints found)" : ""}`);
                 for (const str of ss)
@@ -365,28 +382,18 @@ export class Operations {
             // TODO: if caller is MemberExpression with property 'apply', 'call' or 'bind', treat as call to the native function of that name (relevant for lodash/atomizer TAPIR benchmark)
         }
 
-        if (!options.oldobj) {
-            // if 'new' and function...
-            if (isNew && t instanceof FunctionToken) {
+        // if 'new' and function...
+        if (isNew && t instanceof FunctionToken) {
 
-                // constraint: q ∈ ⟦new E0(E1,...,En)⟧ where q is the instance object
-                const q = this.newObjectToken(t.fun);
-                this.solver.addTokenConstraint(q, resultVar);
+            // constraint: q ∈ ⟦new E0(E1,...,En)⟧ where q is the instance object
+            const q = this.newObjectToken(t.fun);
+            this.solver.addTokenConstraint(q, resultVar);
 
-                // ... q ∈ ⟦this_f⟧
-                this.solver.addTokenConstraint(q, this.solver.varProducer.thisVar(t.fun));
+            // ... q ∈ ⟦this_f⟧
+            this.solver.addTokenConstraint(q, this.solver.varProducer.thisVar(t.fun));
 
-                // constraint: ⟦t.prototype⟧ ⊆ ⟦q.[[Prototype]]⟧
-                this.solver.addInherits(q, this.solver.varProducer.objPropVar(t, "prototype"));
-            }
-        } else {
-
-            // if 'new' and function...
-            if (isNew && (t instanceof FunctionToken || t instanceof ClassToken)) {
-
-                // constraint: t ∈ ⟦new E0(E1,...,En)⟧ where t is the current PackageObjectToken
-                this.solver.addTokenConstraint(this.packageObjectToken, resultVar);
-            }
+            // constraint: ⟦t.prototype⟧ ⊆ ⟦q.[[Prototype]]⟧
+            this.solver.addInherits(q, this.solver.varProducer.objPropVar(t, "prototype"));
         }
     }
 
@@ -499,14 +506,6 @@ export class Operations {
 
                     this.solver.addSubsetConstraint(this.readPropertyFromChain(t, prop), dst);
 
-                    if (options.oldobj) {
-                        if ((t instanceof FunctionToken || t instanceof ClassToken) && prop === "prototype") {
-                            // constraint: ... p="prototype" ∧ t is a function or class ⇒ k ∈ ⟦E.p⟧ where k represents the package
-                            if (dst)
-                                this.solver.addTokenConstraint(this.packageObjectToken, dst);
-                        }
-                    }
-
                 } else if (t instanceof AccessPathToken) {
 
                     // constraint: ... if t is access path, @E.p ∈ ⟦E.p⟧
@@ -550,12 +549,12 @@ export class Operations {
         if (base instanceof ArrayToken && prop === "length")
             return undefined;
         const dst = this.solver.varProducer.readResultVar(base, prop);
-        if (base instanceof FunctionToken && prop === "prototype") // function objects always have 'prototype', no need to consult prototype chain
+        if (prop === "prototype" && getNativeType(base) === "Function") // function objects always have 'prototype', no need to consult prototype chain or getters
             this.readPropertyBound(base, prop, dst, {t: base, s: prop}, base);
         else if (options.proto && prop === INTERNAL_PROTOTYPE()) // all objects have __proto__
             this.readProto(base, dst);
         else {
-            const nativeProperty = isNativeProperty(base, prop, true);
+            const nativeProperty = isNativeMethod(base, prop, true);
             const objProto = this.globalSpecialNatives?.[OBJECT_PROTOTYPE];
             // constraint: ... ∀ ancestors t2 of t: ...
             this.solver.addForAllAncestorsConstraint(base, TokenListener.READ_ANCESTORS, {s: prop}, (t2: Token) => {
@@ -574,7 +573,7 @@ export class Operations {
             this.solver.addTokenConstraint(this.globalSpecialNatives[OBJECT_PROTOTYPE], dst);
         else if (t instanceof ArrayToken)
             this.solver.addTokenConstraint(this.globalSpecialNatives[ARRAY_PROTOTYPE], dst);
-        else if (t instanceof FunctionToken || t instanceof PrototypeToken || t instanceof ClassToken)
+        else if (t instanceof FunctionToken || t instanceof PrototypeToken)
             this.solver.addTokenConstraint(this.globalSpecialNatives[FUNCTION_PROTOTYPE], dst);
         else if (t instanceof AllocationSiteToken) {
             if (t.kind === "Promise")
@@ -624,14 +623,14 @@ export class Operations {
 
         const bindGetterThis = (baset: Token, t: Token) => {
             if (t instanceof FunctionToken && t.fun.params.length === 0)
-                this.solver.addTokenConstraint(this.solver.fragmentState.maybeWidened(baset), this.solver.varProducer.thisVar(t.fun));
+                this.solver.addTokenConstraint(baset, this.solver.varProducer.thisVar(t.fun));
         };
 
         // constraint: ... ⟦t.p⟧ ⊆ ⟦E.p⟧
         this.solver.addSubsetConstraint(this.solver.varProducer.objPropVar(t, prop), dst); // TODO: exclude AccessPathTokens?
 
         // constraint: ... ∀ functions t3 ∈ ⟦(get)t.p⟧: ⟦ret_t3⟧ ⊆ ⟦E.p⟧ (unless global native, [[Prototype]], "prototype", "toString", or array index)
-        if (!(t instanceof NativeObjectToken && !t.moduleInfo) && prop !== INTERNAL_PROTOTYPE() && prop !== "prototype" && prop !== "toString" && !isArrayIndex(prop)) {
+        if (!isGlobalNative(t) && !isUnlikelyGetterSetter(prop)) {
             const getter = this.solver.varProducer.objPropVar(t, prop, "get");
             this.solver.addForAllTokensConstraint(getter, TokenListener.READ_GETTER, dstkey,
                 (t3: Token) => readFromGetter(t3));
@@ -639,23 +638,7 @@ export class Operations {
                 (t3: Token) => bindGetterThis(thist, t3));
         }
 
-        if (t instanceof PackageObjectToken && t.kind === "Object") {
-            // TODO: also reading from neighbor packages if t is a PackageObjectToken...
-            if (options.readNeighbors)
-                this.solver.addForAllPackageNeighborsConstraint(t.packageInfo, {t, s: prop}, (neighbor: PackageInfo) => { // FIXME: opts?
-                    if (dst)
-                        this.solver.addSubsetConstraint(this.solver.varProducer.packagePropVar(neighbor, prop), dst); // TODO: exclude AccessPathTokens?
-                    if (prop !== "prototype") {
-                        const nt = this.a.canonicalizeToken(new PackageObjectToken(neighbor));
-                        const getter = this.solver.varProducer.packagePropVar(neighbor, prop, "get");
-                        this.solver.addForAllTokensConstraint(getter, TokenListener.READ_GETTER2, dstkey,
-                                                              (t3: Token) => readFromGetter(t3));
-                        this.solver.addForAllTokensConstraint(getter, TokenListener.READ_GETTER_THIS2, {t: nt},
-                                                              (t3: Token) => bindGetterThis(nt, t3));
-                    }
-                });
-
-        } else if (t instanceof ArrayToken) {
+        if (t instanceof ArrayToken) {
             if (isArrayIndex(prop)) {
 
                 // constraint: ... ⟦t.*⟧ ⊆ ⟦E.p⟧
@@ -691,12 +674,12 @@ export class Operations {
 
         const bindSetterThis = (t: Token) => {
             if (t instanceof FunctionToken && t.fun.params.length === 1)
-                this.solver.addTokenConstraint(this.solver.fragmentState.maybeWidened(base), this.solver.varProducer.thisVar(t.fun));
+                this.solver.addTokenConstraint(base, this.solver.varProducer.thisVar(t.fun));
         };
 
         if (isObjectPropertyVarObj(base)) {
 
-            if (!options.nativeOverwrites && prop !== "toString" && isNativeProperty(base, prop)) {
+            if (!options.nativeOverwrites && prop !== "toString" && isNativeMethod(base, prop)) {
                 this.solver.fragmentState.warnUnsupported(node, `Ignoring write to native property ${base}.${prop}`);
                 return;
             }
@@ -707,7 +690,7 @@ export class Operations {
 
             if (invokeSetters)
                 // constraint: ... ∀ ancestors anc of base: ... (unless global native, [[Prototype]], "prototype", "toString" or array index)
-                if (!(base instanceof NativeObjectToken && !base.moduleInfo) && prop !== INTERNAL_PROTOTYPE() && prop !== "prototype" && prop !== "toString" && !isArrayIndex(prop))
+                if (!isGlobalNative(base) && !isUnlikelyGetterSetter(prop))
                     this.solver.addForAllAncestorsConstraint(base, TokenListener.WRITE_ANCESTORS, {n: node, s: prop}, (anc: Token) => {
                         if (isObjectPropertyVarObj(anc)) {
                             // constraint: ...: ∀ functions t2 ∈ ⟦(set)anc.p⟧: ⟦E2⟧ ⊆ ⟦x⟧ where x is the parameter of t2
@@ -966,6 +949,14 @@ export class Operations {
                         this.solver.addSubsetConstraint(vp.objPropVar(t, MAP_VALUES), vp.objPropVar(pair, "1"));
                         break;
                     case "Iterator":
+                    case "ArrayKeys": // see IteratorKind
+                    case "ArrayValues":
+                    case "ArrayEntries":
+                    case "SetValues":
+                    case "SetEntries":
+                    case "MapKeys":
+                    case "MapValues":
+                    case "MapEntries":
                     case "Generator":
                         this.solver.addSubsetConstraint(vp.objPropVar(t, "value"), dst);
                         break;
@@ -975,18 +966,12 @@ export class Operations {
     }
 
     /**
-     * Creates a new ObjectToken
-     * (or, if allocation site is disabled or the token has been widened, returns the current PackageObjectToken).
+     * Creates a new ObjectToken.
      */
-    newObjectToken(n: Node): ObjectToken | PackageObjectToken {
-        if (options.alloc) {
-            const t = this.a.canonicalizeToken(new ObjectToken(n));
-            if (!options.widening || !this.solver.fragmentState.widened.has(t)) {
-                this.a.patching?.registerAllocationSite(t);
-                return t;
-            }
-        }
-        return this.packageObjectToken;
+    newObjectToken(n: Node): ObjectToken {
+        const t = this.a.canonicalizeToken(new ObjectToken(n));
+        this.a.patching?.registerAllocationSite(t);
+        return t;
     }
 
     /**
@@ -1005,13 +990,6 @@ export class Operations {
         const t = this.a.canonicalizeToken(new ArrayToken(n));
         this.a.patching?.registerAllocationSite(t);
         return t;
-    }
-
-    /**
-     * Creates a new ClassToken.
-     */
-    newClassToken(n: Node): ClassToken { // XXX: only used if options.oldobj enabled
-        return this.a.canonicalizeToken(new ClassToken(n));
     }
 
     /**
@@ -1050,4 +1028,18 @@ export class Operations {
                 this.solver.addTokenConstraint(t, res);
         });
     }
+}
+
+/**
+ * Returns true if 'prop' is a very unusual name for a getter/setter.
+ */
+function isUnlikelyGetterSetter(prop: string): boolean {
+    return prop === INTERNAL_PROTOTYPE() || prop === "prototype" || prop === "toString" || isArrayIndex(prop);
+}
+
+/**
+ * Returns true if the token is 'globalThis'.
+ */
+export function isGlobalNative(t: Token): boolean {
+    return t instanceof NativeObjectToken && t.moduleInfo === undefined && t.name !== "globalThis";
 }

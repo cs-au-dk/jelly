@@ -1,4 +1,4 @@
-import {NativeFunctionParams, NativeModel, NativeModelParams} from "./nativebuilder";
+import {NativeFunctionParams, NativeGlobalModelParams, NativeModel, NativeModelParams} from "./nativebuilder";
 import {ArrayToken, NativeObjectToken} from "../analysis/tokens";
 import {invokeCallback} from "./nativehelpers";
 
@@ -53,7 +53,7 @@ export const nodejsModels: NativeModel = {
         },
         {
             name: "global",
-            init: (p: NativeModelParams) => {
+            init: (p: NativeGlobalModelParams) => {
                 return p.globalSpecialNatives["globalThis"];
             }
         },

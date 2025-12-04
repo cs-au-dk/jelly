@@ -147,7 +147,6 @@ export function resolveModule(mode: "commonjs" | "module", str: string, file: Fi
         switch (mode) {
             case "commonjs":
                 try {
-                    // try to resolve the module using require's logic
                     filepath = module.createRequire(file).resolve(str);
                 } catch (e) {
                     logger.debug(`CommonJS resolver failed to resolve '${str}' from ${file}: ${e}`);

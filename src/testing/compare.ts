@@ -279,7 +279,6 @@ export const toMatchAnalysisResults: MatcherFunction<[Solver | FragmentState]> =
             assert.equal(m.size, f.objectProperties.size);
             return m;
         }],
-        ["Widened objects", f => [...f.widened].map(t => t.toString()).sort()],
         // ["Constraint variables", f => {
         //     const {comps} = f === actual ? aComps : eComps;
         //     return [...comps.values()].flatMap(({comp}) => comp.map(v => v.toString())).sort();

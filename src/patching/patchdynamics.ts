@@ -62,9 +62,9 @@ export function patchDynamics(solver: Solver): boolean {
 
         // TODO: enable extra patching for exports properties?
         /*
-        // constraint: ...: ⟦%exports[m].p⟧ ⊆ ⟦E⟧ for each module m in the current package or a neighbor package
+        // constraint: ...: ⟦%exports[m].p⟧ ⊆ ⟦E⟧ for each module m in the current package
         if (prop !== undefined)
-            for (const p of [pck.packageInfo, ...f.packageNeighbors.get(pck.packageInfo) ?? []]) {
+            for (const p of pck.packageInfo) ?? []]) {
                 for (const m of p.modules.values()) {
                     const t = f.a.canonicalizeToken(new NativeObjectToken("exports", m));
                     const v = f.getRepresentative(solver.varProducer.objPropVar(t, prop));

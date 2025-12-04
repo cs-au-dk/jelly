@@ -39,10 +39,7 @@ export class Patching {
 
     private usedHints = new Set<ReadHint | WriteHint | RequireHint | EvalHint>();
 
-    constructor(readonly hints: Hints) {
-        assert(!options.widening, "Option --widening is not supported with approximate interpretation patching"); // TODO: widen allocSite2Token...
-        assert(!options.oldobj, "Option --oldobj is not supported with approximate interpretation patching");
-    }
+    constructor(readonly hints: Hints) {}
 
     /**
      * Registers a token for an allocation site during analysis.

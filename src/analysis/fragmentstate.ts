@@ -1,9 +1,16 @@
 import {AncestorsVar, ConstraintVar, ObjectPropertyVarObj} from "./constraintvars";
-import {AccessPathToken, ArrayToken, FunctionToken, ObjectToken, PackageObjectToken, Token} from "./tokens";
-import {DummyModuleInfo, FunctionInfo, ModuleInfo, PackageInfo} from "./infos";
+import {AccessPathToken, ArrayToken, FunctionToken, PackageObjectToken, Token} from "./tokens";
+import {DummyModuleInfo, FunctionInfo, ModuleInfo} from "./infos";
 import {
-    CallExpression, Function, Identifier,
-    isIdentifier, JSXIdentifier, NewExpression, Node, OptionalCallExpression, SourceLocation,
+    CallExpression,
+    Function,
+    Identifier,
+    isIdentifier,
+    JSXIdentifier,
+    NewExpression,
+    Node,
+    OptionalCallExpression,
+    SourceLocation,
 } from "@babel/types";
 import assert from "assert";
 import {
@@ -14,7 +21,13 @@ import {
     mapGetMap,
     mapGetSet
 } from "../misc/util";
-import {AccessPath, CallResultAccessPath, ComponentAccessPath, ModuleAccessPath, PropertyAccessPath} from "./accesspaths";
+import {
+    AccessPath,
+    CallResultAccessPath,
+    ComponentAccessPath,
+    ModuleAccessPath,
+    PropertyAccessPath
+} from "./accesspaths";
 import {options} from "../options";
 import logger from "../misc/logger";
 import {NodePath} from "@babel/traverse";
@@ -67,7 +80,6 @@ export type MergeRepresentativeVar = ConstraintVar & { readonly __repr: unique s
 
 export type PostponedListenerCall =
     [(t: Token) => void, Token] |
-    [(neighbor: PackageInfo) => void, PackageInfo] |
     [(prop: string) => void, string];
 
 /**
@@ -121,13 +133,9 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
 
     readonly externalCallbacksProcessed: Set<FunctionToken> = new Set;
 
-    readonly packageNeighborListeners: Map<PackageInfo, Map<ListenerID, (neighbor: PackageInfo) => void>> = new Map;
-
     readonly arrayEntriesListeners: Map<ArrayToken, Map<ListenerID, (prop: string) => void>> = new Map;
 
-    objectPropertiesListeners: Map<ObjectPropertyVarObj, Map<ListenerID, (prop: string) => void>> = new Map;
-
-    readonly packageNeighbors: Map<PackageInfo, Set<PackageInfo>> = new Map;
+    readonly objectPropertiesListeners: Map<ObjectPropertyVarObj, Map<ListenerID, (prop: string) => void>> = new Map;
 
     readonly postponedListenerCalls: Array<PostponedListenerCall> = [];
 
@@ -235,11 +243,6 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
      * Constraint variables that represent expressions whose values may escape.
      */
     readonly maybeEscaping: Set<ConstraintVar> = new Set;
-
-    /**
-     * Object tokens that have been widened.
-     */
-    readonly widened: Set<ObjectToken> = new Set;
 
     /**
      * Constraint variables whose values may escape to external code.
@@ -356,7 +359,7 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
 
     constructor(s: Solver) {
         this.a = s.globalState;
-        this.varProducer = new ConstraintVarProducer(s, this);
+        this.varProducer = new ConstraintVarProducer(s, s.globalState);
     }
 
     /**
@@ -723,23 +726,6 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
         return !this.tokens.has(v);
     }
 
-    private static emptyHas = (_t: Token) => false;
-
-    /**
-     * Returns a 'has' function for the given constraint variable.
-     */
-    getHas(v: RVT): (t: Token) => boolean {
-        if (v) {
-            const ts = this.tokens.get(v);
-            if (ts) {
-                if (ts instanceof Token)
-                    return (t: Token) => ts === t;
-                return (t: Token) => ts.has(t);
-            }
-        }
-        return FragmentState.emptyHas;
-    }
-
     /**
      * Returns the number of constraint variables with tokens.
      */
@@ -776,14 +762,6 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
      */
     deleteVar(v: RVT) {
         this.tokens.delete(v);
-    }
-
-    /**
-     * Replaces tokens for a constraint variable.
-     */
-    replaceTokens(v: RVT, ts: Set<Token>, old: number) {
-        this.tokens.set(v, ts.size === 1 ? ts.values().next().value! : ts);
-        this.numberOfTokens += ts.size - old;
     }
 
     /**
@@ -851,17 +829,6 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
         }
         this.numberOfTokens += added.length;
         return added;
-    }
-
-    /**
-     * If the provided token is an object token that has been widened, the corresponding package object token is returned.
-     * Otherwise the provided token is returned as is.
-     */
-    maybeWidened<T extends Token>(t: T): T | PackageObjectToken {
-        if (options.widening && t instanceof ObjectToken && this.widened.has(t))
-            return this.a.canonicalizeToken(new PackageObjectToken(t.getPackageInfo(), t.kind));
-        else
-            return t;
     }
 
     /**

@@ -75,8 +75,6 @@ export default class AnalysisDiagnostics {
 
     tokenListener2Notifications: number = 0;
 
-    packageNeighborListenerNotifications: number = 0;
-
     arrayEntriesListenerNotifications: number = 0;
 
     objectPropertiesListenerNotifications: number = 0;
@@ -92,10 +90,6 @@ export default class AnalysisDiagnostics {
     totalPropagationTime: bigint = 0n;
 
     totalListenerCallTime: bigint = 0n;
-
-    totalWideningTime: bigint = 0n;
-
-    totalFragmentMergeTime: bigint = 0n;
 
     totalEscapePatchingTime: bigint = 0n;
 

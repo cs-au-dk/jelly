@@ -40,11 +40,9 @@ import {
     returnUnknown,
     setPrototypeOf,
     warnNativeUsed,
-    widenArgument,
 } from "./nativehelpers";
 import {
     AllocationSiteToken,
-    ClassToken,
     FunctionToken,
     NativeObjectToken,
     ObjectKind,
@@ -55,7 +53,6 @@ import {isExpression, isNewExpression, isStringLiteral} from "@babel/types";
 import {NativeFunctionParams, NativeModel, NativeModelParams} from "./nativebuilder";
 import {TokenListener} from "../analysis/listeners";
 import {options} from "../options";
-import {ObjectPropertyVarObj} from "../analysis/constraintvars";
 
 export const OBJECT_PROTOTYPE = "Object.prototype";
 export const ARRAY_PROTOTYPE = "Array.prototype";
@@ -99,7 +96,7 @@ export function isInternalProperty(prop: string): boolean {
 /**
  * Returns the native type of objects represented by the given token, or undefined if unknown.
  */
-function getNativeType(t: Token): ObjectKind | "Function" | undefined {
+export function getNativeType(t: Token): ObjectKind | "Function" | undefined {
     let k: ObjectKind | "Function" | undefined;
     if (t instanceof AllocationSiteToken || t instanceof PackageObjectToken)
         switch (t.kind) {
@@ -109,14 +106,13 @@ function getNativeType(t: Token): ObjectKind | "Function" | undefined {
                 break;
             case "PromiseResolve":
             case "PromiseReject":
-            case "Class":
                 k = "Function";
                 break;
             default:
                 k = t.kind;
                 break;
         }
-    else if (t instanceof FunctionToken || t instanceof ClassToken)
+    else if (t instanceof FunctionToken)
         k = "Function";
     else if (t instanceof NativeObjectToken)
         if (METHODS.has(t.name) &&
@@ -129,11 +125,12 @@ function getNativeType(t: Token): ObjectKind | "Function" | undefined {
 
 /**
  * Returns true if 't' inherits from a global native object that has a method named 'prop'.
- * @param dummyOnly If true, only return true if the method is a dummy (unmodeled) method.
+ * If dummyOnly is true, only return true if the method is a dummy (unmodeled) method.
  */
-export function isNativeProperty(t: Token, prop: string, dummyOnly: boolean = false): boolean {
+export function isNativeMethod(t: Token, prop: string, dummyOnly: boolean = false): boolean {
     const kind = getNativeType(t);
-    if (!kind) return false;
+    if (!kind)
+        return false;
     const ms = METHODS.get(kind);
     return Boolean(ms?.has(prop) && (!dummyOnly || ms.get(prop) === undefined));
 }
@@ -797,8 +794,6 @@ export const ecmascriptModels: NativeModel = {
                 {
                     name: "throw",
                     invoke: (p: NativeFunctionParams) => {
-                        if (p.path.node.arguments.length >= 1)
-                            widenArgument(p.path.node.arguments[0], p);
                         generatorCall(p);
                     }
                 },
@@ -826,8 +821,6 @@ export const ecmascriptModels: NativeModel = {
                 {
                     name: "throw",
                     invoke: (p: NativeFunctionParams) => {
-                        if (p.path.node.arguments.length >= 1)
-                            widenArgument(p.path.node.arguments[0], p);
                         generatorCall(p);
                     }
                 },
@@ -1159,9 +1152,7 @@ export const ecmascriptModels: NativeModel = {
             name: "Object",
             invoke: (p: NativeFunctionParams) => {
                 // Object(...) can return primitive wrapper objects, but they are not relevant
-                returnToken(
-                    !options.alloc ? p.op.packageObjectToken :
-                    newObject(p), p);
+                returnToken(newObject(p), p);
                 returnArgument(p.path.node.arguments[0], p);
             },
             staticMethods: [
@@ -1186,18 +1177,14 @@ export const ecmascriptModels: NativeModel = {
                         if (args.length === 0)
                             return;
 
-                        let obj: ObjectPropertyVarObj;
-                        if (options.alloc) {
-                            if (!isExpression(args[0])) {
-                                warnNativeUsed("Object.create", p, "with non-expression as prototype");
-                                return;
-                            }
+                        if (!isExpression(args[0])) {
+                            warnNativeUsed("Object.create", p, "with non-expression as prototype");
+                            return;
+                        }
 
-                            // the returned object gets the object passed as 1st argument as prototype
-                            obj = newObject(p);
-                            addInherits(obj, args[0], p);
-                        } else
-                            obj = p.op.packageObjectToken;
+                        // the returned object gets the object passed as 1st argument as prototype
+                        const obj = newObject(p);
+                        addInherits(obj, args[0], p);
 
                         returnToken(obj, p);
 

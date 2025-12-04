@@ -12,11 +12,14 @@ import {ObjectPropertyVarObj} from "../analysis/constraintvars";
 
 export type CallNodePath = NodePath<CallExpression | OptionalCallExpression | NewExpression>;
 
-export type NativeModelParams = {
+export type NativeGlobalModelParams = {
     solver: Solver,
+    globalSpecialNatives: SpecialNativeObjects
+};
+
+export type NativeModelParams = NativeGlobalModelParams & {
     moduleInfo: ModuleInfo,
     moduleSpecialNatives: SpecialNativeObjects,
-    globalSpecialNatives: SpecialNativeObjects
 };
 
 export type NativeFunctionParams = NativeModelParams & {
@@ -29,7 +32,7 @@ export type NativeFunctionAnalyzer = (p: NativeFunctionParams) => void;
 
 export type NativeModelInitializer = (p: NativeModelParams) => void;
 
-export type NativeVariableInitializer = (p: NativeModelParams) => NativeObjectToken;
+export type NativeVariableInitializer = (p: NativeGlobalModelParams) => NativeObjectToken;
 
 export type NativeModel = {
     name: string,
@@ -67,17 +70,13 @@ export type SpecialNativeObjects = Record<string, NativeObjectToken>;
 
 /**
  * Prepares models for the ECMAScript and Node.js native declarations.
- * Returns the tokens for special native objects.
+ * Returns the tokens for special global native objects.
  */
-export function buildNatives(solver: Solver, moduleInfo: ModuleInfo, moduleParams: Map<string, Identifier>): {
-    moduleSpecialNatives: SpecialNativeObjects,
-    globalSpecialNatives: SpecialNativeObjects
-} {
-    const moduleSpecialNatives: SpecialNativeObjects = {};
+export function buildGlobalNatives(solver: Solver): SpecialNativeObjects {
     const globalSpecialNatives: SpecialNativeObjects = {};
     const f = solver.fragmentState;
     const a = solver.globalState;
-    solver.phase = "init";
+    solver.phase = "Initializing";
 
     const models = [ecmascriptModels, nodejsModels];
     for (const m of models) {
@@ -85,24 +84,19 @@ export function buildNatives(solver: Solver, moduleInfo: ModuleInfo, moduleParam
         /**
          * Adds an identifier to the global scope.
          * @param name identifier name
-         * @param moduleSpecific if true, the token and identifier will belong to the current module
          * @param invoke optional model of calls if a function
          * @param constr if true, the function is a constructor (default: false)
          * @param hidden if true, the identifier is not added to globals
          * @param init if provided, execute this initializer instead of using a fresh NativeObjectToken
          */
-        function defineGlobal(name: string, moduleSpecific: boolean = false, invoke?: NativeFunctionAnalyzer, constr: boolean = false, hidden: boolean = false, init?: NativeVariableInitializer) {
+        function defineGlobal(name: string, invoke?: NativeFunctionAnalyzer, constr: boolean = false, hidden: boolean = false, init?: NativeVariableInitializer) {
             if (options.natives || m.name === "ecmascript" || (m.name === "nodejs" && ["exports", "module"].includes(name))) {
                 const t = init
-                    ? init({solver, moduleInfo, moduleSpecialNatives, globalSpecialNatives})
-                    : a.canonicalizeToken(new NativeObjectToken(name, moduleSpecific ? moduleInfo : undefined, invoke, constr));
-                (moduleSpecific ? moduleSpecialNatives : globalSpecialNatives)[name] = t;
+                    ? init({solver, globalSpecialNatives})
+                    : a.canonicalizeToken(new NativeObjectToken(name, undefined, invoke, constr));
+                globalSpecialNatives[name] = t;
                 if (!hidden)
-                    solver.addTokenConstraint(t,
-                        moduleSpecific ?
-                        f.varProducer.nodeVar(moduleParams.get(name)!) :
-                        f.varProducer.objPropVar(globalSpecialNatives["globalThis"], name)
-                    );
+                    solver.addTokenConstraint(t, f.varProducer.objPropVar(globalSpecialNatives["globalThis"], name));
             }
         }
 
@@ -110,7 +104,7 @@ export function buildNatives(solver: Solver, moduleInfo: ModuleInfo, moduleParam
          * Adds a global function.
          */
         function defineGlobalFunction(name: string, invoke: NativeFunctionAnalyzer | undefined, constr: boolean = false, hidden: boolean = false) {
-            defineGlobal(name, undefined, invoke, constr, hidden);
+            defineGlobal(name, invoke, constr, hidden);
         }
 
         /**
@@ -159,15 +153,10 @@ export function buildNatives(solver: Solver, moduleInfo: ModuleInfo, moduleParam
         if (logger.isVerboseEnabled())
             logger.verbose(`Adding ${m.name}`);
 
-        // implicit parameters
-        if (m.params)
-            for (const v of m.params)
-                defineGlobal(v.name, true, undefined, undefined, undefined, v.init);
-
         // global variables
         if (m.variables)
             for (const v of m.variables)
-                defineGlobal(v.name, undefined, undefined, undefined, undefined, v.init);
+                defineGlobal(v.name, undefined, undefined, undefined, v.init);
 
         // global functions
         for (const f of m.functions)
@@ -195,6 +184,43 @@ export function buildNatives(solver: Solver, moduleInfo: ModuleInfo, moduleParam
         }
     }
 
+    return globalSpecialNatives;
+}
+
+/**
+ * Prepares module-specific models for the Node.js native declarations.
+ * Returns the tokens for special module-specific native objects.
+ */
+export function buildModuleNatives(solver: Solver, moduleInfo: ModuleInfo, moduleParams: Map<string, Identifier>): SpecialNativeObjects {
+    const moduleSpecialNatives: SpecialNativeObjects = {};
+    const f = solver.fragmentState;
+    const a = solver.globalState;
+    const globalSpecialNatives = a.globalSpecialNatives!;
+
+    const models = [ecmascriptModels, nodejsModels];
+    for (const m of models) {
+
+        /**
+         * Adds an identifier to the global scope.
+         * @param name identifier name
+         * @param init if provided, execute this initializer instead of using a fresh NativeObjectToken
+         */
+        function defineGlobal(name: string, init?: NativeVariableInitializer) {
+            if (options.natives || m.name === "ecmascript" || (m.name === "nodejs" && ["exports", "module"].includes(name))) {
+                const t = init
+                    ? init({solver, globalSpecialNatives})
+                    : a.canonicalizeToken(new NativeObjectToken(name, moduleInfo));
+                moduleSpecialNatives[name] = t;
+                solver.addTokenConstraint(t, f.varProducer.nodeVar(moduleParams.get(name)!));
+            }
+        }
+
+        // implicit parameters
+        if (m.params)
+            for (const v of m.params)
+                defineGlobal(v.name, v.init);
+    }
+
     // specialized initialization
     for (const m of models)
         if (m.init) {
@@ -202,8 +228,6 @@ export function buildNatives(solver: Solver, moduleInfo: ModuleInfo, moduleParam
                 logger.verbose(`Running initialization for ${m.name}`);
             m.init({solver, moduleInfo, moduleSpecialNatives, globalSpecialNatives});
         }
-    if (logger.isVerboseEnabled())
-        logger.verbose("Adding natives completed");
 
-    return {moduleSpecialNatives, globalSpecialNatives};
+    return moduleSpecialNatives;
 }

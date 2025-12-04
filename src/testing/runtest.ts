@@ -103,15 +103,6 @@ export function runTest(basedir: string,
                 test("oneCalleeCalls", () => expect(new AnalysisStateReporter(solver.fragmentState).getOneCalleeCalls()).toBe(args.oneCalleeCalls));
         });
 
-        test("merge regression", () => {
-            // test that merging a fragmentState to a fresh one preserves key results
-            const solver2 = new Solver();
-            (solver2 as any).globalState = solver.globalState; // copy globalState reference...
-            solver2.prepare();
-            solver2.merge(solver.fragmentState);
-            expect(solver2).toMatchAnalysisResults(solver);
-        });
-
         /* test("callgraph-regression", () => {
             // FIXME: This is not robust against re-orderings
             const cg = new AnalysisStateReporter(solver.fragmentState).callGraphToJSON(files);

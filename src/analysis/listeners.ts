@@ -1,7 +1,7 @@
 /**
  * IDs for token listeners.
  */
-export enum TokenListener {
+export enum TokenListener { // TODO: rename
     CALL_BASE, // base at method call
     CALL_METHOD, // callee at method call
     CALL_FUNCTION, // callee at (non-method) function call
@@ -10,9 +10,7 @@ export enum TokenListener {
     READ_BASE, // base at property read (static)
     READ_BASE_DYNAMIC, // base at property read (dynamic)
     READ_GETTER, // getter at property read
-    READ_GETTER2, // getter at property read (for PackageObjectTokens)
     READ_GETTER_THIS, // getter at property read
-    READ_GETTER_THIS2, // getter at property read (for PackageObjectTokens)
     WRITE_BASE, // base at property write (static)
     WRITE_BASE_DYNAMIC, // base at property write (dynamic)
     WRITE_SETTER, // setter at property write
@@ -27,7 +25,6 @@ export enum TokenListener {
     ANCESTORS,
     READ_ANCESTORS,
     WRITE_ANCESTORS,
-    PACKAGE_NEIGHBORS,
     CLASS_FIELD,
     EXTENDS,
     READ_ITERATOR_VALUE,

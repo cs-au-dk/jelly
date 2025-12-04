@@ -280,17 +280,14 @@ describe("tests/micro", () => {
         });
     });
 
-    describe.each([false, true])("oldobj=%p", (oldobj: boolean) => {
-        const expected = oldobj ? 1 : 0;
-        runTest("tests/micro", "client-this.js", {
-            options: {ignoreDependencies: true, oldobj},
-            soundness: "tests/micro/client-this.json",
-            // TODO: make this work with newobj
-            funFound: expected,
-            callFound: expected,
-            callTotal: 1,
-            reachableFound: 3+expected,
-        });
+    const expected = 0; // TODO: Should be 1, but it's difficult to analyze soundly while ignoring dependencies
+    runTest("tests/micro", "client-this.js", {
+        options: {ignoreDependencies: true},
+        soundness: "tests/micro/client-this.json",
+        funFound: expected,
+        callFound: expected,
+        callTotal: 1,
+        reachableFound: 3+expected,
     });
 
     runTest("tests/micro", "arrays.js", {
@@ -737,7 +734,7 @@ describe("tests/micro", () => {
     });
 
     runTest("tests/micro", "match1.js", {
-        options: {oldobj: true, widening: true, readNeighbors: true, ignoreDependencies: true},
+        options: {ignoreDependencies: true},
         patterns: ["tests/micro/match1-patterns.json"],
         matches: {total: 1},
     });
@@ -785,7 +782,7 @@ describe("tests/micro", () => {
     });
 
     runTest("tests/micro", "match9.ts",  {
-        options: {oldobj: true, widening: true, readNeighbors: true, ignoreDependencies: true},
+        options: {ignoreDependencies: true, proto: true}, // note: proto necessary
         patterns: ["tests/micro/match9-patterns.json"],
         matches: {total: 1, low: 0},
     });

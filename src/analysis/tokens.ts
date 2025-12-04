@@ -1,5 +1,5 @@
 import {Function, Node} from "@babel/types";
-import {Location, locationToStringWithFileAndEnd} from "../misc/util";
+import {locationToStringWithFileAndEnd} from "../misc/util";
 import assert from "assert";
 import {ModuleInfo, PackageInfo} from "./infos";
 import {AccessPath} from "./accesspaths";
@@ -29,6 +29,16 @@ export class FunctionToken extends Token {
     }
 }
 
+export type IteratorKind =
+    "ArrayKeys" |
+    "ArrayValues" |
+    "ArrayEntries" |
+    "SetValues" |
+    "SetEntries" |
+    "MapKeys" |
+    "MapValues" |
+    "MapEntries";
+
 /**
  * Object kinds, used by AllocationSiteToken and PackageObjectToken.
  *
@@ -42,7 +52,7 @@ export class FunctionToken extends Token {
  *
  * Prototype represents prototype objects associated with functions.
  */
-export type ObjectKind = "Object" | "Array" | "Class" | "Map" | "Set" | "WeakMap" | "WeakSet" | "WeakRef" | "Iterator" | "Generator" | "RegExp" | "Date" | "Promise" | "PromiseResolve" | "PromiseReject" | "Error" | "Prototype"; // XXX: "Class" only used if options.oldobj enabled
+export type ObjectKind = "Object" | "Array" | "Map" | "Set" | "WeakMap" | "WeakSet" | "WeakRef" | "Iterator" | "Generator" | "RegExp" | "Date" | "Promise" | "PromiseResolve" | "PromiseReject" | "Error" | "Prototype" | IteratorKind;
 
 /**
  * Token that represents objects with a specific allocation site.
@@ -72,12 +82,6 @@ export class ObjectToken extends AllocationSiteToken {
     constructor(allocSite: Node) {
         super("Object", allocSite);
     }
-
-    getPackageInfo(): PackageInfo {
-        const loc = this.allocSite.loc as Location;
-        assert(loc && loc.module);
-        return loc.module.packageInfo;
-    }
 }
 
 /**
@@ -97,16 +101,6 @@ export class ArrayToken extends AllocationSiteToken {
 
     constructor(allocSite: Node) {
         super("Array", allocSite);
-    }
-}
-
-/**
- * Token that represents classes with a specific allocation site.
- */
-export class ClassToken extends AllocationSiteToken { // XXX: only used if options.oldobj enabled
-
-    constructor(allocSite: Node) {
-        super("Class", allocSite);
     }
 }
 
