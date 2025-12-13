@@ -16,8 +16,7 @@ import {
     JSXIdentifier,
     JSXMemberExpression,
     JSXNamespacedName,
-    Node,
-    Program
+    Node
 } from "@babel/types";
 import {NodePath} from "@babel/traverse";
 import {
@@ -39,6 +38,8 @@ import {MergeRepresentativeVar, RepresentativeVar} from "./fragmentstate";
 import Solver from "./solver";
 import {ARRAY_ALL, ARRAY_UNKNOWN} from "../natives/ecmascript";
 import {getEnclosingNonArrowFunction} from "../misc/asthelpers";
+import {Location} from "../misc/util";
+import {ModuleInfo} from "./infos";
 
 export class ConstraintVarProducer<RVT extends RepresentativeVar | MergeRepresentativeVar = RepresentativeVar> {
 
@@ -92,7 +93,7 @@ export class ConstraintVarProducer<RVT extends RepresentativeVar | MergeRepresen
         if (binding)
             return {v: this.nodeVar(binding.identifier)};
         else if (id.name === "arguments")
-            return {v: this.argumentsVar(getEnclosingNonArrowFunction(path) ?? path.findParent(p => p.isProgram())!.node as Program)};
+            return {v: this.argumentsVar(getEnclosingNonArrowFunction(path) ?? (id.loc as Location).module!)};
         else
             return {v: this.objPropVar(this.a.globalSpecialNatives!["globalThis"], id.name), unbound: true};
     }
@@ -137,7 +138,7 @@ export class ConstraintVarProducer<RVT extends RepresentativeVar | MergeRepresen
     /**
      * Finds the constraint variable representing 'arguments' for the given function.
      */
-    argumentsVar(fun: Function | Program): ArgumentsVar {
+    argumentsVar(fun: Function | ModuleInfo): ArgumentsVar {
         return this.a.canonicalizeVar(new ArgumentsVar(fun));
     }
 

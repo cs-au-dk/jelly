@@ -39,6 +39,7 @@ import {NodePath} from "@babel/traverse";
 import {Operations} from "../analysis/operations";
 import {AccessorType, ConstraintVar, isObjectPropertyVarObj, ObjectPropertyVarObj} from "../analysis/constraintvars";
 import {UnknownAccessPath} from "../analysis/accesspaths";
+import {ModuleInfo} from "../analysis/infos";
 
 /**
  * Models an assignment from a function parameter (0-based indexing) to a property of the base object.
@@ -367,7 +368,7 @@ export function invokeCallback(kind: CallbackKind, p: NativeFunctionParams, arg:
  */
 export function generatorCall(p: NativeFunctionParams) {
     if (p.base instanceof AllocationSiteToken && p.base.kind === "Generator") {
-        assert(isFunction(p.base.allocSite));
+        assert(!(p.base.allocSite instanceof ModuleInfo) && isFunction(p.base.allocSite));
         const solver = p.solver;
         const f = solver.fragmentState;
         const a = solver.globalState;

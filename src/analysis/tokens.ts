@@ -61,7 +61,7 @@ export class AllocationSiteToken extends Token {
 
     constructor(
         readonly kind: ObjectKind,
-        readonly allocSite: Node
+        readonly allocSite: Node | ModuleInfo
     ) {
         super();
         assert(this instanceof ArrayToken || kind !== "Array", "AllocationSiteTokens of kind Array must be created using ArrayToken");
@@ -99,7 +99,7 @@ export class PrototypeToken extends AllocationSiteToken {
  */
 export class ArrayToken extends AllocationSiteToken {
 
-    constructor(allocSite: Node) {
+    constructor(allocSite: Node | ModuleInfo) {
         super("Array", allocSite);
     }
 }

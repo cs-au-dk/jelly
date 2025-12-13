@@ -8,6 +8,7 @@ import {
     ClassPrivateMethod,
     ClassPrivateProperty,
     ClassProperty,
+    Expression,
     Function,
     Identifier,
     ImportDefaultSpecifier,
@@ -248,9 +249,9 @@ export function getEnclosingNonArrowFunction(path: NodePath): Function | undefin
 /**
  * Searches downward to the nearest non-parenthesized-expression.
  */
-export function skipParenthesizedChildren(path: NodePath): NodePath {
+export function skipParenthesizedChildren<T extends Node>(path: NodePath<T | Expression>): NodePath<T | Expression> {
     while (path.isParenthesizedExpression() || path.isTSAsExpression() || path.isTSTypeAssertion() || path.isTSNonNullExpression() || path.isTypeCastExpression())
-        path = path.get("expression") as NodePath;
+        path = path.get("expression") as NodePath<typeof path.node["expression"]>;
     return path;
 }
 

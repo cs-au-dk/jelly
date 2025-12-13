@@ -1,8 +1,8 @@
 import {ArgumentsVar, ConstraintVar, FunctionReturnVar, IntermediateVar, NodeVar, ObjectPropertyVar, ThisVar} from "../analysis/constraintvars";
 import {codeFromLocation} from "../misc/files";
-import {SourceLocation} from "@babel/types";
 import {AllocationSiteToken, FunctionToken, Token} from "../analysis/tokens";
 import {FunctionInfo} from "../analysis/infos";
+import {Location} from "../misc/util";
 
 /**
  * Returns a string description of the given function, with a code snippet.
@@ -14,7 +14,7 @@ export function funcToStringWithCode(info: FunctionInfo): string {
 /**
  * Extracts the source location from a token, or returns undefined if the token doesn't have a source location.
  */
-export function getTokenLocation(token: Token): SourceLocation | undefined {
+export function getTokenLocation(token: Token): Location | undefined {
     if (token instanceof FunctionToken) {
         if (token.fun.loc)
             return token.fun.loc;

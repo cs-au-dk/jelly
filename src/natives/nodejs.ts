@@ -19,9 +19,8 @@ export const nodejsModels: NativeModel = {
         p.solver.addTokenConstraint(exp, vp.objPropVar(mod, "exports"));
         p.solver.addTokenConstraint(exp, vp.objPropVar(exp, "default"));
         // model 'arguments' of module wrapper function
-        const prog = a.modules.get(p.moduleInfo)!;
-        const args = a.canonicalizeToken(new ArrayToken(prog));
-        p.solver.addTokenConstraint(args, vp.argumentsVar(prog));
+        const args = a.canonicalizeToken(new ArrayToken(p.moduleInfo));
+        p.solver.addTokenConstraint(args, vp.argumentsVar(p.moduleInfo));
         p.solver.addTokenConstraint(exp, vp.objPropVar(args, "0"));
         p.solver.addTokenConstraint(req, vp.objPropVar(args, "1"));
         p.solver.addTokenConstraint(mod, vp.objPropVar(args, "2"));

@@ -1,4 +1,4 @@
-import {Function, Node, Program} from "@babel/types";
+import {Function, Node} from "@babel/types";
 import {FilePath, getOrSet, Location, locationToStringWithFile, mapGetMap, strHash} from "../misc/util";
 import {
     AccessorType,
@@ -46,7 +46,7 @@ export class GlobalState {
 
     private canonicalThisVar: WeakMap<Function, ThisVar> = new WeakMap;
 
-    private canonicalArgumentsVar: WeakMap<Function | Program, ArgumentsVar> = new WeakMap;
+    private canonicalArgumentsVar: WeakMap<Function | ModuleInfo, ArgumentsVar> = new WeakMap;
 
     private canonicalObjectPropertyVar: WeakMap<
         ObjectPropertyVarObj,
@@ -94,8 +94,6 @@ export class GlobalState {
      * Set of DummyModuleInfos created (for module files that haven't been found).
      */
     readonly dummyModuleInfos: Map<string, DummyModuleInfo> = new Map;
-
-    readonly modules: Map<ModuleInfo, Program> = new Map;
 
     /**
      * Map from Function AST object to FunctionInfo.

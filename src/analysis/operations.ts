@@ -768,13 +768,13 @@ export class Operations {
             }
             if (m) {
 
-                // add access path token
+                // add access path token (if module is tracked or not analyzed)
+                const s = normalizeModuleName(str);
+                const tracked = options.trackedModules && options.trackedModules.some(e =>
+                    micromatch.isMatch(m!.getOfficialName(), e) || micromatch.isMatch(s, e));
                 const analyzed = m instanceof ModuleInfo && m.isIncluded;
-                if (!analyzed || options.vulnerabilities) {
-                    const s = normalizeModuleName(str);
-                    const tracked = options.trackedModules && options.trackedModules.find(e =>
-                        micromatch.isMatch(m!.getOfficialName(), e) || micromatch.isMatch(s, e));
-                    const ap = tracked ? new ModuleAccessPath(m, s) : IgnoredAccessPath.instance;
+                const ap = tracked ? new ModuleAccessPath(m, s) : analyzed ? undefined : IgnoredAccessPath.instance;
+                if (ap) {
                     this.solver.addAccessPath(ap, resultVar, path.node, this.a.getEnclosingFunctionOrModule(path));
                     if (isExportAllDeclaration(path.node))
                         this.solver.addAccessPath(ap, this.solver.varProducer.objPropVar(this.a.canonicalizeToken(new NativeObjectToken("module", this.moduleInfo)), "exports"));

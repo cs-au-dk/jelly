@@ -494,7 +494,7 @@ export function mapCallsToFunctions(cg: CallGraph): Map<number, number> {
             while (funIndex < functions.length) {
                 const fun = functions[funIndex], cmp = compareLC(fun.start, call.start);
                 // require that the function starts strictly before the call, unless the function is
-                // the synthetic module function. requiring that calls are stricly before functions
+                // the synthetic module function. requiring that calls are strictly before functions
                 // is required due to how functions sometimes have incorrect start positions in the
                 // dynamic analysis
                 if (cmp < 0 || (cmp === 0 && fun.start.line === 1 && fun.start.column === 0)) {

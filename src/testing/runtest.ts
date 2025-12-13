@@ -1,3 +1,5 @@
+import path from "node:path";
+import fs from "node:fs/promises";
 import {options, resetOptions, resolveBaseDir, setDefaultTrackedModules, setPatternProperties} from "../options";
 import {tapirLoadPatterns, tapirPatternMatch} from "../patternmatching/tapirpatterns";
 import {analyzeFiles} from "../analysis/analyzer";
@@ -39,11 +41,11 @@ export function runTest(basedir: string,
                             callTotal?: number,
                             reachableFound?: number,
                             reachableTotal?: number,
-                            apiUsageAccessPathPatternsAtNodes?: number
+                            apiUsageAccessPathPatternsAtNodes?: number,
                             vulnerabilities?: Array<Vulnerability>,
                             vulnerabilitiesMatches?: number,
                             hasEdges?: Array<[string, string]>,
-                            containsTokens?: Array<[string, number]>
+                            containsTokens?: Array<[string, number]>,
                         }) {
 
     const files = Array.isArray(app) ? app : [app];
@@ -76,8 +78,15 @@ export function runTest(basedir: string,
                 options.trackedModules ??= ["**"];
             }
 
-            if (args.vulnerabilities) {
-                options.vulnerabilities = "someFile"; // dummy value for the analysis to know that vulnerabilities is used
+            if (args.vulnerabilities || options.vulnerabilities) {
+                assert(!args.vulnerabilities || !options.vulnerabilities, "Either args.vulnerabilities or options.vulnerabilities must be set, not both.");
+                if (args.vulnerabilities)
+                    options.vulnerabilities = "someFile"; // dummy value for the analysis to know that vulnerabilities is used
+                else
+                    args.vulnerabilities = JSON.parse(
+                        await fs.readFile(path.resolve(basedir, options.vulnerabilities!), "utf8")
+                    ) as Array<Vulnerability>;
+
                 vulnerabilityDetector = new VulnerabilityDetector(args.vulnerabilities);
                 const qs = vulnerabilityDetector.getPatterns();
                 setDefaultTrackedModules(getGlobs(qs));
@@ -151,7 +160,7 @@ export function runTest(basedir: string,
             });
 
         if (args.vulnerabilitiesMatches !== undefined)
-            test("vulnerabilities", () => {
+            test("vulnerability matches", () => {
                 if (!vulnerabilityDetector)
                     throw new Error("vulnerabilitiesMatches can only be checked if vulnerabilities has been given.");
                 const matches = vulnerabilityDetector.patternMatch(solver.fragmentState, undefined, solver.diagnostics);
