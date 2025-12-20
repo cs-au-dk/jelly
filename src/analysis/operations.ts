@@ -240,6 +240,24 @@ export class Operations {
             return undefined;
         });
 
+        if (options.interops && isIdentifier(p.node) && [
+            "__importDefault", "__importStar", // TypeScript
+            "_interopRequireDefault", "_interopRequireWildcard", // Babel
+            "_interop_require_default", "_interop_require_wildcard", // SWC
+            "getDefaultExportFromCjs", "_interopDefault", "_interopNamespace", // Rollup
+            "__toESM" // esbuild
+        ].includes(p.node.name)) {
+            if (logger.isDebugEnabled())
+                logger.debug(`Interop call: ${p.node.name} at ${locationToStringWithFile(path.node.loc)}`);
+            this.solver.addSubsetConstraint(argVars[0], resultVar);
+            f.registerCall(pars.node, caller, undefined);
+            // TODO: registerCallEdge to the helper function?
+            return;
+        }
+        // TODO: also model __webpack_require__ (Webpack)?
+        // TODO: other common helper functions?
+        // TODO: recognize by implementation instead of name for soundness and to also work on minified code?
+
         const handleCall = (base: ObjectPropertyVarObj | undefined, t: Token) => {
             this.callFunctionBound(base, t, calleeVar, argVars, resultVar, strings, path);
         };

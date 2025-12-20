@@ -201,6 +201,7 @@ describe("tests/micro", () => {
     });
 
     runTest("tests/micro", "client4.js", {
+        options: {interops: false},
         soundness: "tests/micro/client4.json",
         functionInfos: 4,
         moduleInfos: 3,
@@ -215,6 +216,7 @@ describe("tests/micro", () => {
     });
 
     runTest("tests/micro", "client5.js", {
+        options: {interops: false},
         soundness: "tests/micro/client5.json",
         functionInfos: 3,
         moduleInfos: 3,

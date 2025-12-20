@@ -19,7 +19,7 @@ describe("tests/mochatest", () => {
 
     describe("with-require-hook", () =>
         runTest("tests/mochatest", ["test.js", "require-hook.js"], {
-            options: {callgraphExternal: false},
+            options: {callgraphExternal: false, interops: false},
             soundness: "tests/mochatest/test-with-hook.json",
             functionInfos: 14,
             moduleInfos: 4,

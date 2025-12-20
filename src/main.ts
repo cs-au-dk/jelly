@@ -117,6 +117,8 @@ program
     .option("--native-overwrites", "allow overwriting of native object properties")
     .option("--ignore-imprecise-native-calls", "ignore imprecise native calls")
     .option("--vulnerabilities-full", "full report of vulnerabilities")
+    .option("--eager-propagation", "perform propagation after each module")
+    .option("--no-interops", "disable models of common module interop helper functions")
     .usage("[options] [files]")
     .addHelpText("after",
         "\nAll modules reachable by require/import from the given files are included in the analysis\n" +
