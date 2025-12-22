@@ -50,6 +50,7 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
                     logger.info(`Loading ${options.approxLoad}`);
                 a.approx!.add(JSON.parse(readFileSync(options.approxLoad, "utf-8")));
             }
+            let prevTokens = 0;
             while (a.pendingFiles.isNonEmpty()) {
                 while (a.pendingFiles.isNonEmpty()) {
                     for (const file of a.pendingFiles) {
@@ -102,6 +103,14 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
                             // traverse the AST
                             writeStdOutIfActive("Traversing AST...");
                             visit(ast, new Operations(moduleInfo, solver, buildModuleNatives(solver, moduleInfo, moduleParams)));
+
+                            if (options.eagerPropagation) {
+                                const t = new Timer();
+                                await solver.propagate("Analyzing");
+                                solver.updateDiagnostics();
+                                logger.info(`Time: +${nanoToMs(t.elapsed())}, tokens: +${solver.fragmentState.numberOfTokens - prevTokens}${prevTokens > 0 ? ` (+${percent((solver.fragmentState.numberOfTokens - prevTokens) / prevTokens)})` : ""}`);
+                                prevTokens = solver.fragmentState.numberOfTokens;
+                            }
                         }
 
                         ast.tokens = undefined; // tokens are no longer needed, allow GC
