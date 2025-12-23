@@ -24,7 +24,6 @@ import {
     locationToStringWithFileAndEnd,
     mapGetMap,
     mapGetSet,
-    mapMapSize,
     nodeToString,
     pushArraySingle,
     strHash,
@@ -120,9 +119,8 @@ export default class Solver {
         const d = this.diagnostics;
         d.functions = a.functionInfos.size;
         d.vars = f.getNumberOfVarsWithTokens();
-        d.listeners = [
-            f.tokenListeners, f.tokenListeners2, f.arrayEntriesListeners, f.objectPropertiesListeners,
-        ].reduce((acc, l: Map<unknown, Map<unknown, unknown>>) => acc + mapMapSize(l), 0);
+        d.listeners = f.tokenListeners.totalSize() + f.tokenListeners2.totalSize() +
+            f.arrayEntriesListeners.totalSize() + f.objectPropertiesListeners.totalSize();
         d.tokens = f.numberOfTokens;
         d.subsetEdges = f.numberOfSubsetEdges;
         d.functionToFunctionEdges = f.numberOfFunctionToFunctionEdges;
@@ -288,12 +286,12 @@ export default class Solver {
     addSubsetEdge(fromRep: RepresentativeVar, toRep: RepresentativeVar) {
         if (fromRep !== toRep) {
             const f = this.fragmentState;
-            const s = mapGetSet(f.subsetEdges, fromRep);
+            const s = f.subsetEdges.getSet(fromRep);
             if (!s.has(toRep)) {
                 // add the edge
                 s.add(toRep);
                 f.numberOfSubsetEdges++;
-                mapGetSet(f.reverseSubsetEdges, toRep).add(fromRep);
+                f.reverseSubsetEdges.getSet(toRep).add(fromRep);
                 if (logger.isVerboseEnabled())
                     assert(!f.redirections.has(fromRep) && !f.redirections.has(toRep));
                 f.vars.add(fromRep);
@@ -382,7 +380,7 @@ export default class Solver {
                         }
                     break;
             }
-        const m = mapGetMap(bound ? f.tokenListeners2 : f.tokenListeners, vRep);
+        const m = (bound ? f.tokenListeners2 : f.tokenListeners).getMap(vRep);
         if (!m.has(id)) {
             // run listener on all existing tokens
             if (bound)
@@ -514,7 +512,7 @@ export default class Solver {
      */
     private runArrayEntriesListener(t: ArrayToken, id: ListenerID, listener: (prop: string) => void): Map<ListenerID, (prop: string) => void> | false {
         const f = this.fragmentState;
-        const m = mapGetMap(f.arrayEntriesListeners, t);
+        const m = f.arrayEntriesListeners.getMap(t);
         if (!m.has(id)) {
             const ps = f.arrayEntries.get(t);
             if (ps)
@@ -535,7 +533,7 @@ export default class Solver {
         if (!isArrayIndex(prop))
             return;
         const f = this.fragmentState;
-        const ps = mapGetSet(f.arrayEntries, a);
+        const ps = f.arrayEntries.getSet(a);
         if (!ps.has(prop)) {
             if (logger.isDebugEnabled())
                 logger.debug(`Adding array entry ${a}[${prop}]`);
@@ -578,7 +576,7 @@ export default class Solver {
      */
     private runObjectPropertiesListener(t: ObjectPropertyVarObj, id: ListenerID, listener: (prop: string) => void): Map<ListenerID, (prop: string) => void> | false {
         const f = this.fragmentState;
-        const m = mapGetMap(f.objectPropertiesListeners, t);
+        const m = f.objectPropertiesListeners.getMap(t);
         if (!m.has(id)) {
             const ps = f.objectProperties.get(t);
             if (ps)
@@ -597,7 +595,7 @@ export default class Solver {
      */
     addObjectProperty(a: ObjectPropertyVarObj, prop: string) {
         const f = this.fragmentState;
-        const ps = mapGetSet(f.objectProperties, a);
+        const ps = f.objectProperties.getSet(a);
         if (!ps.has(prop)) {
             if (logger.isDebugEnabled())
                 logger.debug(`Adding object property ${a}.${prop}`);
@@ -671,8 +669,8 @@ export default class Solver {
             if (!has(t))
                 rts.add(t);
         // redirect subset edges
-        const repOut = mapGetSet(f.subsetEdges, rep);
-        const repIn = mapGetSet(f.reverseSubsetEdges, rep);
+        const repOut = f.subsetEdges.getSet(rep);
+        const repIn = f.reverseSubsetEdges.getSet(rep);
         const vOut = f.subsetEdges.get(v);
         if (vOut) {
             for (const w of vOut) {
@@ -716,7 +714,7 @@ export default class Solver {
         // redirect listeners, invoke on tokens in rep that are not in v
         const tr = f.tokenListeners.get(v);
         if (tr) {
-            const qr = mapGetMap(f.tokenListeners, rep);
+            const qr = f.tokenListeners.getMap(rep);
             for (const [k, listener] of tr)
                 if (!qr.has(k)) {
                     qr.set(k, listener);
@@ -727,7 +725,7 @@ export default class Solver {
         }
         const tr2 = f.tokenListeners2.get(v);
         if (tr2) {
-            const qr = mapGetMap(f.tokenListeners2, rep);
+            const qr = f.tokenListeners2.getMap(rep);
             for (const [k, listener] of tr2)
                 if (!qr.has(k)) {
                     qr.set(k, listener);

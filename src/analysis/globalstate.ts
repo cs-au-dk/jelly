@@ -50,13 +50,15 @@ export class GlobalState {
 
     private canonicalObjectPropertyVar: WeakMap<
         ObjectPropertyVarObj,
-        Map<string, Record<AccessorType, ObjectPropertyVar| undefined>>
+        Map<string, Record<AccessorType, ObjectPropertyVar | undefined>>
     > = new WeakMap;
 
     /**
      * Map from AST node to canonical NodeVar object.
      */
     readonly canonicalNodeVars: WeakMap<Node, NodeVar> = new WeakMap;
+
+    readonly vars: Array<ConstraintVar> = [];
 
     /**
      * Map from token string hash to canonical Token object.
@@ -68,6 +70,8 @@ export class GlobalState {
     private canonicalIgnoredAccessPathToken: AccessPathToken | undefined;
 
     private canonicalNativeObjectTokens: Map<string, NativeObjectToken> = new Map;
+
+    readonly tokens: Array<Token> = [];
 
     /**
      * Map from access path string hash to canonical AccessPath object.
@@ -173,16 +177,21 @@ export class GlobalState {
      * Returns the canonical representative of the given constraint variable (possibly the given one).
      */
     canonicalizeVar<T extends ConstraintVar>(v: T): T {
+        const next = () => {
+           v.index = this.vars.length;
+           this.vars.push(v);
+           return v;
+        };
         if (v instanceof NodeVar)
-            return getOrSet(this.canonicalNodeVars, v.node, () => v) as unknown as T;
+            return getOrSet(this.canonicalNodeVars, v.node, next as unknown as () => NodeVar) as unknown as T;
         else if (v instanceof AncestorsVar)
-            return getOrSet(this.canonicalAncestorVars, v.t, () => v) as unknown as T;
+            return getOrSet(this.canonicalAncestorVars, v.t, next as unknown as () => AncestorsVar) as unknown as T;
         else if (v instanceof FunctionReturnVar)
-            return getOrSet(this.canonicalReturnVar, v.fun, () => v) as unknown as T;
+            return getOrSet(this.canonicalReturnVar, v.fun, next as unknown as () => FunctionReturnVar) as unknown as T;
         else if (v instanceof ThisVar)
-            return getOrSet(this.canonicalThisVar, v.fun, () => v) as unknown as T;
+            return getOrSet(this.canonicalThisVar, v.fun, next as unknown as () => ThisVar) as unknown as T;
         else if (v instanceof ArgumentsVar)
-            return getOrSet(this.canonicalArgumentsVar, v.fun, () => v) as unknown as T;
+            return getOrSet(this.canonicalArgumentsVar, v.fun, next as unknown as () => ArgumentsVar) as unknown as T;
         else if (v instanceof ObjectPropertyVar) {
             const props = mapGetMap(this.canonicalObjectPropertyVar, v.obj);
             const m = getOrSet(props, v.prop, () => ({
@@ -190,39 +199,44 @@ export class GlobalState {
                 set: undefined,
                 normal: undefined,
             }));
-            return (m[v.accessor] ??= v) as unknown as T;
+            return (m[v.accessor] ??= next() as unknown as ObjectPropertyVar) as unknown as T;
         }
         this.numberOfCanonicalizeVarCalls++;
-        return getOrSet(this.canonicalConstraintVars, v.toString(), () => v) as T;
+        return getOrSet(this.canonicalConstraintVars, v.toString(), next) as T;
     }
 
     /**
      * Returns the canonical representative of the given token (possibly the given one).
      */
     canonicalizeToken<T extends Token>(t: T): T {
+        const next = () => {
+            t.index = this.tokens.length;
+            this.tokens.push(t);
+            return t;
+        };
         if (t instanceof AccessPathToken) {
             if (t.ap === UnknownAccessPath.instance) {
                 if (!this.canonicalUnknownAccessPathToken) {
                     t.hash = strHash(t.toString());
-                    this.canonicalUnknownAccessPathToken = t;
+                    this.canonicalUnknownAccessPathToken = next() as unknown as AccessPathToken;
                 }
                 return this.canonicalUnknownAccessPathToken as unknown as T;
             }
             if (t.ap === IgnoredAccessPath.instance) {
                 if (!this.canonicalIgnoredAccessPathToken) {
                     t.hash = strHash(t.toString());
-                    this.canonicalIgnoredAccessPathToken = t;
+                    this.canonicalIgnoredAccessPathToken = next() as unknown as AccessPathToken;
                 }
                 return this.canonicalIgnoredAccessPathToken as unknown as T;
             }
         } else if (t instanceof NativeObjectToken && !t.moduleInfo)
             return getOrSet(this.canonicalNativeObjectTokens, t.name, () => {
                 t.hash = strHash(t.toString());
-                return t;
+                return next() as unknown as NativeObjectToken;
             }) as any;
         this.numberOfCanonicalizeTokenCalls++;
         const s = t.toString();
-        return getOrSet(this.canonicalTokens, s, () => (t.hash = strHash(s), t)) as T;
+        return getOrSet(this.canonicalTokens, s, () => (t.hash = strHash(s), next())) as T;
     }
 
     /**

@@ -10,7 +10,9 @@ import {NativeFunctionAnalyzer} from "../natives/nativebuilder";
  */
 export abstract class Token {
 
-    hash: number | undefined; // set by canonicalizeToken
+    index: number = -1; // set by canonicalizeToken
+
+    hash: number | undefined = undefined; // set by canonicalizeToken
 
     abstract toString(): string
 }

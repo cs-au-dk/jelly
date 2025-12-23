@@ -3,7 +3,7 @@ import {resolve} from "path";
 import logger, {writeStdOutIfActive} from "../misc/logger";
 import Solver, {AbortedException} from "./solver";
 import Timer, {nanoToMs, TimeoutException} from "../misc/timer";
-import {getMapHybridSetSize, mapMapSize, percent} from "../misc/util";
+import {getMapHybridSetSize, percent} from "../misc/util";
 import {visit} from "./astvisitor";
 import {FunctionInfo} from "./infos";
 import {options, resolveBaseDir} from "../options";
@@ -221,9 +221,9 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
                 if (options.maxWaves !== undefined)
                     logger.info(`Fixpoint wave limit reached: ${d.waveLimitReached} time${d.waveLimitReached !== 1 ? "s" : ""}`);
                 logger.info(`Constraint vars: ${f.getNumberOfVarsWithTokens()} (${f.vars.size}), tokens: ${d.tokens}, subset edges: ${d.subsetEdges}, max tokens: ${f.getLargestTokenSetSize()}, max subset out: ${f.getLargestSubsetEdgeOutDegree()}, redirections: ${f.redirections.size}`);
-                logger.info(`Listeners (notifications) token: ${mapMapSize(f.tokenListeners)} (${d.tokenListenerNotifications}), bounded: ${mapMapSize(f.tokenListeners2)} (${d.tokenListener2Notifications}), ` +
-                    `array: ${mapMapSize(f.arrayEntriesListeners)} (${d.arrayEntriesListenerNotifications}), ` +
-                    `obj: ${mapMapSize(f.objectPropertiesListeners)} (${d.objectPropertiesListenerNotifications})`);
+                logger.info(`Listeners (notifications) token: ${f.tokenListeners.totalSize()} (${d.tokenListenerNotifications}), bounded: ${f.tokenListeners2.totalSize()} (${d.tokenListener2Notifications}), ` +
+                    `array: ${f.arrayEntriesListeners.totalSize()} (${d.arrayEntriesListenerNotifications}), ` +
+                    `obj: ${f.objectPropertiesListeners.totalSize()} (${d.objectPropertiesListenerNotifications})`);
                 logger.info(`Canonicalize vars: ${a.canonicalConstraintVars.size} (${a.numberOfCanonicalizeVarCalls}), tokens: ${a.canonicalTokens.size} (${a.numberOfCanonicalizeTokenCalls}), access paths: ${a.canonicalAccessPaths.size} (${a.numberOfCanonicalizeAccessPathCalls})`);
                 logger.info(`Propagation: ${nanoToMs(d.totalPropagationTime)}, listeners: ${nanoToMs(d.totalListenerCallTime)}` +
                     `, finalization: ${nanoToMs(d.finalizationTime)}`);

@@ -34,6 +34,8 @@ function getTokenParent(obj: Token): Node | PackageInfo | ModuleInfo | undefined
  */
 export abstract class ConstraintVar {
 
+    index: number = -1; // set by canonicalizeVar
+
     abstract toString(): string
 
     /**

@@ -37,6 +37,7 @@ import Solver from "./solver";
 import {MaybeEmptyPropertyRead} from "../patching/patchdynamics";
 import {getEnclosingNonArrowFunction, isInTryBlockOrBranch} from "../misc/asthelpers";
 import {isAbsoluteModuleName, isLocalRequire, resolveModule} from "../misc/files";
+import {ArrayMap, ArrayMapMap, ArrayMapSet} from "../misc/arraymap";
 
 export type ListenerID = bigint;
 
@@ -98,7 +99,7 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
      * The current analysis solution.
      * Singleton sets are represented as plain references, larger sets are represented as ES2015 sets.
      */
-    private readonly tokens: Map<RVT, Token | Set<Token>> = new Map;
+    private readonly tokens: ArrayMap<ConstraintVar, RVT, Token | Set<Token>>;
 
     /**
      * The set of constraint variables (including those with tokens, subset edges, or listeners, but excluding those that are redirected).
@@ -117,25 +118,25 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
 
     numberOfSubsetEdges: number = 0;
 
-    readonly subsetEdges: Map<RVT, Set<RVT>> = new Map;
+    readonly subsetEdges: ArrayMapSet<ConstraintVar, RVT, RVT>;
 
-    readonly reverseSubsetEdges: Map<RVT, Set<RVT>> = new Map; // (used by solver.redirect)
+    readonly reverseSubsetEdges: ArrayMapSet<ConstraintVar, RVT, RVT>; // (used by solver.redirect)
 
-    readonly arrayEntries: Map<ArrayToken, Set<string>> = new Map;
+    readonly arrayEntries: ArrayMapSet<Token, ArrayToken, string>;
 
-    readonly objectProperties: Map<ObjectPropertyVarObj, Set<string>> = new Map;
+    readonly objectProperties: ArrayMapSet<Token, ObjectPropertyVarObj, string>;
 
-    readonly tokenListeners: Map<RVT, Map<ListenerID, (t: Token) => void>> = new Map;
+    readonly tokenListeners: ArrayMapMap<ConstraintVar, RVT, ListenerID, (t: Token) => void>;
 
-    readonly tokenListeners2: Map<RVT, Map<ListenerID, (t: Token) => void>> = new Map;
+    readonly tokenListeners2: ArrayMapMap<ConstraintVar, RVT, ListenerID, (t: Token) => void>;
 
     readonly listenersProcessed: Map<ListenerID, Set<Token>> = new Map;
 
     readonly externalCallbacksProcessed: Set<FunctionToken> = new Set;
 
-    readonly arrayEntriesListeners: Map<ArrayToken, Map<ListenerID, (prop: string) => void>> = new Map;
+    readonly arrayEntriesListeners: ArrayMapMap<Token, ArrayToken, ListenerID, (prop: string) => void>;
 
-    readonly objectPropertiesListeners: Map<ObjectPropertyVarObj, Map<ListenerID, (prop: string) => void>> = new Map;
+    readonly objectPropertiesListeners: ArrayMapMap<Token, ObjectPropertyVarObj, ListenerID, (prop: string) => void>;
 
     readonly postponedListenerCalls: Array<PostponedListenerCall> = [];
 
@@ -360,6 +361,15 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
     constructor(s: Solver) {
         this.a = s.globalState;
         this.varProducer = new ConstraintVarProducer(s, s.globalState);
+        this.tokens = new ArrayMap(this.a.vars);
+        this.subsetEdges = new ArrayMapSet(this.a.vars);
+        this.reverseSubsetEdges = new ArrayMapSet(this.a.vars);
+        this.tokenListeners = new ArrayMapMap(this.a.vars);
+        this.tokenListeners2 = new ArrayMapMap(this.a.vars);
+        this.arrayEntries = new ArrayMapSet(this.a.tokens);
+        this.objectProperties = new ArrayMapSet(this.a.tokens);
+        this.arrayEntriesListeners = new ArrayMapMap(this.a.tokens);
+        this.objectPropertiesListeners = new ArrayMapMap(this.a.tokens);
     }
 
     /**
@@ -697,9 +707,9 @@ export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVa
     *getAllVarsAndTokens(): Iterable<[RVT, Set<Token> | Array<Token>, number]> {
         for (const [v, ts] of this.tokens)
             if (ts instanceof Token)
-                yield [v, [ts], 1];
+                yield [v as RVT, [ts], 1];
             else
-                yield [v, ts, ts.size];
+                yield [v as RVT, ts, ts.size];
     }
 
     private static emptySizeAndHas: [number, (t: Token) => boolean] = [0, (_t: Token) => false];

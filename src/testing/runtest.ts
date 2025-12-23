@@ -172,11 +172,6 @@ export function runTest(basedir: string,
                 test("data structure invariants", () => {
                     // checks that all data structures that are supposed to
                     // contain representatives actually contain representatives
-                    const check = (s: Set<RepresentativeVar> | Map<RepresentativeVar, object>) => {
-                        for (const v of s.keys())
-                            assert(f.isRepresentative(v));
-                    };
-
                     const f = solver.fragmentState;
                     for (const [v] of f.getAllVarsAndTokens())
                         assert(f.isRepresentative(v));
@@ -184,10 +179,12 @@ export function runTest(basedir: string,
                     for (const edges of [f.subsetEdges, f.reverseSubsetEdges])
                         for (const [v, es] of edges) {
                             assert(f.isRepresentative(v));
-                            check(es);
+                            for (const v of es.keys())
+                                assert(f.isRepresentative(v));
                         }
 
-                    check(f.tokenListeners);
+                    for (const v of f.tokenListeners.keys())
+                        assert(f.isRepresentative(v));
 
                     for (const v of f.redirections.keys())
                         assert(!f.vars.has(v as RepresentativeVar));
