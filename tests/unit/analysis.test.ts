@@ -289,7 +289,7 @@ describe("tests/unit/analysis", () => {
             expect(getTokens(f.varProducer.nodeVar(param))).toEqual([tUnknown]);
         });
 
-        test.each(["./fake.js", "./*", "./*.js"])("exported library module: %s", (pattern: string) => {
+        test.each([/^fake\.js$/, /^.*$/, /^.*\.js$/])("exported library module: %s", (pattern: RegExp) => {
             const {solver, a, f, getTokens} = setup;
 
             a.packageJsonInfos.set(p.dir, {
@@ -298,7 +298,7 @@ describe("tests/unit/analysis", () => {
                 version: undefined,
                 main: undefined,
                 packagekey,
-                exports: [pattern],
+                exports: pattern,
             });
 
             solver.addTokenConstraint(a.canonicalizeToken(new FunctionToken(fun1)), vExports);
@@ -315,7 +315,7 @@ describe("tests/unit/analysis", () => {
                 version: undefined,
                 main: undefined,
                 packagekey,
-                exports: ["./other-file.js"],
+                exports: /^other-file\.js$/,
             });
 
             solver.addTokenConstraint(a.canonicalizeToken(new FunctionToken(fun1)), vExports);

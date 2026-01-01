@@ -347,6 +347,13 @@ export function pushAll<V>(from: Iterable<V>, to: Array<V>) {
 }
 
 /**
+ * Escapes special regex characters in a string.
+ */
+export function escapeRegExp(s: string): string {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
  * Computes a hashcode for the given string.
  * https://github.com/bryc/code/blob/master/jshash/experimental/cyrb53.js
  */

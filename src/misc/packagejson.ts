@@ -1,4 +1,4 @@
-import {FilePath, pushAll} from "./util";
+import {FilePath, escapeRegExp, pushAll} from "./util";
 import {basename, dirname, relative, resolve} from "path";
 import {existsSync, readFileSync} from "fs";
 import logger from "./logger";
@@ -36,9 +36,9 @@ export interface PackageJsonInfo {
     dir: string;
 
     /**
-     * All values in "exports", undefined if absent.
+     * Pattern that matches all exported paths according to "exports", undefined if absent.
      */
-    exports: Array<string> | undefined;
+    exports: RegExp | undefined;
 }
 
 /**
@@ -79,7 +79,7 @@ function parsePackageJson(packageJson: FilePath): unknown {
  * Extracts PackageJsonInfo for the package containing the given file.
  */
 export function getPackageJsonInfo(tofile: FilePath): PackageJsonInfo {
-    let packagekey, name: string, version: string | undefined, main: string | undefined, dir: string, exports: Array<string> | undefined;
+    let packagekey, name: string, version: string | undefined, main: string | undefined, dir: string, exports: RegExp | undefined;
     const p = findPackageJson(tofile); // TODO: add command-line option to skip search for package.json for entry files?
     let f: unknown;
     if (p) {
@@ -114,17 +114,23 @@ export function getPackageJsonInfo(tofile: FilePath): PackageJsonInfo {
         if (typeof f === "object" && "exports" in f) {
             // This documentation is better than the NodeJS documentation: https://webpack.js.org/guides/package-exports/
             // TODO: negative patterns, e.g., {"./test/*": null}
-            exports = [];
-            if (main)
-                exports.push(main);
+            const patterns: Array<string> = [];
+            let valid = true;
             const queue = [f.exports];
             while (queue.length > 0) {
                 const exp = queue.pop();
                 if (typeof exp === "string") {
-                    if (exp.startsWith("./"))
-                        exports.push(exp !== "./" && exp.endsWith("/") ? exp + "*" : exp);
-                    else {
-                        exports = undefined;
+                    if (exp === "./") { // "./" exposes the entire package
+                        patterns.length = 0;
+                        patterns.push(".*");
+                        break;
+                    } else if (exp.startsWith("./")) {
+                        const path = exp.substring(2); // strip "./" prefix
+                        patterns.push(path.endsWith("/") ?
+                            escapeRegExp(path) + ".*" : // trailing "/" is deprecated directory export
+                            escapeRegExp(path).replaceAll("\\*", "[^/]*")); // * matches single path segment
+                    } else {
+                        valid = false;
                         logger.warn(`Warning: Non-relative export (${exp}) found in ${p.packageJson}`);
                         break;
                     }
@@ -135,11 +141,13 @@ export function getPackageJsonInfo(tofile: FilePath): PackageJsonInfo {
                 else if (typeof exp === "object")
                     pushAll(Object.values(exp), queue);
                 else {
-                    exports = undefined;
+                    valid = false;
                     logger.warn(`Warning: Invalid export (${exp}) found in ${p.packageJson}`);
                     break;
                 }
             }
+            if (valid)
+                exports = new RegExp("^(" + patterns.join("|") + ")$");
         }
     } else {
         name = "<main>";
@@ -149,16 +157,3 @@ export function getPackageJsonInfo(tofile: FilePath): PackageJsonInfo {
     return {packagekey, name, version, main, dir, exports};
 }
 
-/**
- * Checks if a file (relative path) belongs to the exports of a package.
- */
-export function isInExports(rel: string, exports: Array<string>): boolean {
-    // TODO: all wildcards in a pattern should expand to the same value
-    for (const path of exports)
-        if (path.includes("*")) {
-            if (new RegExp(`^${path.replaceAll(/\*/g, ".*")}$`).test(rel))
-                return true;
-        } else if (path === rel)
-            return true;
-    return false;
-}
