@@ -6,12 +6,12 @@ import {
     ImportDeclaration,
     isIdentifier,
     isImport,
-    isStringLiteral
 } from "@babel/types";
 import traverse, {NodePath} from "@babel/traverse";
 import Module from "module";
 import {ModuleInfo} from "./infos";
 import {FragmentState} from "./fragmentstate";
+import {getConstantString} from "../misc/asthelpers";
 
 /**
  * Scans AST for 'require', 'import' and 'export' only (no proper analysis).
@@ -31,9 +31,9 @@ export function findModules(ast: File, f: FragmentState, moduleInfo: ModuleInfo)
                     path.node.callee.name === "require" &&
                     !path.scope.getBinding(path.node.callee.name))) &&
                 path.node.arguments.length >= 1) {
-                const arg = path.node.arguments[0];
-                if (isStringLiteral(arg))
-                    loadModule(imp ? "module" : "commonjs", arg.value, path);
+                const str = getConstantString(path.get("arguments.0"));
+                if (str)
+                    loadModule(imp ? "module" : "commonjs", str, path);
                 else
                     f.warnUnsupported(path.node, "Unhandled 'require'");
             }

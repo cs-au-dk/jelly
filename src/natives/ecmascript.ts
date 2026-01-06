@@ -49,10 +49,11 @@ import {
     PackageObjectToken,
     Token
 } from "../analysis/tokens";
-import {isExpression, isNewExpression, isStringLiteral} from "@babel/types";
+import {isExpression, isNewExpression} from "@babel/types";
 import {NativeFunctionParams, NativeModel, NativeModelParams} from "./nativebuilder";
 import {TokenListener} from "../analysis/listeners";
 import {options} from "../options";
+import {getConstantString} from "../misc/asthelpers";
 
 export const OBJECT_PROTOTYPE = "Object.prototype";
 export const ARRAY_PROTOTYPE = "Array.prototype";
@@ -1221,8 +1222,9 @@ export const ecmascriptModels: NativeModel = {
                         const args = p.path.node.arguments;
                         if (args.length < 3)
                             return;
+                        const prop = getConstantString(p.path.get("arguments.1"));
 
-                        if (!isStringLiteral(args[1])) {
+                        if (prop === undefined) {
                             warnNativeUsed("Object.defineProperty", p, "with dynamic property name");
                             return;
                         }
@@ -1232,7 +1234,7 @@ export const ecmascriptModels: NativeModel = {
                             return;
                         }
 
-                        const ivars = prepareDefineProperty("Object.defineProperty", args[1].value, p.op.expVar(args[2], p.path), p);
+                        const ivars = prepareDefineProperty("Object.defineProperty", prop, p.op.expVar(args[2], p.path), p);
                         defineProperties([args[0], TokenListener.NATIVE_OBJECT_DEFINE_PROPERTY], ivars, p);
                     }
                 },

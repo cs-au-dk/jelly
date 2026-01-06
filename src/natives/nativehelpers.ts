@@ -6,7 +6,6 @@ import {
     isIdentifier,
     isObjectExpression,
     isObjectProperty,
-    isStringLiteral
 } from "@babel/types";
 import {
     AccessPathToken,
@@ -20,7 +19,7 @@ import {
     PackageObjectToken,
     Token
 } from "../analysis/tokens";
-import {getKey, isParentExpressionStatement} from "../misc/asthelpers";
+import {getConstantString, getKey, isParentExpressionStatement} from "../misc/asthelpers";
 import {Node} from "@babel/core";
 import {
     GENERATOR_PROTOTYPE_NEXT,
@@ -1046,8 +1045,9 @@ export function defineGetterSetter(ac: "get" | "set", p: NativeFunctionParams) {
     const args = p.path.node.arguments;
     if (args.length < 2 || !p.base)
         return;
+    const prop = getConstantString(p.path.get("arguments.0"));
 
-    if (!isStringLiteral(args[0])) {
+    if (prop === undefined) {
         warnNativeUsed(`Object.__define${ac === "get" ? "G" : "S"}etter__`, p, "with dynamic property name");
         return;
     }
@@ -1059,5 +1059,5 @@ export function defineGetterSetter(ac: "get" | "set", p: NativeFunctionParams) {
 
     const ivar = p.op.expVar(args[1], p.path);
     if (ivar)
-        defineProperties(p.base, [{prop: args[0].value, ac, ivar}], p);
+        defineProperties(p.base, [{prop, ac, ivar}], p);
 }

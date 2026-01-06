@@ -17,7 +17,6 @@ import {
     isParenthesizedExpression,
     isRestElement,
     isSpreadElement,
-    isStringLiteral,
     isSuper,
     isTSParameterProperty,
     isTypeCastExpression,
@@ -35,6 +34,7 @@ import {
 import {NodePath} from "@babel/traverse";
 import {
     getAdjustedCallNodePath,
+    getConstantString,
     getEnclosingFunction,
     getEnclosingNonArrowFunction,
     getKey,
@@ -200,8 +200,22 @@ export class Operations {
         f.registerInvokedExpression(path.node.callee);
 
         let strs: Array<string> | undefined;
-        const strings = () =>
-            strs ??= args.length >= 1 && isStringLiteral(args[0]) ? [args[0].value] : this.getRequireHints(pars) ?? [];
+        const strings = () => {
+            if (!strs) {
+                let res: Array<string> | undefined;
+                if (args.length >= 1) {
+                    const s = getConstantString(path.get("arguments.0"));
+                    if (s !== undefined)
+                        res = [s];
+                    else
+                        res = this.getRequireHints(pars);
+                }
+                if (!res)
+                    res = [];
+                strs = res;
+            }
+            return strs;
+        };
 
         // 'import' expression
         if (isImport(p.node)) {

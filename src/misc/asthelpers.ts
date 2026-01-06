@@ -336,3 +336,24 @@ export function getConstructor(path: NodePath<Class>): NodePath<ClassMethod> {
             return b as NodePath<ClassMethod>;
     assert.fail(`Constructor not found for class ${locationToStringWithFileAndEnd(path.node.loc)}`);
 }
+
+/**
+ * Returns the string value of the given expression if it is a string literal
+ * or has a unique definition that is a string literal.
+ */
+export function getConstantString(id: NodePath): string | undefined {
+    if (id.isStringLiteral())
+        return id.node.value;
+    if (id.isIdentifier()) {
+        const binding = id.scope.getBinding(id.node.name);
+        if (binding && binding.constant && binding.constantViolations.length === 0) {
+            const def = binding.path;
+            if (def.isVariableDeclarator()) {
+                const init = def.node.init;
+                if (init && isStringLiteral(init))
+                    return init.value;
+            }
+        }
+    }
+    return undefined;
+}
