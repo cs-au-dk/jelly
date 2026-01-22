@@ -34,14 +34,13 @@ import {
 } from "./constraintvars";
 import {ArrayToken} from "./tokens";
 import {GlobalState} from "./globalstate";
-import {MergeRepresentativeVar, RepresentativeVar} from "./fragmentstate";
 import Solver from "./solver";
 import {ARRAY_ALL, ARRAY_UNKNOWN} from "../natives/ecmascript";
 import {getEnclosingNonArrowFunction} from "../misc/asthelpers";
 import {Location} from "../misc/util";
 import {ModuleInfo} from "./infos";
 
-export class ConstraintVarProducer<RVT extends RepresentativeVar | MergeRepresentativeVar = RepresentativeVar> {
+export class ConstraintVarProducer {
 
     constructor(
         private readonly s: Solver,

@@ -69,15 +69,9 @@ export type ListenerID = bigint;
  *
  * Bugs in the implementation of `solver.redirect` can easily invalidate the invariant for constraint variables
  * that are stored in data structures for representative variables, without us being able to detect that statically.
- *
- * A representative variable in one FragmentState is not guaranteed to be a representative in another.
- * Like the implementation of `solver.redirect`, code that merges variables from different fragment states must
- * handle representative variables carefully!
- * In this case it is possible to use `FragmentState<MergeRepresentativeVar>` for the second fragment state
- * to prevent representative variable mixups.
  */
 export type RepresentativeVar = ConstraintVar & { readonly __repr: unique symbol };
-export type MergeRepresentativeVar = ConstraintVar & { readonly __repr: unique symbol };
+type RVT = RepresentativeVar;
 
 export type PostponedListenerCall =
     [(t: Token) => void, Token] |
@@ -86,14 +80,14 @@ export type PostponedListenerCall =
 /**
  * Analysis state for a fragment (a module or a package with dependencies, depending on the analysis phase).
  */
-export class FragmentState<RVT extends RepresentativeVar | MergeRepresentativeVar = RepresentativeVar> {
+export class FragmentState {
 
     readonly a: GlobalState;
 
     /**
      * Constraint variable producer.
      */
-    readonly varProducer: ConstraintVarProducer<RVT>;
+    readonly varProducer: ConstraintVarProducer;
 
     /**
      * The current analysis solution.
