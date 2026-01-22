@@ -110,11 +110,6 @@ export class GlobalState {
     readonly entryFiles: Set<FilePath> = new Set;
 
     /**
-     * Files reached during analysis.
-     */
-    readonly reachedFiles: Set<FilePath> = new Set;
-
-    /**
      * Files reached and waiting to be analyzed.
      */
     readonly pendingFiles = new Worklist<FilePath>();
@@ -275,10 +270,8 @@ export class GlobalState {
      * Records that the given file has been reached, and returns its ModuleInfo.
      */
     reachedFile(tofile: FilePath, entry: boolean, from?: ModuleInfo, local?: boolean): ModuleInfo {
-        let moduleInfo;
-        if (this.reachedFiles.has(tofile))
-            moduleInfo = this.moduleInfosByPath.get(tofile)!;
-        else {
+        let moduleInfo = this.moduleInfosByPath.get(tofile);
+        if (!moduleInfo) {
 
             // find package.json and extract name, version, and main file
             let packageInfo: PackageInfo | undefined;
@@ -292,7 +285,9 @@ export class GlobalState {
                 if (rel.startsWith("../")) {
                     logger.warn(`Relative module reference from ${from.getPath()} to ${rel} outside current package ${packageInfo}`);
                     packageInfo = undefined;
-                }
+                } else
+                    // check if module already exists in this package
+                    moduleInfo = packageInfo.modules.get(rel);
             }
 
             if (!packageInfo) {
@@ -309,8 +304,7 @@ export class GlobalState {
                     this.packageInfos.set(p.packagekey, packageInfo);
                     if (!options.modulesOnly && !options.approxOnly && options.printProgress && logger.isVerboseEnabled())
                         logger.verbose(`Reached package ${packageInfo} at ${p.dir}`);
-                    if (this.vulnerabilities)
-                        this.vulnerabilities.reachedPackage(packageInfo);
+                    this.vulnerabilities?.reachedPackage(packageInfo);
 
                 } else {
 
@@ -335,13 +329,12 @@ export class GlobalState {
                 packageInfo.modules.set(rel, moduleInfo);
 
                 // record that module has been reached
-                this.reachedFiles.add(tofile);
+                this.moduleInfos.set(moduleInfo.toString(), moduleInfo);
                 if (ignoreModule)
                     logger.info(`Ignoring module ${moduleInfo}`);
                 else
                     this.pendingFiles.enqueue(tofile);
-                if (this.vulnerabilities)
-                    this.vulnerabilities.reachedModule(moduleInfo);
+                this.vulnerabilities?.reachedModule(moduleInfo);
 
                 // if the package was reached before in another directory, record the ModuleInfo for the file in that directory
                 if (otherfile)
@@ -350,7 +343,6 @@ export class GlobalState {
 
             // record the ModuleInfo for the given file
             this.moduleInfosByPath.set(tofile, moduleInfo);
-            this.moduleInfos.set(moduleInfo.toString(), moduleInfo);
         }
 
         // unless this is an entry file, extend the package and module dependencies
