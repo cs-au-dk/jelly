@@ -519,35 +519,30 @@ describe("tests/unit/files", () => {
             const a = new GlobalState();
 
             // Seed packageJsonInfos for two directories with same package (same name@version)
+            const [pkgA, pkgB] = ["a", "b"].map(dir => `/fake/${dir}/node_modules/test-pkg`);
             const pkgInfo = {
                 name: "test-pkg",
                 version: "1.0.0",
                 packagekey: "test-pkg@1.0.0",
-                dir: "/fake/a/node_modules/test-pkg",
+                dir: pkgA,
                 main: undefined,
                 exports: undefined,
             };
-            a.packageJsonInfos.set("/fake/a/node_modules/test-pkg", pkgInfo);
-            a.packageJsonInfos.set("/fake/b/node_modules/test-pkg", {
-                ...pkgInfo,
-                dir: "/fake/b/node_modules/test-pkg",
-            });
+            a.packageJsonInfos.set(pkgA, pkgInfo);
+            a.packageJsonInfos.set(pkgB, {...pkgInfo, dir: pkgB});
 
             // 1. Reach index.js from path A (creates PackageInfo)
-            const m1 = a.reachedFile("/fake/a/node_modules/test-pkg/index.js", true);
+            const m1 = a.reachedFile(`${pkgA}/index.js`, true);
 
-            // 2. Reach lib.js from path A via local require
-            const m2 = a.reachedFile("/fake/a/node_modules/test-pkg/lib.js", false, m1, true);
+            // 2. Reach lib.js from path B via direct require
+            const m2 = a.reachedFile(`${pkgB}/lib.js`, true);
 
-            // 3. Reach index.js from path B (should reuse existing ModuleInfo)
-            const m3 = a.reachedFile("/fake/b/node_modules/test-pkg/index.js", false);
+            expect(m1.packageInfo).toBe(m2.packageInfo);  // Same PackageInfo
 
-            // 4. Reach lib.js from path B via local require
-            const m4 = a.reachedFile("/fake/b/node_modules/test-pkg/lib.js", false, m3, true);
+            // 3. Reach lib.js from path A via local require
+            const m3 = a.reachedFile(`${pkgA}/lib.js`, false, m1, true);
 
-            // should be the same ModuleInfo objects
-            expect(m1).toBe(m3);  // Same index.js module
-            expect(m2).toBe(m4);  // Same lib.js module
+            expect(m2).toBe(m3);  // Same lib.js module
             expect(m1.packageInfo.modules.size).toBe(2);
             expect(a.moduleInfos.size).toBe(2);
         });
