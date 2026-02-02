@@ -60,7 +60,7 @@ export class WriteDetectionPattern extends DetectionPattern {
 export class CallDetectionPattern extends DetectionPattern {
 
     constructor(
-        ap: AccessPathPattern,
+        ap: CallResultAccessPathPattern,
         readonly onlyReturnChanged: boolean, // TODO: change to "callReturns"?
         readonly onlyWhenUsedAsPromise: boolean,
         readonly onlyNonNewCalls: boolean,
@@ -77,7 +77,7 @@ export class CallDetectionPattern extends DetectionPattern {
 export class ComponentDetectionPattern extends DetectionPattern {
 
     constructor(
-        ap: AccessPathPattern,
+        ap: ComponentAccessPathPattern,
         readonly filters: Array<Filter> | undefined
     ) {
         super(ap);

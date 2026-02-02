@@ -596,9 +596,7 @@ export class PatternMatcher {
                     res.push({exp, encl, uncertainties});
                 }
         } else if (d instanceof CallDetectionPattern) {
-            // 'call' patterns match entire call expressions but refer only to the functions being called,
-            // so we wrap the access path pattern in a CallResultAccessPathPattern
-            const sub = this.findAccessPathPatternMatches(new CallResultAccessPathPattern(d.ap), moduleFilter);
+            const sub = this.findAccessPathPatternMatches(d.ap, moduleFilter);
             const f = this.fragmentState;
             for (const level of confidenceLevels)
                 matches: for (const [exp, [, encl]] of sub[level]) {
@@ -642,9 +640,7 @@ export class PatternMatcher {
                     }
                 }
         } else if (d instanceof ComponentDetectionPattern) {
-            // 'component' patterns match entire call expressions but refer only to the functions being called,
-            // so we wrap the access path pattern in a ComponentAccessPathPattern
-            const sub = this.findAccessPathPatternMatches(new ComponentAccessPathPattern(d.ap), moduleFilter);
+            const sub = this.findAccessPathPatternMatches(d.ap, moduleFilter);
             for (const level of confidenceLevels)
                 matches: for (const [exp, [, encl]] of sub[level]) {
                     assert(encl); // only undefined at PotentiallyUnknownAccessPathPattern matches

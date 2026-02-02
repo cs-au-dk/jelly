@@ -1,7 +1,9 @@
+import {getOrSet} from "../misc/util";
 import {
     AccessPathPattern,
     CallDetectionPattern,
     CallResultAccessPathPattern,
+    ComponentAccessPathPattern,
     ComponentDetectionPattern,
     DetectionPattern,
     DisjunctionAccessPathPattern,
@@ -24,15 +26,10 @@ import {
 
 export class AccessPathPatternCanonicalizer {
 
-    canonical: Map<string, AccessPathPattern> = new Map;
+    private canonical: Map<string, AccessPathPattern> = new Map;
 
     canonicalize<T extends AccessPathPattern>(p: T): T {
-        const key = p.toString();
-        const c = this.canonical.get(key) as T;
-        if (c)
-            return c;
-        this.canonical.set(key, p);
-        return p;
+        return getOrSet(this.canonical, p.toString(), () => p) as T;
     }
 }
 
@@ -376,6 +373,9 @@ export function parseDetectionPattern(pattern: string, c: AccessPathPatternCanon
             [filter, pos] = parseFilter(pos);
             filters.push(filter);
         }
+        // 'call' patterns match entire call expressions but refer only to the functions being called,
+        // so we wrap the access path pattern in a CallResultAccessPathPattern
+        p = c.canonicalize(new CallResultAccessPathPattern(p));
         res = new CallDetectionPattern(p, onlyReturnChanged, onlyWhenUsedAsPromise, onlyNonNewCalls, filters.length > 0 ? filters : undefined);
     } else if (([b, pos] = parseOptionalKeyword(pos, "component")) && b) {
         pos = parseSpace(pos, false);
@@ -386,6 +386,9 @@ export function parseDetectionPattern(pattern: string, c: AccessPathPatternCanon
             [filter, pos] = parseFilter(pos);
             filters.push(filter);
         }
+        // 'component' patterns match entire call expressions but refer only to the functions being called,
+        // so we wrap the access path pattern in a ComponentAccessPathPattern
+        p = c.canonicalize(new ComponentAccessPathPattern(p));
         res = new ComponentDetectionPattern(p, filters.length > 0 ? filters : undefined);
     } else
         throw 0;
