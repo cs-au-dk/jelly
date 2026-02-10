@@ -36,7 +36,7 @@ Proc. ICSE 2013: 752-761
 Proc. ACM Program. Lang. 8(PLDI): 194:1-194:24 (2024)
 
 [5] Madhurima Chakraborty, Aakash Gnanakumar, Manu Sridharan, Anders Møller:
-[Indirection-Bounded Call Graph Analysis](https://doi.org/10.4230/LIPIcs.ECOOP.2024.27)
+[Indirection-Bounded Call Graph Analysis](https://doi.org/10.4230/LIPIcs.ECOOP.2024.10)
 Proc. ECOOP 2024: 27:1-27:27
 
 ## Installing
