@@ -100,6 +100,7 @@ import {PropertyAccessPath} from "./accesspaths";
 import {ConstraintVar, isObjectPropertyVarObj} from "./constraintvars";
 import {
     getClass,
+    getEnclosingNonArrowFunction,
     getExportName,
     getImportName,
     getKey,
@@ -137,23 +138,28 @@ export function visit(ast: File, op: Operations) {
 
             // this
             const encl = path.findParent((p: NodePath) =>
-                isFunction(p.node) && !isArrowFunctionExpression(p.node) || isStaticBlock(p.node) || isClassProperty(p.node) || isClassPrivateProperty(p.node));
+                isFunction(p.node) || isStaticBlock(p.node) || isClassProperty(p.node) || isClassPrivateProperty(p.node));
             if (encl && (isStaticBlock(encl.node) || ((isClassProperty(encl.node) || isClassPrivateProperty(encl.node)) && encl.node.static))) {
-                // in static block or static field initializer (including arrows inside them)
+                // in static block or static field initializer
                 // constraint: c ∈ ⟦this⟧ where c is the constructor of the enclosing class
                 const cls = encl.parentPath?.parentPath?.node as Class;
                 assert(cls);
                 const constr = class2constructor.get(cls);
                 assert(constr);
                 solver.addTokenConstraint(op.newFunctionToken(constr), vp.nodeVar(path.node));
-            } else if (encl && isFunction(encl.node) && !isArrowFunctionExpression(encl.node)) {
-                // in constructor or method
-                // constraint: ⟦this_f⟧ ⊆ ⟦this⟧ where f is the enclosing non-arrow function
-                solver.addSubsetConstraint(vp.thisVar(encl.node), vp.nodeVar(path.node));
             } else {
-                // at module top level
-                // constraint: %exports ∈ ⟦this⟧
-                solver.addTokenConstraint(op.exportsObjectToken, vp.nodeVar(path.node));
+                const fun = getEnclosingNonArrowFunction(path);
+                if (fun) {
+                    // in constructor or method
+                    // constraint: ⟦this_f⟧ ⊆ ⟦this⟧ where f is the enclosing function (excluding arrow functions)
+                    solver.addSubsetConstraint(vp.thisVar(fun), vp.nodeVar(path.node));
+                } else {
+                    // // constraint %globalThis ∈ ⟦this⟧
+                    // solver.addTokenConstraint(op.globalSpecialNatives.get("globalThis")!, vp.nodeVar(path.node));
+
+                    // constraint %exports ∈ ⟦this⟧
+                    solver.addTokenConstraint(op.exportsObjectToken, vp.nodeVar(path.node));
+                }
             }
         },
 
