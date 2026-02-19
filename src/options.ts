@@ -4,7 +4,7 @@ import logger from "./misc/logger";
 import {realpathSync} from "fs";
 
 export const VERSION = require("../package.json").version;
-export const COPYRIGHT = "Copyright (C) 2023-2025 Anders Møller & Oskar Haarklou Veileborg\n";
+export const COPYRIGHT = "Copyright (C) 2023-2026 Anders Møller & Oskar Haarklou Veileborg\n";
 export const PKG = "pkg" in process;
 
 /**
