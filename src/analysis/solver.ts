@@ -849,12 +849,15 @@ export default class Solver {
                         // process new tokens for the component representatives in topological order
                         if (logger.isVerboseEnabled())
                             logger.verbose(`Processing ${this.diagnostics.unprocessedTokensSize} new token${this.diagnostics.unprocessedTokensSize !== 1 ? "s" : ""}`);
-                        for (let i = reps.length - 1; i >= 0; i--) {
-                            const v = reps[i];
-                            this.processTokens(v);
-                            await this.checkAbort(true);
+                        try {
+                            for (let i = reps.length - 1; i >= 0; i--) {
+                                const v = reps[i];
+                                this.processTokens(v);
+                                await this.checkAbort(true);
+                            }
+                        } finally {
+                            this.diagnostics.totalPropagationTime += timer2.elapsed();
                         }
-                        this.diagnostics.totalPropagationTime += timer2.elapsed();
                         f.nodesWithNewEdges.clear();
                     }
                     // process remaining tokens outside the sub-graph reachable via the new edges
@@ -867,11 +870,14 @@ export default class Solver {
                     if (logger.isVerboseEnabled())
                         logger.verbose(`Processing ${this.diagnostics.unprocessedTokensSize} new token${this.diagnostics.unprocessedTokensSize !== 1 ? "s" : ""}`);
                     const timer = new Timer();
-                    for (const v of this.unprocessedTokens.keys()) {
-                        this.processTokens(v);
-                        await this.checkAbort(true);
+                    try {
+                        for (const v of this.unprocessedTokens.keys()) {
+                            this.processTokens(v);
+                            await this.checkAbort(true);
+                        }
+                    } finally {
+                        this.diagnostics.totalPropagationTime += timer.elapsed();
                     }
-                    this.diagnostics.totalPropagationTime += timer.elapsed();
                 }
             }
             if (this.unprocessedTokens.size !== 0 || this.diagnostics.unprocessedTokensSize !== this.unprocessedTokens.size)
@@ -882,15 +888,18 @@ export default class Solver {
                     logger.verbose(`Processing non-bounded listener calls: ${f.postponedListenerCalls.length}`);
                 const timer = new Timer();
                 this.diagnostics.listenerNotificationRounds++;
-                for (const [fun, arg] of f.postponedListenerCalls) {
-                    fun(arg as any);
-                    if (++this.postponedListenersProcessed % 100 === 0) {
-                        f.a.timeoutTimer.checkTimeout();
-                        this.printDiagnostics();
+                try {
+                    for (const [fun, arg] of f.postponedListenerCalls) {
+                        fun(arg as any);
+                        if (++this.postponedListenersProcessed % 100 === 0) {
+                            f.a.timeoutTimer.checkTimeout();
+                            this.printDiagnostics();
+                        }
                     }
+                } finally {
+                    this.diagnostics.totalListenerCallTime += timer.elapsed();
                 }
                 f.postponedListenerCalls.length = this.postponedListenersProcessed = 0;
-                this.diagnostics.totalListenerCallTime += timer.elapsed();
             } else if (f.postponedListenerCalls2.length > 0) {
                 if (options.maxIndirections !== undefined && round > options.maxIndirections) {
                     this.diagnostics.indirectionsLimitReached++;
@@ -907,14 +916,17 @@ export default class Solver {
                     this.diagnostics.listenerNotificationRounds++;
                     const calls = Array.from(f.postponedListenerCalls2);
                     f.postponedListenerCalls2.length = this.postponedListenersProcessed = 0;
-                    for (const [fun, args] of calls) {
-                        (fun as Function).apply(undefined, Array.isArray(args) ? args : [args]);
-                        if (++this.postponedListenersProcessed % 100 === 0) {
-                            f.a.timeoutTimer.checkTimeout();
-                            this.printDiagnostics();
+                    try {
+                        for (const [fun, args] of calls) {
+                            (fun as Function).apply(undefined, Array.isArray(args) ? args : [args]);
+                            if (++this.postponedListenersProcessed % 100 === 0) {
+                                f.a.timeoutTimer.checkTimeout();
+                                this.printDiagnostics();
+                            }
                         }
+                    } finally {
+                        this.diagnostics.totalListenerCallTime += timer.elapsed();
                     }
-                    this.diagnostics.totalListenerCallTime += timer.elapsed();
                     if (logger.isVerboseEnabled() || (options.diagnostics && options.printProgress))
                         logger.info(`${isTTY ? GREY : ""}Round ${round} completed after ${nanoToMs(this.timer.elapsed())} (call edges: ${f.numberOfCallToFunctionEdges}, vars: ${f.getNumberOfVarsWithTokens()}, tokens: ${f.numberOfTokens}, subsets: ${f.numberOfSubsetEdges})${isTTY ? RESET : ""}`);
                     round++;
