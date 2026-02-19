@@ -25,7 +25,8 @@ export type NativeModelParams = NativeGlobalModelParams & {
 export type NativeFunctionParams = NativeModelParams & {
     base: ObjectPropertyVarObj | undefined,
     op: Operations,
-    path: CallNodePath
+    path: CallNodePath,
+    callArgs?: CallExpression["arguments"], // when set, overrides path.node.arguments (used by call/apply on native functions)
 };
 
 export type NativeFunctionAnalyzer = (p: NativeFunctionParams) => void;

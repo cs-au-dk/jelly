@@ -355,13 +355,13 @@ describe("tests/micro", () => {
         soundness: "tests/micro/more1.json",
         functionInfos: 19,
         moduleInfos: 1,
-        numberOfFunctionToFunctionEdges: 15,
+        numberOfFunctionToFunctionEdges: 17,
         oneCalleeCalls: 2,
-        funFound: 14,
+        funFound: 16,
         funTotal: 20,
-        callFound: 20,
+        callFound: 24,
         callTotal: 29,
-        reachableFound: 16,
+        reachableFound: 18,
         reachableTotal: 20,
     });
 

@@ -40,6 +40,7 @@ import {
     returnUnknown,
     setPrototypeOf,
     warnNativeUsed,
+    getCallArgs,
 } from "./nativehelpers";
 import {
     AllocationSiteToken,
@@ -226,7 +227,7 @@ export const ecmascriptModels: NativeModel = {
             ],
             invoke: (p: NativeFunctionParams) => {
                 const t = newArray(p);
-                for (let i = 0; i < p.path.node.arguments.length; i++)
+                for (let i = 0; i < getCallArgs(p).length; i++)
                     assignParameterToArrayValue(i, t, p);
                 returnToken(t, p);
             },
@@ -235,14 +236,14 @@ export const ecmascriptModels: NativeModel = {
                     name: "from",
                     invoke: (p: NativeFunctionParams) => {
                         const t = newArray(p);
-                        if (!p.path.node.arguments.every(arg => isExpression(arg)))
+                        if (!getCallArgs(p).every(arg => isExpression(arg)))
                             warnNativeUsed("Array.from", p, "with SpreadElement"); // TODO: SpreadElement
-                        else if (p.path.node.arguments.length > 0)
+                        else if (getCallArgs(p).length > 0)
                             assignIteratorValuesToArrayValue(0, t, p);
-                        if (p.path.node.arguments.length > 1) {
-                            // TODO: connect p.path.node.arguments[0] iterable/arrayLike values to mapFn
+                        if (getCallArgs(p).length > 1) {
+                            // TODO: connect getCallArgs(p)[0] iterable/arrayLike values to mapFn
                             // TODO: connect returnVar of mapFn to array value of t
-                            // TODO: if p.path.node.arguments.length > 2, connect thisArg to thisVar of mapFn
+                            // TODO: if getCallArgs(p).length > 2, connect thisArg to thisVar of mapFn
                             warnNativeUsed("Array.from", p, "with map function argument"); // TODO
                         }
                         returnToken(t, p);
@@ -255,7 +256,7 @@ export const ecmascriptModels: NativeModel = {
                     name: "of",
                     invoke: (p: NativeFunctionParams) => {
                         const t = newArray(p);
-                        for (let i = 0; i < p.path.node.arguments.length; i++)
+                        for (let i = 0; i < getCallArgs(p).length; i++)
                             assignParameterToArrayValue(i, t, p);
                         returnToken(t, p);
                     }
@@ -273,7 +274,7 @@ export const ecmascriptModels: NativeModel = {
                     invoke: (p: NativeFunctionParams) => {
                         const t = newArray(p);
                         assignBaseArrayValueToArray(t, p);
-                        for (let i = 0; i < p.path.node.arguments.length; i++) {
+                        for (let i = 0; i < getCallArgs(p).length; i++) {
                             assignIteratorValuesToArrayValue(i, t, p);
                             assignParameterToArrayValue(i, t, p); // TODO: could omit arrays among the arguments (see also 'flat' below)
                         }
@@ -330,7 +331,7 @@ export const ecmascriptModels: NativeModel = {
                         const t = newArray(p);
                         assignBaseArrayValueToArray(t, p); // TODO: could omit arrays among the arguments (see also 'concat' above)
                         assignBaseArrayArrayValueToArray(t, p);
-                        if (p.path.node.arguments.length > 0)
+                        if (getCallArgs(p).length > 0)
                             warnNativeUsed("Array.prototype.flat", p, "with unknown depth"); // TODO: connect elements of elements of base recursively
                         returnToken(t, p);
                     }
@@ -439,7 +440,7 @@ export const ecmascriptModels: NativeModel = {
                     invoke: (p: NativeFunctionParams) => {
                         const t = returnShuffledArray(p);
                         if (t)
-                            for (let i = 2; i < p.path.node.arguments.length; i++)
+                            for (let i = 2; i < getCallArgs(p).length; i++)
                                 assignParameterToArrayValue(i, t, p);
                     }
                 },
@@ -709,7 +710,7 @@ export const ecmascriptModels: NativeModel = {
                 }
             ],
             invoke: (p: NativeFunctionParams) => {
-                if (p.path.node.arguments.length > 1)
+                if (getCallArgs(p).length > 1)
                     warnNativeUsed("Error", p, "with multiple arguments"); // TODO
                 returnPackageObject(p, "Error");
             }
@@ -717,7 +718,7 @@ export const ecmascriptModels: NativeModel = {
         {
             name: "EvalError",
             invoke: (p: NativeFunctionParams) => {
-                if (p.path.node.arguments.length > 1)
+                if (getCallArgs(p).length > 1)
                     warnNativeUsed("EvalError", p, "with multiple arguments"); // TODO
                 returnPackageObject(p, "Error");
             }
@@ -851,7 +852,7 @@ export const ecmascriptModels: NativeModel = {
         {
             name: "InternalError",
             invoke: (p: NativeFunctionParams) => {
-                if (p.path.node.arguments.length > 1)
+                if (getCallArgs(p).length > 1)
                     warnNativeUsed("InternalError", p, "with multiple arguments"); // TODO
                 returnPackageObject(p, "Error");
             }
@@ -869,7 +870,7 @@ export const ecmascriptModels: NativeModel = {
                 {
                     name: "parse",
                     invoke: (p: NativeFunctionParams) => {
-                        if (p.path.node.arguments.length > 1)
+                        if (getCallArgs(p).length > 1)
                             warnNativeUsed("JSON.parse", p, "with reviver"); // TODO
                         // returnPackageObject(p, "Object");
                         // returnPackageObject(p, "Array");
@@ -879,7 +880,7 @@ export const ecmascriptModels: NativeModel = {
                 {
                     name: "stringify",
                     invoke: (p: NativeFunctionParams) => {
-                        if (p.path.node.arguments.length > 1)
+                        if (getCallArgs(p).length > 1)
                             warnNativeUsed("JSON.stringify", p, "with replacer"); // TODO (only warn if second argument may be a function)
                     }
                 },
@@ -890,7 +891,7 @@ export const ecmascriptModels: NativeModel = {
             invoke: (p: NativeFunctionParams) => {
                 if (isNewExpression(p.path.node)) {
                     const t = newSpecialObject("Map", p);
-                    if (p.path.node.arguments.length > 0)
+                    if (getCallArgs(p).length > 0)
                         assignIteratorMapValuePairs(0, t, MAP_KEYS, MAP_VALUES, p);
                     returnToken(t, p);
                 }
@@ -1154,13 +1155,13 @@ export const ecmascriptModels: NativeModel = {
             invoke: (p: NativeFunctionParams) => {
                 // Object(...) can return primitive wrapper objects, but they are not relevant
                 returnToken(newObject(p), p);
-                returnArgument(p.path.node.arguments[0], p);
+                returnArgument(getCallArgs(p)[0], p);
             },
             staticMethods: [
                 {
                     name: "assign",
                     invoke: (p: NativeFunctionParams) => {
-                        const args = p.path.node.arguments;
+                        const args = getCallArgs(p);
                         if (args.length >= 1) {
                             if (!isExpression(args[0]))
                                 warnNativeUsed("Object.assign", p, "with non-expression as target");
@@ -1174,7 +1175,7 @@ export const ecmascriptModels: NativeModel = {
                 {
                     name: "create",
                     invoke: (p: NativeFunctionParams) => {
-                        const args = p.path.node.arguments;
+                        const args = getCallArgs(p);
                         if (args.length === 0)
                             return;
 
@@ -1203,7 +1204,7 @@ export const ecmascriptModels: NativeModel = {
                 {
                     name: "defineProperties",
                     invoke: (p: NativeFunctionParams) => {
-                        const args = p.path.node.arguments;
+                        const args = getCallArgs(p);
                         if (args.length < 2)
                             return;
 
@@ -1219,7 +1220,7 @@ export const ecmascriptModels: NativeModel = {
                 {
                     name: "defineProperty",
                     invoke: (p: NativeFunctionParams) => {
-                        const args = p.path.node.arguments;
+                        const args = getCallArgs(p);
                         if (args.length < 3)
                             return;
                         const prop = getConstantString(p.path.get("arguments.1"));
@@ -1236,6 +1237,7 @@ export const ecmascriptModels: NativeModel = {
 
                         const ivars = prepareDefineProperty("Object.defineProperty", prop, p.op.expVar(args[2], p.path), p);
                         defineProperties([args[0], TokenListener.NATIVE_OBJECT_DEFINE_PROPERTY], ivars, p);
+                        returnArgument(args[0], p);
                     }
                 },
                 {
@@ -1441,7 +1443,7 @@ export const ecmascriptModels: NativeModel = {
         {
             name: "RangeError",
             invoke: (p: NativeFunctionParams) => {
-                if (p.path.node.arguments.length > 1)
+                if (getCallArgs(p).length > 1)
                     warnNativeUsed("RangeError", p, "with multiple arguments"); // TODO
                 returnPackageObject(p, "Error");
             }
@@ -1450,7 +1452,7 @@ export const ecmascriptModels: NativeModel = {
         {
             name: "ReferenceError",
             invoke: (p: NativeFunctionParams) => {
-                if (p.path.node.arguments.length > 1)
+                if (getCallArgs(p).length > 1)
                     warnNativeUsed("ReferenceError", p, "with multiple arguments"); // TODO
                 returnPackageObject(p, "Error");
             }
@@ -1552,7 +1554,7 @@ export const ecmascriptModels: NativeModel = {
             invoke: (p: NativeFunctionParams) => {
                 if (isNewExpression(p.path.node)) {
                     const t = newSpecialObject("Set", p);
-                    if (p.path.node.arguments.length > 0)
+                    if (getCallArgs(p).length > 0)
                         assignIteratorValuesToProperty(0, t, SET_VALUES, p);
                     returnToken(t, p);
                 }
@@ -1737,7 +1739,7 @@ export const ecmascriptModels: NativeModel = {
         {
             name: "SyntaxError",
             invoke: (p: NativeFunctionParams) => {
-                if (p.path.node.arguments.length > 1)
+                if (getCallArgs(p).length > 1)
                     warnNativeUsed("SyntaxError", p, "with multiple arguments"); // TODO
                 returnPackageObject(p, "Error");
             }
@@ -1751,7 +1753,7 @@ export const ecmascriptModels: NativeModel = {
         {
             name: "TypeError",
             invoke: (p: NativeFunctionParams) => {
-                if (p.path.node.arguments.length > 1)
+                if (getCallArgs(p).length > 1)
                     warnNativeUsed("TypeError", p, "with multiple arguments"); // TODO
                 returnPackageObject(p, "Error");
             }
@@ -1788,7 +1790,7 @@ export const ecmascriptModels: NativeModel = {
         {
             name: "URIError",
             invoke: (p: NativeFunctionParams) => {
-                if (p.path.node.arguments.length > 1)
+                if (getCallArgs(p).length > 1)
                     warnNativeUsed("URIError", p, "with multiple arguments"); // TODO
                 returnPackageObject(p, "Error");
             }
@@ -1798,7 +1800,7 @@ export const ecmascriptModels: NativeModel = {
             name: "WeakMap",
             invoke: (p: NativeFunctionParams) => {
                 const t = newSpecialObject("WeakMap", p);
-                if (p.path.node.arguments.length > 0)
+                if (getCallArgs(p).length > 0)
                     assignIteratorMapValuePairs(0, t, null, WEAKMAP_VALUES, p);
                 returnToken(t, p);
             },
