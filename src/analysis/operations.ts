@@ -581,6 +581,9 @@ export class Operations {
         if (base instanceof ArrayToken && prop === "length")
             return undefined;
         const dst = this.solver.varProducer.readResultVar(base, prop);
+        if (this.solver.fragmentState.processedReadResultVars.has(dst))
+            return dst; // already processed
+        this.solver.fragmentState.processedReadResultVars.add(dst);
         if (prop === "prototype" && getNativeType(base) === "Function") // function objects always have 'prototype', no need to consult prototype chain or getters
             this.readPropertyBound(base, prop, dst, {t: base, s: prop}, base);
         else if (options.proto && prop === INTERNAL_PROTOTYPE()) // all objects have __proto__

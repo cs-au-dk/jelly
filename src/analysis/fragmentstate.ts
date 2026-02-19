@@ -1,4 +1,4 @@
-import {AncestorsVar, ConstraintVar, ObjectPropertyVarObj} from "./constraintvars";
+import {AncestorsVar, ConstraintVar, ObjectPropertyVarObj, ReadResultVar} from "./constraintvars";
 import {AccessPathToken, ArrayToken, FunctionToken, PackageObjectToken, Token} from "./tokens";
 import {DummyModuleInfo, FunctionInfo, ModuleInfo} from "./infos";
 import {
@@ -351,6 +351,11 @@ export class FragmentState {
      * Set of all function tokens.
      */
     readonly functionTokens: Set<FunctionToken> = new Set;
+
+    /**
+     * Set of ReadResultVars that have been processed by readPropertyFromChain.
+     */
+    readonly processedReadResultVars: Set<ReadResultVar> = new Set;
 
     constructor(s: Solver) {
         this.a = s.globalState;
