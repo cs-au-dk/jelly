@@ -67,12 +67,6 @@ export const SET_PROTOTYPE = "Set.prototype";
 export const WEAKMAP_PROTOTYPE = "WeakMap.prototype";
 export const WEAKSET_PROTOTYPE = "WeakSet.prototype";
 export const WEAKREF_PROTOTYPE = "WeakRef.prototype";
-export const GENERATOR_PROTOTYPE_NEXT = "Generator.prototype.next";
-export const GENERATOR_PROTOTYPE_RETURN = "Generator.prototype.return";
-export const GENERATOR_PROTOTYPE_THROW = "Generator.prototype.throw";
-export const ASYNC_GENERATOR_PROTOTYPE_NEXT = "AsyncGenerator.prototype.next";
-export const ASYNC_GENERATOR_PROTOTYPE_RETURN = "AsyncGenerator.prototype.return";
-export const ASYNC_GENERATOR_PROTOTYPE_THROW = "AsyncGenerator.prototype.throw";
 export const PROMISE_PROTOTYPE = "Promise.prototype";
 
 export const INTERNAL_PROTOTYPE = () => options.proto ? "__proto__" : "%[[Prototype]]";

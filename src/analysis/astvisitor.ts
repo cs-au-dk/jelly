@@ -112,12 +112,6 @@ import {
 } from "../misc/asthelpers";
 import {
     ARRAY_UNKNOWN,
-    ASYNC_GENERATOR_PROTOTYPE_NEXT,
-    ASYNC_GENERATOR_PROTOTYPE_RETURN,
-    ASYNC_GENERATOR_PROTOTYPE_THROW,
-    GENERATOR_PROTOTYPE_NEXT,
-    GENERATOR_PROTOTYPE_RETURN,
-    GENERATOR_PROTOTYPE_THROW,
     INTERNAL_PROTOTYPE,
     PROMISE_FULFILLED_VALUES
 } from "../natives/ecmascript";
@@ -300,14 +294,9 @@ export function visit(ast: File, op: Operations) {
 
                     // function*
 
-                    // constraint: %(Async)Generator.prototype.next ⊆ ⟦i.next⟧ where i is the generator object for the function
+                    // constraint: i inherits from (Async)Generator.prototype where i is the generator object for the function
                     const iter = a.canonicalizeToken(new AllocationSiteToken("Generator", fun));
-                    const iterNext = vp.objPropVar(iter, "next"); // TODO: inherit from Generator.prototype or AsyncGenerator.prototype instead of copying properties
-                    solver.addTokenConstraint(op.globalSpecialNatives[fun.async ? ASYNC_GENERATOR_PROTOTYPE_NEXT : GENERATOR_PROTOTYPE_NEXT], iterNext);
-                    const iterReturn = vp.objPropVar(iter, "return");
-                    solver.addTokenConstraint(op.globalSpecialNatives[fun.async ? ASYNC_GENERATOR_PROTOTYPE_RETURN : GENERATOR_PROTOTYPE_RETURN], iterReturn);
-                    const iterThrow = vp.objPropVar(iter, "throw");
-                    solver.addTokenConstraint(op.globalSpecialNatives[fun.async ? ASYNC_GENERATOR_PROTOTYPE_THROW : GENERATOR_PROTOTYPE_THROW], iterThrow);
+                    solver.addInherits(iter, op.globalSpecialNatives[fun.async ? "AsyncGenerator.prototype" : "Generator.prototype"]);
 
                     // constraint i ∈ ⟦ret_f⟧ where i is the generator object for the function
                     solver.addTokenConstraint(iter, vp.returnVar(fun));

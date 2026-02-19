@@ -23,9 +23,6 @@ import {
 import {getConstantString, getKey, isParentExpressionStatement} from "../misc/asthelpers";
 import {Node} from "@babel/core";
 import {
-    GENERATOR_PROTOTYPE_NEXT,
-    GENERATOR_PROTOTYPE_RETURN,
-    GENERATOR_PROTOTYPE_THROW,
     MAP_KEYS,
     MAP_VALUES,
     PROMISE_FULFILLED_VALUES,
@@ -245,12 +242,7 @@ export function returnIterator(kind: IteratorKind, p: NativeFunctionParams) { //
         if (t instanceof AllocationSiteToken) {
             const iter = a.canonicalizeToken(new AllocationSiteToken(kind, t.allocSite));
             p.solver.addTokenConstraint(iter, vp.expVar(p.path.node, p.path));
-            const iterNext = vp.objPropVar(iter, "next"); // TODO: inherit from Generator.prototype instead of copying properties
-            p.solver.addTokenConstraint(p.globalSpecialNatives[GENERATOR_PROTOTYPE_NEXT], iterNext);
-            const iterReturn = vp.objPropVar(iter, "return");
-            p.solver.addTokenConstraint(p.globalSpecialNatives[GENERATOR_PROTOTYPE_RETURN], iterReturn);
-            const iterThrow = vp.objPropVar(iter, "throw");
-            p.solver.addTokenConstraint(p.globalSpecialNatives[GENERATOR_PROTOTYPE_THROW], iterThrow);
+            p.solver.addInherits(iter, p.globalSpecialNatives["Generator.prototype"]);
             switch (kind) {
                 case "ArrayKeys": {
                     if (t.kind !== "Array")
