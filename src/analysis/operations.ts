@@ -368,6 +368,7 @@ export class Operations {
                 t.invoke({
                     base,
                     path,
+                    callArgs: path.node.arguments,
                     solver: this.solver,
                     op: this,
                     moduleInfo: this.moduleInfo,

@@ -1,4 +1,4 @@
-import {CallExpression, Identifier, NewExpression, OptionalCallExpression} from "@babel/types";
+import {CallExpression, Expression, Identifier, NewExpression, OptionalCallExpression} from "@babel/types";
 import Solver from "../analysis/solver";
 import {NativeObjectToken} from "../analysis/tokens";
 import {ModuleInfo} from "../analysis/infos";
@@ -25,8 +25,8 @@ export type NativeModelParams = NativeGlobalModelParams & {
 export type NativeFunctionParams = NativeModelParams & {
     base: ObjectPropertyVarObj | undefined,
     op: Operations,
-    path: CallNodePath,
-    callArgs?: CallExpression["arguments"], // when set, overrides path.node.arguments (used by call/apply on native functions)
+    path: NodePath<Expression>,
+    callArgs: CallExpression["arguments"],
 };
 
 export type NativeFunctionAnalyzer = (p: NativeFunctionParams) => void;

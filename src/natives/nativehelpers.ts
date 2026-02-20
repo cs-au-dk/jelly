@@ -29,7 +29,7 @@ import {
     PROMISE_REJECTED_VALUES,
     SET_VALUES
 } from "./ecmascript";
-import {NativeFunctionParams} from "./nativebuilder";
+import {CallNodePath, NativeFunctionParams} from "./nativebuilder";
 import {TokenListener} from "../analysis/listeners";
 import assert from "assert";
 import {NodePath} from "@babel/traverse";
@@ -39,20 +39,11 @@ import {UnknownAccessPath} from "../analysis/accesspaths";
 import {ModuleInfo} from "../analysis/infos";
 
 /**
- * Returns the effective arguments for a native function call.
- * When callArgs is set (e.g., when a native function is invoked via .call()),
- * it provides the shifted arguments; otherwise falls back to the AST arguments.
- */
-export function getCallArgs(p: NativeFunctionParams): CallExpression["arguments"] {
-    return p.callArgs ?? p.path.node.arguments;
-}
-
-/**
  * Models an assignment from a function parameter (0-based indexing) to a property of the base object.
  */
 export function assignParameterToThisProperty(param: number, prop: string, p: NativeFunctionParams) {
-    if (getCallArgs(p).length > param && p.base) {
-        const arg = getCallArgs(p)[param];
+    if (p.callArgs.length > param && p.base) {
+        const arg = p.callArgs[param];
         const argVar = isExpression(arg) ? p.solver.varProducer.expVar(arg, p.path) : undefined;
         if (argVar) // TODO: non-expression arguments?
             // TODO: use Operations.writeProperty?
@@ -73,8 +64,8 @@ function assignExpressionToArrayValue(from: Expression, t: ArrayToken, p: Native
  * Models an assignment from a function parameter (0-based indexing) to an unknown entry of the base array object.
  */
 export function assignParameterToThisArrayValue(param: number, p: NativeFunctionParams) {
-    if (getCallArgs(p).length > param && p.base instanceof ArrayToken) {
-        const arg = getCallArgs(p)[param];
+    if (p.callArgs.length > param && p.base instanceof ArrayToken) {
+        const arg = p.callArgs[param];
         if (isExpression(arg)) // TODO: non-expression arguments?
             assignExpressionToArrayValue(arg, p.base, p);
     }
@@ -84,8 +75,8 @@ export function assignParameterToThisArrayValue(param: number, p: NativeFunction
  * Models an assignment from a function parameter (0-based indexing) to an unknown entry of the given array object.
  */
 export function assignParameterToArrayValue(param: number, t: ArrayToken, p: NativeFunctionParams) {
-    if (getCallArgs(p).length > param) {
-        const arg = getCallArgs(p)[param];
+    if (p.callArgs.length > param) {
+        const arg = p.callArgs[param];
         if (isExpression(arg)) // TODO: non-expression arguments?
             assignExpressionToArrayValue(arg, t, p);
     }
@@ -341,7 +332,7 @@ type CallbackKind =
  * Models call to a callback.
  */
 export function invokeCallback(kind: CallbackKind, p: NativeFunctionParams, arg: number = 0, key: TokenListener = TokenListener.NATIVE_INVOKE_CALLBACK) {
-    const args = getCallArgs(p);
+    const args = p.callArgs;
     if (args.length > arg) {
         const funarg = args[arg];
         const bt = p.base;
@@ -383,14 +374,14 @@ export function invokeCallbackBound(kind: CallbackKind, p: NativeFunctionParams,
     const f = solver.fragmentState;
     const vp = f.varProducer;
     const a = solver.globalState;
-    const args = getCallArgs(p);
+    const args = p.callArgs;
     const arg1Var = isExpression(args[1]) ? vp.expVar(args[1], p.path) : undefined;
     const pResultVar = vp.expVar(p.path.node, p.path);
     const caller = a.getEnclosingFunctionOrModule(p.path);
 
     const modelCall = (args: Array<Token | ConstraintVar | undefined>, baseVar?: ConstraintVar, resultVar?: ConstraintVar) => {
         assert(ft instanceof FunctionToken);
-        p.op.callFunctionTokenBound(ft, baseVar, caller, args, resultVar, false, p.path, {native: true});
+        p.op.callFunctionTokenBound(ft, baseVar, caller, args, resultVar, false, p.path as CallNodePath, {native: true});
     };
 
     // helper for constructing unique intermediate variables
@@ -474,14 +465,10 @@ export function invokeCallbackBound(kind: CallbackKind, p: NativeFunctionParams,
             }
             break;
         case "Array.prototype.sort":
-            if (bt instanceof ArrayToken) {
+            if (bt instanceof ArrayToken && ft instanceof FunctionToken) { // TODO: currently limited support for generic array methods
                 const btVar = vp.arrayAllVar(bt);
-                solver.addSubsetConstraint(btVar, vp.arrayUnknownVar(bt));
-                solver.addForAllArrayEntriesConstraint(bt, TokenListener.NATIVE_SORT_SMASH_ENTRIES, p.path.node, (prop: string) => {
-                    solver.addSubsetConstraint(btVar, vp.objPropVar(bt, prop));
-                });
-                if (ft instanceof FunctionToken)
-                    modelCall([btVar, btVar]);
+                p.solver.addSubsetConstraint(btVar, vp.arrayUnknownVar(bt));  // smash array (always reading from arrayUnknownVar, so safe to ignore other properties)
+                modelCall([btVar, btVar]);
             }
             if (bt)
                 solver.addTokenConstraint(bt, pResultVar);
@@ -571,34 +558,26 @@ export function invokeCallApply(kind: CallApplyKind, p: NativeFunctionParams) {
     const ft = p.base;
     if (ft instanceof NativeObjectToken) {
         if (ft.invoke) {
-            const args = getCallArgs(p);
+            const args = p.callArgs;
             const basearg = args[0];
             const baseVar = isExpression(basearg) ? p.solver.varProducer.expVar(basearg, p.path) : undefined;
-            if (kind === "Function.prototype.call") {
-                // iterate over thisArg tokens and invoke the native function model with each as the base object
-                if (baseVar) {
-                    const shiftedArgs = args.slice(1);
-                    p.solver.addForAllTokensConstraint(baseVar, TokenListener.NATIVE_INVOKE_CALL_NATIVE, p.path.node, (t: Token) => {
-                        if (isObjectPropertyVarObj(t))
-                            ft.invoke!({...p, base: t, callArgs: shiftedArgs});
-                    });
-                }
-            } else {
-                // apply: iterate over thisArg tokens, pass the arguments array as a single arg (approximation)
-                const applyArgs: CallExpression["arguments"] = args.length >= 2 && isExpression(args[1]) ? [args[1]] : [];
-                if (baseVar) {
-                    p.solver.addForAllTokensConstraint(baseVar, TokenListener.NATIVE_INVOKE_APPLY_NATIVE, p.path.node, (t: Token) => {
-                        if (isObjectPropertyVarObj(t))
-                            ft.invoke!({...p, base: t, callArgs: applyArgs});
-                    });
-                } else
-                    ft.invoke({...p, base: undefined, callArgs: applyArgs});
+            const effectiveArgs = kind === "Function.prototype.call" ? args.slice(1) :
+                args.length >= 2 && isExpression(args[1]) ? [args[1]] as CallExpression["arguments"] : [];
+            const listenerKey = kind === "Function.prototype.call" ? TokenListener.NATIVE_INVOKE_CALL_NATIVE : TokenListener.NATIVE_INVOKE_APPLY_NATIVE;
+            // always invoke with base: undefined (basearg may be null/undefined/primitive, which won't produce tokens)
+            ft.invoke({...p, base: undefined, callArgs: effectiveArgs});
+            // also invoke per base object token
+            if (baseVar) {
+                p.solver.addForAllTokensConstraint(baseVar, listenerKey, p.path.node, (t: Token) => {
+                    if (isObjectPropertyVarObj(t))
+                        ft.invoke!({...p, base: t, callArgs: effectiveArgs});
+                });
             }
         }
     } else if (ft instanceof FunctionToken) {
         const a = p.solver.globalState;
         const vp = p.solver.varProducer;
-        const args = getCallArgs(p);
+        const args = p.callArgs;
         const basearg = args[0];
         const caller = a.getEnclosingFunctionOrModule(p.path);
 
@@ -640,7 +619,7 @@ export function invokeCallApply(kind: CallApplyKind, p: NativeFunctionParams) {
         // TODO: SpreadElement? non-MemberExpression?
         const baseVar = isExpression(basearg) ? vp.expVar(basearg, p.path) : undefined;
         const resultVar = vp.expVar(p.path.node, p.path);
-        p.op.callFunctionTokenBound(ft, baseVar, caller, argVars, resultVar, false, p.path, {native: true});
+        p.op.callFunctionTokenBound(ft, baseVar, caller, argVars, resultVar, false, p.path as CallNodePath, {native: true});
     }
 }
 
@@ -648,7 +627,7 @@ export function invokeCallApply(kind: CallApplyKind, p: NativeFunctionParams) {
  * Models 'bind'.
  */
 export function functionBind(p: NativeFunctionParams) {
-    const args = getCallArgs(p);
+    const args = p.callArgs;
     const basearg = args[0];
     if (p.base instanceof FunctionToken) { // TODO: ignoring native functions etc.
         if (isExpression(basearg) && !isArrowFunctionExpression(p.base.fun)) { // TODO:SpreadElement? non-MemberExpression?
@@ -679,7 +658,7 @@ export function functionBind(p: NativeFunctionParams) {
  * Models flow from values of the given iterator's values to the given object property.
  */
 export function assignIteratorValuesToProperty(param: number, t: AllocationSiteToken | PackageObjectToken, prop: string, p: NativeFunctionParams) {
-    const arg = getCallArgs(p)[param];
+    const arg = p.callArgs[param];
     if (isExpression(arg)) { // TODO: non-Expression argument
         const src = p.op.expVar(arg, p.path);
         const dst = p.solver.varProducer.objPropVar(t, prop);
@@ -691,7 +670,7 @@ export function assignIteratorValuesToProperty(param: number, t: AllocationSiteT
  * Models flow from values of the given iterator's values to unknown values of the given array.
  */
 export function assignIteratorValuesToArrayValue(param: number, t: ArrayToken, p: NativeFunctionParams) {
-    const arg = getCallArgs(p)[param];
+    const arg = p.callArgs[param];
     if (isExpression(arg)) { // TODO: non-Expression argument
         const src = p.op.expVar(arg, p.path);
         const dst = p.solver.varProducer.arrayUnknownVar(t);
@@ -703,12 +682,12 @@ export function assignIteratorValuesToArrayValue(param: number, t: ArrayToken, p
  * Models flow from key-value pairs of the given iterator's values to the given object key and value properties.
  */
 export function assignIteratorMapValuePairs(param: number, t: AllocationSiteToken | PackageObjectToken, keys: string | null, values: string, p: NativeFunctionParams) {
-    const arg = getCallArgs(p)[param];
+    const arg = p.callArgs[param];
     if (isExpression(arg)) { // TODO: non-Expression argument
         const src = p.op.expVar(arg, p.path);
         const dst = p.solver.varProducer.intermediateVar(p.path.node, "assignIteratorValuePairsToProperties");
         p.op.readIteratorValue(src, dst, arg); // using the argument node as allocation site for the iterator values
-        p.solver.addForAllTokensConstraint(dst, TokenListener.NATIVE_ASSIGN_ITERATOR_MAP_VALUE_PAIRS, {n: getCallArgs(p)[param], t}, (t2: Token) => { // TODO: need keys+values in key?
+        p.solver.addForAllTokensConstraint(dst, TokenListener.NATIVE_ASSIGN_ITERATOR_MAP_VALUE_PAIRS, {n: p.callArgs[param], t}, (t2: Token) => { // TODO: need keys+values in key?
             if (t2 instanceof ArrayToken) {
                 if (keys)
                     p.solver.addSubsetConstraint(p.solver.varProducer.objPropVar(t2, "0"), p.solver.varProducer.objPropVar(t, keys));
@@ -746,7 +725,7 @@ export function assignBaseArrayArrayValueToArray(t: ArrayToken, p: NativeFunctio
  * Models call to a promise executor.
  */
 export function callPromiseExecutor(p: NativeFunctionParams) {
-    const args = getCallArgs(p);
+    const args = p.callArgs;
     if (args.length >= 1 && isExpression(args[0])) { // TODO: SpreadElement? non-MemberExpression?
         const funVar = p.solver.varProducer.expVar(args[0], p.path);
         const caller = p.solver.globalState.getEnclosingFunctionOrModule(p.path);
@@ -755,7 +734,7 @@ export function callPromiseExecutor(p: NativeFunctionParams) {
                 p.op.callFunctionTokenBound(t, undefined, caller, [
                     newSpecialObject("PromiseResolve", p),
                     newSpecialObject("PromiseReject", p),
-                ], undefined, false, p.path, {native: true});
+                ], undefined, false, p.path as CallNodePath, {native: true});
         });
     }
 }
@@ -799,7 +778,7 @@ export function callPromiseResolve(t: AllocationSiteToken, args: CallExpression[
  * Models a call to Promise.resolve or Promise.reject.
  */
 export function returnResolvedPromise(kind: "resolve" | "reject", p: NativeFunctionParams) {
-    const args = getCallArgs(p);
+    const args = p.callArgs;
     // make a new promise and return it
     const promise = newSpecialObject("Promise", p);
     p.solver.addTokenConstraint(promise, p.solver.varProducer.expVar(p.path.node, p.path));
@@ -834,7 +813,7 @@ export function returnResolvedPromise(kind: "resolve" | "reject", p: NativeFunct
  * Models a call to Promise.all, Promise.allSettled, Promise.any or Promise.race.
  */
 export function returnPromiseIterator(kind: "all" | "allSettled" | "any" | "race", p: NativeFunctionParams) {
-    const args = getCallArgs(p);
+    const args = p.callArgs;
     if (args.length >= 1 && isExpression(args[0])) { // TODO: non-Expression?
         const arg = p.op.expVar(args[0], p.path);
         if (arg) {
@@ -920,7 +899,7 @@ export function returnPromiseIterator(kind: "all" | "allSettled" | "any" | "race
 }
 
 export function returnPrototypeOf(p: NativeFunctionParams) {
-    const arg = getCallArgs(p)[0], dst = p.solver.varProducer.expVar(p.path.node, p.path);
+    const arg = p.callArgs[0], dst = p.solver.varProducer.expVar(p.path.node, p.path);
     if (isExpression(arg) && !isParentExpressionStatement(p.path) && dst !== undefined) // TODO: non-Expression arguments?
         p.solver.addForAllTokensConstraint(p.solver.varProducer.expVar(arg, p.path), TokenListener.NATIVE_RETURN_PROTOTYPE_OF, p.path.node, (t: Token) => {
             if (isObjectPropertyVarObj(t))
@@ -929,7 +908,7 @@ export function returnPrototypeOf(p: NativeFunctionParams) {
 }
 
 export function setPrototypeOf(p: NativeFunctionParams) {
-    const [obj, prototype] = getCallArgs(p);
+    const [obj, prototype] = p.callArgs;
     if (isExpression(obj) && isExpression(prototype)) { // TODO: non-Expression arguments?
         const pvar = p.op.solver.varProducer.expVar(prototype, p.path);
         if (pvar)
@@ -1098,7 +1077,7 @@ export function defineProperties(
  * Models the behavior of Object.prototype.__defineGetter__ & Object.prototype.__defineSetter__.
  */
 export function defineGetterSetter(ac: "get" | "set", p: NativeFunctionParams) {
-    const args = getCallArgs(p);
+    const args = p.callArgs;
     if (args.length < 2 || !p.base)
         return;
     const prop = getConstantString(p.path.get("arguments.0"));
