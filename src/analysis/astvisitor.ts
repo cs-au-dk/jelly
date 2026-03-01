@@ -548,7 +548,6 @@ export function visit(ast: File, op: Operations) {
                             solver.addTokenConstraint(op.newFunctionToken(path.node), vp.nodeVar(cls.id));
                         break;
                 }
-                // TODO: currently ignoring generator, async, static (often easy to resolve!), override, optional, abstract
             }
         },
 

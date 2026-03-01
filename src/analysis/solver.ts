@@ -804,21 +804,21 @@ export default class Solver {
         this.phase = phase;
         if (logger.isDebugEnabled())
             logger.debug("Processing constraints until fixpoint...");
-        const f = this.fragmentState;
+        const {fragmentState: f, diagnostics: d} = this;
         f.a.timeoutTimer.checkTimeout();
         await this.checkAbort();
         if (logger.isVerboseEnabled())
             logger.verbose(`Propagating (tokens: ${this.unprocessedTokens.size}, non-bounded: ${f.postponedListenerCalls.length}, bounded: ${f.postponedListenerCalls2.length})`);
         let wave = 1, round = 1;
         while (this.unprocessedTokens.size > 0 || f.postponedListenerCalls.length > 0 || f.postponedListenerCalls2.length > 0) {
-            this.diagnostics.wave = wave;
-            this.diagnostics.round = round;
+            d.wave = wave;
+            d.round = round;
             if (logger.isVerboseEnabled())
                 logger.verbose(`Fixpoint wave: ${wave} (call edges: ${f.numberOfCallToFunctionEdges}, vars: ${f.getNumberOfVarsWithTokens()}, tokens: ${f.numberOfTokens}, subsets: ${f.numberOfSubsetEdges})`);
             if (options.maxWaves !== undefined && wave > options.maxWaves) {
                 f.warn("Fixpoint wave limit reached, aborting propagation");
-                this.diagnostics.waveLimitReached++;
-                this.diagnostics.unprocessedTokensSize = 0;
+                d.waveLimitReached++;
+                d.unprocessedTokensSize = 0;
                 this.unprocessedTokens.clear();
                 f.nodesWithNewEdges.clear();
                 f.postponedListenerCalls.length = 0;
@@ -841,14 +841,14 @@ export default class Solver {
                         for (const [v, rep] of repmap)
                             this.redirect(v, rep); // TODO: this includes processing pending edges and tokens for v, which may be unnecessary?
                         f.prevNumEdges = f.numberOfSubsetEdges;
-                        this.diagnostics.totalCycleEliminationTime += timer1.elapsed();
-                        this.diagnostics.totalCycleEliminationRuns++;
+                        d.totalCycleEliminationTime += timer1.elapsed();
+                        d.totalCycleEliminationRuns++;
                         if (logger.isVerboseEnabled())
                             logger.verbose(`Cycle detection roots: ${nodes.size} roots, edges: ${edgesBefore} -> ${f.numberOfSubsetEdges} (${nanoToMs(timer1.elapsed())})`);
                         const timer2 = new Timer();
                         // process new tokens for the component representatives in topological order
                         if (logger.isVerboseEnabled())
-                            logger.verbose(`Processing ${this.diagnostics.unprocessedTokensSize} new token${this.diagnostics.unprocessedTokensSize !== 1 ? "s" : ""}`);
+                            logger.verbose(`Processing ${d.unprocessedTokensSize} new token${d.unprocessedTokensSize !== 1 ? "s" : ""}`);
                         try {
                             for (let i = reps.length - 1; i >= 0; i--) {
                                 const v = reps[i];
@@ -856,7 +856,7 @@ export default class Solver {
                                 await this.checkAbort(true);
                             }
                         } finally {
-                            this.diagnostics.totalPropagationTime += timer2.elapsed();
+                            d.totalPropagationTime += timer2.elapsed();
                         }
                         f.nodesWithNewEdges.clear();
                     }
@@ -864,11 +864,11 @@ export default class Solver {
                     const timer3 = new Timer();
                     for (const v of this.unprocessedTokens.keys())
                         this.processTokens(v);
-                    this.diagnostics.totalPropagationTime += timer3.elapsed();
+                    d.totalPropagationTime += timer3.elapsed();
                 } else {
                     // process all tokens in worklist until empty
                     if (logger.isVerboseEnabled())
-                        logger.verbose(`Processing ${this.diagnostics.unprocessedTokensSize} new token${this.diagnostics.unprocessedTokensSize !== 1 ? "s" : ""}`);
+                        logger.verbose(`Processing ${d.unprocessedTokensSize} new token${d.unprocessedTokensSize !== 1 ? "s" : ""}`);
                     const timer = new Timer();
                     try {
                         for (const v of this.unprocessedTokens.keys()) {
@@ -876,18 +876,18 @@ export default class Solver {
                             await this.checkAbort(true);
                         }
                     } finally {
-                        this.diagnostics.totalPropagationTime += timer.elapsed();
+                        d.totalPropagationTime += timer.elapsed();
                     }
                 }
             }
-            if (this.unprocessedTokens.size !== 0 || this.diagnostics.unprocessedTokensSize !== this.unprocessedTokens.size)
-                assert.fail(`worklist non-empty: unprocessedTokens.size: ${this.unprocessedTokens.size}, unprocessedTokensSize: ${this.diagnostics.unprocessedTokensSize}`);
+            if (this.unprocessedTokens.size !== 0 || d.unprocessedTokensSize !== this.unprocessedTokens.size)
+                assert.fail(`worklist non-empty: unprocessedTokens.size: ${this.unprocessedTokens.size}, unprocessedTokensSize: ${d.unprocessedTokensSize}`);
             if (f.postponedListenerCalls.length > 0) {
                 // process all enqueued non-bounded listener calls (including those created during the processing)
                 if (logger.isVerboseEnabled())
                     logger.verbose(`Processing non-bounded listener calls: ${f.postponedListenerCalls.length}`);
                 const timer = new Timer();
-                this.diagnostics.listenerNotificationRounds++;
+                d.listenerNotificationRounds++;
                 try {
                     for (const [fun, arg] of f.postponedListenerCalls) {
                         fun(arg as any);
@@ -897,13 +897,13 @@ export default class Solver {
                         }
                     }
                 } finally {
-                    this.diagnostics.totalListenerCallTime += timer.elapsed();
+                    d.totalListenerCallTime += timer.elapsed();
                 }
                 f.postponedListenerCalls.length = this.postponedListenersProcessed = 0;
             } else if (f.postponedListenerCalls2.length > 0) {
                 if (options.maxIndirections !== undefined && round > options.maxIndirections) {
-                    this.diagnostics.indirectionsLimitReached++;
-                    this.diagnostics.unprocessedTokensSize = 0;
+                    d.indirectionsLimitReached++;
+                    d.unprocessedTokensSize = 0;
                     this.unprocessedTokens.clear();
                     f.nodesWithNewEdges.clear();
                     f.postponedListenerCalls.length = 0;
@@ -913,7 +913,7 @@ export default class Solver {
                     if (logger.isVerboseEnabled())
                         logger.verbose(`Processing bounded listener calls: ${f.postponedListenerCalls2.length}`);
                     const timer = new Timer();
-                    this.diagnostics.listenerNotificationRounds++;
+                    d.listenerNotificationRounds++;
                     const calls = Array.from(f.postponedListenerCalls2);
                     f.postponedListenerCalls2.length = this.postponedListenersProcessed = 0;
                     try {
@@ -925,7 +925,7 @@ export default class Solver {
                             }
                         }
                     } finally {
-                        this.diagnostics.totalListenerCallTime += timer.elapsed();
+                        d.totalListenerCallTime += timer.elapsed();
                     }
                     if (logger.isVerboseEnabled() || (options.diagnostics && options.printProgress))
                         logger.info(`${isTTY ? GREY : ""}Round ${round} completed after ${nanoToMs(this.timer.elapsed())} (call edges: ${f.numberOfCallToFunctionEdges}, vars: ${f.getNumberOfVarsWithTokens()}, tokens: ${f.numberOfTokens}, subsets: ${f.numberOfSubsetEdges})${isTTY ? RESET : ""}`);
@@ -938,8 +938,8 @@ export default class Solver {
         }
         if (logger.isVerboseEnabled() || (options.diagnostics && options.printProgress))
             logger.info(`${isTTY ? GREY : ""}${phase} completed after ${nanoToMs(this.timer.elapsed())} (call edges: ${f.numberOfCallToFunctionEdges}, vars: ${f.getNumberOfVarsWithTokens()}, tokens: ${f.numberOfTokens}, subsets: ${f.numberOfSubsetEdges})${isTTY ? RESET : ""}`);
-        if (this.diagnostics.unprocessedTokensSize !== 0)
-            assert.fail(`unprocessedTokensSize non-zero after propagate: ${this.diagnostics.unprocessedTokensSize}`);
+        if (d.unprocessedTokensSize !== 0)
+            assert.fail(`unprocessedTokensSize non-zero after propagate: ${d.unprocessedTokensSize}`);
     }
 
     async checkAbort(throttle: boolean = false) {

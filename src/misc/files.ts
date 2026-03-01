@@ -130,10 +130,7 @@ export function isAbsoluteModuleName(str: string): boolean {
  * @throws exception if an error occurred
  */
 export function resolveModule(mode: "commonjs" | "module", str: string, file: FilePath, a: GlobalState): FilePath | undefined {
-    if ([".less", ".svg", ".png", ".css", ".scss", ".json", ".node"].includes(extname(str)))  {
-        logger.verbose(`Ignoring module '${str}' with special extension`);
-        return undefined;
-    } else if (str[0] === "/")
+    if (str[0] === "/")
         throw new Error("Ignoring absolute module path");
     let filepath: string;
     if ([".ts", ".tsx", ".mts", ".cts"].includes(extname(file))) {

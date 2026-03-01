@@ -172,7 +172,7 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
         if (a.approx) {
             a.approx.stop();
             if (options.approx && (options.diagnostics || options.diagnosticsJson))
-                solver.diagnostics.approx = a.approx.getDiagnostics();
+                d.approx = a.approx.getDiagnostics();
         }
     }
     if (d.aborted)

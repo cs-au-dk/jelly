@@ -508,9 +508,9 @@ export class Operations {
             f.registerCallEdge(node, caller, this.a.functionInfos.get(at.fun)!, {external: true});
             if (!f.externalCallbacksProcessed.has(at)) {
                 f.externalCallbacksProcessed.add(at);
-                for (let j = 0; j < at.fun.params.length; j++)
-                    if (isIdentifier(at.fun.params[j])) // TODO: non-identifier parameters?
-                        this.solver.addAccessPath(UnknownAccessPath.instance, f.varProducer.nodeVar(at.fun.params[j]));
+                for (const param of at.fun.params)
+                    if (isIdentifier(param)) // TODO: non-identifier parameters?
+                        this.solver.addAccessPath(UnknownAccessPath.instance, f.varProducer.nodeVar(param));
                 this.solver.addAccessPath(UnknownAccessPath.instance, f.varProducer.thisVar(at.fun));
                 // TODO: handle 'this' under --newobj?
             }
@@ -1074,7 +1074,7 @@ function isUnlikelyGetterSetter(prop: string): boolean {
 }
 
 /**
- * Returns true if the token is 'globalThis'.
+ * Returns true if the token is a global native object but not 'globalThis'.
  */
 export function isGlobalNative(t: Token): boolean {
     return t instanceof NativeObjectToken && t.moduleInfo === undefined && t.name !== "globalThis";

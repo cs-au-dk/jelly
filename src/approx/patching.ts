@@ -172,7 +172,7 @@ export class Patching {
             const repVar = solver.fragmentState.getRepresentative(dstVar);
             if (!solver.fragmentState.hasToken(repVar, valToken) &&
                 (!APPROX_ONLY_EMPTY || solver.fragmentState.getTokensSize(repVar)[0] === 0)) { // TODO: optionally only patch if exactly one patch token is available for repVar? (may avoid precision losses)
-                solver.addToken(valToken!, repVar);
+                solver.addToken(valToken, repVar);
                 return true;
             }
             return false;
@@ -237,7 +237,7 @@ export class Patching {
                             d.tokensNotFound++;
                             continue;
                         }
-                        const dstVar = solver.varProducer.objPropVar(baseToken!, hint.prop, hint.type);
+                        const dstVar = solver.varProducer.objPropVar(baseToken, hint.prop, hint.type);
                         if (logger.isVerboseEnabled())
                             logger.verbose(`Patching dynamic write: ${dstVar.obj}["${hint.prop}"] <- ${valToken}`);
                         if (patch(dstVar, valToken, hint)) {
