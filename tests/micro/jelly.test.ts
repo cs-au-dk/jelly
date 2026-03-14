@@ -297,7 +297,7 @@ describe("tests/micro", () => {
         functionInfos: 4,
         moduleInfos: 1,
         numberOfFunctionToFunctionEdges: 4,
-        oneCalleeCalls: 1,
+        oneCalleeCalls: 0,
         funFound: 3,
         funTotal: 3,
         callFound: 3,
@@ -729,9 +729,11 @@ describe("tests/micro", () => {
         // TODO: patch dynamics heuristic does not kick in for dynamic property reads
         // on 'this', as 'this' always contains the @Unknown access path which
         // propagates to `this[...]`.
+        funFound: 3,
         funTotal: 4,
         callFound: 3,
         callTotal: 4,
+        reachableFound: 4,
         reachableTotal: 5,
     });
 

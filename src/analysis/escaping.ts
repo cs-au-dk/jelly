@@ -9,6 +9,12 @@ import {isInternalProperty} from "../natives/ecmascript";
 import {options} from "../options";
 
 /**
+ * If true, skip injecting %UnknownAccessPath at property vars where the ReadResultVar for
+ * the (token, property) pair already has a non-empty points-to set.
+ */
+const SKIP_RESOLVED_READS = true;
+
+/**
  * Finds the ObjectTokens that may be accessed from outside the fragment via exporting to or importing from other modules.
  * Also adds UnknownAccessPath at parameters of escaping functions and properties of escaping objects.
  * Note: objects that are assigned to 'exports' (or to properties of such objects) are not considered escaping
@@ -91,6 +97,13 @@ export function findEscapingObjects(ms: ModuleInfo | Array<ModuleInfo>, solver: 
             if (!isInternalProperty(p)) {
                 const w = f.varProducer.objPropVar(t, p);
                 addToWorklist(w);
+                // Skip injection if the property read already resolved to concrete values
+                if (SKIP_RESOLVED_READS) {
+                    const readResult = f.varProducer.readResultVar(t, p);
+                    if (f.processedReadResultVars.has(readResult) &&
+                        f.getTokensSize(f.getRepresentative(readResult))[0] > 0)
+                        continue;
+                }
                 solver.addToken(theUnknownAccessPathToken, f.getRepresentative(w));
             }
     }

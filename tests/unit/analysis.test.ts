@@ -322,6 +322,42 @@ describe("tests/unit/analysis", () => {
             expect(findEscapingObjects(m, solver).size).toBe(0);
             expect(getTokens(f.varProducer.nodeVar(param))).not.toContain(tUnknown);
         });
+
+        test("skip resolved reads", async () => {
+            const {solver, a, f, getTokens} = setup;
+
+            const tObject = a.canonicalizeToken(new ObjectToken(param));
+            solver.addTokenConstraint(tObject, v);
+            f.registerEscaping(v);
+
+            const vA = f.varProducer.objPropVar(tObject, "A");
+            const tFunction = a.canonicalizeToken(new FunctionToken(fun1));
+            solver.addTokenConstraint(tFunction, vA);
+
+            const op = new Operations(m, solver, {});
+            op.readPropertyFromChain(tObject, "A");
+            await solver.propagate("Testing");
+
+            findEscapingObjects(m, solver);
+
+            expect(getTokens(f.getRepresentative(vA))).toContain(tFunction);
+            expect(getTokens(f.getRepresentative(vA))).not.toContain(tUnknown);
+        });
+
+        test("skip resolved reads (unresolved)", () => {
+            const {solver, a, f, getTokens} = setup;
+
+            const tObject = a.canonicalizeToken(new ObjectToken(param));
+            solver.addTokenConstraint(tObject, v);
+            f.registerEscaping(v);
+
+            const vA = f.varProducer.objPropVar(tObject, "A");
+            const tFunction = a.canonicalizeToken(new FunctionToken(fun1));
+            solver.addTokenConstraint(tFunction, vA);
+
+            findEscapingObjects(m, solver);
+            expect(getTokens(f.getRepresentative(vA))).toContain(tUnknown);
+        });
     });
 
     describe("patch dynamics", () => {
