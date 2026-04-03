@@ -1,4 +1,6 @@
 import {PluginObj, template, transformFromAstSync} from "@babel/core";
+import {parseAndDesugar} from "../parsing/parser";
+import {preprocessAst} from "../parsing/extras";
 import {
     ArrayExpression,
     ArrowFunctionExpression,
@@ -16,7 +18,6 @@ import {
     conditionalExpression,
     Expression,
     expressionStatement,
-    File,
     Function,
     FunctionDeclaration,
     FunctionExpression,
@@ -66,7 +67,6 @@ import {
     variableDeclarator
 } from "@babel/types";
 import {NodePath} from "@babel/traverse";
-import logger from "../misc/logger";
 import {FilePath, locationToString} from "../misc/util";
 import {dirname, resolve} from "path";
 import Module from "module";
@@ -123,36 +123,49 @@ export function checkFile(file: string) {
 }
 
 /**
- * Transform the given code for approximate interpretation.
- * @param ast the AST
- * @param str the textual code
- * @param file the name (file path, possibly with ":eval[...]" blocks)
+ * Parses, preprocesses, and transforms code for approximate interpretation.
+ * Used by both the main thread (CJS) and the hooks thread (ESM).
+ * @param code the source code
+ * @param name module name (file path, possibly with ":eval[...]" blocks)
  * @param mode CommonJS or ESM module
- * @return {transformed: transformed code or undefined if transformation failed, staticRequires: static requires, numFunctions: number of functions}
+ * @param log logging callback
+ * @return transformed code and metadata, or undefined if transformation failed
  */
-export function approxTransform(ast: File, str: string, file: string, mode: "commonjs" | "module"): {
-    transformed: string | undefined,
+export function approxTransform(code: string, name: string, mode: "commonjs" | "module",
+                                log: (level: string, msg: string) => void): {
+    transformed: string,
     staticRequires: Set<string>,
     numStaticFunctions: number
-} {
+} | undefined {
+    log("verbose", `Instrumenting ${name}`);
     let numStaticFunctions = 0;
     const staticRequires = new Set<string>();
-    const t = transformFromAstSync(ast, str, {
-        plugins: [
-            transform
-        ],
-        cwd: __dirname,
-        configFile: false,
-        compact: str.length > 1048576,
-        code: true
-    });
-    if (t?.code) {
-        if (logger.isDebugEnabled())
-            logger.debug("Transformed for approximate interpretation:\n" + t.code);
-        return {transformed: t.code, staticRequires, numStaticFunctions};
-    } else {
-        logger.error(`Error: Transformation failed for ${file}`);
-        return {transformed: undefined, staticRequires, numStaticFunctions};
+    try {
+        const ast = parseAndDesugar(code, name);
+        if (!ast) {
+            log("warn", `Parsing failed for ${name}`);
+            return undefined;
+        }
+        preprocessAst(ast);
+        const t = transformFromAstSync(ast, code, {
+            plugins: [
+                transform
+            ],
+            cwd: __dirname,
+            configFile: false,
+            compact: code.length > 1048576,
+            code: true
+        });
+        if (t?.code) {
+            log("debug", "Transformed for approximate interpretation:\n" + t.code);
+            return {transformed: t.code, staticRequires, numStaticFunctions};
+        } else {
+            log("error", `Error: Transformation failed for ${name}`);
+            return undefined;
+        }
+    } catch (err) {
+        log("error", `Error: Instrumentation failed for ${name}, ${err instanceof Error ? err.stack : err}`);
+        return undefined;
     }
 
     function transform(): PluginObj {
@@ -160,7 +173,7 @@ export function approxTransform(ast: File, str: string, file: string, mode: "com
             visitor: {
                 Program: {
                     exit(path: NodePath<Program>) {
-                        visitProgram(path, file);
+                        visitProgram(path, name);
                     }
                 },
                 ObjectExpression: {

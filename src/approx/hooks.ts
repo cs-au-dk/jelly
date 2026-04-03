@@ -8,15 +8,13 @@ import {extname} from "path";
 import {WHITELISTED} from "./sandbox";
 import {TSModuleResolver} from "../typescript/moduleresolver";
 import {fileURLToPath} from "node:url";
-import {PREFIX} from "./transform";
+import {approxTransform, checkFile, PREFIX} from "./transform";
 import {isShebang} from "../misc/files";
 import {pathToFileURL} from "url";
 
 const tsModuleResolver = new TSModuleResolver();
 
 let port2: MessagePort | undefined;
-
-const responsePromiseResolves = new Map<FilePath, (transformed: string) => void>();
 
 /**
  * Module hooks initialization.
@@ -25,15 +23,6 @@ const responsePromiseResolves = new Map<FilePath, (transformed: string) => void>
 export async function initialize({opts, port2: p2}: {opts: Partial<typeof options>, port2: MessagePort}) {
     setOptions(opts);
     port2 = p2;
-    port2.on("message", ({filename, transformed}: {filename: FilePath, transformed: string}) => {
-        const resolve = responsePromiseResolves.get(filename);
-        if (!resolve)
-            log("error", `Error: Unexpected response for ${filename}`);
-        else {
-            resolve(transformed);
-            responsePromiseResolves.delete(filename);
-        }
-    });
 }
 
 /**
@@ -73,6 +62,34 @@ export async function resolve(
 }
 
 /**
+ * Transforms an ESM module source directly in the hooks thread.
+ */
+function transformModule(filename: FilePath, code: string): string {
+    if (!filename.startsWith(options.basedir)) {
+        log("verbose", `Ignoring module outside basedir: ${filename}`);
+        return "";
+    }
+    try {
+        checkFile(filename);
+    } catch (err) {
+        log("error", String(err));
+        return "";
+    }
+    const result = approxTransform(code, filename, "module", log);
+    if (!result)
+        return "";
+    // send metadata back to the main thread asynchronously
+    port2!.postMessage({
+        type: "metadata",
+        numStaticFunctions: result.numStaticFunctions,
+        staticRequires: [...result.staticRequires],
+        filename,
+        codeSize: code.length
+    });
+    return result.transformed;
+}
+
+/**
  * Module loading hook.
  */
 export async function load(
@@ -107,13 +124,8 @@ export async function load(
             log("error", `Error: Unexpected source type for ${url}`);
         else {
             const filename = fileURLToPath(url);
-            const transformPromise = new Promise<string>(resolve => {
-                if (responsePromiseResolves.has(filename))
-                    log("error", `Error: Loading conflict for ${filename}`);
-                responsePromiseResolves.set(filename, resolve);
-            });
-            port2!.postMessage({type: "transform", filename, source: new TextDecoder().decode(res.source)});
-            const transformed = await transformPromise;
+            const source = new TextDecoder().decode(res.source);
+            const transformed = transformModule(filename, source);
             return {
                 format: "module",
                 shortCircuit: true,
