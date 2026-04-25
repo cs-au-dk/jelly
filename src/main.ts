@@ -7,6 +7,7 @@ import logger, {logToFile, setLogLevel} from "./misc/logger";
 import {
     COPYRIGHT,
     options,
+    parsePositiveInt,
     PKG,
     resolveBaseDir,
     setDefaultTrackedModules,
@@ -38,7 +39,10 @@ import {Vulnerability} from "./typings/vulnerabilities";
 import {addAll} from "./misc/util";
 import {getAPIExported, reportAccessPaths, reportAPIExportedFunctions} from "./patternmatching/apiexported";
 import {merge} from "./output/merge";
+import {saveMatches} from "./output/matchesfile";
+import {saveReachable} from "./output/reachablefile";
 import {CallGraph} from "./typings/callgraph";
+import {saveCallStacks} from "./output/callstacksfile";
 import {ProcessManager} from "./approx/processmanager";
 import semver from "semver";
 
@@ -51,7 +55,7 @@ program
     .option("-b, --basedir <directory>", "base directory for files to analyze (default: auto-detect)")
     .option("-f, --logfile <file>", "log to file (default: log to stdout)")
     .option("-l, --loglevel <level>", "log level (debug/verbose/info/warn/error)", "info")
-    .option("-i, --timeout <seconds>", "limit analysis time")
+    .option("-i, --timeout <seconds>", "limit analysis time", parsePositiveInt)
     .option("-a, --dataflow-html <file>", "save data-flow graph as HTML file")
     .option("-m, --callgraph-html <file>", "save call graph as HTML file")
     .option("-j, --callgraph-json <file>", "save call graph as JSON file")
@@ -98,9 +102,13 @@ program
     .option("--no-callgraph-external", "omit heuristic external callbacks in call graph")
     .option("--diagnostics", "report internal analysis diagnostics")
     .option("--diagnostics-json <file>", "save analysis diagnostics in JSON file")
+    .option("--matches-file <file>", "save vulnerability matches as JSON file")
+    .option("--reachable-file <file>", "save reachable packages and modules as JSON file")
+    .option("--callstacks-file <file>", "save vulnerability call-stacks as JSON file")
+    .option("--max-file-size <bytes>", "skip files larger than this many bytes", parsePositiveInt)
     .option("--variable-kinds", "report constraint variable kinds")
-    .option("--max-waves <number>", "limit number of fixpoint waves")
-    .option("--max-indirections <number>", "limit number of function call and property write indirections")
+    .option("--max-waves <number>", "limit number of fixpoint waves", parsePositiveInt)
+    .option("--max-indirections <number>", "limit number of function call and property write indirections", parsePositiveInt)
     .option("--full-indirection-bounding", "enable indirection bounding for method calls and property reads (use with --max-indirections)")
     .option("--typescript-library-usage <file>", "save TypeScript library usage in JSON file, no analysis")
     .option("--modules-only", "report reachable packages and modules only, no analysis")
@@ -318,7 +326,7 @@ async function main() {
                 return;
             }
 
-            let tapirPatterns, patterns, globs, props, vulnerabilityDetector;
+            let tapirPatterns, patterns, globs, props, vulnerabilityDetector, loadedVulnerabilities: Array<Vulnerability> | undefined;
             if (options.patterns) {
                 tapirPatterns = removeObsoletePatterns(loadTapirDetectionPatternFiles(options.patterns));
                 patterns = convertTapirPatterns(tapirPatterns);
@@ -327,7 +335,8 @@ async function main() {
             }
             if (options.vulnerabilities) {
                 logger.info(`Loading vulnerability patterns from ${options.vulnerabilities}`);
-                vulnerabilityDetector = new VulnerabilityDetector(JSON.parse(readFileSync(options.vulnerabilities, "utf8")) as Array<Vulnerability>); // TODO: use when setting globs and props? (see also server.ts)
+                loadedVulnerabilities = JSON.parse(readFileSync(options.vulnerabilities, "utf8")) as Array<Vulnerability>;
+                vulnerabilityDetector = new VulnerabilityDetector(loadedVulnerabilities); // TODO: use when setting globs and props? (see also server.ts)
                 const ps = vulnerabilityDetector.getPatterns();
                 addAll(getGlobs(ps), (globs = globs ?? new Set<string>()));
                 addAll(getProperties(ps), (props = props ?? new Set<string>()));
@@ -393,6 +402,15 @@ async function main() {
 
             if (options.diagnosticsJson)
                 out.saveDiagnostics(solver.diagnostics, options.diagnosticsJson);
+
+            if (options.matchesFile)
+                saveMatches(vr, loadedVulnerabilities, options.matchesFile);
+
+            if (options.callstacksFile)
+                saveCallStacks(solver, vr, options.callstacksFile);
+
+            if (options.reachableFile)
+                saveReachable(solver, options.reachableFile);
 
             if (options.modulesOnly)
                 out.reportReachablePackagesAndModules();

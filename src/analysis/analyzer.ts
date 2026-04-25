@@ -56,6 +56,18 @@ export async function analyzeFiles(files: Array<string>, solver: Solver) {
                     for (const file of a.pendingFiles) {
                         const moduleInfo = a.getModuleInfo(file);
 
+                        if (options.maxFileSize !== undefined) {
+                            try {
+                                const fileBytes = statSync(file).size;
+                                if (fileBytes > options.maxFileSize) {
+                                    logger.warn(`Skipping ${file} (${fileBytes} bytes > --max-file-size ${options.maxFileSize})`);
+                                    continue;
+                                }
+                            } catch {
+                                // statSync rarely fails; let the existing read path handle the actual error
+                            }
+                        }
+
                         d.modules++;
                         d.packages = a.packageInfos.size;
                         if (!options.modulesOnly && options.printProgress)
