@@ -44,8 +44,7 @@ export function findEscapingObjects(ms: ModuleInfo | Array<ModuleInfo>, solver: 
     // first round, seed worklist with module.exports, find functions accessible via property reads
     for (const m of Array.isArray(ms) ? ms : [ms])
         if (m.packageInfo.isEntry && (m.getPath().includes("node_modules") || options.library)) { // only consider escaping objects for entry packages in libraries
-            const pi = a.packageJsonInfos.get(m.packageInfo.dir);
-            if (!pi?.exports || pi.exports.test(m.relativePath)) // only consider escaping objects from modules that are exported
+            if (!m.packageInfo.exports || m.packageInfo.exports.test(m.relativePath)) // only consider escaping objects from modules that are exported
                 addToWorklist(f.varProducer.objPropVar(a.canonicalizeToken(new NativeObjectToken("module", m)), "exports"));
         }
     const w2: Array<ObjectPropertyVarObj> = [];

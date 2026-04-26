@@ -15,6 +15,7 @@ export class PackageInfo {
         readonly version: string | undefined, // package version, undefined if not available
         readonly main: string | undefined, // package main file, undefined if not available
         readonly dir: FilePath, // absolute path to representative package root directory, or current working directory if no package.json is found for the entry files
+        public exports: RegExp | undefined, // compiled regex from the package.json "exports" field, or undefined if no exports field
         readonly isEntry: boolean // true for entry packages
     ) {}
 

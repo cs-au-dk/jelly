@@ -25,7 +25,7 @@ describe("tests/unit/analysis", () => {
         options.cycleElimination = true;
     });
 
-    const p = new PackageInfo("fake", undefined, undefined, "node_modules/fake", true);
+    const p = new PackageInfo("fake", undefined, undefined, "node_modules/fake", undefined, true);
     const packagekey = "fake@?";
     const m = new ModuleInfo("fake.js", p, true, true);
 
@@ -182,6 +182,7 @@ describe("tests/unit/analysis", () => {
             vExports = solver.varProducer.objPropVar(tModule, "exports");
             solver.addTokenConstraint(tExports, vExports);
             v = solver.varProducer.intermediateVar(param, "fake");
+            p.exports = undefined;
         });
 
         test("module.exports = function", () => {
@@ -292,14 +293,7 @@ describe("tests/unit/analysis", () => {
         test.each([/^fake\.js$/, /^.*$/, /^.*\.js$/])("exported library module: %s", (pattern: RegExp) => {
             const {solver, a, f, getTokens} = setup;
 
-            a.packageJsonInfos.set(p.dir, {
-                name: p.name,
-                dir: p.dir,
-                version: undefined,
-                main: undefined,
-                packagekey,
-                exports: pattern,
-            });
+            p.exports = pattern;
 
             solver.addTokenConstraint(a.canonicalizeToken(new FunctionToken(fun1)), vExports);
             expect(findEscapingObjects(m, solver).size).toBe(0);
@@ -309,14 +303,7 @@ describe("tests/unit/analysis", () => {
         test("unexported library module", () => {
             const {solver, a, f, getTokens} = setup;
 
-            a.packageJsonInfos.set(p.dir, {
-                name: p.name,
-                dir: p.dir,
-                version: undefined,
-                main: undefined,
-                packagekey,
-                exports: /^other-file\.js$/,
-            });
+            p.exports = /^other-file\.js$/;
 
             solver.addTokenConstraint(a.canonicalizeToken(new FunctionToken(fun1)), vExports);
             expect(findEscapingObjects(m, solver).size).toBe(0);
