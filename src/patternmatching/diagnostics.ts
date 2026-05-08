@@ -94,4 +94,9 @@ export class VulnerabilityDiagnostics {
      * Number of entry-package calls that may reach on a vulnerable function.
      */
     entryPackageCallsThatMayReachVulnerableFunctions: number = 0;
+
+    /**
+     * Number of vulnerability paths collected.
+     */
+    vulnerabilityPaths: number = 0;
 }

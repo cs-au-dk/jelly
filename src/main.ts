@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import {analyzeFiles} from "./analysis/analyzer";
-import {closeSync, openSync, readdirSync, readFileSync, unlinkSync} from "fs";
+import {closeSync, openSync, readdirSync, readFileSync, unlinkSync, writeFileSync} from "fs";
 import {program} from "commander";
 import logger, {logToFile, setLogLevel} from "./misc/logger";
 import {
@@ -116,6 +116,7 @@ program
     .option("--obj-spread", "enable model of spread syntax for object literals ({...obj})")
     .option("--native-overwrites", "allow overwriting of native object properties")
     .option("--ignore-imprecise-native-calls", "ignore imprecise native calls")
+    .option("--callstacks-json <file>", "save vulnerability call stacks in JSON file")
     .option("--vulnerabilities-full", "full report of vulnerabilities")
     .option("--eager-propagation", "perform propagation after each module")
     .option("--no-interops", "disable models of common module interop helper functions")
@@ -351,6 +352,8 @@ async function main() {
             const vr = vulnerabilityDetector?.collectAllVulnerabilityResults(solver, typer) ?? {};
             if (options.vulnerabilitiesFull)
                 vulnerabilityDetector?.reportResults(f, vr);
+            if (options.callstacksJson)
+                writeFileSync(options.callstacksJson, JSON.stringify(vr.paths, null, 2));
 
             if (options.callgraphHtml) {
                 const file = options.callgraphHtml;
