@@ -84,6 +84,7 @@ export const options: {
     vulnerabilitiesFull: boolean,
     eagerPropagation: boolean,
     interops: boolean,
+    maxFileSize: number | undefined,
 } = {
     callgraphHtml: undefined,
     dataflowHtml: undefined,
@@ -158,6 +159,7 @@ export const options: {
     vulnerabilitiesFull: false,
     eagerPropagation: false,
     interops: true,
+    maxFileSize: undefined,
 };
 
 export function setOptions(opts: OptionValues & Partial<typeof options>) {

@@ -1,3 +1,4 @@
+import {statSync} from "fs";
 import {Function, Node} from "@babel/types";
 import {FilePath, getOrSet, Location, locationToStringWithFile, mapGetMap, strHash} from "../misc/util";
 import {
@@ -322,9 +323,16 @@ export class GlobalState {
             } else {
 
                 // module has not been reached before, create new ModuleInfo
-                const ignoreModule = (from && (options.ignoreDependencies ||
+                let ignoreModule = (from && (options.ignoreDependencies ||
                         (!packageInfo.isEntry && ((options.includePackages && !options.includePackages.includes(packageInfo.name)))))) ||
                     options.excludePackages?.includes(packageInfo.name);
+                if (!ignoreModule && options.maxFileSize !== undefined) {
+                    const fileSize = statSync(tofile).size;
+                    if (fileSize > options.maxFileSize) {
+                        ignoreModule = true;
+                        logger.warn(`Ignoring module ${tofile} due to file size ${fileSize} > ${options.maxFileSize}`);
+                    }
+                }
                 moduleInfo = new ModuleInfo(rel, packageInfo, from === undefined, !ignoreModule); // FIXME: from === undefined may depend on visit order when using approx
                 packageInfo.modules.set(rel, moduleInfo);
 

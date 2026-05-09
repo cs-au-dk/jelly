@@ -120,6 +120,7 @@ program
     .option("--vulnerabilities-full", "full report of vulnerabilities")
     .option("--eager-propagation", "perform propagation after each module")
     .option("--no-interops", "disable models of common module interop helper functions")
+    .option("--max-file-size <bytes>", "skip files larger than the given size in bytes", (value) => parseInt(value, 10))
     .usage("[options] [files]")
     .addHelpText("after",
         "\nAll modules reachable by require/import from the given files are included in the analysis\n" +
