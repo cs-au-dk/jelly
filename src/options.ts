@@ -1,4 +1,4 @@
-import {OptionValues} from "commander";
+import {InvalidArgumentError, OptionValues} from "commander";
 import {resolve} from "path";
 import logger from "./misc/logger";
 import {realpathSync} from "fs";
@@ -58,6 +58,8 @@ export const options: {
     callgraphRequire: boolean,
     callgraphExternal: boolean,
     diagnosticsJson: string | undefined,
+    matchesFile: string | undefined,
+    reachableFile: string | undefined,
     maxWaves: number | undefined,
     maxIndirections: number | undefined,
     fullIndirectionBounding: boolean,
@@ -133,6 +135,8 @@ export const options: {
     callgraphRequire: true,
     callgraphExternal: true,
     diagnosticsJson: undefined,
+    matchesFile: undefined,
+    reachableFile: undefined,
     maxWaves: undefined,
     maxIndirections: undefined,
     fullIndirectionBounding: false,
@@ -161,6 +165,23 @@ export const options: {
     interops: true,
     maxFileSize: undefined,
 };
+
+/**
+ * Commander argument parser that requires a positive integer. Use as the
+ * third argument to `.option(...)` declarations for flags whose value is
+ * compared as a number (e.g. --timeout, --max-waves, --max-indirections).
+ * Without this, commander returns the raw string and use sites rely on
+ * JavaScript coercion, which silently misbehaves on bad input.
+ */
+export function parsePositiveInt(raw: string): number {
+    const n = Number.parseInt(raw, 10);
+    // The round-trip check is the strict part: rejects "+5", "05", "5.0",
+    // and "5abc" even though parseInt would otherwise accept them.
+    if (!Number.isFinite(n) || n <= 0 || String(n) !== raw.trim()) {
+        throw new InvalidArgumentError("expected a positive integer");
+    }
+    return n;
+}
 
 export function setOptions(opts: OptionValues & Partial<typeof options>) {
     for (const opt of Object.getOwnPropertyNames(options)) {
