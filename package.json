@@ -1,6 +1,6 @@
 {
   "name": "@cs-au-dk/jelly",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "description": "Jelly - call graph and library usage analyzer for JavaScript",
   "author": "Anders Møller <amoeller@cs.au.dk>",
   "license": "BSD-3-Clause",
